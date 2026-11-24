@@ -47,13 +47,13 @@ func searchEnv(dir string, env func(string) (string, bool), globs ...string) []s
 				}
 				slashed = strings.TrimRight(filepath.ToSlash(home), "/") + slashed[1:]
 			}
-			if prefix := literalPrefix(slashed); prefix != "" {
-				if !filepath.IsAbs(prefix) {
-					prefix = filepath.Join(dir, prefix)
-				} else if !strings.HasPrefix(prefix, "//") {
-					prefix = filepath.FromSlash(prefix)
+			if p := literalPrefix(slashed); p != "" {
+				if !filepath.IsAbs(p) {
+					p = filepath.Join(dir, p)
+				} else if !strings.HasPrefix(p, "//") {
+					p = filepath.FromSlash(p)
 				}
-				out = append(out, prefix)
+				out = append(out, p)
 			}
 		}
 	}
@@ -75,12 +75,12 @@ func globToSlash(g string) string {
 	return string(b)
 }
 func expandGlobBraces(s string, limit int) ([]string, bool) {
-	if strings.Count(s, "{") > limit {
-		return nil, false
-	}
 	open := strings.IndexByte(s, '{')
 	if open < 0 {
 		return []string{s}, true
+	}
+	if strings.Count(s, "{") > limit {
+		return nil, false
 	}
 	closeIdx := strings.IndexByte(s[open+1:], '}')
 	if closeIdx < 0 {
@@ -91,9 +91,9 @@ func expandGlobBraces(s string, limit int) ([]string, bool) {
 	if strings.ContainsRune(body, '{') || len(parts) < 2 || len(parts) > limit {
 		return nil, false
 	}
-	prefix, suffix, out := s[:open], s[open+closeIdx+2:], []string(nil)
+	var out []string
 	for _, p := range parts {
-		sub, ok := expandGlobBraces(prefix+p+suffix, limit-len(out))
+		sub, ok := expandGlobBraces(s[:open]+p+s[open+closeIdx+2:], limit-len(out))
 		if !ok || len(out)+len(sub) > limit {
 			return nil, false
 		}
@@ -120,19 +120,16 @@ func searchedEnv(paths []string, cwd string, env func(string) (string, bool)) []
 }
 func searchedBy(paths []string, cwd string, env func(string) (string, bool), deadline time.Time) []string {
 	var sc *scan
-	var unknownDir string
-	out := make([]string, 0, len(paths))
-	add := func(p string) {
-		if !slices.Contains(out, p) {
-			out = append(out, p)
-		}
-	}
+	unknownDir, out := "", make([]string, 0, len(paths))
 	for _, p := range paths {
 		dir, alone := strings.CutPrefix(p, aloneMark)
 		if remote(dir, cwd) {
 			dir = unknownReach(dir)
 		}
-		if add(dir); alone || dir == "" || isUnknownReach(dir) || unknownDir != "" {
+		if !slices.Contains(out, dir) {
+			out = append(out, dir)
+		}
+		if alone || dir == "" || isUnknownReach(dir) || unknownDir != "" {
 			continue
 		}
 		if sc == nil {
@@ -149,7 +146,9 @@ func searchedBy(paths []string, cwd string, env func(string) (string, bool), dea
 	}
 	if sc != nil {
 		for _, p := range sc.out {
-			add(p)
+			if !slices.Contains(out, p) {
+				out = append(out, p)
+			}
 		}
 	}
 	if unknownDir != "" {

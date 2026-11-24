@@ -15,7 +15,7 @@ type wrapper struct {
 	sub                                string
 	values, chdir, split, shell, names []string
 	operands                           int
-	script, each                       bool
+	script, each, creates              bool
 }
 
 var (
@@ -29,7 +29,7 @@ var (
 		"time": {values: []string{"-f", "--format", "-o", "--output"}}, "caffeinate": {values: []string{"-t", "-w"}},
 		"xargs": {values: []string{"-I", "-n", "-L", "-P", "-s", "-E", "-d", "-a", "--replace", "--max-args", "--max-lines", "--max-procs", "--max-chars", "--eof", "--delimiter", "--arg-file"}},
 		"watch": {values: []string{"-n", "--interval"}, script: true}, "hyperfine": {script: true, each: true},
-		"flock":  {values: []string{"-w", "--timeout", "-E", "--conflict-exit-code"}, shell: []string{"-c", "--command"}, operands: 1},
+		"flock":  {values: []string{"-w", "--timeout", "-E", "--conflict-exit-code"}, shell: []string{"-c", "--command"}, operands: 1, creates: true},
 		"uv":     {sub: "run", values: []string{"--with", "--python", "-p", "--package", "--extra", "--group", "--env-file", "--index"}, chdir: []string{"--project", "--directory"}},
 		"poetry": {sub: "run"}, "pipenv": {sub: "run"}, "bundle": {sub: "exec"}, "pnpm": {sub: "exec", values: []string{"--filter", "-F"}},
 		"npm": {sub: "exec", values: []string{"--package", "-w", "--workspace"}, shell: []string{"-c", "--call"}}, "npx": {values: []string{"-p", "--package"}, shell: []string{"-c", "--call"}},
@@ -47,32 +47,32 @@ var (
 	grep          = reader{letters: "rR", words: []string{"--recursive", "--dereference-recursive", "--directories=recurse", "-d recurse"}}
 	shallow       = map[string]reader{
 		"ls": {letters: "R", words: []string{"--recursive"}}, "git": {sub: "grep"}, "grep": grep, "egrep": grep, "fgrep": grep, "zgrep": grep,
-		"cp":  {letters: "rRa", words: []string{"--recursive", "--archive"}},
-		"tar": {letters: "c", words: []string{"--create"}, bare: true}, "zip": {letters: "r", words: []string{"--recurse-paths"}},
-		"cd": {}, "pushd": {}, "popd": {}, "pwd": {}, "mkdir": {}, "rmdir": {}, "touch": {}, "mv": {}, "ln": {},
-		"stat": {}, "file": {}, "test": {}, "[": {}, "echo": {}, "printf": {}, "realpath": {}, "readlink": {},
-		"basename": {}, "dirname": {}, "which": {}, "command": {}, "true": {}, "false": {},
+		"cp": {letters: "rRa", words: []string{"--recursive", "--archive"}}, "tar": {letters: "c", words: []string{"--create"}, bare: true}, "zip": {letters: "r", words: []string{"--recurse-paths"}},
+		"cd": {}, "pushd": {}, "popd": {}, "pwd": {}, "mkdir": {}, "rmdir": {}, "touch": {}, "mv": {}, "ln": {}, "stat": {}, "file": {}, "test": {}, "[": {},
+		"echo": {}, "printf": {}, "realpath": {}, "readlink": {}, "basename": {}, "dirname": {}, "which": {}, "command": {}, "true": {}, "false": {},
 		"export": {}, "declare": {}, "typeset": {}, "local": {}, "readonly": {}, "unset": {},
 	}
-	depthOptions = map[string]string{"fd": "-d", "tree": "-L"}
 )
 
-func depthOption(name, opt string) bool {
-	return opt == "-maxdepth" || opt == "--max-depth" || depthOptions[name] == opt && opt != ""
-}
-func execAction(name, opt string) bool {
-	if name == "find" {
-		return opt == "-exec" || opt == "-execdir" || opt == "-ok" || opt == "-okdir"
+type (
+	script struct {
+		letters string
+		words   []string
+		shell   bool
 	}
-	return name == "fd" && (opt == "-x" || opt == "--exec" || opt == "-X" || opt == "--exec-batch" ||
-		strings.HasPrefix(opt, "--exec=") || strings.HasPrefix(opt, "--exec-batch="))
-}
-
-type script struct {
-	letters string
-	words   []string
-	shell   bool
-}
+	reader struct {
+		letters, sub string
+		words        []string
+		bare         bool
+	}
+	wrapped struct {
+		before, script, command []*syntax.Word
+		roles                   []role
+		attachedChdir           map[int]string
+		split                   *syntax.Word
+		each                    bool
+	}
+)
 
 func (s script) takes(opt string) bool {
 	return scriptFlag(opt, s.letters, s.shell) || slices.Contains(s.words, opt)
@@ -81,17 +81,9 @@ func scriptOf(name string) (script, bool) {
 	s, ok := scripts[strings.TrimRight(name, "0123456789.")]
 	return s, ok
 }
-
-type reader struct {
-	letters, sub string
-	words        []string
-	bare         bool
-}
-
 func (r reader) recursive(opt, next string, first bool) bool {
 	short := len(opt) > 1 && opt[0] == '-' && opt[1] != '-' || r.bare && first && opt != "" && opt[0] != '-'
-	return short && r.letters != "" && strings.ContainsAny(strings.TrimPrefix(opt, "-"), r.letters) ||
-		slices.Contains(r.words, opt) || slices.Contains(r.words, opt+" "+next)
+	return short && r.letters != "" && strings.ContainsAny(strings.TrimPrefix(opt, "-"), r.letters) || slices.Contains(r.words, opt) || slices.Contains(r.words, opt+" "+next)
 }
 
 // shellAt is the index among args of a shell given its script with -c past its options, or -1.
@@ -109,14 +101,6 @@ func shellAt(args []*syntax.Word) int {
 		}
 	}
 	return -1
-}
-
-type wrapped struct {
-	before, script, command []*syntax.Word
-	roles                   []role
-	attachedChdir           map[int]string
-	split                   *syntax.Word
-	each                    bool
 }
 
 func unwrap(args []*syntax.Word) wrapped {
@@ -141,13 +125,13 @@ func unwrap(args []*syntax.Word) wrapped {
 			case opt == "--":
 				n, roles = n+1, append(roles, program)
 				break options
-			case value && slices.Contains(w.split, opt):
+			case value && (slices.Contains(w.split, opt) || slices.Contains(w.shell, opt)):
 				u.before, u.roles = append(u.before, u.command[:n+1]...), append(append(u.roles, roles...), program)
-				u.split, u.command = u.command[n+1], u.command[n+2:]
-				return u
-			case value && slices.Contains(w.shell, opt):
-				u.before, u.roles = append(u.before, u.command[:n+1]...), append(append(u.roles, roles...), program)
-				u.script, u.command = u.command[n+1:n+2], nil
+				if slices.Contains(w.split, opt) {
+					u.split, u.command = u.command[n+1], u.command[n+2:]
+				} else {
+					u.script, u.command = u.command[n+1:n+2], nil
+				}
 				return u
 			case value && slices.Contains(w.chdir, opt):
 				n, roles = n+1, append(roles, program, target)
@@ -162,7 +146,11 @@ func unwrap(args []*syntax.Word) wrapped {
 			case strings.HasPrefix(lead, "-") && lead != "-", isAssignment(word):
 				roles = append(roles, program)
 			case operands < w.operands:
-				operands, roles = operands+1, append(roles, program)
+				r := program
+				if w.creates && (opt == "" || strings.Trim(opt, "0123456789") != "") {
+					r = plain
+				}
+				operands, roles = operands+1, append(roles, r)
 			default:
 				break options
 			}
@@ -205,10 +193,7 @@ func scriptFlag(opt, letters string, anywhere bool) bool {
 	if len(opt) < 2 || opt[0] != '-' || strings.ContainsFunc(opt[1:], func(r rune) bool { return (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') }) {
 		return false
 	}
-	if anywhere {
-		return strings.ContainsAny(opt[1:], letters)
-	}
-	return len(opt) <= 4 && strings.ContainsRune(letters, rune(opt[len(opt)-1]))
+	return anywhere && strings.ContainsAny(opt[1:], letters) || !anywhere && len(opt) <= 4 && strings.ContainsRune(letters, rune(opt[len(opt)-1]))
 }
 func folderValue(w *syntax.Word, dashCFolder bool) role {
 	if opt, _, eq := strings.Cut(leadingLit(w), "="); eq && slices.Contains(folderOptions, opt) || dashCFolder && strings.HasPrefix(opt, "-C") && w.Lit() != "-C" {
@@ -234,8 +219,13 @@ func (sc *scan) run(args []*syntax.Word) {
 	case "eval", "trap":
 		if name == "trap" {
 			args = args[:min(len(args), 1)]
+		} else if len(args) > 0 && args[0].Lit() == "--" {
+			args = args[1:]
 		}
-		sc.inline(args, true)
+		sc.inline(args, true, name == "trap")
+		return
+	case "unset":
+		sc.unset(args)
 		return
 	case "export", "declare", "typeset", "local", "readonly":
 		for _, w := range args {
@@ -270,21 +260,26 @@ func (sc *scan) run(args []*syntax.Word) {
 			after = args[j+1].Lit()
 		}
 		dashCFolder := slices.Contains(dashC, name) && (name != "git" || sub == "")
-		hasExec = hasExec || execAction(name, opt)
+		hasExec = hasExec || name == "find" && (opt == "-exec" || opt == "-execdir" || opt == "-ok" || opt == "-okdir") ||
+			name == "fd" && (opt == "-x" || opt == "--exec" || opt == "-X" || opt == "--exec-batch" || strings.HasPrefix(opt, "--exec=") || strings.HasPrefix(opt, "--exec-batch="))
 		switch {
 		case next && scripted && s.takes(opt):
 			j++
-			sc.inline(args[j:j+1], s.shell)
+			sc.inline(args[j:j+1], s.shell, true)
 		case next && (slices.Contains(folderOptions, opt) || opt == "-C" && dashCFolder):
 			j++
 			sc.arg(args[j], folder)
 			if (opt == "-C" || opt == "--directory") && name != "env" {
-				moved = sc.into(args[j]) || moved
+				if fields, err := sc.fields(args[j]); err != nil {
+					sc.unknown = true
+				} else if len(fields) == 1 && sc.intoPath(fields[0]) {
+					moved = true
+				}
 			}
 		case next && sub == "" && slices.Contains(valueOptions[name], opt):
 			j++
 			sc.arg(args[j], plain)
-		case next && depthOption(name, opt):
+		case next && (opt == "-maxdepth" || opt == "--max-depth" || name == "fd" && opt == "-d" || name == "tree" && opt == "-L"):
 			j++
 			if n, err := strconv.Atoi(after); err == nil {
 				levels = n
@@ -315,14 +310,6 @@ func (sc *scan) run(args []*syntax.Word) {
 		sc.below(d, levels)
 	}
 }
-func (sc *scan) into(w *syntax.Word) bool {
-	fields, err := sc.fields(w)
-	if err != nil {
-		sc.unknown = true
-		return false
-	}
-	return len(fields) == 1 && sc.intoPath(fields[0])
-}
 func (sc *scan) intoPath(val string) bool {
 	if p, ok := sc.path(val, sc.dir); ok && val != "" && sc.spend(1) && !sc.hasRemoteLink(p) {
 		if info, err := os.Stat(p); err == nil && info.IsDir() {
@@ -337,23 +324,43 @@ func runsShell(cmd syntax.Command) bool {
 	if !ok || len(ce.Args) == 0 {
 		return false
 	}
-	u := unwrap(ce.Args)
-	if len(u.command) == 0 {
-		return false
-	}
-	s, ok := scriptOf(programName(u.command[0]))
-	if !ok || !s.shell {
-		return false
-	}
-	for i, args := 0, u.command[1:]; i < len(args); i++ {
-		switch opt := args[i].Lit(); {
-		case opt == "-s":
+	if u := unwrap(ce.Args); len(u.command) > 0 {
+		if s, ok := scriptOf(programName(u.command[0])); ok && s.shell {
+			for i, args := 0, u.command[1:]; i < len(args); i++ {
+				switch opt := args[i].Lit(); {
+				case opt == "-s":
+					return true
+				case opt == "-o" || opt == "+o" || opt == "-O" || opt == "+O":
+					i++
+				case s.takes(opt), !strings.HasPrefix(opt, "-") && !strings.HasPrefix(opt, "+"):
+					return false
+				}
+			}
 			return true
-		case opt == "-o" || opt == "+o" || opt == "-O" || opt == "+O":
-			i++
-		case s.takes(opt), !strings.HasPrefix(opt, "-") && !strings.HasPrefix(opt, "+"):
-			return false
 		}
 	}
-	return true
+	return false
+}
+func (sc *scan) unset(args []*syntax.Word) {
+	opts, fn := true, false
+	for _, w := range args {
+		if lit := w.Lit(); opts && (lit == "--" || len(lit) > 1 && lit[0] == '-') {
+			opts, fn = lit != "--", fn || strings.ContainsRune(lit[1:], 'f')
+			continue
+		}
+		opts = false
+		if sc.substitutions(w); fn {
+			continue
+		}
+		fields, err := sc.fields(w)
+		if err != nil {
+			sc.unknown = true
+			return
+		}
+		for _, f := range fields {
+			if base, _, _ := strings.Cut(f, "["); isName(base) {
+				sc.setVar(base, nil)
+			}
+		}
+	}
 }

@@ -52,11 +52,12 @@ type scan struct {
 	places                                      map[string]bool
 	examined                                    map[candidate]cached
 	work
-	src      string
-	depth    int
-	pushed   []string
-	loopVars map[string]bool
-	feedBuf  *strings.Builder
+	src          string
+	depth        int
+	pushed       []string
+	loopVars     map[string]bool
+	feedBuf      *strings.Builder
+	dirUncertain bool
 }
 
 type work struct {

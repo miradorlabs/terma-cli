@@ -99,6 +99,16 @@ func TestShellPathsReadACdToASubstitution(t *testing.T) {
 		`x=$(cat p); cat "$x"`:                                            {UnknownReach},
 		`if true; then D=../acme-api; else D=side; fi; cat "$D"`:          {m.api, UnknownReach},
 		`builtin export CDPATH=..; cd acme-api && cat NOTES.md`:           {m.api},
+		`D=acme; false && D=side; cat "../$D-api/NOTES.md"`:               {UnknownReach},
+		`D=acme; true || D=side; cat "../$D-api/NOTES.md"`:                {UnknownReach},
+		`false && cd ..; cat acme-api/NOTES.md`:                           {m.parent, UnknownReach},
+		`eval 'cd ..'; cat acme-api/NOTES.md`:                             {m.parent, m.api},
+		`eval -- 'D=../acme-api'; cat "$D/NOTES.md"`:                      {m.api},
+		`D=.; unset D; cat ${D:-../acme-api}/NOTES.md`:                    {m.api},
+		`D=.; unset -v -- D; cat ${D:-../acme-api}/NOTES.md`:              {m.api},
+		`D=../acme-api; unset -f D; cat "$D/NOTES.md"`:                    {m.api},
+		`flock ../acme-api/new.lock true`:                                 {m.api},
+		`flock 200 true`:                                                  nil,
 	})
 }
 

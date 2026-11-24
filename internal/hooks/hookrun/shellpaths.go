@@ -11,20 +11,19 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
+const windowsShells = filepath.Separator == '\\'
+
 // ShellPaths returns the folders command may reach from cwd (and UnknownReach on static
 // ambiguity, budget/deadline overflow, or remote shares). It never executes commands.
 func ShellPaths(command, cwd string) []string { return shellPaths(command, cwd, os.LookupEnv) }
 func shellPaths(command, cwd string, env func(string) (string, bool)) []string {
 	return shellPathsBy(command, cwd, env, time.Now().Add(maxShellTime))
 }
-
-const windowsShells = filepath.Separator == '\\'
-
-func shellPathsBy(command, cwd string, env func(string) (string, bool), deadline time.Time) []string {
-	return readShell(command, shellReadings(command, windowsShells), cwd, env, deadline)
+func shellPathsBy(command, cwd string, env func(string) (string, bool), d time.Time) []string {
+	return readShell(command, shellReadings(command, windowsShells), cwd, env, d)
 }
-func readShell(command string, readings []string, cwd string, env func(string) (string, bool), deadline time.Time) []string {
-	return readShellWith(command, readings, cwd, env, work{deadline: deadline})
+func readShell(cmd string, r []string, cwd string, env func(string) (string, bool), d time.Time) []string {
+	return readShellWith(cmd, r, cwd, env, work{deadline: d})
 }
 func readShellWith(command string, readings []string, cwd string, env func(string) (string, bool), done work) []string {
 	var out []string
@@ -75,17 +74,18 @@ func scanShell(src, cwd string, env func(string) (string, bool), done work) (sc 
 }
 
 type branchState struct {
-	dir, prev string
-	pushed    []string
-	vars      map[string]*string
-	loopVars  map[string]bool
+	dir, prev    string
+	dirUncertain bool
+	pushed       []string
+	vars         map[string]*string
+	loopVars     map[string]bool
 }
 
 func (sc *scan) snapshot() branchState {
-	return branchState{sc.dir, sc.prev, slices.Clone(sc.pushed), maps.Clone(sc.vars), maps.Clone(sc.loopVars)}
+	return branchState{sc.dir, sc.prev, sc.dirUncertain, slices.Clone(sc.pushed), maps.Clone(sc.vars), maps.Clone(sc.loopVars)}
 }
 func (sc *scan) restore(s branchState) {
-	sc.dir, sc.prev, sc.pushed, sc.vars, sc.loopVars = s.dir, s.prev, slices.Clone(s.pushed), maps.Clone(s.vars), maps.Clone(s.loopVars)
+	sc.dir, sc.prev, sc.dirUncertain, sc.pushed, sc.vars, sc.loopVars = s.dir, s.prev, s.dirUncertain, slices.Clone(s.pushed), maps.Clone(s.vars), maps.Clone(s.loopVars)
 }
 func (sc *scan) setLoopVar(name string, on bool) {
 	if !on {
@@ -101,35 +101,28 @@ func (sc *scan) mergeBranches(states []branchState) {
 	if len(states) == 0 || sc.unknown {
 		return
 	}
-	first, merged := states[0], maps.Clone(states[0].vars)
+	first, merged, uncertain := states[0], maps.Clone(states[0].vars), states[0].dirUncertain
+	drop := func(k string) { merged[k] = nil; delete(sc.loopVars, k) }
 	for _, st := range states[1:] {
-		if st.dir != first.dir || st.prev != first.prev || !slices.Equal(st.pushed, first.pushed) {
-			sc.unknown = true
-			return
-		}
+		uncertain = uncertain || st.dirUncertain || st.dir != first.dir || st.prev != first.prev || !slices.Equal(st.pushed, first.pushed)
 		for k, v0 := range merged {
 			if v, ok := st.vars[k]; !ok || v0 == nil || v == nil || *v != *v0 {
-				merged[k] = nil
-				delete(sc.loopVars, k)
+				drop(k)
 			}
 		}
 		for k := range st.vars {
 			if _, ok := merged[k]; !ok {
-				merged[k] = nil
-				delete(sc.loopVars, k)
+				drop(k)
 			}
 		}
 	}
-	sc.dir, sc.prev, sc.pushed, sc.vars = first.dir, first.prev, slices.Clone(first.pushed), merged
+	sc.dir, sc.prev, sc.dirUncertain, sc.pushed, sc.vars = first.dir, first.prev, uncertain, slices.Clone(first.pushed), merged
 }
 func (sc *scan) ifClause(c *syntax.IfClause) {
 	ends, hasElse := []branchState(nil), false
 	for ; c != nil && !sc.unknown; c = c.Else {
-		if len(c.Cond) > 0 {
-			sc.stmts(c.Cond, false)
-		} else {
-			hasElse = true
-		}
+		sc.stmts(c.Cond, false)
+		hasElse = hasElse || len(c.Cond) == 0
 		before := sc.snapshot()
 		sc.stmts(c.Then, false)
 		ends = append(ends, sc.snapshot())
@@ -170,15 +163,13 @@ func (sc *scan) script(src string) {
 	outer, outerFeed := sc.src, sc.feedBuf
 	sc.src, sc.feedBuf, sc.depth = src, nil, sc.depth+1
 	defer func() { sc.src, sc.feedBuf, sc.depth = outer, outerFeed, sc.depth-1 }()
-	var stmts []*syntax.Stmt
-	var err error
+	stmts, err, end := []*syntax.Stmt(nil), error(nil), 0
 	for s, e := range syntax.NewParser(syntax.Variant(syntax.LangBash), syntax.KeepComments(true)).StmtsSeq(strings.NewReader(src)) {
 		if err = e; err != nil {
 			break
 		}
 		stmts = append(stmts, s)
 	}
-	end := 0
 	for _, s := range stmts {
 		syntax.Walk(s, func(n syntax.Node) bool {
 			if c, ok := n.(*syntax.Comment); ok && c.Hash.Offset() > 0 && strings.IndexByte(" \t\n;&|()<>", src[c.Hash.Offset()-1]) < 0 {
@@ -194,9 +185,6 @@ func (sc *scan) script(src string) {
 		sc.rest(src[min(end, len(src)):])
 	}
 }
-
-var moves = []string{"cd", "pushd", "popd"}
-
 func (sc *scan) rest(text string) {
 	if strings.Contains(strings.ReplaceAll(text, "$((", ""), "$(") || strings.ContainsAny(text, "`") ||
 		strings.Contains(text, "<(") || strings.Contains(text, ">(") || strings.Contains(text, "=(") {
@@ -211,7 +199,7 @@ func (sc *scan) rest(text string) {
 		if w = unquote.Replace(w); w == "" || seen[w] {
 			continue
 		}
-		if seen[w] = true; slices.Contains(moves, w) || !sc.spend(1) || !sc.charge(len(w)) {
+		if seen[w] = true; w == "cd" || w == "pushd" || w == "popd" || !sc.spend(1) || !sc.charge(len(w)) {
 			sc.unknown = true
 			return
 		}

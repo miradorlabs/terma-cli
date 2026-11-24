@@ -22,31 +22,38 @@ func (sc *scan) stmts(list []*syntax.Stmt, feeds bool) {
 
 // stmt reads one statement and its redirects; backgrounded commands and pipeline stages run in subshells.
 func (sc *scan) stmt(s *syntax.Stmt, feeds bool) {
+	if sc.dirUncertain {
+		sc.unknown = true
+		return
+	}
 	if s.Background {
 		defer sc.restore(sc.snapshot())
 	}
 	switch c := s.Cmd.(type) {
 	case *syntax.CallExpr:
-		sc.call(c)
-		if feeds {
+		if sc.call(c); feeds {
 			sc.feed(c, s.Redirs)
 		}
 	case *syntax.BinaryCmd:
 		if c.Op != syntax.Pipe && c.Op != syntax.PipeAll {
-			sc.stmt(c.X, feeds)
-			sc.stmt(c.Y, feeds)
-		} else {
-			if runsShell(c.Y.Cmd) {
-				var buf strings.Builder
-				prev := sc.feedBuf
-				sc.feedBuf = &buf
-				sc.subshell(func() { sc.stmt(c.X, true) })
-				sc.feedBuf = prev
-				if !sc.unknown && buf.Len() > 0 {
-					sc.subshell(func() { sc.script(buf.String()) })
+			parts := append(chain(c.X, c.Op), chain(c.Y, c.Op)...)
+			states := make([]branchState, 0, len(parts))
+			for _, p := range parts {
+				if sc.stmt(p, feeds); sc.unknown {
+					return
 				}
-			} else {
-				sc.subshell(func() { sc.stmt(c.X, false) })
+				states = append(states, sc.snapshot())
+			}
+			sc.mergeBranches(states)
+		} else {
+			var buf strings.Builder
+			run, prev := runsShell(c.Y.Cmd), sc.feedBuf
+			if run {
+				sc.feedBuf = &buf
+			}
+			sc.subshell(func() { sc.stmt(c.X, run) })
+			if sc.feedBuf = prev; run && !sc.unknown && buf.Len() > 0 {
+				sc.subshell(func() { sc.script(buf.String()) })
 			}
 			sc.subshell(func() { sc.stmt(c.Y, feeds) })
 		}
@@ -61,6 +68,7 @@ func (sc *scan) stmt(s *syntax.Stmt, feeds bool) {
 		before := sc.snapshot()
 		sc.stmts(c.Do, false)
 		sc.mergeBranches([]branchState{before, sc.snapshot()})
+		sc.unknown = sc.unknown || sc.dirUncertain
 	case *syntax.ForClause:
 		sc.loop(c)
 	case *syntax.CaseClause:
@@ -79,11 +87,11 @@ func (sc *scan) stmt(s *syntax.Stmt, feeds bool) {
 		sc.subshell(func() { sc.stmt(c.Stmt, false) })
 	case *syntax.TestClause:
 		syntax.Walk(c.X, func(n syntax.Node) bool {
-			if w, ok := n.(*syntax.Word); ok {
+			w, ok := n.(*syntax.Word)
+			if ok {
 				sc.arg(w, plain)
-				return false
 			}
-			return true
+			return !ok
 		})
 	default:
 		sc.substitutions(s.Cmd)
@@ -109,19 +117,18 @@ func (sc *scan) feed(ce *syntax.CallExpr, redirs []*syntax.Redirect) {
 		sc.unknown = true
 		return
 	}
-	switch words := u.command[1:]; programName(u.command[0]) {
+	words, sep, printf := u.command[1:], " ", false
+	switch programName(u.command[0]) {
 	case "echo":
 		for len(words) > 0 && strings.HasPrefix(words[0].Lit(), "-") {
 			words = words[1:]
 		}
-		sc.echoed(words, " ", false)
 	case "printf":
-		sc.echoed(words, "\n", true)
+		sep, printf = "\n", true
 	default:
 		sc.unknown = true
+		return
 	}
-}
-func (sc *scan) echoed(words []*syntax.Word, sep string, printf bool) {
 	var text []string
 	for i, w := range words {
 		fields, err := sc.fields(w)
@@ -169,13 +176,22 @@ func (sc *scan) call(ce *syntax.CallExpr) {
 	}
 	switch {
 	case u.split != nil:
-		sc.splitScript(u.split, u.command)
+		fields, err := sc.fields(u.split)
+		if err != nil {
+			sc.unknown = true
+			return
+		}
+		text := strings.Join(fields, " ")
+		if len(u.command) > 0 {
+			text += " " + sc.src[u.command[0].Pos().Offset():u.command[len(u.command)-1].End().Offset()]
+		}
+		sc.subshell(func() { sc.script(text) })
 	case u.each:
 		for i := range u.script {
-			sc.inline(u.script[i:i+1], true)
+			sc.inline(u.script[i:i+1], true, true)
 		}
 	case u.script != nil:
-		sc.inline(u.script, true)
+		sc.inline(u.script, true, true)
 	case len(u.command) > 0:
 		sc.run(u.command)
 	}
@@ -189,18 +205,6 @@ func (sc *scan) export(w *syntax.Word) {
 		_, v, _ := strings.Cut(strings.Join(fields, " "), "=")
 		sc.vars[name] = &v
 	}
-}
-func (sc *scan) splitScript(s *syntax.Word, rest []*syntax.Word) {
-	fields, err := sc.fields(s)
-	if err != nil {
-		sc.unknown = true
-		return
-	}
-	text := strings.Join(fields, " ")
-	if len(rest) > 0 {
-		text += " " + sc.src[rest[0].Pos().Offset():rest[len(rest)-1].End().Offset()]
-	}
-	sc.subshell(func() { sc.script(text) })
 }
 func (sc *scan) cd(args []*syntax.Word, push bool) {
 	for len(args) > 0 && len(args[0].Lit()) > 1 && args[0].Lit()[0] == '-' {
@@ -228,6 +232,8 @@ func (sc *scan) cd(args []*syntax.Word, push bool) {
 	default:
 		if home, ok := sc.lookup("HOME"); ok {
 			sc.candidate(home, target)
+		} else if _, set := sc.vars["HOME"]; set {
+			sc.unknown = true
 		}
 	}
 	if push && pushed {
@@ -236,7 +242,8 @@ func (sc *scan) cd(args []*syntax.Word, push bool) {
 }
 func (sc *scan) cdpath(w *syntax.Word) {
 	cdpath, ok := sc.lookup("CDPATH")
-	if !ok || cdpath == "" {
+	_, uncertain := sc.vars["CDPATH"]
+	if !ok && !uncertain || ok && cdpath == "" {
 		return
 	}
 	fields, err := sc.fields(w)
@@ -244,17 +251,20 @@ func (sc *scan) cdpath(w *syntax.Word) {
 		strings.HasPrefix(fields[0], "./") || strings.HasPrefix(fields[0], "../") {
 		return
 	}
-	for _, d := range filepath.SplitList(cdpath) {
-		if d != "" {
-			sc.candidate(filepath.Join(d, fields[0]), target)
+	if !ok {
+		sc.unknown = true
+	} else {
+		for _, d := range filepath.SplitList(cdpath) {
+			if d != "" {
+				sc.candidate(filepath.Join(d, fields[0]), target)
+			}
 		}
 	}
 }
 func (sc *scan) assign(a *syntax.Assign) {
 	if sc.substitutions(a.Index); a.Array != nil {
 		for _, elem := range a.Array.Elems {
-			sc.substitutions(elem.Index)
-			if elem.Value != nil {
+			if sc.substitutions(elem.Index); elem.Value != nil {
 				sc.arg(elem.Value, plain)
 			}
 		}
@@ -263,11 +273,10 @@ func (sc *scan) assign(a *syntax.Assign) {
 		}
 		return
 	}
-	if a.Value == nil {
-		return
-	}
-	if a.Name == nil || a.Naked {
-		sc.arg(a.Value, plain)
+	if a.Value == nil || a.Name == nil || a.Naked {
+		if a.Value != nil {
+			sc.arg(a.Value, plain)
+		}
 		return
 	}
 	sc.arg(a.Value, slashedOnly)
@@ -306,8 +315,7 @@ func (sc *scan) loop(fc *syntax.ForClause) {
 	defer func() { sc.setLoopVar(name, prevLoop) }()
 	for _, v := range values {
 		sc.vars[name] = v
-		sc.setLoopVar(name, v == nil)
-		if !sc.spend(len(fc.Do)) {
+		if sc.setLoopVar(name, v == nil); !sc.spend(len(fc.Do)) {
 			return
 		}
 		sc.stmts(fc.Do, false)
@@ -316,7 +324,16 @@ func (sc *scan) loop(fc *syntax.ForClause) {
 func (sc *scan) redirect(r *syntax.Redirect, shell bool) {
 	switch r.Op {
 	case syntax.Hdoc, syntax.DashHdoc:
-		sc.heredoc(r.Hdoc, shell)
+		if b := r.Hdoc; b != nil && len(b.Parts) > 0 {
+			text := sc.src[b.Parts[0].Pos().Offset():b.Parts[len(b.Parts)-1].End().Offset()]
+			if !shell && b.Lit() == "" {
+				sc.substitutions(b)
+				if expanded, err := sc.expandWord(b, expand.Document); err == nil {
+					text = expanded
+				}
+			}
+			sc.body(text, shell)
+		}
 	case syntax.WordHdoc:
 		sc.substitutions(r.Word)
 		if fields, err := sc.fields(r.Word); err == nil {
@@ -328,35 +345,19 @@ func (sc *scan) redirect(r *syntax.Redirect, shell bool) {
 		sc.arg(r.Word, plain)
 		sc.unknown = sc.unknown || shell
 	case syntax.DplIn, syntax.DplOut:
-		if l := r.Word.Lit(); l == "-" || strings.Trim(l, "0123456789") == "" {
-			return
+		if l := r.Word.Lit(); l != "-" && strings.Trim(l, "0123456789") != "" {
+			sc.arg(r.Word, creates)
 		}
-		sc.arg(r.Word, creates)
 	default:
 		sc.arg(r.Word, creates)
 	}
 }
-func (sc *scan) heredoc(body *syntax.Word, shell bool) {
-	if body == nil || len(body.Parts) == 0 {
-		return
-	}
-	text := sc.src[body.Parts[0].Pos().Offset():body.Parts[len(body.Parts)-1].End().Offset()]
-	if !shell && body.Lit() == "" {
-		sc.substitutions(body)
-		if expanded, err := sc.expandWord(body, expand.Document); err == nil {
-			text = expanded
-		}
-	}
-	sc.body(text, shell)
-}
 func (sc *scan) body(text string, shell bool) {
 	if !shell {
 		sc.fragments(text, data)
-	} else if sc.feedBuf != nil {
-		if sc.charge(len(text) + 1) {
-			sc.feedBuf.WriteString(text + "\n")
-		}
-	} else {
+	} else if sc.feedBuf != nil && sc.charge(len(text)+1) {
+		sc.feedBuf.WriteString(text + "\n")
+	} else if sc.feedBuf == nil {
 		sc.subshell(func() { sc.script(text) })
 	}
 }
@@ -369,7 +370,7 @@ func (sc *scan) fragments(text string, r role) {
 	}
 }
 func (sc *scan) withoutFeed(f func()) { prev := sc.feedBuf; sc.feedBuf = nil; f(); sc.feedBuf = prev }
-func (sc *scan) inline(words []*syntax.Word, shell bool) {
+func (sc *scan) inline(words []*syntax.Word, shell, isolate bool) {
 	sc.withoutFeed(func() {
 		var script []string
 		for _, w := range words {
@@ -381,12 +382,23 @@ func (sc *scan) inline(words []*syntax.Word, shell bool) {
 			}
 			script = append(script, fields...)
 		}
-		if shell {
-			sc.subshell(func() { sc.script(strings.Join(script, " ")) })
+		text := strings.Join(script, " ")
+		if !shell {
+			sc.fragments(text, slashedOnly)
+		} else if isolate {
+			sc.subshell(func() { sc.script(text) })
 		} else {
-			sc.fragments(strings.Join(script, " "), slashedOnly)
+			sc.script(text)
 		}
 	})
+}
+func chain(s *syntax.Stmt, op syntax.BinCmdOperator) []*syntax.Stmt {
+	if len(s.Redirs) == 0 && !s.Background && !s.Negated {
+		if b, ok := s.Cmd.(*syntax.BinaryCmd); ok && b.Op == op {
+			return append(chain(b.X, op), chain(b.Y, op)...)
+		}
+	}
+	return []*syntax.Stmt{s}
 }
 func (sc *scan) substitutions(node syntax.Node) {
 	if node == nil {
@@ -394,15 +406,15 @@ func (sc *scan) substitutions(node syntax.Node) {
 	}
 	sc.withoutFeed(func() {
 		syntax.Walk(node, func(n syntax.Node) bool {
-			if c, ok := n.(*syntax.CmdSubst); ok {
-				sc.subshell(func() { sc.stmts(c.Stmts, false) })
-				return false
+			switch x := n.(type) {
+			case *syntax.CmdSubst:
+				sc.subshell(func() { sc.stmts(x.Stmts, false) })
+			case *syntax.ProcSubst:
+				sc.subshell(func() { sc.stmts(x.Stmts, false) })
+			default:
+				return true
 			}
-			if p, ok := n.(*syntax.ProcSubst); ok {
-				sc.subshell(func() { sc.stmts(p.Stmts, false) })
-				return false
-			}
-			return true
+			return false
 		})
 	})
 }

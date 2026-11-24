@@ -59,12 +59,11 @@ func (sc *scan) pieces(f string, r role) {
 		return
 	}
 	if strings.ContainsFunc(f, unicode.IsSpace) {
-		sc.fragments(f, data)
+		r = data
 	} else if r == plain {
-		sc.fragments(f, part)
-	} else {
-		sc.fragments(f, slashedOnly)
+		r = part
 	}
+	sc.fragments(f, r)
 }
 func (sc *scan) glob(pat string, r role) bool {
 	if pat == "~" || strings.HasPrefix(pat, "~/") {
@@ -149,11 +148,7 @@ func (sc *scan) recordCached(res cached, r role) {
 func (sc *scan) globstar(dirs, segs []string, r role) bool {
 	found, prefix := false, literalPrefix(strings.Join(segs, "/"))
 	for _, dir := range dirs {
-		p := filepath.Join(dir, prefix)
-		if !sc.spend(1) {
-			break
-		}
-		if !sc.hasRemoteLink(p) {
+		if p := filepath.Join(dir, prefix); sc.spend(1) && !sc.hasRemoteLink(p) {
 			if info, err := os.Stat(p); err == nil && info.IsDir() {
 				found = true
 				sc.place(p)
@@ -205,11 +200,8 @@ func mayGlob(w *syntax.Word) bool {
 		return false
 	})
 }
-
-const fragmentSeparators = "'\"`()[]{}<>,;:@="
-
 func isFragmentSeparator(r rune) bool {
-	return unicode.IsSpace(r) || strings.ContainsRune(fragmentSeparators, r)
+	return unicode.IsSpace(r) || strings.ContainsRune("'\"`()[]{}<>,;:@=", r)
 }
 func fragments(text string) iter.Seq[string] {
 	return func(yield func(string) bool) {
