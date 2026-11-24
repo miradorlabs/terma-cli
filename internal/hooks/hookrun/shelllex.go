@@ -11,8 +11,7 @@ import (
 )
 
 var secretOptions, secretNames, compounds = []string{"-c", "-e", "--eval", "-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-ascii", "--data-raw", "--data-binary", "--data-urlencode", "--url-query", "--json", "--oauth2-bearer", "-E", "--cert", "--proxy-cert", "--post-data", "--body-data", "--post-file", "--body-file", "-F", "--form", "--form-string"}, []string{"pass", "token", "secret", "key", "auth"}, []string{"if", "for", "while", "until", "case", "select"}
-var userinfo = regexp.MustCompile(`(://)[^/\s]+@|[^/\s:@]*:[^/\s@]+@`)
-var shellMeta = [256]bool{' ': true, '\t': true, '\n': true, '\\': true, '$': true, '`': true, '"': true, '\'': true, '(': true, ')': true, '[': true, ']': true, '{': true, '}': true, '|': true, '&': true, '<': true, '>': true, ';': true}
+var userinfo, shellMeta = regexp.MustCompile(`(://)[^/\s]+@|[^/\s:@]*:[^/\s@]+@`), [256]bool{' ': true, '\t': true, '\n': true, '\\': true, '$': true, '`': true, '"': true, '\'': true, '(': true, ')': true, '[': true, ']': true, '{': true, '}': true, '|': true, '&': true, '<': true, '>': true, ';': true}
 
 const maxShellNesting, maxShellExpr, separators = 256, 4096, " \t\n;&|()<>"
 
@@ -24,7 +23,7 @@ func maskWords(command string, depth int) string {
 	}
 	words, bare := shellFields(command[:n], 5)
 	more, words, bare = more || len(words) > 4, words[:min(len(words), 4)], bare[:min(len(bare), 4)]
-	secret, redir, heredoc, hasRedis, hasSubst := false, 0, false, false, false
+	secret, redir, heredoc, hasRedis, hasSubst := 0, 0, false, false, false
 	for i, b := range bare {
 		hasRedis, hasSubst = hasRedis || strings.HasSuffix(b, "redis-cli"), strings.ContainsAny(b, "`$") || strings.ContainsRune(b, '{') && (strings.ContainsRune(b, ',') || strings.Contains(b, ".."))
 		if heredoc {
@@ -45,7 +44,7 @@ func maskWords(command string, depth int) string {
 		} else {
 			masked, short := userinfo.ReplaceAllString(b, "${1}…@"), len(b) > 2 && b[0] == '-' && b[1] != '-'
 			name, _, eq := strings.Cut(masked, "=")
-			if secret || hasSubst || depth >= 2 && strings.ContainsAny(b, " \t\n") {
+			if secret > 0 || hasSubst || depth >= 2 && strings.ContainsAny(b, " \t\n") {
 				words[i] = "…"
 			} else if short {
 				words[i] = b[:2] + "…"
@@ -58,7 +57,8 @@ func maskWords(command string, depth int) string {
 				words[i] = masked
 			}
 			lower := strings.ToLower(b)
-			secret = hasSubst || slices.Contains(secretOptions, b) || len(b) >= 4 && strings.HasPrefix(b, "--") && slices.ContainsFunc(secretOptions, func(o string) bool { return strings.HasPrefix(o, b) }) || b == "eval" || b == "-a" && hasRedis || short && (strings.ContainsRune(b[1:], 'c') || slices.Contains(secretOptions, "-"+b[len(b)-1:]) || b[len(b)-1] == 'a' && hasRedis) || strings.HasPrefix(b, "-") && slices.ContainsFunc(secretNames, func(n string) bool { return strings.Contains(lower, n) })
+			one := hasSubst || slices.Contains(secretOptions, b) || len(b) >= 4 && strings.HasPrefix(b, "--") && slices.ContainsFunc(secretOptions, func(o string) bool { return strings.HasPrefix(o, b) }) || b == "eval" || b == "-a" && hasRedis || short && (strings.ContainsRune(b[1:], 'c') || slices.Contains(secretOptions, "-"+b[len(b)-1:]) || b[len(b)-1] == 'a' && hasRedis) || strings.HasPrefix(b, "-") && slices.ContainsFunc(secretNames, func(n string) bool { return strings.Contains(lower, n) })
+			secret = max(secret-1, pick(hasRedis && lower == "auth", 2, pick(one, 1, 0)))
 		}
 	}
 	r := []rune(strings.Map(func(r rune) rune { return pick(r < 0x20 || r == 0x7f, ' ', r) }, strings.Join(words, " ")))
@@ -167,9 +167,7 @@ func parsable(src string) bool {
 	}
 	open, docs, bodies, body, expr, exprDepth, letUntil, links, words, dollars := []byte{0}, []heredoc(nil), []heredoc(nil), 0, -1, 0, -1, 0, 0, 0
 	push := func(c byte, n, i int, isExpr bool) {
-		if isExpr && expr < 0 {
-			expr, exprDepth = i, len(open)
-		}
+		expr, exprDepth = pick(isExpr && expr < 0, i, expr), pick(isExpr && expr < 0, len(open), exprDepth)
 		k := strings.IndexByte("({[", c)
 		open = append(open, slices.Repeat([]byte{pick(k >= 0, ")}]"[max(k, 0)], c)}, n)...)
 	}
@@ -177,8 +175,7 @@ func parsable(src string) bool {
 	for i := 0; i < len(src); i++ {
 		c, top := src[i], open[len(open)-1]
 		if top == 0 && (c == ' ' || c == '\t' || c == '\n' && len(bodies) == 0 && len(docs) == 0) {
-			for letUntil = pick(c == '\n', -1, letUntil); i+1 < len(src) && (src[i+1] == ' ' || src[i+1] == '\t' || src[i+1] == '\n' && len(bodies) == 0 && len(docs) == 0); i++ {
-				letUntil = pick(src[i+1] == '\n', -1, letUntil)
+			for letUntil = pick(c == '\n', -1, letUntil); i+1 < len(src) && (src[i+1] == ' ' || src[i+1] == '\t' || src[i+1] == '\n' && len(bodies) == 0 && len(docs) == 0); i, letUntil = i+1, pick(src[i+1] == '\n', -1, letUntil) {
 			}
 			continue
 		}
@@ -220,8 +217,7 @@ func parsable(src string) bool {
 			j := strings.IndexAny(src[i+1:], pick(top == 'h', "\n\\$`", "\\$`\""))
 			i = pick(j >= 0, i+j, len(src)-1)
 		case c == '\'':
-			for i++; i < len(src) && src[i] != '\''; i++ {
-				i += pick(src[i] == '\\' && prev == '$', 1, 0) // $'\''
+			for i++; i < len(src) && src[i] != '\''; i += 1 + pick(src[i] == '\\' && prev == '$', 1, 0) {
 			}
 		case c == '#' && strings.IndexByte(" \t\n;&|()", prev) >= 0:
 			words, i = words+1, lineEnd(src, i)-1
@@ -278,9 +274,8 @@ func skipCont(src string, i int) int {
 func heredocDelimiter(src string, i int) (heredoc, int) {
 	i = skipCont(src, i)
 	stripTabs, quoted := i < len(src) && src[i] == '-', false
-	i = len(src) - len(strings.TrimLeft(src[i+pick(stripTabs, 1, 0):], " \t"))
 	var d strings.Builder
-	for quote := byte(0); i < len(src); i++ {
+	for quote, i := byte(0), len(src)-len(strings.TrimLeft(src[i+pick(stripTabs, 1, 0):], " \t")); i < len(src); i++ {
 		switch c := src[i]; {
 		case quote != '\'' && skipCont(src, i) > i:
 			i = skipCont(src, i) - 1
@@ -299,7 +294,7 @@ func heredocDelimiter(src string, i int) (heredoc, int) {
 			d.WriteByte(c)
 		}
 	}
-	return heredoc{d.String(), quoted, stripTabs}, i - 1
+	return heredoc{d.String(), quoted, stripTabs}, len(src) - 1
 }
 func lineEnd(src string, i int) int {
 	j := strings.IndexByte(src[i:], '\n')

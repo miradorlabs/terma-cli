@@ -35,7 +35,7 @@ func (sc *scan) candidatePath(t string, r role, fallback bool) {
 	if t == "" || !slashed && r.needsSlash() || sc.away(t, r) {
 		return
 	} else if len(t) > maxPathBytes || !filepath.IsAbs(t) && len(t)+max(len(sc.dir), len(sc.cwd))+1 > maxPathBytes || !slashed && (filepath.Separator != '\\' && len(t) > 255 || filepath.Separator == '\\' && len(utf16.Encode([]rune(t))) > 255) {
-		sc.unknown = sc.unknown || r.mustResolve(slashed)
+		sc.unknown = sc.unknown || r == target || r == physTarget || r == folder || slashed && r != program && r != data && r != part
 		return
 	}
 	if t == "~" || strings.HasPrefix(t, "~/") {
@@ -52,7 +52,7 @@ func (sc *scan) candidatePath(t string, r role, fallback bool) {
 				if res.named = res.named || info != nil; info != nil && info.IsDir() {
 					res.dir, res.folders = pick(i == 0, p, res.dir), append(res.folders, p)
 				}
-			} else if r.mayCreate(slashed) && !res.named {
+			} else if (r == creates || slashed && (r == plain || r == folder || r == slashedOnly)) && !res.named {
 				if p, ok := sc.path(t, d); ok {
 					if rPath, parent, _, found := sc.walkPath(p, true); !found && !sc.unknown && parent != "" && (!fallback || filepath.Dir(rPath) == parent && strings.ContainsAny(strings.TrimRight(t, `/\`), `/\`)) {
 						sc.place(parent)
@@ -112,7 +112,8 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 		if err != nil && !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, fs.ErrInvalid) {
 			return "", "", nil, nil, !sc.fail()
 		} else if err != nil {
-			dot := slices.Contains(parts, "..") || slices.Contains(parts, ".")
+			dot, missing := slices.Contains(parts, "..") || slices.Contains(parts, "."), filepath.Join(curPath, part)
+			sc.unknown = sc.unknown || dot && sc.created[pick(filepath.Separator == '\\', strings.ToLower(missing), missing)]
 			return pick(dot, "", filepath.Join(append([]string{curPath, part}, parts...)...)), pick(dot, "", curPath), nil, nil, false
 		}
 		if fi.Mode()&fs.ModeSymlink != 0 {
@@ -126,12 +127,12 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 			tVol := filepath.VolumeName(target)
 			if filepath.IsAbs(target) || os.IsPathSeparator(target[0]) {
 				newVol := cmp.Or(tVol, filepath.VolumeName(curPath), filepath.VolumeName(sc.cwd)) + string(filepath.Separator)
-				if nr, err := openRootDir(newVol); err != nil {
+				nr, err := openRootDir(newVol)
+				if err != nil {
 					return "", "", nil, nil, !sc.fail()
-				} else {
-					closeAll()
-					stack, paths = []dirHandle{nr}, []string{newVol}
 				}
+				closeAll()
+				stack, paths = []dirHandle{nr}, []string{newVol}
 			}
 			parts = append(strings.FieldsFunc(target[len(tVol):], isSep), parts...)
 			continue
@@ -178,15 +179,13 @@ func (sc *scan) resolveJoined(base, raw string, logical bool) (string, bool) {
 	} else if !filepath.IsAbs(raw) && base != "" {
 		raw = strings.TrimRight(base, string(filepath.Separator)) + string(filepath.Separator) + raw
 	}
-	if len(raw) > maxPathBytes {
-		return "", !sc.fail()
+	if len(raw) > maxPathBytes && sc.fail() || logical && !filepath.IsAbs(raw) {
+		return "", false
 	} else if !logical && !slices.ContainsFunc(strings.FieldsFunc(raw, isSep), func(s string) bool { return s == "." || s == ".." }) {
 		return filepath.Clean(raw), true
 	} else if !logical {
 		res, _, _, found := sc.walkPath(raw, false)
 		return res, found || !sc.unknown && res != ""
-	} else if !filepath.IsAbs(raw) {
-		return "", false
 	}
 	vol, sep, out := cmp.Or(filepath.VolumeName(raw), share(raw)), string(filepath.Separator), []string(nil)
 	parts := strings.FieldsFunc(raw[len(vol):], isSep)
@@ -198,6 +197,7 @@ func (sc *scan) resolveJoined(base, raw string, logical bool) (string, bool) {
 			out = append(out, part)
 		} else if cur := vol + sep + strings.Join(out, sep); part == ".." && cur != "" {
 			if t, _, info, found := sc.walkPath(cur, true); !found || !info.IsDir() {
+				sc.unknown = sc.unknown || sc.created[pick(filepath.Separator == '\\', strings.ToLower(t), t)]
 				return "", false
 			} else if _, _, li, ok := sc.walkPath(cur, false); ok && li.Mode()&fs.ModeSymlink != 0 {
 				sc.place(t)
@@ -212,6 +212,7 @@ func (sc *scan) reachRole(w, dir string, r role) (res string, _ os.FileInfo) {
 	if p, ok := sc.resolvePath(w, dir, r == target); !ok {
 		return "", nil
 	} else if r0, parent, info, found := sc.walkPath(p, false); !found {
+		sc.unknown = sc.unknown || (r == target || r == physTarget) && sc.created[pick(filepath.Separator == '\\', strings.ToLower(r0), r0)]
 		return "", nil
 	} else if res = r0; info.IsDir() {
 		sc.place(res)
@@ -228,24 +229,23 @@ func (sc *scan) reachRole(w, dir string, r role) (res string, _ os.FileInfo) {
 }
 func (sc *scan) away(w string, r role) bool {
 	rem := remote(w, sc.cwd)
-	sc.unknown = sc.unknown || rem && (share(w) != "" || len(w) > 2 && !strings.ContainsAny(w, " \t\n") && strings.TrimLeft(w, `/\`) != "") && r.mustResolve(true)
+	sc.unknown = sc.unknown || rem && (share(w) != "" || len(w) > 2 && !strings.ContainsAny(w, " \t\n") && strings.TrimLeft(w, `/\`) != "") && r != program && r != data && r != part
 	return rem
 }
 func (sc *scan) path(w, dir string) (string, bool) { return sc.resolvePath(w, dir, false) }
 func (sc *scan) resolvePath(w, dir string, logical bool) (string, bool) {
 	if w == "~" || strings.HasPrefix(w, "~/") {
-		if home, ok := sc.homeDir(); !ok || home == "" || remote(home, sc.cwd) {
+		home, ok := sc.homeDir()
+		if !ok || home == "" || remote(home, sc.cwd) {
 			sc.unknown = sc.unknown || remote(home, sc.cwd) || sc.isUnresolvedVar("HOME")
 			return "", false
-		} else {
-			return sc.resolveJoined(home, strings.TrimLeft(w[1:], "/"), logical)
 		}
+		return sc.resolveJoined(home, strings.TrimLeft(w[1:], "/"), logical)
 	} else if remote(w, sc.cwd) || !filepath.IsAbs(w) && dir == "" {
 		return "", false
 	}
 	return sc.resolveJoined(dir, w, logical)
 }
-
 func urlPath(w string) (string, bool, bool) {
 	scheme, rest, ok := strings.Cut(w, "://")
 	if !ok && len(w) > 5 && strings.EqualFold(w[:5], "file:") && w[5] == '/' {
@@ -257,11 +257,11 @@ func urlPath(w string) (string, bool, bool) {
 	rest, _, _ = strings.Cut(rest, "?")
 	rest, _, _ = strings.Cut(rest, "#")
 	rest = pick(len(rest) > 9 && strings.EqualFold(rest[:9], "localhost") && rest[9] == '/', rest[min(len(rest), 9):], rest)
-	if u, err := url.PathUnescape(rest); err != nil || strings.ContainsRune(u, 0) {
+	u, err := url.PathUnescape(rest)
+	if err != nil || strings.ContainsRune(u, 0) {
 		return "", true, true
-	} else {
-		return pick(filepath.Separator == '\\' && len(u) > 2 && u[0] == '/' && u[2] == ':', u[min(len(u), 1):], pick(strings.HasPrefix(u, "/"), u, "//"+u)), true, false
 	}
+	return pick(filepath.Separator == '\\' && len(u) > 2 && u[0] == '/' && u[2] == ':', u[min(len(u), 1):], pick(strings.HasPrefix(u, "/"), u, "//"+u)), true, false
 }
 
 // remote reports whether p starts with two separators (UNC/device path) outside cwd's share.

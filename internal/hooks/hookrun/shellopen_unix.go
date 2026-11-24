@@ -21,11 +21,11 @@ func (d dirHandle) openSubDir(n string, w fs.FileInfo) (dirHandle, error) {
 	return openAt(int(d), n, unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_NONBLOCK, w)
 }
 func (d dirHandle) open(name string, dir bool, want fs.FileInfo) (*os.File, error) {
-	if fd, err := openAt(int(d), name, unix.O_NOFOLLOW|unix.O_NONBLOCK|pick(dir, unix.O_DIRECTORY, 0), want); err != nil {
+	fd, err := openAt(int(d), name, unix.O_NOFOLLOW|unix.O_NONBLOCK|pick(dir, unix.O_DIRECTORY, 0), want)
+	if err != nil {
 		return nil, err
-	} else {
-		return os.NewFile(uintptr(fd), name), nil
 	}
+	return os.NewFile(uintptr(fd), name), nil
 }
 func (d dirHandle) lstat(name string) (fs.FileInfo, error) {
 	var st unix.Stat_t
@@ -55,19 +55,25 @@ func openAt(dirfd int, name string, flags int, want fs.FileInfo) (dirHandle, err
 		return dirHandle(fd), nil
 	}
 }
-func sameDevice(a, b fs.FileInfo) bool {
+
+var effectiveUID, modeBits = os.Geteuid, map[uint32]fs.FileMode{unix.S_IFDIR: fs.ModeDir, unix.S_IFLNK: fs.ModeSymlink, unix.S_IFIFO: fs.ModeNamedPipe, unix.S_IFREG: 0}
+
+func statIDs(a fs.FileInfo) (uint64, uint32, bool) {
 	if sa, ok := a.Sys().(*unix.Stat_t); ok {
-		sb, ok := b.Sys().(*unix.Stat_t)
-		return ok && sa.Dev == sb.Dev
+		return uint64(sa.Dev), sa.Uid, true
+	} else if sa, ok := a.Sys().(*syscall.Stat_t); ok {
+		return uint64(sa.Dev), sa.Uid, true
 	}
-	sa, ok1 := a.Sys().(*syscall.Stat_t)
-	sb, ok2 := b.Sys().(*syscall.Stat_t)
-	return ok1 && ok2 && sa.Dev == sb.Dev
+	return 0, 0, false
 }
+func sameDevice(a, b fs.FileInfo) bool {
+	d1, _, ok1 := statIDs(a)
+	d2, _, ok2 := statIDs(b)
+	return ok1 && ok2 && d1 == d2
+}
+func sameOwner(a fs.FileInfo) bool { _, u, ok := statIDs(a); return ok && u == uint32(effectiveUID()) }
 
 type statInfo struct{ st unix.Stat_t }
-
-var modeBits = map[uint32]fs.FileMode{unix.S_IFDIR: fs.ModeDir, unix.S_IFLNK: fs.ModeSymlink, unix.S_IFIFO: fs.ModeNamedPipe, unix.S_IFREG: 0}
 
 func (s *statInfo) Name() string       { return "" }
 func (s *statInfo) Size() int64        { return s.st.Size }

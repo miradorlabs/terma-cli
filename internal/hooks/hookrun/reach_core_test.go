@@ -112,14 +112,14 @@ func TestCandidateCacheHitReplaysFolderOperands(t *testing.T) {
 	sc := newScan(side, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
 
 	// First command (e.g. `ls ..`): cache miss populates sc.examined.
-	sc.reads = &operands{}
+	sc.reads = &cached{}
 	sc.candidate("..", plain)
 	if !sc.reads.named || !slices.Contains(sc.reads.folders, parent) {
 		t.Fatalf("first command reads = %+v, want parent %q", sc.reads, parent)
 	}
 
 	// Second command (e.g. `rg -n TODO ..`): cache hit MUST still record parent in sc.reads.
-	sc.reads = &operands{}
+	sc.reads = &cached{}
 	sc.candidate("..", plain)
 	if !sc.reads.named || !slices.Contains(sc.reads.folders, parent) {
 		t.Fatalf("second command reads (cache hit) = %+v, want parent %q", sc.reads, parent)
@@ -2708,5 +2708,96 @@ func TestReachCoreReviewRegressions(t *testing.T) {
 	}), work{deadline: time.Now().Add(time.Minute)})
 	if scNoSys.hasWorktreeConfig(filepath.Join(repo, ".git")) {
 		t.Errorf("hasWorktreeConfig with GIT_CONFIG_NOSYSTEM=1 = true, want false")
+	}
+
+	// 4. Missing utilities on an explicit PATH fail closed across all platforms (including Windows).
+	emptyBin := filepath.Join(parent, "emptybin")
+	if err := os.MkdirAll(emptyBin, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	scMissing := newScan(repo, makeEnv(map[string]string{
+		"PATH": emptyBin, "HOME": parent, "USERPROFILE": parent, "TMPDIR": parent, "TMP": parent,
+	}), work{deadline: time.Now().Add(time.Minute)})
+	for _, cmd := range []string{"dirname /a/b", "basename /a/b", "realpath .", "readlink -f .", "mktemp -d", "git rev-parse --show-toplevel", "go env GOPATH"} {
+		if got, err := evalSubst(scMissing, cmd); err == nil {
+			t.Errorf("empty PATH substitute(%q) = %q, want error", cmd, got)
+		}
+	}
+
+	// 5. Invented mktemp paths fail closed on traversal via ../. or cd, while direct children place the parent dir.
+	scMk := newScan(repo, makeEnv(map[string]string{
+		"HOME": parent, "USERPROFILE": parent, "TMPDIR": parent, "TMP": parent,
+	}), work{deadline: time.Now().Add(time.Minute)})
+	mkPath, err := evalSubst(scMk, "mktemp -d")
+	if err != nil {
+		t.Fatalf("mktemp -d failed: %v", err)
+	}
+	scMk.candidate(filepath.Join(mkPath, "child.txt"), plain)
+	if scMk.unknown || !scMk.places[parent] {
+		t.Errorf("mktemp direct child: unknown=%v places=%v, want unknown=false and %q placed", scMk.unknown, scMk.places, parent)
+	}
+	for _, tc := range []struct {
+		name string
+		arg  string
+		r    role
+	}{
+		{"dotdot", mkPath + "/../repo/file", plain},
+		{"nested dotdot", mkPath + "/sub/../../repo/file", plain},
+		{"logical cd dotdot", mkPath + "/../repo", target},
+		{"cd into mktemp", mkPath, target},
+	} {
+		scCase := newScan(repo, makeEnv(map[string]string{
+			"HOME": parent, "USERPROFILE": parent, "TMPDIR": parent, "TMP": parent,
+		}), work{deadline: time.Now().Add(time.Minute)})
+		if _, err := evalSubst(scCase, "mktemp -d"); err != nil {
+			t.Fatalf("mktemp -d (%s): %v", tc.name, err)
+		}
+		scCase.candidate(tc.arg, tc.r)
+		if !scCase.unknown {
+			t.Errorf("mktemp %s (%q): unknown=false, want true", tc.name, tc.arg)
+		}
+	}
+
+	// 6. Imported Bash functions (BASH_FUNC_<name>%% and BASH_FUNC_<name>()) fail closed, including for builtin pwd.
+	for _, tc := range []struct {
+		envKey string
+		cmd    string
+	}{
+		{"BASH_FUNC_git%%", "git rev-parse --show-toplevel"},
+		{"BASH_FUNC_git()", "git rev-parse --show-toplevel"},
+		{"BASH_FUNC_pwd%%", "pwd"},
+		{"BASH_FUNC_pwd()", "pwd -P"},
+		{"BASH_FUNC_dirname%%", "dirname /a/b"},
+	} {
+		scFn := newScan(repo, makeEnv(map[string]string{
+			"HOME": parent, "USERPROFILE": parent, tc.envKey: "() { echo /other/repo; }",
+		}), work{deadline: time.Now().Add(time.Minute)})
+		if got, err := evalSubst(scFn, tc.cmd); err == nil {
+			t.Errorf("%s substitute(%q) = %q, want error", tc.envKey, tc.cmd, got)
+		}
+	}
+
+	// 7. Positional Redis AUTH passwords (1-arg and 2-arg forms, any case) are masked in firstWords.
+	for _, tc := range []struct {
+		cmd    string
+		secret string
+	}{
+		{"redis-cli AUTH SUPERSECRET $(opaque)", "SUPERSECRET"},
+		{"redis-cli auth alice SUPERSECRET $(opaque)", "SUPERSECRET"},
+		{"redis-cli auth alice SUPERSECRET $(opaque)", "alice"},
+		{"/usr/bin/redis-cli --tls Auth SUPERSECRET", "SUPERSECRET"},
+		{`sh -c "redis-cli AUTH SUPERSECRET $(opaque)"`, "SUPERSECRET"},
+	} {
+		if got := firstWords(tc.cmd); strings.Contains(got, tc.secret) {
+			t.Errorf("firstWords(%q) = %q, leaked %q", tc.cmd, got, tc.secret)
+		}
+	}
+
+	// 8. SUDO_UID fails closed in safeLocate because Git ownership rules differ under sudo.
+	scSudo := newScan(repo, makeEnv(map[string]string{
+		"HOME": parent, "USERPROFILE": parent, "SUDO_UID": "1000",
+	}), work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scSudo.safeLocate(repo); ok {
+		t.Errorf("safeLocate with SUDO_UID = (%q, true), want false", got)
 	}
 }

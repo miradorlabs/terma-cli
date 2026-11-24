@@ -13,8 +13,7 @@ import (
 
 // UnknownReach is a NUL-prefixed sentinel returned when a shell reach scan fails closed.
 const UnknownReach = "\x00unknown"
-const shellTime, maxShellPlaces, maxShellLookups, maxShellWords, maxShellStats = 20 * time.Millisecond, 256, 4096, 16384, 131072
-const maxShellBytes, maxShellDepth, maxShellBraces, maxGlobSegments, substitutionSize, maxBelowDepth = 1 << 20, 4, 16, 3, 4096, 4
+const shellTime, maxShellPlaces, maxShellLookups, maxShellWords, maxShellStats, maxShellBytes, maxShellDepth, maxShellBraces, maxGlobSegments, substitutionSize, maxBelowDepth = 20 * time.Millisecond, 256, 4096, 16384, 131072, 1 << 20, 4, 16, 3, 4096, 4
 
 var maxShellTime, errOpaque = shellTime, errors.New("an expansion ShellPaths cannot resolve")
 
@@ -27,12 +26,6 @@ const plain, program, target, folder, creates, data, part, slashedOnly, globbed,
 
 func (r role) whole() bool      { return r == program || r == target || r == physTarget }
 func (r role) needsSlash() bool { return r == program || r == data || r == part || r == slashedOnly }
-func (r role) mayCreate(slashed bool) bool {
-	return r == creates || slashed && (r == plain || r == folder || r == slashedOnly)
-}
-func (r role) mustResolve(slashed bool) bool {
-	return r == target || r == physTarget || r == folder || slashed && r != program && r != data && r != part
-}
 
 // scan holds the state of one bounded shell reach scan.
 type scan struct {
@@ -42,8 +35,8 @@ type scan struct {
 	env                          func(string) (string, bool)
 	vars                         map[string]*string
 	cfg                          *expand.Config
-	reads                        *operands
-	places                       map[string]bool
+	reads                        *cached
+	places, created              map[string]bool
 	examined                     map[candidate]cached
 	work
 }
@@ -63,15 +56,15 @@ type cached struct {
 
 func newScan(cwd string, env func(string) (string, bool), done work) *scan {
 	done.deadline = pick(done.deadline.IsZero(), time.Now().Add(maxShellTime), done.deadline)
-	sc := &scan{cwd: cwd, dir: cwd, env: env, vars: map[string]*string{}, places: map[string]bool{}, examined: map[candidate]cached{}, work: done}
+	sc := &scan{cwd: cwd, dir: cwd, env: env, vars: map[string]*string{}, places: map[string]bool{}, created: map[string]bool{}, examined: map[candidate]cached{}, work: done}
 	sc.cfg = sc.config()
 	return sc
 }
 func (sc *scan) config() *expand.Config {
 	return &expand.Config{Env: sc, CmdSubst: sc.substitute, ProcSubst: func(*syntax.ProcSubst) (string, error) { return "", errOpaque }, NoUnset: true}
 }
-func pick[T any](cond bool, a, b T) T {
-	if cond {
+func pick[T any](c bool, a, b T) T {
+	if c {
 		return a
 	}
 	return b
@@ -240,8 +233,7 @@ func (sc *scan) fields(w *syntax.Word) ([]string, error) {
 		prev := sc.opaque
 		sc.opaque = false
 		f, err := expand.Fields(sc.cfg, b)
-		bad := sc.opaque
-		if sc.opaque = prev; err != nil || bad || len(out)+len(f) > maxShellWords && sc.fail() {
+		if sc.opaque, prev = prev, sc.opaque; err != nil || prev || len(out)+len(f) > maxShellWords && sc.fail() {
 			return nil, errOpaque
 		}
 		out = append(out, f...)

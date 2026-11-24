@@ -13,10 +13,7 @@ import (
 // dirHandle wraps os.Root with post-open os.SameFile verification against the lstat result on non-Unix platforms.
 type dirHandle struct{ r *os.Root }
 
-func openRootDir(volRoot string) (dirHandle, error) {
-	r, err := os.OpenRoot(volRoot)
-	return dirHandle{r}, err
-}
+func openRootDir(v string) (dirHandle, error)         { r, e := os.OpenRoot(v); return dirHandle{r}, e }
 func (d dirHandle) close()                            { _ = d.r.Close() }
 func (d dirHandle) readlink(n string) (string, error) { return d.r.Readlink(n) }
 func (d dirHandle) lstat(name string) (fs.FileInfo, error) {
@@ -47,3 +44,4 @@ func (d dirHandle) open(name string, dir bool, want fs.FileInfo) (*os.File, erro
 	}
 }
 func sameDevice(_, _ fs.FileInfo) bool { return true }
+func sameOwner(_ fs.FileInfo) bool     { return true }
