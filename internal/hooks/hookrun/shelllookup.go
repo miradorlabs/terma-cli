@@ -81,11 +81,7 @@ const (
 // hasRemoteLink walks components of p top-down without following symlinks, failing closed on remote shares or >maxSymlinkHops.
 func (sc *scan) hasRemoteLink(p string) bool { return sc.hasRemoteLinkAt(filepath.Clean(p), 0) }
 func (sc *scan) hasRemoteLinkAt(p string, hops int) bool {
-	if remote(p, sc.cwd) {
-		sc.unknown = true
-		return true
-	}
-	if len(p) > maxPathBytes {
+	if remote(p, sc.cwd) || len(p) > maxPathBytes {
 		sc.unknown = true
 		return true
 	}

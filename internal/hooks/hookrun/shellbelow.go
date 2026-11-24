@@ -21,7 +21,7 @@ const maxBelowDepth = 4
 
 // safeLocate finds the git worktree root for dir without statting remote GIT_DIR or .git gitdir targets.
 func (sc *scan) safeLocate(dir string) (string, bool) {
-	if dir == "" || sc.hasRemoteLink(dir) {
+	if dir == "" || sc.hasRemoteLink(dir) || sc.isUnresolvedVar("GIT_DIR") || sc.isUnresolvedVar("GIT_WORK_TREE") {
 		return "", false
 	}
 	if gd, ok := sc.lookup("GIT_DIR"); ok && gd != "" {
@@ -34,6 +34,9 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 		}
 		info, err := os.Stat(absGD)
 		return absWT, err == nil && info.IsDir()
+	}
+	if wt, ok := sc.lookup("GIT_WORK_TREE"); ok && wt != "" {
+		return "", false
 	}
 	cur, err := filepath.Abs(dir)
 	if err != nil {
@@ -58,6 +61,7 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 	}
 	return "", false
 }
+func (sc *scan) isUnresolvedVar(name string) bool { v, set := sc.vars[name]; return set && v == nil }
 func (sc *scan) locateGitdirFile(path, cur string) (string, bool) {
 	f, err := os.Open(path)
 	if err != nil {

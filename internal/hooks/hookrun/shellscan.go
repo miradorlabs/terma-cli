@@ -105,10 +105,10 @@ func (sc *scan) Get(name string) expand.Variable {
 }
 func (sc *scan) Each(func(string, expand.Variable) bool) {}
 func (sc *scan) lookup(name string) (string, bool) {
-	if name == "PWD" {
+	switch {
+	case name == "PWD":
 		return sc.dir, sc.dir != ""
-	}
-	if name == "OLDPWD" && sc.prev != "" {
+	case name == "OLDPWD" && sc.prev != "":
 		return sc.prev, true
 	}
 	if v, ok := sc.vars[name]; ok {
@@ -210,8 +210,7 @@ func (sc *scan) fieldsBounded(w *syntax.Word, limit int) bool {
 }
 func (sc *scan) chargeFields(v string) bool {
 	if ifs := sc.ifs(); ifs != "" {
-		rem := maxShellWords - sc.words
-		if n := countFields(v, ifs, rem); n > rem {
+		if n := countFields(v, ifs, maxShellWords-sc.words); n > maxShellWords-sc.words {
 			sc.unknown = true
 			return false
 		} else {
@@ -268,7 +267,7 @@ func (sc *scan) consumeFields(v, ifs string, rem int) int {
 		sc.unknown = true
 		return -1
 	} else if n > 1 {
-		rem -= n - 1
+		return rem - (n - 1)
 	}
 	return rem
 }

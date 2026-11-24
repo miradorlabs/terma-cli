@@ -58,10 +58,10 @@ func where(sc *scan, args []*syntax.Word) (string, bool) {
 	return sc.dir, sc.dir != "" && len(args) == 0
 }
 func toplevel(sc *scan, args []*syntax.Word) (string, bool) {
-	if len(args) != 0 {
-		return "", false
+	if len(args) == 0 {
+		return sc.safeLocate(sc.dir)
 	}
-	return sc.safeLocate(sc.dir)
+	return "", false
 }
 func gopath(sc *scan, args []*syntax.Word) (string, bool) {
 	if v, ok := sc.lookup("GOPATH"); ok && v != "" {
@@ -74,17 +74,17 @@ func modcache(sc *scan, args []*syntax.Word) (string, bool) {
 	if v, ok := sc.lookup("GOMODCACHE"); ok && v != "" {
 		return v, len(args) == 0
 	}
-	gp, ok := gopath(sc, args)
-	if list := filepath.SplitList(gp); ok && len(list) > 0 && list[0] != "" {
-		return filepath.Join(list[0], "pkg", "mod"), true
+	if gp, ok := gopath(sc, args); ok {
+		if list := filepath.SplitList(gp); len(list) > 0 && list[0] != "" {
+			return filepath.Join(list[0], "pkg", "mod"), true
+		}
 	}
 	return "", false
 }
 func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 	name, tmp := "", false
 	for _, a := range args {
-		l := a.Lit()
-		switch {
+		switch l := a.Lit(); {
 		case l == "" || strings.HasPrefix(l, "--tmpdir="):
 			return "", false
 		case l == "--tmpdir":
@@ -115,11 +115,10 @@ func ofOperand(f func(sc *scan, p string) string) func(*scan, []*syntax.Word) (s
 		if len(args) > 0 && args[0].Lit() == "--" {
 			args = args[1:]
 		}
-		if len(args) != 1 {
-			return "", false
-		}
-		if fields, err := sc.fields(args[0]); err == nil && len(fields) == 1 {
-			return f(sc, fields[0]), true
+		if len(args) == 1 {
+			if fields, err := sc.fields(args[0]); err == nil && len(fields) == 1 {
+				return f(sc, fields[0]), true
+			}
 		}
 		return "", false
 	}
