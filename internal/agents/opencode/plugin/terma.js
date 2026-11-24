@@ -339,7 +339,7 @@ function hookRunner(cfg) {
       if (typeof timer.unref === "function") timer.unref()
       try {
         child = spawn(argv[0], [...argv.slice(1), event], { stdio: ["pipe", "ignore", "ignore"] })
-        child.on("error", (err) => { if (err && err.code === "ENOENT") missing = true; markExited(); finish(false) })
+        child.on("error", (err) => { if (err && err.code === "ENOENT") missing = true; if (!child?.pid || err?.code === "ESRCH") markExited(); finish(false) })
         child.on("close", (code) => { markExited(); finish(code === 0) })
         child.stdin.on("error", () => {})
         child.stdin.end(JSON.stringify(payload))

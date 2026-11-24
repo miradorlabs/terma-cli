@@ -45,7 +45,7 @@ function spawnHook(event: string, payload: Record<string, unknown>, untilExit = 
     try {
       const [cmd, ...args] = CONFIG!.hookCommand
       child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"], detached: false })
-      child.on("error", () => { markExited(); finish(false) })
+      child.on("error", (err: any) => { if (!child?.pid || err?.code === "ESRCH") markExited(); finish(false) })
       child.on("close", (code: number | null) => { markExited(); if (untilExit) finish(code === 0) })
       child.stdin.on("error", () => { if (!untilExit) finish(false) })
       if (untilExit && timeoutMs > 0) {
@@ -298,22 +298,25 @@ export default async function (omp: any) {
       }),
     ])
   const tainted = new Set<string>()
-  const fenced = new Set<string>()
+  const fenced = new Map<string, { gen: number; parent: string; pGen: number }>()
   const fencing = new Map<string, Promise<boolean>>()
   const runGen = new Map<string, number>()
-  const markSet = (set: Set<string>, s: string, parent: string) => {
-    if (s) set.add(s)
-    if (parent) set.add(parent)
-  }
   const isTainted = (s: string, parent = "") => !!(s && tainted.has(s)) || !!(parent && tainted.has(parent))
-  const isFenced = (s: string, parent = "") => !!(s && fenced.has(s)) || !!(parent && fenced.has(parent))
-  const taint = (s: string, cwd: unknown, parent: string): Promise<boolean> => {
+  const isFenced = (s: string, parent = "") => {
+    const valid = (id: string) => {
+      const f = fenced.get(id)
+      return !!f && f.gen === (runGen.get(id) ?? 0) && (!f.parent || f.pGen === (runGen.get(f.parent) ?? 0))
+    }
+    return (!!s && valid(s)) || (!!parent && valid(parent))
+  }
+  const taint = (s: string, cwd: unknown, parent: string, gen = runGen.get(s) ?? 0, pGen = parent ? (runGen.get(parent) ?? 0) : 0): Promise<boolean> => {
     if (!s) return Promise.resolve(false)
-    markSet(tainted, s, parent)
+    if ((runGen.get(s) ?? 0) === gen) tainted.add(s)
+    if (parent && (runGen.get(parent) ?? 0) === pGen) tainted.add(parent)
     if (isFenced(s, parent)) return Promise.resolve(true)
-    const active = fencing.get(s)
+    const key = parent || s
+    const active = fencing.get(key)
     if (active) return active
-    const gen = runGen.get(s) ?? 0
     // Fail-closed fence: await lifecycle drain (bounded) and flip the run to Mixed via
     // an unresolvable shell reach before tool execution continues. If fencing also fails,
     // tool_call blocks execution so OMP's native OTLP export cannot leak under a stale claim.
@@ -329,10 +332,13 @@ export default async function (omp: any) {
       }, true, HOOK_TIMEOUT_MS)
       lifecycle = lifecycle.then(() => run.exit, () => run.exit)
       const ok = await awaitWithin(run.result, HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS + 500, false)
-      if (ok && (runGen.get(s) ?? 0) === gen) markSet(fenced, s, parent)
+      if (ok && (runGen.get(s) ?? 0) === gen && (!parent || (runGen.get(parent) ?? 0) === pGen)) {
+        fenced.set(s, { gen, parent, pGen })
+        if (parent) fenced.set(parent, { gen: pGen, parent: "", pGen: 0 })
+      }
       return ok
-    })().finally(() => { if (fencing.get(s) === p) fencing.delete(s) })
-    fencing.set(s, p)
+    })().finally(() => { if (fencing.get(key) === p) fencing.delete(key) })
+    fencing.set(key, p)
     return p
   }
   const reached = new Map<string, Promise<boolean>>()
@@ -342,15 +348,17 @@ export default async function (omp: any) {
     const s = sessionOf(ctx)
     if (!s) return null
     const parent = parentOf(ctx)
+    const gen = runGen.get(s) ?? 0
+    const pGen = parent ? (runGen.get(parent) ?? 0) : 0
     if (isFenced(s, parent)) return Promise.resolve(true)
-    if (isTainted(s, parent)) return taint(s, ctx?.cwd, parent)
+    if (isTainted(s, parent)) return taint(s, ctx?.cwd, parent, gen, pGen)
     return queuedHook("omp-tool-reach", {
       session_id: s,
       cwd: ctx?.cwd,
       tool: String(event?.toolName ?? ""),
       parent_session_id: parent || undefined,
       ...reach,
-    }).then((ok) => (ok ? true : taint(s, ctx?.cwd, parent)))
+    }).then((ok) => (ok ? true : taint(s, ctx?.cwd, parent, gen, pGen)))
   }
 
   omp.on("session_start", (event: any, ctx: any) => {

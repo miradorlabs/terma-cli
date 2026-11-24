@@ -153,7 +153,7 @@ func (x Extension) toolReach(ctx context.Context, env Env) error {
 	if env.Routing != nil && !env.Routing.Usable() {
 		return ErrFailClosed
 	}
-	_ = env.Routing.takeWriteErr()
+	_ = env.Routing.TakeWriteErr()
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
 	subagent := session.ValidID(in.ParentSessionID) && in.ParentSessionID != in.SessionID
 	if subagent {
@@ -169,7 +169,7 @@ func (x Extension) toolReach(ctx context.Context, env Env) error {
 			env.propagateMixed(in.ParentSessionID, in.SessionID, x.Tool)
 		}
 	}
-	if err := env.Routing.takeWriteErr(); err != nil {
+	if err := env.Routing.TakeWriteErr(); err != nil {
 		return fmt.Errorf("%w: %w", ErrFailClosed, err)
 	}
 	return nil

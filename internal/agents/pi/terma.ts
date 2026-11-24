@@ -173,7 +173,7 @@ function spawnHook(event: string, payload: Record<string, unknown>): { result: P
     try {
       const [cmd, ...args] = CONFIG!.hookCommand
       child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"], detached: false })
-      child.on("error", () => { markExited(); finish(false) })
+      child.on("error", (err: any) => { if (!child?.pid || err?.code === "ESRCH") markExited(); finish(false) })
       child.on("close", (code: number | null) => { markExited(); finish(code === 0) })
       child.stdin.on("error", () => {})
       child.stdin.end(JSON.stringify(payload))

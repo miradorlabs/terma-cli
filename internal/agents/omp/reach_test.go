@@ -258,8 +258,12 @@ console.log(JSON.stringify({ first, second }))
 			t.Fatalf("node: %v\n%s", err, out)
 		}
 		var got struct {
-			First  struct{ Block bool `json:"block"` } `json:"first"`
-			Second struct{ Block bool `json:"block"` } `json:"second"`
+			First struct {
+				Block bool `json:"block"`
+			} `json:"first"`
+			Second struct {
+				Block bool `json:"block"`
+			} `json:"second"`
 		}
 		if err := json.Unmarshal(out, &got); err != nil {
 			t.Fatalf("parse output %q: %v", out, err)
@@ -317,8 +321,10 @@ console.log(JSON.stringify({ first: first ?? null, afterResume: afterResume ?? n
 			t.Fatalf("node: %v\n%s", err, out)
 		}
 		var got struct {
-			First       map[string]any              `json:"first"`
-			AfterResume struct{ Block bool `json:"block"` } `json:"afterResume"`
+			First       map[string]any `json:"first"`
+			AfterResume struct {
+				Block bool `json:"block"`
+			} `json:"afterResume"`
 		}
 		if err := json.Unmarshal(out, &got); err != nil {
 			t.Fatalf("parse output %q: %v", out, err)
@@ -334,5 +340,58 @@ console.log(JSON.stringify({ first: first ?? null, afterResume: afterResume ?? n
 			t.Fatalf("resumed session did not invoke omp-tool-reach for /other/b.go; log:\n%s", logBytes)
 		}
 	})
-}
 
+	// Subtest 4: parent resumes while child's fence is in flight -> child fence completion
+	// must NOT re-fence the resumed parent run.
+	t.Run("child_fence_cannot_refence_resumed_parent", func(t *testing.T) {
+		dir := t.TempDir()
+		logFile := filepath.Join(dir, "reach.log")
+		hook := filepath.Join(dir, "hook.sh")
+		hookSrc := "#!/bin/sh\nbody=$(cat)\n" +
+			"if [ \"$1\" = \"omp-tool-reach\" ]; then\n" +
+			"  echo \"$body\" >> " + strconv.Quote(logFile) + "\n" +
+			"  case \"$body\" in\n" +
+			"    *TERMA_REACH_FAILED*) sleep 0.2; exit 0 ;;\n" +
+			"    *child_fail*) exit 1 ;;\n" +
+			"    *) exit 0 ;;\n" +
+			"  esac\n" +
+			"fi\n" +
+			"exit 0\n"
+		if err := os.WriteFile(hook, []byte(hookSrc), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		ext := filepath.Join(dir, "terma-ext.ts")
+		if _, err := writeExtension(ext, []string{hook}, relayConfig().Endpoint); err != nil {
+			t.Fatal(err)
+		}
+		script := `
+const [ext] = process.argv.slice(2)
+const h = {}
+const mod = await import(ext)
+await mod.default({ on: (n, fn) => { h[n] = fn } })
+const dir = "/home/dev/.omp/agent/sessions/-work"
+const pFile = dir + "/2026-11-21T13-14-22-769Z_parent-1.jsonl"
+const sm = (id, file, header) => ({ getSessionId: () => id, getSessionFile: () => file, getHeader: () => header })
+const parent = { cwd: "/work", sessionManager: sm("parent-1", pFile, { id: "parent-1" }) }
+const child = { cwd: "/work", sessionManager: sm("child-1", pFile.replace(/\.jsonl$/, "") + "/Sub.jsonl", { parentSession: pFile }) }
+await h.session_start({ reason: "startup" }, parent)
+await h.session_start({ reason: "startup" }, child)
+const childCall = h.tool_call({ toolName: "read", toolCallId: "c1", input: { path: "/other/child_fail.go" } }, child)
+// Parent resumes while child's fence is still running.
+const parentResume = h.session_start({ reason: "resume" }, parent)
+await Promise.all([childCall, parentResume])
+await h.tool_call({ toolName: "read", toolCallId: "p1", input: { path: "/other/parent_after_resume.go" } }, parent)
+`
+		driverPath := filepath.Join(dir, "driver.mjs")
+		if err := os.WriteFile(driverPath, []byte(script), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if out, err := exec.Command(node, driverPath, ext).CombinedOutput(); err != nil {
+			t.Fatalf("node: %v\n%s", err, out)
+		}
+		logBytes, _ := os.ReadFile(logFile)
+		if !strings.Contains(string(logBytes), "parent_after_resume.go") {
+			t.Fatalf("resumed parent skipped omp-tool-reach after concurrent child fence; log:\n%s", logBytes)
+		}
+	})
+}

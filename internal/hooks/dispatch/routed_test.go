@@ -65,11 +65,13 @@ func TestDispatchUsesClaimedRoutedWhenRoutingActive(t *testing.T) {
 
 type extFake struct{}
 
-func (extFake) Name() string                      { return "extfake" }
-func (extFake) DisplayName() string               { return "ExtFake" }
-func (extFake) Installed(context.Context) bool    { return true }
-func (extFake) FlushAfter() []string              { return nil }
-func (extFake) Events() map[string]agents.Handler { return hookrun.Extension{Tool: "omp"}.Events("extfake") }
+func (extFake) Name() string                   { return "extfake" }
+func (extFake) DisplayName() string            { return "ExtFake" }
+func (extFake) Installed(context.Context) bool { return true }
+func (extFake) FlushAfter() []string           { return nil }
+func (extFake) Events() map[string]agents.Handler {
+	return hookrun.Extension{Tool: "omp"}.Events("extfake")
+}
 
 func TestDispatchToolReachFailsClosedOnWriteError(t *testing.T) {
 	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
@@ -141,9 +143,17 @@ func TestDispatchToolReachFailsClosedOnWriteError(t *testing.T) {
 	if code := Run(ctx, deps, Request{Event: "extfake-tool-reach", Cwd: repoA, Stdin: strings.NewReader(fenceBody)}); code == 0 {
 		t.Fatalf("fallback fence exited 0 despite unwritable stateDir; want non-zero")
 	}
+	// Local read inside repoB triggers fallback ClaimFromPayload crossing orgA->orgB;
+	// persistence failure during fallback claiming must also exit non-zero.
+	localInB := `{"session_id":"` + sid + `","cwd":` + strconv.Quote(repoB) + `,"tool":"read","paths":[` + strconv.Quote(fileB) + `]}`
+	if code := Run(ctx, deps, Request{Event: "extfake-tool-reach", Cwd: repoB, Stdin: strings.NewReader(localInB)}); code == 0 {
+		t.Fatalf("fallback ClaimFromPayload tool-reach exited 0 despite unwritable stateDir; want non-zero")
+	}
 	// Unusable routing state also fails closed with non-zero exit.
 	unusableDeps := deps
-	unusableDeps.Profile = func() Profile { return Profile{Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting("default", nil)} }
+	unusableDeps.Profile = func() Profile {
+		return Profile{Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting("default", nil)}
+	}
 	if code := Run(ctx, unusableDeps, Request{Event: "extfake-tool-reach", Cwd: repoA, Stdin: strings.NewReader(reachBody)}); code == 0 {
 		t.Fatalf("unusable routing tool-reach exited 0; want non-zero")
 	}

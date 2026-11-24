@@ -502,4 +502,3 @@ await hooks.dispose()
 		t.Fatalf("expected execute_tool write span for unrelated session; got %v", spanNames)
 	}
 }
-

@@ -381,4 +381,3 @@ print(json.dumps({"ok1": ok1, "started_while_alive": started_while_alive, "start
 		t.Fatalf("Hermes FIFO confirmed-exit invariant violated: %+v", got)
 	}
 }
-
