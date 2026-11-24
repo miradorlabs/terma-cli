@@ -921,11 +921,11 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	if os.IsPathSeparator('\\') {
 		scWin := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
 		want := filepath.VolumeName(dir) + `\other\repo\file`
-		if got, ok := scWin.resolveTarget(dir, `\other\repo\file`, 0); !ok || got != want {
-			t.Fatalf(`resolveTarget(\other\repo\file) = (%q, %v), want (%q, true)`, got, ok, want)
+		if got, ok := scWin.resolveJoined(dir, `\other\repo\file`, false); !ok || got != want {
+			t.Fatalf(`resolveJoined(\other\repo\file) = (%q, %v), want (%q, true)`, got, ok, want)
 		}
-		if got, ok := scWin.resolveTarget(dir, `C:..\api\file`, 0); ok || !scWin.unknown {
-			t.Fatalf(`resolveTarget(C:..\api\file) = (%q, %v) unknown=%v, want ("", false, true)`, got, ok, scWin.unknown)
+		if got, ok := scWin.resolveJoined(dir, `C:..\api\file`, false); ok || !scWin.unknown {
+			t.Fatalf(`resolveJoined(C:..\api\file) = (%q, %v) unknown=%v, want ("", false, true)`, got, ok, scWin.unknown)
 		}
 	}
 
@@ -2208,6 +2208,54 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 	for _, ws := range []string{strings.Repeat(" ", maxShellBytes), strings.Repeat("\n", maxShellBytes), strings.Repeat(" \t\n", maxShellBytes/3)} {
 		if !parsable(ws) {
 			t.Fatalf("parsable(1MiB whitespace) = false, want true")
+		}
+	}
+
+	// 10. Shell special and positional parameters (?, 1, 0, @, *, _, etc.) stay opaque even if present in exec env.
+	specDir := t.TempDir()
+	scSpec := newScan(specDir, func(k string) (string, bool) {
+		switch k {
+		case "?", "1", "0", "@", "*", "_":
+			return "/tmp/decoy", true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	for _, name := range []string{"?", "1", "0", "@", "*", "_"} {
+		if v, ok := scSpec.lookup(name); ok || v != "" {
+			t.Errorf("lookup(%q) = (%q, %v), want (\"\", false)", name, v, ok)
+		}
+		scSpec.opaque = false
+		_ = scSpec.Get(name)
+		if !scSpec.opaque {
+			t.Errorf("Get(%q) did not mark scan opaque", name)
+		}
+	}
+	fSpec, err := syntax.NewParser().Parse(strings.NewReader(`cat "$?/repo/file"`), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := scSpec.fields(fSpec.Stmts[0].Cmd.(*syntax.CallExpr).Args[1]); err == nil {
+		t.Fatal(`fields("$?/repo/file") succeeded despite special parameter ? in env, want error`)
+	}
+
+	// 11. Windows-illegal component chars do not fail closed, and bare 100-CJK-char filenames resolve on Windows.
+	scIll := newScan(specDir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	for _, tok := range []string{"*.go", "a:b", "foo\nbar"} {
+		scIll.candidate(tok, plain)
+		if scIll.unknown {
+			t.Errorf("candidate(%q, plain) unexpectedly marked scan unknown", tok)
+		}
+	}
+	if filepath.Separator == '\\' {
+		cjkDir := t.TempDir()
+		cjkName := strings.Repeat("漢", 100) // 300 UTF-8 bytes, 100 UTF-16 code units (valid on NTFS)
+		if err := os.WriteFile(filepath.Join(cjkDir, cjkName), []byte("ok"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		scCJK := newScan(cjkDir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+		scCJK.candidate(cjkName, plain)
+		if !slices.Contains(scCJK.out, cjkDir) {
+			t.Errorf("candidate(100-CJK-char file) out=%q, want %q", scCJK.out, cjkDir)
 		}
 	}
 }

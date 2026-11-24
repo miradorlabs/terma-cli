@@ -68,7 +68,7 @@ func (sc *scan) hasGoEnv(key string) bool {
 		} else if xdg := sc.envVal("XDG_CONFIG_HOME"); runtime.GOOS != "darwin" && (xdg != "" || sc.isUnresolvedVar("XDG_CONFIG_HOME")) {
 			dir, bad = xdg, sc.isUnresolvedVar("XDG_CONFIG_HOME")
 		} else if home, ok := sc.lookup("HOME"); ok || sc.isUnresolvedVar("HOME") {
-			dir, bad = filepath.Join(home, map[bool]string{true: "Library/Application Support", false: ".config"}[runtime.GOOS == "darwin"]), sc.isUnresolvedVar("HOME")
+			dir, bad = filepath.Join(home, pick(runtime.GOOS == "darwin", "Library/Application Support", ".config")), sc.isUnresolvedVar("HOME")
 		}
 		if p = filepath.Join(dir, "go", "env"); bad || dir == "" {
 			return bad
@@ -82,7 +82,7 @@ func gopath(sc *scan, args []*syntax.Word) (string, bool) {
 	} else if v, ok := sc.lookup("GOPATH"); ok && v != "" {
 		return v, !slices.ContainsFunc(filepath.SplitList(v), func(p string) bool { return !filepath.IsAbs(p) })
 	}
-	key := map[bool]string{true: "USERPROFILE", false: "HOME"}[runtime.GOOS == "windows"]
+	key := pick(runtime.GOOS == "windows", "USERPROFILE", "HOME")
 	home, ok := sc.lookup(key)
 	return filepath.Join(home, "go"), !sc.isUnresolvedVar(key) && !sc.hasGoEnv("GOPATH") && ok && home != ""
 }
@@ -132,7 +132,7 @@ func ofOperand(f func(*scan, string) (string, bool)) func(*scan, []*syntax.Word)
 	}
 }
 func dirname(_ *scan, p string) (string, bool) {
-	vol, sep := filepath.VolumeName(p), map[bool]string{true: `/\`, false: "/"}[filepath.Separator == '\\']
+	vol, sep := filepath.VolumeName(p), pick(filepath.Separator == '\\', `/\`, "/")
 	rest := strings.TrimRight(p[len(vol):], sep)
 	if i := strings.LastIndexAny(rest, sep); i >= 0 {
 		return vol + filepath.FromSlash(cmp.Or(strings.TrimRight(rest[:i], sep), string(filepath.Separator))), true
@@ -157,8 +157,8 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 		return "", false
 	}
 	if gd, wt := sc.envVal("GIT_DIR"), sc.envVal("GIT_WORK_TREE"); gd != "" || wt != "" {
-		absGD, ok1 := sc.resolveTarget(cmp.Or(sc.dir, sc.cwd), gd, 1)
-		absWT, ok2 := sc.resolveTarget(cmp.Or(sc.dir, sc.cwd), wt, 1)
+		absGD, ok1 := sc.resolveJoined(cmp.Or(sc.dir, sc.cwd), gd, false)
+		absWT, ok2 := sc.resolveJoined(cmp.Or(sc.dir, sc.cwd), wt, false)
 		if gd == "" || wt == "" || !ok1 || !ok2 || sc.hasRemoteLink(absGD) || sc.hasRemoteLink(absWT) {
 			return "", false
 		}
@@ -209,7 +209,7 @@ func (sc *scan) hasWorktreeConfig(gitDir string) bool {
 	return slices.ContainsFunc(paths, func(p string) bool { return sc.fileHasLine(p, match) })
 }
 func (sc *scan) fileHasLine(path string, match func(string) bool) bool {
-	if p, ok := sc.resolveTarget(sc.dir, path, 0); ok {
+	if p, ok := sc.resolveJoined(sc.dir, path, false); ok {
 		data, err := sc.readSmallFile(p)
 		return err != nil && !errors.Is(err, fs.ErrNotExist) || err == nil && slices.ContainsFunc(strings.Split(data, "\n"), match)
 	}
@@ -233,7 +233,7 @@ func (sc *scan) locateGitdirFile(path, cur string) (string, bool) {
 	if data, err := sc.readSmallFile(path); err != nil {
 		sc.unknown = sc.unknown || errors.Is(err, errOpaque)
 	} else if target, ok := strings.CutPrefix(strings.TrimSuffix(strings.TrimSuffix(data, "\n"), "\r"), "gitdir: "); ok && target != "" {
-		if resolved, ok := sc.resolveTarget(cur, target, 1); ok {
+		if resolved, ok := sc.resolveJoined(cur, target, false); ok {
 			if r, _, info, found := sc.walkPath(resolved, true); found && info.IsDir() {
 				return cur, !sc.hasWorktreeConfig(r)
 			}

@@ -81,7 +81,7 @@ func pick[T any](cond bool, a, b T) T {
 	return b
 }
 func (sc *scan) Get(name string) expand.Variable {
-	if strings.HasPrefix(name, "HOME ") || sc.isUnresolvedVar(name) {
+	if strings.HasPrefix(name, "HOME ") || sc.isUnresolvedVar(name) || !isName(name) || name == "_" {
 		sc.opaque = true
 		return expand.Variable{Set: true, Kind: expand.String}
 	}
@@ -94,7 +94,7 @@ func (sc *scan) lookup(name string) (string, bool) {
 		return sc.dir, sc.dir != ""
 	} else if name == "OLDPWD" && sc.prev != "" {
 		return sc.prev, true
-	} else if v, ok := sc.vars[name]; ok && v == nil {
+	} else if v, ok := sc.vars[name]; !isName(name) || name == "_" || ok && v == nil {
 		return "", false
 	} else if ok {
 		return *v, true
@@ -136,11 +136,9 @@ func (sc *scan) sizeIn(w syntax.Node, opaqueSubst bool) (n int) {
 			case *syntax.ParamExp:
 				n += sc.paramSize(x, opaqueSubst)
 				return false
-			case *syntax.CmdSubst, *syntax.ProcSubst:
-				n = pick(opaqueSubst, maxShellBytes+1, n+substitutionSize)
-				return false
-			case *syntax.ArithmExp:
-				n = maxShellBytes + 1
+			case *syntax.CmdSubst, *syntax.ProcSubst, *syntax.ArithmExp:
+				_, arith := x.(*syntax.ArithmExp)
+				n = pick(opaqueSubst || arith, maxShellBytes+1, n+substitutionSize)
 				return false
 			}
 			return n <= maxShellBytes

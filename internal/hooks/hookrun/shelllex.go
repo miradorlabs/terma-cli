@@ -181,8 +181,7 @@ func parsable(src string) bool {
 	if len(src) > maxShellBytes {
 		return false
 	}
-	var open []byte // what closes each context open: ) } ] " `; h and q a body's (nothing)
-	var docs, bodies []heredoc
+	open, docs, bodies := []byte(nil), []heredoc(nil), []heredoc(nil)
 	body, expr, exprDepth, letUntil, links, words, dollars := 0, -1, 0, -1, 0, 0, 0
 	push := func(c byte, n, i int, isExpr bool) {
 		if isExpr && expr < 0 {
@@ -196,12 +195,6 @@ func parsable(src string) bool {
 		}
 	}
 	read := func() { body, open = len(open), append(open, pick(bodies[0].quoted, byte('q'), byte('h'))) }
-	at := func(s string, k int, def byte) byte {
-		if 0 <= k && k < len(s) {
-			return s[k]
-		}
-		return def
-	}
 	for i := 0; i < len(src); i++ {
 		c, top := src[i], byte(0)
 		if len(open) > 0 {
@@ -214,7 +207,13 @@ func parsable(src string) bool {
 			i--
 			continue
 		}
-		prev, next := at(src, i-1, '\n'), at(src, i+1, 0)
+		prev, next := byte('\n'), byte(0)
+		if i > 0 {
+			prev = src[i-1]
+		}
+		if i+1 < len(src) {
+			next = src[i+1]
+		}
 		double := i+2 < len(src) && src[i+2] == next
 		words += pick(top != '"' && top != 'h' && top != 'q' && (strings.IndexByte(separators, c) < 0 && strings.IndexByte(separators, prev) >= 0 || strings.IndexByte("\"'`([{", c) >= 0), 1, 0)
 		dollars += pick((c == '$' || c == '`') && top != 'q', 1, 0)

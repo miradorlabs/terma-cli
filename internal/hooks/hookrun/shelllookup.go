@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"unicode/utf16"
 )
 
 func (sc *scan) candidate(t string, r role) {
@@ -26,7 +27,7 @@ func (sc *scan) candidate(t string, r role) {
 	slashed, keyDir := pathLike(t), sc.dir
 	if t == "" || !slashed && r.needsSlash() || sc.away(t, r) {
 		return
-	} else if len(t) > maxPathBytes || !filepath.IsAbs(t) && len(t)+max(len(sc.dir), len(sc.cwd))+1 > maxPathBytes || !slashed && len(t) > 255 {
+	} else if len(t) > maxPathBytes || !filepath.IsAbs(t) && len(t)+max(len(sc.dir), len(sc.cwd))+1 > maxPathBytes || !slashed && (filepath.Separator != '\\' && len(t) > 255 || filepath.Separator == '\\' && len(utf16.Encode([]rune(t))) > 255) {
 		sc.unknown = sc.unknown || r.mustResolve(slashed)
 		return
 	}
@@ -50,13 +51,10 @@ func (sc *scan) candidate(t string, r role) {
 	}
 }
 func (sc *scan) resolve(t string, r role, slashed bool) (res cached) {
-	for i, d := range []string{sc.dir, sc.cwd} {
-		if i == 1 && d == sc.dir {
-			break
-		}
+	for i, d := range pick(sc.dir == sc.cwd, []string{sc.dir}, []string{sc.dir, sc.cwd}) {
 		if p, info := sc.reachRole(t, d, r); p != "" {
 			if res.named = res.named || info != nil; info != nil && info.IsDir() {
-				res.dir, res.folders = map[bool]string{true: p, false: res.dir}[i == 0], append(res.folders, p)
+				res.dir, res.folders = pick(i == 0, p, res.dir), append(res.folders, p)
 			}
 		} else if r.mayCreate(slashed) && !res.named {
 			if p, ok := sc.path(t, d); ok {
@@ -164,9 +162,7 @@ func (sc *scan) openLeaf(cur dirHandle, part string, fi fs.FileInfo, openMode ui
 		return nil, openMode == 0
 	}
 	f, err := cur.open(part, openMode == 2, fi)
-	if err != nil {
-		sc.unknown = sc.unknown || !errors.Is(err, fs.ErrNotExist) && (openMode != 2 || !errors.Is(err, fs.ErrPermission))
-	}
+	sc.unknown = sc.unknown || err != nil && !errors.Is(err, fs.ErrNotExist) && (openMode != 2 || !errors.Is(err, fs.ErrPermission))
 	return f, err == nil
 }
 func (sc *scan) walkPath(p string, followFinal bool) (string, string, os.FileInfo, bool) {
@@ -174,9 +170,6 @@ func (sc *scan) walkPath(p string, followFinal bool) (string, string, os.FileInf
 	return r, par, info, ok
 }
 func (sc *scan) hasRemoteLink(p string) bool { _, _, _, _ = sc.walkPath(p, true); return sc.unknown }
-func (sc *scan) resolveTarget(base, raw string, _ int) (string, bool) {
-	return sc.resolveJoined(base, raw, false)
-}
 func (sc *scan) resolveJoined(base, raw string, logical bool) (string, bool) {
 	if remote(raw, sc.cwd) || filepath.VolumeName(raw) != "" && !filepath.IsAbs(raw) {
 		return "", !sc.fail()
@@ -229,24 +222,22 @@ func (sc *scan) reachRole(w, dir string, r role) (string, os.FileInfo) {
 		return "", nil
 	} else if info.IsDir() {
 		sc.place(res)
-		return map[bool]string{true: p, false: res}[r == target], info
+		return pick(r == target, p, res), info
 	} else if sc.place(parent); info.Mode()&fs.ModeSymlink == 0 {
 		return res, info
 	}
 	if dst, tParent, tInfo, tFound := sc.walkPath(p, true); tFound {
-		sc.place(map[bool]string{true: dst, false: tParent}[tInfo.IsDir()])
-		return map[bool]string{true: dst, false: map[bool]string{true: p, false: res}[r == target]}[r == physTarget], tInfo
+		sc.place(pick(tInfo.IsDir(), dst, tParent))
+		return pick(r == physTarget, dst, pick(r == target, p, res)), tInfo
 	} else if !sc.unknown && tParent != "" {
 		sc.place(tParent)
 	}
 	return res, nil
 }
 func (sc *scan) away(w string, r role) bool {
-	if remote(w, sc.cwd) {
-		sc.unknown = sc.unknown || (share(w) != "" || len(w) > 2 && !strings.ContainsAny(w, " \t\n") && strings.TrimLeft(w, `/\`) != "") && r.mustResolve(true)
-		return true
-	}
-	return false
+	rem := remote(w, sc.cwd)
+	sc.unknown = sc.unknown || rem && (share(w) != "" || len(w) > 2 && !strings.ContainsAny(w, " \t\n") && strings.TrimLeft(w, `/\`) != "") && r.mustResolve(true)
+	return rem
 }
 func (sc *scan) path(w, dir string) (string, bool) { return sc.resolvePath(w, dir, false) }
 func (sc *scan) resolvePath(w, dir string, logical bool) (string, bool) {
@@ -285,7 +276,7 @@ func urlPath(w string) (string, bool, bool) {
 	} else if filepath.Separator == '\\' && len(u) > 2 && u[0] == '/' && u[2] == ':' {
 		return u[1:], true, false
 	}
-	return map[bool]string{true: u, false: "//" + u}[strings.HasPrefix(u, "/")], true, false
+	return pick(strings.HasPrefix(u, "/"), u, "//"+u), true, false
 }
 func isScheme(s string) bool {
 	return len(s) > 1 && strings.IndexByte(alnum[:52], s[0]) >= 0 && strings.Trim(s, alnum+"+-.") == ""
@@ -318,7 +309,7 @@ func shellValue(w string) string {
 	} else if len(w) > 2 && w[0] == '-' && w[1] != '-' {
 		return w[2:]
 	}
-	return map[bool]string{true: "", false: w}[strings.HasPrefix(w, "-")]
+	return pick(strings.HasPrefix(w, "-"), "", w)
 }
 func isName(s string) bool {
 	return s != "" && (s[0] < '0' || s[0] > '9') && strings.Trim(s, alnum+"_") == ""
