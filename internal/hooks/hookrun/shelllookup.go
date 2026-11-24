@@ -112,7 +112,7 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 		fi, err := cur.lstat(part)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, fs.ErrInvalid) {
 			return "", "", nil, nil, !sc.fail()
-		} else if err != nil && slices.Contains(parts, "..") {
+		} else if err != nil && (slices.Contains(parts, "..") || slices.Contains(parts, ".")) {
 			return "", "", nil, nil, false
 		} else if err != nil {
 			return filepath.Join(append([]string{curPath, part}, parts...)...), curPath, nil, nil, false
@@ -185,10 +185,10 @@ func (sc *scan) resolveTarget(base, raw string, _ int) (string, bool) {
 	}
 	if len(raw) > maxPathBytes {
 		return "", !sc.fail()
-	} else if !hasDotDot(raw) {
+	} else if !hasDot(raw) {
 		return filepath.Clean(raw), true
 	}
-	res, _, _, found := sc.walkPath(raw, true)
+	res, _, _, found := sc.walkPath(raw, false)
 	return res, found || !sc.unknown && res != ""
 }
 func (sc *scan) reach(w, dir string) (string, os.FileInfo) {
@@ -236,8 +236,8 @@ func (sc *scan) path(w, dir string) (string, bool) {
 
 const alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-func hasDotDot(p string) bool {
-	return p == ".." || strings.HasPrefix(p, "../") || strings.Contains(p, "/..") || os.IsPathSeparator('\\') && (strings.HasPrefix(p, `..\`) || strings.Contains(p, `\..`))
+func hasDot(p string) bool {
+	return slices.ContainsFunc(strings.FieldsFunc(p, isSep), func(s string) bool { return s == "." || s == ".." })
 }
 func urlPath(w string) (string, bool, bool) {
 	scheme, rest, ok := strings.Cut(w, "://")

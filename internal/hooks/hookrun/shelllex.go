@@ -15,7 +15,7 @@ var secretNames, compounds = []string{"pass", "token", "secret", "key", "auth"},
 var userinfo = regexp.MustCompile(`(://)[^/\s]+@|[^/\s:@]*:[^/\s@]+@`)
 
 // Pre-parse bounds preventing deep parser recursion or huge expression backtracking.
-const maxShellNesting, maxShellExpr, separators = 4096, 4096, " \t\n;&|()<>"
+const maxShellNesting, maxShellExpr, separators = 256, 4096, " \t\n;&|()<>"
 
 // firstWords returns command's first four words (<=60 runes) with secret-like values masked.
 func firstWords(command string) string { return maskWords(command, 0) }

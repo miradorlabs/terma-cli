@@ -1841,6 +1841,54 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 	}
 }
 
+func TestRealDotAndNestingBound(t *testing.T) {
+	t.Parallel()
+	if maxShellNesting > 256 {
+		t.Fatalf("maxShellNesting = %d, want <= 256", maxShellNesting)
+	}
+	nested := strings.Repeat("$(x ", maxShellNesting+1) + strings.Repeat(")", maxShellNesting+1)
+	if parsable(nested) {
+		t.Fatalf("parsable(%d nested command substitutions) = true, want false", maxShellNesting+1)
+	}
+
+	dir, _ := filepath.EvalSymlinks(t.TempDir())
+	existing := filepath.Join(dir, "existing")
+	if err := os.MkdirAll(existing, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(existing, "file"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	sc := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	for _, bad := range []string{"existing/missing/.", "existing/missing/./sub", "existing/file/."} {
+		if got, ok := sc.real(bad); ok {
+			t.Fatalf("real(%q) = (%q, true), want false", bad, got)
+		}
+	}
+	if got, ok := sc.real("existing/./missing"); !ok || got != filepath.Join(existing, "missing") {
+		t.Fatalf("real(existing/./missing) = (%q, %v), want (%q, true)", got, ok, filepath.Join(existing, "missing"))
+	}
+	if got, ok := sc.real("existing/."); !ok || got != existing {
+		t.Fatalf("real(existing/.) = (%q, %v), want (%q, true)", got, ok, existing)
+	}
+	other := filepath.Join(dir, "other")
+	if err := os.MkdirAll(other, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(other, "secret.txt")
+	if err := os.WriteFile(target, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(existing, "link")
+	if err := os.Symlink(target, link); err == nil {
+		scLink := newScan(existing, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+		scLink.reach("./link", existing)
+		if !scLink.places[existing] || !scLink.places[other] {
+			t.Fatalf("reach(./link) places = %v, want both %q and %q", scLink.places, existing, other)
+		}
+	}
+}
+
 func FuzzParsable(f *testing.F) {
 	for _, seed := range []string{
 		"ls -la",
