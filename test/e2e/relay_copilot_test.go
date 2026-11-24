@@ -1,8 +1,10 @@
 package e2e
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -50,13 +52,49 @@ func TestRelayCopilot(t *testing.T) {
 				// The turn arrived whole: its agent span, a request with its token counts, and the edit.
 				names := map[string]bool{}
 				tokens := false
+				// A span is the session's when it names it. One that names no session, as the
+				// runtime's session.timing.* spans do, one per phase of a turn, is the session's
+				// when the relay placed it there: by its trace, which a span of the session
+				// names, or by the process that sent it, said on its resource (checkOnlyClaimed).
+				traces := map[string]bool{}
 				for _, s := range e.spans {
-					if v := s.Attrs["gen_ai.conversation.id"]; v != sid {
-						t.Errorf("relay forwarded span %s of another session: gen_ai.conversation.id=%q", s.Name, v)
+					if s.Attrs["gen_ai.conversation.id"] == sid {
+						traces[string(s.Proto.GetTraceId())] = true
+					}
+				}
+				ofSession := func(s Span) bool {
+					if v := s.Attrs["gen_ai.conversation.id"]; v != "" {
+						return v == sid
+					}
+					if s.Resource["terma.relay.attribution"] == "process" {
+						return s.Resource["terma.relay.session.id"] == sid
+					}
+					return traces[string(s.Proto.GetTraceId())]
+				}
+				// What a pass covered, since the service turns the timing spans on for some
+				// sessions only: how many arrived, which keys of theirs and of the agent's
+				// checkout and context upstream got, and what the three that are a vocabulary said.
+				timing, carried := 0, map[string]bool{}
+				for _, s := range e.spans {
+					if !ofSession(s) {
+						t.Errorf("relay forwarded span %s of another session: gen_ai.conversation.id=%q trace=%x terma.relay.attribution=%q",
+							s.Name, s.Attrs["gen_ai.conversation.id"], s.Proto.GetTraceId(), s.Resource["terma.relay.attribution"])
 					}
 					names[strings.Fields(s.Name)[0]] = true
 					tokens = tokens || s.Attrs["gen_ai.usage.input_tokens"] != "" && s.Attrs["gen_ai.usage.output_tokens"] != ""
+					if strings.HasPrefix(s.Name, "session.timing.") {
+						timing++
+					}
+					for k, v := range s.Attrs {
+						switch field, ok := strings.CutPrefix(k, "github.copilot.session.timing."); {
+						case field == "segment" || field == "outcome" || field == "creationOrigin":
+							carried[k+"="+v] = true
+						case ok, strings.HasPrefix(k, "github.copilot.git."), strings.HasPrefix(k, "github.copilot.github."), strings.HasPrefix(k, "github.copilot.context."):
+							carried[k] = true
+						}
+					}
 				}
+				t.Logf("%d spans upstream, %d of them session.timing.*, carrying %q", len(e.spans), timing, slices.Sorted(maps.Keys(carried)))
 				if !names["invoke_agent"] || !names["chat"] || !names["execute_tool"] || !tokens {
 					t.Errorf("the session arrived without its agent span, a request's token counts or a tool call: %v, tokens %v", names, tokens)
 				}

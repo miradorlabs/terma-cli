@@ -36,6 +36,8 @@ var (
 		"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "opencode.tool.file_path", "opencode.session.directory",
 		"function_args", "hook_input", "hook_output", "stdout", "stderr",
 		"github.copilot.tool.parameters.command", "github.copilot.tool.parameters.file_path",
+		"github.copilot.git.repository", "github.copilot.github.org", "github.copilot.git.branch", "github.copilot.git.commit_sha",
+		"github.copilot.context.skills", "github.copilot.context.custom_agent_names",
 		"omp.gen_ai.request.messages", "omp.gen_ai.response.tool_calls",
 		"tool_output", "error_message",
 		"file_path", "result", "cwd"}

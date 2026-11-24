@@ -10,13 +10,22 @@ func (Agent) Correlation() shape.Correlation {
 }
 
 // CaptureRules are where the Copilot runtime's telemetry carries content beyond the GenAI
-// attributes every agent shares: it restates a shell tool's command and a file tool's path.
+// attributes every agent shares: it restates a shell tool's command and a file tool's path,
+// names the checkout it found itself in, and lists the skills and custom agents it loaded.
 func (Agent) CaptureRules() shape.CaptureRules {
 	return shape.CaptureRules{
-		ToolContentFields: []string{"github.copilot.tool.parameters.command", "github.copilot.tool.parameters.file_path"},
+		ToolContentFields: []string{"github.copilot.tool.parameters.command", "github.copilot.tool.parameters.file_path",
+			// The repository, organization, branch and commit as the runtime read them: the
+			// agent's word, unchecked, where the relay names the checkout from the claim
+			// (stampCheckout) under any policy. And the names a developer gave their skills and
+			// custom agents: content, the cautious side, though the names of their MCP servers
+			// below are safe.
+			"github.copilot.git.repository", "github.copilot.github.org", "github.copilot.git.branch", "github.copilot.git.commit_sha",
+			"github.copilot.context.skills", "github.copilot.context.custom_agent_names"},
 		// Strings only: a number or a flag passes whatever its key (a request's AI credits,
 		// its billing multiplier), and a key no rule names is withheld with the content.
-		// Each is one CLI 1.0.96 sends, read from its own export, but for the last three.
+		// Each is one CLI 1.0.96 sends, read from its own export, unless its comment says
+		// where else it was read.
 		SafeKeys: []string{
 			// The ids of a turn and of its requests, who started a request (user or agent),
 			// the kind of agent, a tool's kind, a command's exit status, the account's
@@ -47,6 +56,17 @@ func (Agent) CaptureRules() shape.CaptureRules {
 			// The reasoning effort a request asked a reasoning model for (low, medium, high…),
 			// seen first on CI's exports in October 2026.
 			"gen_ai.request.reasoning.level",
+			// Its session.timing.* spans, one per phase of a turn, which a feature flag of the
+			// service turns on: the phase and segment timed, how the turn ended and what opened
+			// the session, and the ids of the turn and its request, as interaction_id and
+			// service_request_id are above. Read from the keys CI's relay counted in November
+			// 2026 and from the runtime's strings, not from an export: no value of them has
+			// been seen. Named one by one, so another field under the prefix is withheld
+			// until it is read.
+			"github.copilot.session.timing.phase", "github.copilot.session.timing.segment",
+			"github.copilot.session.timing.outcome", "github.copilot.session.timing.creationOrigin",
+			"github.copilot.session.timing.interactionId", "github.copilot.session.timing.requestId",
+			"github.copilot.session.timing.clientRequestId", "github.copilot.session.timing.serviceRequestId",
 		},
 	}
 }
