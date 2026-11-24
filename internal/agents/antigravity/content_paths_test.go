@@ -131,6 +131,28 @@ func TestAntigravityRefusesAFileOfAnExcludedCheckout(t *testing.T) {
 	}
 }
 
+// A call whose arguments name more paths than terma judges is refused, though every one is
+// collected: the count runs across the call's keys, and a value that is not a path counts
+// for nothing.
+func TestAntigravityRefusesACallNamingTooManyPaths(t *testing.T) {
+	g := newPathRig(t)
+	file := filepath.Join(g.collected, "file.txt")
+	for _, n := range []int{antigravityPathsPerCall, antigravityPathsPerCall + 1} {
+		list := make([]string, n-1)
+		for i := range list {
+			list[i] = file
+		}
+		args, err := json.Marshal(map[string]any{"Paths": list, "Path": file, "Query": "made-up", "Limit": 3})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := n > antigravityPathsPerCall
+		if got := newAntigravityPaths(g.pol).refuses(g.collected, args); got != want {
+			t.Errorf("%d collected paths: refused %v, want %v", n, got, want)
+		}
+	}
+}
+
 // Content goes only when every workspace is in a checkout the policy collects: a second
 // workspace in an excluded checkout, or outside git, stops it; global mode collects both.
 func TestAntigravityWorkspacesMustAllBeCollected(t *testing.T) {

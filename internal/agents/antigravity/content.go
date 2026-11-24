@@ -10,10 +10,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
-// What was said in a conversation: the prompt, the reply, a tool's arguments and its result.
-// Which of it a hook may send is the policy's, the developer's and rule 3.3's
-// (content_paths.go); this file holds what is sent once it may be: agy's envelope and T3
-// Code's wrapper taken off a prompt, and the cuts.
+// What was said in a conversation, as it is sent once it may be (the package comment says
+// who decides): agy's envelope and T3 Code's wrapper taken off a prompt, and the cuts.
 
 // antigravityContentLimit bounds one content value, in bytes, the bound terma cuts at
 // everywhere; a marker counts inside it.

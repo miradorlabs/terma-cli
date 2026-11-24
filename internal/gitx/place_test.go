@@ -3,7 +3,6 @@ package gitx
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -108,7 +107,11 @@ func TestPlaceFS(t *testing.T) {
 
 // A folder is placed only when ResolveFolderFS's answer is: a relative one is not.
 func TestPlaceFolderFSWantsAnAbsoluteFolder(t *testing.T) {
-	if _, _, got := PlaceFolderFS(strings.TrimPrefix(t.TempDir(), string(filepath.Separator))); got != Unplaced {
-		t.Errorf("a relative folder: %d", got)
+	// Relative on every system: on Windows a temp folder with its leading separator cut
+	// would still name its drive.
+	for _, dir := range []string{filepath.Join("some", "folder"), "."} {
+		if _, _, got := PlaceFolderFS(dir); got != Unplaced {
+			t.Errorf("a relative folder %q: %d", dir, got)
+		}
 	}
 }

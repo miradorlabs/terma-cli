@@ -1,4 +1,22 @@
 // Package antigravity integrates Antigravity CLI (agy).
+//
+// agy has no telemetry export, so terma makes its events from four hooks and the
+// conversation's transcript. How a hook becomes events:
+//
+//   - The hooks (handlers.go): PreInvocation, PostToolUse, PostInvocation and Stop. Each reads
+//     its payload, resolves the checkout it ran in, and opens the conversation.
+//   - antigravityConversation (conversation.go): the hook's one hold of the conversation's
+//     lock, the read state saved between hooks, and the clock every event is stamped from.
+//   - The reader (transcript_read.go): readAntigravitySteps hands on the lines written since
+//     the last read; antigravityBatch knows which lines are tool results, and whether their
+//     batch asked for a call whose content is refused.
+//   - Which hook may send (turn.go): one of the turn's own checkout and lane, while the
+//     turn's record stands. The rule is stated there once.
+//   - Which content may go (content_paths.go): the developer's consent, the policy's switches,
+//     every workspace collected, and the judgement of each path a call's arguments name.
+//   - What is sent (call.go, content.go): a model call, a prompt, a reply and a tool's result,
+//     cut to size. transcript.go's send picks them for a line; PostToolUse sends the tool
+//     call with its arguments.
 package antigravity
 
 import (

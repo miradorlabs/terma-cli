@@ -127,17 +127,18 @@ func TestAntigravityTurnSendsWhatWasSaid(t *testing.T) {
 	g.sentOnce()
 }
 
-// Each kind of content goes only with its policy switch on and Antigravity chosen. The prompt
-// still counts without its text; the calls and the model calls leave as they always did.
-func TestAntigravityContentFollowsTheSwitches(t *testing.T) {
+// A tool call's arguments go only with tool content on and Antigravity chosen; the call goes
+// either way. What each transcript line sends under the same switches is
+// TestAntigravityWhatEachLineSends.
+func TestAntigravityArgumentsFollowTheSwitches(t *testing.T) {
 	for _, tc := range []struct {
 		name                               string
 		noPrompts, noToolContent, deselect bool
-		promptText, replies, args, results bool
+		args                               bool
 	}{
-		{name: "everything", promptText: true, replies: true, args: true, results: true},
-		{name: "prompts off", noPrompts: true, args: true, results: true},
-		{name: "tool content off", noToolContent: true, promptText: true, replies: true},
+		{name: "everything", args: true},
+		{name: "prompts off", noPrompts: true, args: true},
+		{name: "tool content off", noToolContent: true},
 		{name: "both off", noPrompts: true, noToolContent: true},
 		{name: "Antigravity not chosen", deselect: true},
 	} {
@@ -149,29 +150,13 @@ func TestAntigravityContentFollowsTheSwitches(t *testing.T) {
 			}
 			g.turnOne()
 			got := g.drain()
-			if s := strings.Join(callSteps(got[semconv.TermaModelCallEvent]), ","); s != "step-1,step-3,step-6" {
-				t.Errorf("model calls %s", s)
-			}
 			if len(got[semconv.TermaToolCallEvent]) != 2 {
 				t.Errorf("tool calls %v", got[semconv.TermaToolCallEvent])
-			}
-			prompts := got[semconv.TermaUserMessageEvent]
-			if len(prompts) != 1 {
-				t.Fatalf("prompts %v", prompts)
-			}
-			if _, text := prompts[0].Attrs[semconv.TermaMessageTextKey]; text != tc.promptText {
-				t.Errorf("prompt text %v, want %v", text, tc.promptText)
-			}
-			if n := len(got[semconv.TermaAssistantMessageEvent]); (n == 1) != tc.replies || n > 1 {
-				t.Errorf("%d replies", n)
 			}
 			for _, c := range got[semconv.TermaToolCallEvent] {
 				if _, args := c.Attrs[semconv.GenAIToolCallArgumentsKey]; args != tc.args {
 					t.Errorf("arguments on %v: %v, want %v", c.Attrs[semconv.GenAIToolCallIDKey], args, tc.args)
 				}
-			}
-			if n := len(got[semconv.TermaToolResultEvent]); (n == 2) != tc.results || (n != 0 && n != 2) {
-				t.Errorf("%d results", n)
 			}
 		})
 	}

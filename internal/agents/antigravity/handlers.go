@@ -214,7 +214,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	turn := antigravityTurnID(env, r, id)
 	call, called := antigravityToolCallAttrs(in, turn)
 	if step, stepped := call[semconv.TermaStepIndexKey].(int64); stepped {
-		conv.callStep = step
+		conv.call.step = step
 	}
 	refused := in.ToolCall != nil && conv.refuses(in.ToolCall.Args)
 	conv.read(ctx)

@@ -15,39 +15,71 @@ import (
 )
 
 // antigravityConversation is one hook's hold of a conversation's calls state, under its lock,
-// taken once per hook: how far the transcript was read, whether the batch being read is
-// tainted, and the clock every event of the conversation is stamped from. A hook that cannot
-// have the lock sends what it sends without it, at the real time, and no content.
+// taken once per hook (the package comment says where it fits): how far the transcript was
+// read, the batch being read, and the clock every event of the conversation is stamped from.
+// A hook that cannot have the lock sends what it sends without it, at the real time, and no
+// content.
 type antigravityConversation struct {
-	e   hookrun.Env
-	r   *hookrun.Repo
-	in  *antigravityHookInput
-	ctx context.Context
+	// Fixed for the hook: its environment, the checkout it ran in, and its payload.
+	e  hookrun.Env
+	r  *hookrun.Repo
+	in *antigravityHookInput
 
-	// held is that the lock is held and state is the conversation's.
+	// The conversation's saved state, read and written under its lock. held is that the lock
+	// is held and state is the conversation's; path is the state's file.
 	held   bool
 	unlock func()
 	path   string
 	state  antigravityCallState
-	// began is a state that begins (see turn.go); before is the state as loaded.
+	// began is a state that begins (see turn.go); before is the state as loaded, to save it
+	// only when it changed; created is that there was no state file.
 	began   bool
 	before  []byte
 	created bool
 
+	// This hook's scratch, gone with it.
+	// content is the content the hook may attach, worked out once (contentFor).
 	content *antigravityContent
 	// paths judges the paths the hook meets, each folder placed once.
 	paths *antigravityPaths
-	// callStep is the step of the call a PostToolUse spools, -1 for none; callAt is its time,
-	// stamped just before its result when the read meets that first.
-	callStep int64
-	callAt   time.Time
+	// call is the tool call a PostToolUse spools, and its time.
+	call antigravityOwnCall
+}
+
+// antigravityOwnCall is the tool call a PostToolUse spools, and its time. The hook reads the
+// transcript before it spools the call, and the read may meet the call's own result, the
+// GENERIC line at the call's step: the call's time is then stamped just before that result's,
+// so a result never sorts before its call. The model call that asked for the tool sorts
+// before both.
+type antigravityOwnCall struct {
+	// step is the call's step, -1 for no call.
+	step int64
+	// at is the call's time once stamped, zero before.
+	at time.Time
+}
+
+// meet is the read reaching a GENERIC line at step: the call's own result, the first time,
+// stamps the call's time with stamp.
+func (o *antigravityOwnCall) meet(step int64, stamp func() time.Time) {
+	if step == o.step && o.at.IsZero() {
+		o.at = stamp()
+	}
+}
+
+// time is the call's time: the one stamped before its result when the read met that, else
+// next's.
+func (o *antigravityOwnCall) time(next func() time.Time) time.Time {
+	if !o.at.IsZero() {
+		return o.at
+	}
+	return next()
 }
 
 // openAntigravityConversation takes the conversation's lock, waiting up to
 // antigravityCallLockWait for another of its hooks, and loads its calls state. Without a
 // transcript of agy's shape, a spool or a safe id, it holds nothing.
 func openAntigravityConversation(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *antigravityHookInput) *antigravityConversation {
-	c := &antigravityConversation{e: e, r: r, in: in, ctx: ctx, callStep: -1, paths: newAntigravityPaths(e.Policy)}
+	c := &antigravityConversation{e: e, r: r, in: in, call: antigravityOwnCall{step: -1}, paths: newAntigravityPaths(e.Policy)}
 	transcript := antigravityTranscript(in)
 	id := in.id()
 	if transcript == "" || e.Spool == nil || !session.ValidID(id) {
@@ -107,15 +139,8 @@ func (c *antigravityConversation) at(env hookrun.Env) hookrun.Env {
 	return env
 }
 
-// callTime is the time of the call this PostToolUse spools: the one stamped before its
-// result, when the read met that, else the next. A result never sorts before its call, and
-// the model call that asked for the tool sorts before both.
-func (c *antigravityConversation) callTime() time.Time {
-	if !c.callAt.IsZero() {
-		return c.callAt
-	}
-	return c.now()
-}
+// callTime is the time of the call this PostToolUse spools (antigravityOwnCall).
+func (c *antigravityConversation) callTime() time.Time { return c.call.time(c.now) }
 
 // contentFor is the content this hook may attach, worked out once.
 func (c *antigravityConversation) contentFor() antigravityContent {

@@ -13,13 +13,12 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
-// agy has no export, but its transcript records every model call as a PLANNER_RESPONSE
-// line with the call's model and token counts, written before the hooks that follow the
-// call run, and beside them the prompt (USER_INPUT), the reply (a PLANNER_RESPONSE's
-// content) and each tool's result (GENERIC). Each hook reads the lines written since the last
-// one and sends one terma.model_call per call it may send (see turn.go for which), and with
-// it what was said, as the policy and rule 3.3 allow (content_paths.go). The highest step
-// handled keeps any line from going twice, even after compaction rewrites the file.
+// The transcript as events (the package comment says how it fits): where a conversation's
+// transcript is, a hook's read of it, and what one line sends. agy writes each model call as a
+// PLANNER_RESPONSE line, with its model and token counts, before the hooks that follow the
+// call run, and beside them the prompt (USER_INPUT), the reply (a PLANNER_RESPONSE's content)
+// and each tool's result (GENERIC). The highest step handled keeps any line from going twice,
+// even after compaction rewrites the file.
 
 // antigravityTranscriptName is the transcript that holds the whole of every step; the
 // compact transcript.jsonl beside it cuts long fields.
@@ -128,8 +127,9 @@ func (c *antigravityConversation) read(ctx context.Context) bool {
 
 // send spools what one line of this hook's own turn holds: a prompt, a model call and its
 // reply, or a tool's result and the subagent it opened. Content goes only with its kind's
-// consent (antigravityContentFor); a result of a tainted batch does not go. It reports false when
-// something could not be spooled, for the line to be read again.
+// consent (antigravityContentFor); a result of a tainted batch does not go, nor a GENERIC
+// line outside a batch, which is no tool's result. It reports false when something could not
+// be spooled, for the line to be read again.
 func (c *antigravityConversation) send(s antigravityStep, turn string) bool {
 	e, r, id := c.e, c.r, c.in.id()
 	at := antigravityLineTime(s, e.Time())
@@ -157,9 +157,7 @@ func (c *antigravityConversation) send(s antigravityStep, turn string) bool {
 		reply.Time = c.stamp(at)
 		return e.EmitFor(r, reply)
 	case "GENERIC":
-		if *s.StepIndex == c.callStep && c.callAt.IsZero() {
-			c.callAt = c.stamp(at)
-		}
+		c.call.meet(*s.StepIndex, func() time.Time { return c.stamp(at) })
 		// Only invoke_subagent's result names a child; other output could quote one. The link
 		// is not content: it goes whether or not the batch is tainted.
 		if child := antigravitySubagent(s.Content); s.subagentResult && child != "" && child != id {
@@ -171,7 +169,7 @@ func (c *antigravityConversation) send(s antigravityStep, turn string) bool {
 				return false
 			}
 		}
-		if s.Content == "" || !c.contentFor().tools || s.withheld {
+		if !s.toolResult || s.withheld || s.Content == "" || !c.contentFor().tools {
 			return true
 		}
 		ev := antigravityResultEvent(id, s, turn)

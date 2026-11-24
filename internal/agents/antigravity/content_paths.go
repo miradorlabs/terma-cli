@@ -12,9 +12,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
-// Which content a hook may attach, and the two rules for content of another repository
-// (design 3.3). Both ask one question of a path: which checkout owns it (gitx places it, the
-// policy judges the checkout).
+// Which content a hook may attach (the package comment says how it fits), and the two rules
+// for content of another repository (design 3.3). Both ask one question of a path: which
+// checkout owns it (gitx places it, the policy judges the checkout).
 
 // antigravityShowsFilesInNoRepository is the answer for a file in no repository at all (a
 // skill file, a note in the home folder): shown, as Claude Code and Codex show such reads.
@@ -55,6 +55,12 @@ func antigravityContentFor(e hookrun.Env, in *antigravityHookInput, paths *antig
 // antigravityPathLimit is the longest argument value judged as a path when no key says it
 // names one.
 const antigravityPathLimit = 4096
+
+// antigravityPathsPerCall bounds the values one call's arguments are judged for as paths: each
+// may cost a walk of the file system and a read of a checkout's config. A call that names more
+// files than terma will place is refused, as one it cannot place is. No tool seen names more
+// than a few; a search's or a batch edit's list stays well under it.
+const antigravityPathsPerCall = 64
 
 // antigravityOwner is which checkout owns a path.
 type antigravityOwner int
@@ -166,6 +172,8 @@ func (p *antigravityPaths) workspacesCollected(cwd string, in *antigravityHookIn
 //   - every one under a key known to name a path (antigravityFileKeys, antigravityFolderKeys),
 //     a relative one joined to cwd. Elsewhere a relative value is text, not judged.
 //
+// Past antigravityPathsPerCall values judged, the call is refused unplaced.
+//
 // A folder of a folder key in no repository is refused, but in global mode; any other path in
 // no repository is refused only when antigravityShowsFilesInNoRepository is false. A value that
 // merely looks like a path in free text (an edit's Replacement of "/api/v1/users") resolves to
@@ -184,37 +192,42 @@ func (p *antigravityPaths) refuses(cwd string, raw json.RawMessage) bool {
 	if json.Unmarshal(raw, &args) != nil {
 		return false
 	}
-	return p.refusesValue(cwd, "", args)
+	judged := 0
+	return p.refusesValue(cwd, "", args, &judged)
 }
 
 // refusesValue reports whether v, the value under key, or any value within it is refused; the
-// items of a list are judged under the list's key.
-func (p *antigravityPaths) refusesValue(cwd, key string, v any) bool {
+// items of a list are judged under the list's key. judged counts the values judged as paths
+// in the call so far.
+func (p *antigravityPaths) refusesValue(cwd, key string, v any, judged *int) bool {
 	switch v := v.(type) {
 	case map[string]any:
 		for k, item := range v {
-			if p.refusesValue(cwd, k, item) {
+			if p.refusesValue(cwd, k, item, judged) {
 				return true
 			}
 		}
 	case []any:
 		for _, item := range v {
-			if p.refusesValue(cwd, key, item) {
+			if p.refusesValue(cwd, key, item, judged) {
 				return true
 			}
 		}
 	case string:
-		return p.refusesPath(cwd, key, v)
+		return p.refusesPath(cwd, key, v, judged)
 	}
 	return false
 }
 
 // refusesPath reports whether one string value under key is refused, by refuses's rules.
-func (p *antigravityPaths) refusesPath(cwd, key, value string) bool {
+func (p *antigravityPaths) refusesPath(cwd, key, value string, judged *int) bool {
 	folder := slices.Contains(antigravityFolderKeys, key)
 	named := folder || slices.Contains(antigravityFileKeys, key)
 	if value == "" || !named && !antigravityLooksLikePath(value) {
 		return false
+	}
+	if *judged++; *judged > antigravityPathsPerCall {
+		return true
 	}
 	switch p.owner(cwd, value) {
 	case ownerCollected:

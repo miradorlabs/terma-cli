@@ -12,9 +12,9 @@ import (
 	"os"
 )
 
-// Reading agy's transcript: how far a conversation's transcript was read, and the lines
-// past that point that a hook may send. Which of them it sends is
-// (*antigravityConversation).send's.
+// Reading agy's transcript (the package comment says how it fits): how far a conversation's
+// transcript was read, and the lines past that point, each marked with what the reader knows of
+// it. Which of them a hook sends is (*antigravityConversation).send's.
 
 // antigravityCallState is how far a conversation's transcript was read.
 type antigravityCallState struct {
@@ -27,6 +27,10 @@ type antigravityCallState struct {
 	// Results names the tools of the last call whose results are still to be read: they
 	// follow it in order, one line each.
 	Results []string `json:"results,omitempty"`
+	// Batch is that the last call line asked for tools, or could not be read: the GENERIC
+	// lines until the next call line are tool results. Without it a GENERIC line is no tool's
+	// result and is sent as none (antigravityBatch).
+	Batch bool `json:"batch,omitempty"`
 	// Tainted is that the last call line asked for a call whose content is refused
 	// (antigravityPaths.refuses), or could not be read: every result until the next call line
 	// is withheld (antigravityBatch).
@@ -59,6 +63,9 @@ type antigravityStep struct {
 	Content string `json:"content"`
 	// subagentResult is set on the result of an invoke_subagent call.
 	subagentResult bool
+	// toolResult is set on a GENERIC line inside a batch, one that follows a call line that
+	// asked for tools (antigravityCallState.Batch): a tool's result.
+	toolResult bool
 	// withheld is set on a result of a tainted call line (antigravityCallState.Tainted).
 	withheld bool
 	// prompt is set on the USER_INPUT the turn being read began with.
@@ -87,10 +94,12 @@ var antigravityKept = map[string]bool{"USER_INPUT": true, "PLANNER_RESPONSE": tr
 // done before a line, stops the read there, for the next hook.
 //
 // A call line is on disk before any of its results, and names its calls with the arguments
-// their hooks get. When refuses refuses any of them, or the line cannot be read, the line
-// taints its batch: every result until the next call line is handed on marked withheld, with
-// no pairing of a result to its call. The taint is tracked for every line read, before the
-// boundary too, as Results is.
+// their hooks get. A GENERIC line is handed on marked a tool result only inside a batch, after
+// a call line that asked for tools, however many results follow it. When refuses refuses any
+// of the calls, or the line cannot be read, the line taints its batch: every result until the
+// next call line is handed on marked withheld, with no pairing of a result to its call. The
+// batch and its taint are tracked for every line read, before the boundary too, as Results
+// is.
 func readAntigravitySteps(ctx context.Context, path string, last antigravityCallState, prompt int64, refuses func(json.RawMessage) bool, emit func(s antigravityStep) bool) (antigravityCallState, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -122,9 +131,9 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 			state.Before = 0
 		}
 	}
-	batch := antigravityBatch{tainted: state.Tainted, refuses: refuses}
+	batch := antigravityBatch{open: state.Batch, tainted: state.Tainted, refuses: refuses}
 	stop := func() antigravityCallState {
-		state.Tainted = batch.saved()
+		state.Batch, state.Tainted = batch.open, batch.saved()
 		state.Tail = antigravityTail(f, state.Offset)
 		return state
 	}
@@ -196,7 +205,8 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 		if step > state.Step && antigravityKept[s.Type] {
 			s.prompt = s.Type == "USER_INPUT" && prompt >= 0 && step == prompt
 			if state.Offset >= state.Before || s.prompt {
-				s.withheld = s.Type == "GENERIC" && batch.isTainted()
+				s.toolResult = s.Type == "GENERIC" && batch.open
+				s.withheld = s.toolResult && batch.isTainted()
 				if !emit(s) {
 					return stop(), nil
 				}
@@ -211,11 +221,15 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 	}
 }
 
-// antigravityBatch is the taint of the batch being read: the results that follow the last
-// call line, withheld when it asked for a refused call or could not be read. Whether a call is
-// refused is worked out only when a result of the batch is handed on or the read stops, and
-// once, so a state that begins does not judge every path the transcript ever named.
+// antigravityBatch is the batch being read: the results that follow the last call line, none
+// when it asked for no tool, withheld when it asked for a refused call or could not be read.
+// Whether a call is refused is worked out only when a result of the batch is handed on or the
+// read stops, and once, so a state that begins does not judge every path the transcript ever
+// named.
 type antigravityBatch struct {
+	// open is that the last call line asked for tools, or could not be read: a GENERIC line is
+	// a tool's result only then. False before any call line.
+	open bool
 	// tainted is the batch's taint once judged, or as the state was saved.
 	tainted bool
 	// pending are the calls of a call line not judged yet; nil once judged.
@@ -224,17 +238,17 @@ type antigravityBatch struct {
 }
 
 // begin is a call line asking for calls: a batch of its own, judged later. One that asks for
-// none is not tainted.
+// none opens no batch: the GENERIC lines after it are no tool's results.
 func (b *antigravityBatch) begin(calls []antigravityToolCall) {
-	b.tainted, b.pending = false, nil
-	if len(calls) > 0 {
+	b.open, b.tainted, b.pending = len(calls) > 0, false, nil
+	if b.open {
 		b.pending = calls
 	}
 }
 
 // unknown is a line that cannot be read, or a call line with no step to place it: it may have
-// asked for calls terma cannot see, so the batch is tainted until the next call line.
-func (b *antigravityBatch) unknown() { b.tainted, b.pending = true, nil }
+// asked for calls terma cannot see, so a batch is open and tainted until the next call line.
+func (b *antigravityBatch) unknown() { b.open, b.tainted, b.pending = true, true, nil }
 
 // isTainted reports whether the batch's results are withheld, judging its calls the first time.
 func (b *antigravityBatch) isTainted() bool {
