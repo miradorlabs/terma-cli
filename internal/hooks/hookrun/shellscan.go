@@ -2,7 +2,6 @@ package hookrun
 
 import (
 	"errors"
-	"iter"
 	"os"
 	"strings"
 	"time"
@@ -104,11 +103,11 @@ func (sc *scan) budget(counter *int, n, limit int) bool {
 	*counter += n
 	return true
 }
-func (sc *scan) spend(n int) bool       { return sc.budget(&sc.lookups, n, maxShellLookups) }
-func (sc *scan) spendStat(n int) bool   { return sc.budget(&sc.stats, n, maxShellStats) }
-func (sc *scan) charge(n int) bool      { return sc.budget(&sc.bytes, n, maxShellBytes) }
-func (sc *scan) size(w syntax.Node) int { return sc.sizeIn(w, false) }
-func (sc *scan) sizeIn(w syntax.Node, opaqueSubst bool) (n int) {
+func (sc *scan) spend(n int) bool        { return sc.budget(&sc.lookups, n, maxShellLookups) }
+func (sc *scan) spendStat(n int) bool    { return sc.budget(&sc.stats, n, maxShellStats) }
+func (sc *scan) charge(n int) bool       { return sc.budget(&sc.bytes, n, maxShellBytes) }
+func (sc *scan) size(w *syntax.Word) int { return sc.sizeIn(w, false) }
+func (sc *scan) sizeIn(w *syntax.Word, opaqueSubst bool) (n int) {
 	if w != nil {
 		syntax.Walk(w, func(node syntax.Node) bool {
 			switch x := node.(type) {
@@ -132,13 +131,9 @@ func (sc *scan) sizeIn(w syntax.Node, opaqueSubst bool) (n int) {
 func isCaseOp(op syntax.ParExpOperator) bool {
 	return op == syntax.UpperFirst || op == syntax.UpperAll || op == syntax.LowerFirst || op == syntax.LowerAll
 }
-func (sc *scan) paramValue(pe *syntax.ParamExp) (v string) {
-	if pe.Param != nil {
-		if v, _ = sc.lookup(pe.Param.Value); pe.Excl {
-			v, _ = sc.lookup(v)
-		}
-	}
-	return v
+func (sc *scan) paramValue(pe *syntax.ParamExp) string {
+	v, _ := sc.lookup(pick(pe.Param != nil, pe.Param, &syntax.Lit{}).Value)
+	return pick(pe.Excl, sc.envVal(v), v)
 }
 func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
 	if pe.Index != nil || pe.Slice != nil || pe.Names != 0 {
@@ -212,41 +207,35 @@ func countFields(v, ifs string, limit int) int {
 	return n
 }
 func (sc *scan) fields(w *syntax.Word) ([]string, error) {
-	out, ifs, prev := []string(nil), sc.ifs(), false
-	for b, err := range sc.braces(w) {
-		if err != nil || len(ifs) > 64 && sc.fail() || !sc.charge(sc.size(b)) || ifs != "" && sc.checkPartsFields(b.Parts, ifs, maxShellWords-len(out), false) < 0 {
-			return nil, errOpaque
+	out, ifs, n, braced := []string(nil), sc.ifs(), 0, *w
+	add := func(b *syntax.Word) bool {
+		if len(ifs) > 64 && sc.fail() || !sc.charge(sc.size(b)) || ifs != "" && sc.checkPartsFields(b.Parts, ifs, maxShellWords-len(out), false) < 0 {
+			return false
 		}
-		prev, sc.opaque = sc.opaque, false
+		prev := sc.opaque
+		sc.opaque = false
 		f, err := expand.Fields(sc.cfg, b)
 		if sc.opaque, prev = prev, sc.opaque; err != nil || prev || len(out)+len(f) > maxShellWords && sc.fail() {
-			return nil, errOpaque
+			return false
 		}
 		out = append(out, f...)
+		return true
+	}
+	for _, p := range w.Parts {
+		if lit, ok := p.(*syntax.Lit); ok {
+			n += strings.Count(lit.Value, "{")
+		}
+	}
+	if n > maxShellBraces && sc.fail() {
+		return nil, errOpaque
+	} else if n == 0 || !syntax.SplitBraces(&braced) {
+		ok := add(w)
+		return pick(ok, out, nil), pick(ok, nil, errOpaque)
+	}
+	for b, err := range expand.BracesSeq(sc.cfg, &braced) {
+		if (err != nil || !sc.spend(1)) && sc.fail() || !add(b) {
+			return nil, errOpaque
+		}
 	}
 	return out, nil
-}
-func (sc *scan) braces(w *syntax.Word) iter.Seq2[*syntax.Word, error] {
-	return func(yield func(*syntax.Word, error) bool) {
-		n := 0
-		for _, p := range w.Parts {
-			if lit, ok := p.(*syntax.Lit); ok {
-				n += strings.Count(lit.Value, "{")
-			}
-		}
-		if braced := *w; n > maxShellBraces && sc.fail() {
-			yield(nil, errOpaque)
-		} else if n == 0 || !syntax.SplitBraces(&braced) {
-			yield(w, nil)
-		} else {
-			for b, err := range expand.BracesSeq(sc.cfg, &braced) {
-				if (err != nil || !sc.spend(1)) && sc.fail() {
-					b, err = nil, errOpaque
-				}
-				if !yield(b, err) || err != nil {
-					return
-				}
-			}
-		}
-	}
 }

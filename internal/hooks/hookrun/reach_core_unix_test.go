@@ -79,4 +79,20 @@ func TestTrustedCmdRejectsSymlinkAliasAndNonRoot(t *testing.T) {
 	if os.Geteuid() != 0 && isSysBin(dir, fi) {
 		t.Fatalf("isSysBin(user-owned dir) = true, want false")
 	}
+	if os.Geteuid() != 0 {
+		// User-owned symlink dir in PATH pointing to /usr/bin must be rejected even though the final binary is root-owned.
+		linkDir := filepath.Join(dir, "sysbin")
+		if err := os.Symlink("/usr/bin", linkDir); err != nil {
+			t.Fatal(err)
+		}
+		scLinkDir := newScan(dir, func(k string) (string, bool) {
+			if k == "PATH" {
+				return linkDir, true
+			}
+			return "", false
+		}, work{deadline: time.Now().Add(time.Minute)})
+		if r, ok := scLinkDir.trustedCmd("dirname"); ok {
+			t.Fatalf("trustedCmd(user symlink dir -> /usr/bin) = (%q, true), want false", r)
+		}
+	}
 }

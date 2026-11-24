@@ -31,13 +31,17 @@ func (sc *scan) candidate(t string, r role) {
 }
 func (sc *scan) candidatePath(t string, r role, fallback bool) {
 	t = pick(filepath.Separator == '/' && strings.HasPrefix(t, "///") && strings.TrimLeft(t, "/") != "", "/"+strings.TrimLeft(t, "/"), t)
-	slashed, keyDir := pathLike(t), sc.dir
-	if t == "" || !slashed && r.needsSlash() || sc.away(t, r) {
+	slashed, rem := pathLike(t), remote(t, sc.cwd)
+	if t == "" || !slashed && r.needsSlash() {
+		return
+	} else if rem {
+		sc.unknown = sc.unknown || (share(t) != "" || len(t) > 2 && !strings.ContainsAny(t, " \t\n") && strings.TrimLeft(t, `/\`) != "") && r != program && r != data && r != part
 		return
 	} else if len(t) > maxPathBytes || !filepath.IsAbs(t) && len(t)+max(len(sc.dir), len(sc.cwd))+1 > maxPathBytes || !slashed && (filepath.Separator != '\\' && len(t) > 255 || filepath.Separator == '\\' && len(utf16.Encode([]rune(t))) > 255) {
 		sc.unknown = sc.unknown || r == target || r == physTarget || r == folder || slashed && r != program && r != data && r != part
 		return
 	}
+	keyDir := sc.dir
 	if t == "~" || strings.HasPrefix(t, "~/") {
 		home, _ := sc.homeDir()
 		keyDir = "\x00" + home
@@ -71,7 +75,7 @@ func (sc *scan) candidatePath(t string, r role, fallback bool) {
 }
 
 // walk traverses p component-by-component via dirHandle (openat O_DIRECTORY|O_NOFOLLOW|O_NONBLOCK on Unix,
-// os.Root on Windows), preventing TOCTOU symlink swaps and FIFO hangs. openMode: 0=stat, 1=openFile, 2=openDir.
+// os.Root on Windows), preventing TOCTOU symlink swaps and FIFO hangs. openMode: 0=stat, 1=openFile, 2=openDir, 3=sysBin.
 func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, parent string, info os.FileInfo, f *os.File, ok bool) {
 	if !filepath.IsAbs(p) && !filepath.IsAbs(sc.dir) {
 		return "", "", nil, nil, false
@@ -110,6 +114,8 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 			dot, missing := slices.Contains(parts, "..") || slices.Contains(parts, "."), filepath.Join(curPath, part)
 			sc.unknown = sc.unknown || dot && sc.created[pick(filepath.Separator == '\\', strings.ToLower(missing), missing)]
 			return pick(dot, "", filepath.Join(append([]string{curPath, part}, parts...)...)), pick(dot, "", curPath), nil, nil, false
+		} else if openMode == 3 && !isSysBin(filepath.Join(curPath, part), fi) {
+			return "", "", nil, nil, false
 		}
 		if fi.Mode()&fs.ModeSymlink != 0 {
 			if !followFinal && len(parts) == 0 {
@@ -152,8 +158,8 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 	return "", "", nil, nil, !sc.fail()
 }
 func (sc *scan) openLeaf(cur dirHandle, part string, fi fs.FileInfo, openMode uint8) (*os.File, bool) {
-	if openMode == 0 || openMode == 1 && !fi.Mode().IsRegular() || openMode == 2 && !fi.IsDir() {
-		return nil, openMode == 0
+	if openMode == 0 || openMode == 3 || openMode == 1 && !fi.Mode().IsRegular() || openMode == 2 && !fi.IsDir() {
+		return nil, openMode == 0 || openMode == 3
 	}
 	f, err := cur.open(part, openMode == 2, fi)
 	sc.unknown = sc.unknown || err != nil && !errors.Is(err, fs.ErrNotExist) && (openMode != 2 || !errors.Is(err, fs.ErrPermission))
@@ -221,11 +227,6 @@ func (sc *scan) reachRole(w, dir string, r role) (res string, _ os.FileInfo) {
 		sc.place(tParent)
 	}
 	return res, nil
-}
-func (sc *scan) away(w string, r role) bool {
-	rem := remote(w, sc.cwd)
-	sc.unknown = sc.unknown || rem && (share(w) != "" || len(w) > 2 && !strings.ContainsAny(w, " \t\n") && strings.TrimLeft(w, `/\`) != "") && r != program && r != data && r != part
-	return rem
 }
 func (sc *scan) path(w, dir string) (string, bool) { return sc.resolvePath(w, dir, false) }
 func (sc *scan) resolvePath(w, dir string, logical bool) (string, bool) {

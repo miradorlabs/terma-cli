@@ -33,11 +33,11 @@ func (d dirHandle) open(name string, dir bool, want fs.FileInfo) (*os.File, erro
 func (d dirHandle) lstat(name string) (fs.FileInfo, error) {
 	var st unix.Stat_t
 	err := unix.Fstatat(int(d), name, &st, unix.AT_SYMLINK_NOFOLLOW)
-	return pick(err == nil, fs.FileInfo(&statInfo{st}), nil), err
+	return pick(err == nil, fs.FileInfo(&statInfo{st}), nil), pick(errors.Is(err, unix.ENAMETOOLONG), fs.ErrNotExist, err)
 }
 func (d dirHandle) readlink(name string) (string, error) {
 	var buf [maxPathBytes]byte
-	if n, err := unix.Readlinkat(int(d), name, buf[:]); err == nil && n < len(buf) {
+	if n, err := unix.Readlinkat(int(d), name, buf[:]); err == nil && n >= 0 && n < len(buf) {
 		return string(buf[:n]), nil
 	}
 	return "", errOpaque
@@ -59,9 +59,10 @@ func openAt(dirfd int, name string, flags int, want fs.FileInfo) (dirHandle, err
 	}
 }
 func statIDs(a fs.FileInfo) (uint64, uint32, bool) {
-	if sa, ok := a.Sys().(*unix.Stat_t); ok {
+	switch sa := a.Sys().(type) {
+	case *unix.Stat_t:
 		return uint64(sa.Dev), sa.Uid, true
-	} else if sa, ok := a.Sys().(*syscall.Stat_t); ok {
+	case *syscall.Stat_t:
 		return uint64(sa.Dev), sa.Uid, true
 	}
 	return 0, 0, false
@@ -77,7 +78,7 @@ func sameOwner(_ string, a fs.FileInfo) bool {
 }
 func isSysBin(_ string, a fs.FileInfo) bool {
 	_, u, ok := statIDs(a)
-	return ok && u == 0 && a.Mode()&0o022 == 0
+	return ok && u == 0 && (a.Mode()&fs.ModeSymlink != 0 || a.Mode()&0o022 == 0)
 }
 func (s *statInfo) Name() string       { return "" }
 func (s *statInfo) Size() int64        { return s.st.Size }

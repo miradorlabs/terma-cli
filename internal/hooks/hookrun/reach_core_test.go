@@ -2752,14 +2752,14 @@ func TestReachCoreReviewRegressions(t *testing.T) {
 	// 3. GIT_CONFIG_NOSYSTEM unresolved fails closed; GIT_CONFIG_NOSYSTEM=1 skips system gitconfig lookup.
 	scUnresNoSys := newScan(repo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent}), work{deadline: time.Now().Add(time.Minute)})
 	scUnresNoSys.vars["GIT_CONFIG_NOSYSTEM"] = nil
-	if !scUnresNoSys.hasWorktreeConfig(filepath.Join(repo, ".git")) {
+	if !scUnresNoSys.hasWorktreeConfig(filepath.Join(repo, ".git"), repo) {
 		t.Errorf("hasWorktreeConfig with unresolved GIT_CONFIG_NOSYSTEM = false, want true")
 	}
 	scNoSys := newScan(repo, makeEnv(map[string]string{
 		"HOME": parent, "USERPROFILE": parent, "GIT_CONFIG_NOSYSTEM": "1",
 		"PATH": fakeBin, // skipped for system gitconfig when GIT_CONFIG_NOSYSTEM=1
 	}), work{deadline: time.Now().Add(time.Minute)})
-	if scNoSys.hasWorktreeConfig(filepath.Join(repo, ".git")) {
+	if scNoSys.hasWorktreeConfig(filepath.Join(repo, ".git"), repo) {
 		t.Errorf("hasWorktreeConfig with GIT_CONFIG_NOSYSTEM=1 = true, want false")
 	}
 
@@ -3091,5 +3091,213 @@ func TestReachCoreReviewRegressions(t *testing.T) {
 		if got, err := evalSubst(scCol, "mktemp -d"); err == nil {
 			t.Errorf("mktemp colliding symlink = %q, want error", got)
 		}
+	}
+}
+
+func TestPR175ReviewRegressions(t *testing.T) {
+	t.Parallel()
+	parent, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	makeEnv := func(extra map[string]string) func(string) (string, bool) {
+		return func(k string) (string, bool) {
+			v, ok := extra[k]
+			return v, ok
+		}
+	}
+
+	// 1. Replacement parameter expansions with omitted replacement word (nil Repl.With) must not panic.
+	for _, tc := range []struct {
+		cmd, val, want string
+	}{
+		{`echo ${f/.txt}`, "note.txt", "note"},
+		{`echo ${f//x}`, "axbxc", "abc"},
+		{`echo ${f/pre_}`, "pre_file", "file"},
+		{`echo ${f/#pre_}`, "pre_file", "pre_file"},
+		{`echo ${f/%_suf}`, "file_suf", "file_suf"},
+	} {
+		sc := newScan(parent, makeEnv(map[string]string{"f": tc.val}), work{deadline: time.Now().Add(time.Minute)})
+		got, err := sc.fields(parseFirstArg(t, tc.cmd))
+		if err != nil || len(got) != 1 || got[0] != tc.want {
+			t.Errorf("%s (f=%q) = (%q, %v), want ([%q], nil)", tc.cmd, tc.val, got, err, tc.want)
+		}
+	}
+
+	// 2. Long prose arguments with slashes (>255-byte component -> ENAMETOOLONG / ERROR_FILENAME_EXCED_RANGE) stay known.
+	prose := "summary " + strings.Repeat("a", 280) + "/internal/foo.go and https://github.com/org/repo/issues/1"
+	scProse := newScan(parent, makeEnv(nil), work{deadline: time.Now().Add(time.Minute)})
+	scProse.candidate(prose, plain)
+	if scProse.unknown {
+		t.Errorf("long prose argument with slashes set unknown=true, want false")
+	}
+
+	// 3. Git config [include]/[includeIf], sparse-checkout (worktreeConfig), matching submodule core.worktree, >4KiB config, and below() decoupling.
+	baseEnv := makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, "GIT_CONFIG_NOSYSTEM": "1"})
+
+	// 3a. [include] and [includeIf] with benign included file succeed; malicious included file fails closed.
+	incRepo := filepath.Join(parent, "inc-repo")
+	makeValidGitDir(t, filepath.Join(incRepo, ".git"))
+	benignInc := filepath.Join(parent, "benign.gitconfig")
+	if err := os.WriteFile(benignInc, []byte("[user]\n\tname = \"Test \\\"User\\\"\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	incCfg := "[include]\n\tpath = " + filepath.ToSlash(benignInc) + "\n[includeIf \"gitdir:" + filepath.ToSlash(incRepo) + "/\"]\n\tpath = missing-optional.gitconfig\n"
+	if err := os.WriteFile(filepath.Join(incRepo, ".git", "config"), []byte(incCfg), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scIncOK := newScan(incRepo, baseEnv, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scIncOK.safeLocate(incRepo); !ok || !samePath(got, incRepo) {
+		t.Errorf("safeLocate(benign include/includeIf) = (%q, %v), want (%q, true)", got, ok, incRepo)
+	}
+	evilInc := filepath.Join(parent, "evil.gitconfig")
+	if err := os.WriteFile(evilInc, []byte("[core]\n\tworktree = /elsewhere\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(incRepo, ".git", "config"), []byte("[includeIf \"gitdir:/tmp/\"]\n\tpath = "+filepath.ToSlash(evilInc)+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scIncBad := newScan(incRepo, baseEnv, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scIncBad.safeLocate(incRepo); ok {
+		t.Errorf("safeLocate(evil includeIf worktree) = (%q, true), want false", got)
+	}
+
+	// 3b. sparse-checkout (extensions.worktreeConfig = true + benign config.worktree under format v0) succeeds.
+	sparseRepo := filepath.Join(parent, "sparse-repo")
+	makeValidGitDir(t, filepath.Join(sparseRepo, ".git"))
+	if err := os.WriteFile(filepath.Join(sparseRepo, ".git", "config"), []byte("[core]\n\trepositoryformatversion = 0\n[extensions]\n\tworktreeConfig = true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sparseRepo, ".git", "config.worktree"), []byte("[core]\n\tsparseCheckout = true\n\tsparseCheckoutCone = true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scSparse := newScan(sparseRepo, baseEnv, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scSparse.safeLocate(sparseRepo); !ok || !samePath(got, sparseRepo) {
+		t.Errorf("safeLocate(sparse-checkout worktreeConfig) = (%q, %v), want (%q, true)", got, ok, sparseRepo)
+	}
+
+	// 3c. Submodule core.worktree pointing back to the discovered worktree root succeeds; mismatch fails closed.
+	subMod := filepath.Join(parent, "super", "submod")
+	subGit := filepath.Join(parent, "super", ".git", "modules", "submod")
+	makeValidGitDir(t, subGit)
+	if err := os.MkdirAll(subMod, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(subMod, ".git"), []byte("gitdir: ../.git/modules/submod\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(subGit, "config"), []byte("[core]\n\tworktree = ../../../submod\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scSubOK := newScan(subMod, baseEnv, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scSubOK.safeLocate(subMod); !ok || !samePath(got, subMod) {
+		t.Errorf("safeLocate(submodule matching core.worktree) = (%q, %v), want (%q, true)", got, ok, subMod)
+	}
+	if err := os.WriteFile(filepath.Join(subGit, "config"), []byte("[core]\n\tworktree = ../../../other\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scSubBad := newScan(subMod, baseEnv, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scSubBad.safeLocate(subMod); ok {
+		t.Errorf("safeLocate(submodule mismatched core.worktree) = (%q, true), want false", got)
+	}
+
+	// 3d. >4 KiB benign .git/config succeeds (64 KiB readSmallFile buffer).
+	bigRepo := filepath.Join(parent, "big-cfg-repo")
+	makeValidGitDir(t, filepath.Join(bigRepo, ".git"))
+	var bigCfg strings.Builder
+	bigCfg.WriteString("[core]\n\trepositoryformatversion = 0\n\tbare = false\n")
+	for i := range 120 {
+		bigCfg.WriteString("[branch \"feature-")
+		bigCfg.WriteString(strings.Repeat("x", 20))
+		bigCfg.WriteString(string(rune('a' + i%26)))
+		bigCfg.WriteString("\"]\n\tremote = origin\n\tmerge = refs/heads/main\n")
+	}
+	if bigCfg.Len() <= 4096 {
+		t.Fatalf("expected >4KiB config, got %d bytes", bigCfg.Len())
+	}
+	if err := os.WriteFile(filepath.Join(bigRepo, ".git", "config"), []byte(bigCfg.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scBig := newScan(bigRepo, baseEnv, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scBig.safeLocate(bigRepo); !ok || !samePath(got, bigRepo) {
+		t.Errorf("safeLocate(>4KiB config) = (%q, %v), want (%q, true)", got, ok, bigRepo)
+	}
+
+	// 3e. below() stops at a checkout root without running strict safeLocate/PATH/config checks.
+	nestedRepo := filepath.Join(incRepo, "nested-inner")
+	if err := os.MkdirAll(filepath.Join(nestedRepo, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	// incRepo currently has evil includeIf AND no GIT_CONFIG_NOSYSTEM AND empty PATH — below() must still stop at incRepo!
+	scBelow := newScan(parent, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent}), work{deadline: time.Now().Add(time.Minute)})
+	scBelow.below(incRepo, 4)
+	if scBelow.places[nestedRepo] || scBelow.unknown {
+		t.Errorf("below(incRepo) walked into nested repo or failed closed: places=%v unknown=%v", scBelow.out, scBelow.unknown)
+	}
+
+	// 4. GOENV and Go env allowlist: invalid GO111MODULE/GOWORK/GOEXPERIMENT/GOFIPS140 and malformed GOENV lines fail closed; benign GOENV succeeds.
+	for _, env := range []map[string]string{
+		{"HOME": parent, "USERPROFILE": parent, "GO111MODULE": "bogus"},
+		{"HOME": parent, "USERPROFILE": parent, "GOWORK": "bogus"},
+		{"HOME": parent, "USERPROFILE": parent, "GOEXPERIMENT": "arenas"},
+		{"HOME": parent, "USERPROFILE": parent, "GOFIPS140": "v1.0.0"},
+	} {
+		scBad := newScan(parent, makeEnv(env), work{deadline: time.Now().Add(time.Minute)})
+		if got, ok := gopath(scBad, nil); ok {
+			t.Errorf("%v: gopath = %q, want false", env, got)
+		}
+	}
+	benignGoEnv := filepath.Join(parent, "goenv-benign")
+	if err := os.WriteFile(benignGoEnv, []byte("# comment\nGOPROXY=https://proxy.golang.org,direct\nGOPRIVATE=\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scBenignGo := newScan(parent, makeEnv(map[string]string{
+		"HOME": parent, "USERPROFILE": parent, "GOENV": benignGoEnv, "GO111MODULE": "on", "GOWORK": "off",
+	}), work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := gopath(scBenignGo, nil); !ok || got != filepath.Join(parent, "go") {
+		t.Errorf("benign GOENV gopath = (%q, %v), want (%q, true)", got, ok, filepath.Join(parent, "go"))
+	}
+	for _, body := range []string{"=bogus\n", "GOFLAGS=-mod=readonly\n", "GOWORK=bogus\n", "GO111MODULE=bogus\n"} {
+		badGoEnv := filepath.Join(parent, "goenv-bad")
+		if err := os.WriteFile(badGoEnv, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		scBadGE := newScan(parent, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, "GOENV": badGoEnv}), work{deadline: time.Now().Add(time.Minute)})
+		if got, ok := gopath(scBadGE, nil); ok {
+			t.Errorf("GOENV %q: gopath = %q, want false", body, got)
+		}
+	}
+
+	// 5. UTF-8 BOM only allowed on line 1 of git config; BOM on line 2+ fails closed.
+	bomRepo := filepath.Join(parent, "bom-line-repo")
+	makeValidGitDir(t, filepath.Join(bomRepo, ".git"))
+	if err := os.WriteFile(filepath.Join(bomRepo, ".git", "config"), []byte("\ufeff[core]\n\tbare = false\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scBOM1 := newScan(bomRepo, baseEnv, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scBOM1.safeLocate(bomRepo); !ok || !samePath(got, bomRepo) {
+		t.Errorf("safeLocate(line-1 BOM) = (%q, %v), want (%q, true)", got, ok, bomRepo)
+	}
+	if err := os.WriteFile(filepath.Join(bomRepo, ".git", "config"), []byte("[core]\n\ufeff\tbare = false\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scBOM2 := newScan(bomRepo, baseEnv, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scBOM2.safeLocate(bomRepo); ok {
+		t.Errorf("safeLocate(line-2 BOM) = (%q, true), want false", got)
+	}
+
+	// 6. Reftable-only .git without refs/ fails closed in safeLocate.
+	reftableRepo := filepath.Join(parent, "reftable-repo")
+	for _, sub := range []string{".git/objects", ".git/reftable"} {
+		if err := os.MkdirAll(filepath.Join(reftableRepo, sub), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(reftableRepo, ".git", "HEAD"), []byte("ref: refs/heads/main\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scReftable := newScan(reftableRepo, baseEnv, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scReftable.safeLocate(reftableRepo); ok {
+		t.Errorf("safeLocate(reftable without refs) = (%q, true), want false", got)
 	}
 }
