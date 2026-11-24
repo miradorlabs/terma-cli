@@ -128,7 +128,8 @@ func (e Env) propagateMixed(parentID, childID, tool string) {
 	now := e.Time()
 	c := claim.Claim{Kind: claim.KindMixed, Run: cur.id, Tool: tool, Profile: e.Routing.Profile, Account: e.claimAccount()}
 	e.writeClaim(parentID, c, now)
-	for _, alias := range cur.aliases {
+	p, _ := runs.Locate(e.StateDir, childID)
+	for _, alias := range p.Aliases {
 		if alias != childID && alias != parentID {
 			e.writeClaim(alias, c, now)
 		}
