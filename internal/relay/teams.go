@@ -82,6 +82,16 @@ type (
 	}
 )
 
+func newTeamState() teamState {
+	return teamState{
+		pinnedHold:    map[string][]heldPart{},
+		teamSenders:   map[teamRoute]*sender{},
+		teamRecovered: map[teamRoute]bool{},
+		mixedSeen:     map[string]time.Time{},
+		nudging:       map[string]bool{},
+	}
+}
+
 // Routing outcomes, recheck verdicts, and hold/drop reasons.
 const (
 	Hold Outcome = iota
@@ -105,9 +115,14 @@ func (w Why) reason() string { return cmp.Or(string(w), string(WhyUnknown)) }
 func (rec Record) EffectiveEnd() time.Time { return nonZeroTime(rec.EndAt, rec.At) }
 
 // EffectiveEnd returns EndAt when non-zero, falling back to At.
-func (q Queued) EffectiveEnd() time.Time   { return nonZeroTime(q.EndAt, q.At) }
-func nonZeroTime(a, b time.Time) time.Time { return map[bool]time.Time{true: a, false: b}[!a.IsZero()] }
-func (r *Relay) teams() bool               { return r.opts.Router != nil && r.opts.Router.Active() }
+func (q Queued) EffectiveEnd() time.Time { return nonZeroTime(q.EndAt, q.At) }
+func nonZeroTime(a, b time.Time) time.Time {
+	if !a.IsZero() {
+		return a
+	}
+	return b
+}
+func (r *Relay) teams() bool { return r.opts.Router != nil && r.opts.Router.Active() }
 func (r *Relay) takesUnplaced() bool {
 	if r.teams() {
 		return r.opts.Router.UnknownToPersonal()
@@ -143,17 +158,28 @@ func crossedPlacement(raw claim.Claim, pid int, c claim.Claim, start, end time.T
 			}
 		}
 		if pl, ok := raw.At(pid, at); !ok || placementKey(pl) != want {
-			return map[bool]string{true: whyNotCollected, false: string(WhyMixed)}[ok && pl.Kind == "" && pl.ProjectID == ""]
+			if ok && pl.Kind == "" && pl.ProjectID == "" {
+				return whyNotCollected
+			}
+			return string(WhyMixed)
 		}
 	}
 	return ""
 }
 func (r *Relay) decideTeams(key string, p *part) verdict {
-	if ppid, ok := procOf(key); ok && r.collectsNone(ppid, p.at) && (p.endAt.IsZero() || p.endAt.Equal(p.at) || r.collectsNone(ppid, p.endAt)) {
+	if ppid, ok := procOf(key); ok && r.collectsNone(ppid, p.startAt) && (p.endAt.IsZero() || p.endAt.Equal(p.startAt) || r.collectsNone(ppid, p.endAt)) {
 		return verdict{why: whyNotCollected, final: true}
 	}
 	session, held := r.sessionOf(key, p.pid)
-	rec, how := Record{Session: session, At: p.at, EndAt: p.endAt, Account: p.account, Narrow: p.narrow, Claimed: p.claimed}, attribution{}
+	rec := Record{
+		Session: session,
+		Account: p.account,
+		At:      p.startAt,
+		EndAt:   p.endAt,
+		Narrow:  p.narrow,
+		Claimed: p.claimed,
+	}
+	var how attribution
 	if rec.Session != "" {
 		if strings.HasPrefix(key, procPrefix) || r.sessionFor(key) == "" {
 			how = attribution{how: semconv.TermaRelayAttributionProcess, session: rec.Session}
@@ -161,18 +187,38 @@ func (r *Relay) decideTeams(key string, p *part) verdict {
 		held = whyUnclaimed
 		if raw, ok := r.lookup(rec.Session); ok {
 			held = whyProcess
-			if c, ok := raw.At(p.pid, p.at); ok {
-				if why := map[bool]string{true: whyNotCollected, false: crossedPlacement(raw, p.pid, c, p.at, p.endAt)}[c.Kind == "" && c.ProjectID == ""]; why != "" {
-					return verdict{why: why, blocker: map[bool]string{true: "mixed:" + rec.Session}[why == string(WhyMixed)], final: true}
+			if c, ok := raw.At(p.pid, p.startAt); ok {
+				if c.Kind == "" && c.ProjectID == "" {
+					return verdict{why: whyNotCollected, final: true}
 				}
-				rec.Placement, rec.Placed, held = c, true, ""
+				if why := crossedPlacement(raw, p.pid, c, p.startAt, p.endAt); why != "" {
+					v := verdict{why: why, final: true}
+					if why == string(WhyMixed) {
+						v.blocker = "mixed:" + rec.Session
+					}
+					return v
+				}
+				rec.Placement = c
+				rec.Placed = true
+				held = ""
 			}
 		}
 	}
 	routed := r.opts.Router.Route(rec)
-	v, q := verdict{why: routed.Why.reason(), blocker: routed.Blocker, mixedAt: routed.MixedAt, session: rec.Session, c: rec.Placement}, routed.Queued
+	v := verdict{
+		why:     routed.Why.reason(),
+		blocker: routed.Blocker,
+		mixedAt: routed.MixedAt,
+		session: rec.Session,
+		c:       rec.Placement,
+	}
+	q := routed.Queued
 	if q.Enrollment != "" {
-		q.Account, q.Session, q.Run, q.At, q.EndAt = cmp.Or(q.Account, p.account), cmp.Or(q.Session, rec.Session), cmp.Or(q.Run, rec.Placement.Run), nonZeroTime(q.At, p.at), nonZeroTime(q.EndAt, p.endAt)
+		q.Account = cmp.Or(q.Account, p.account)
+		q.Session = cmp.Or(q.Session, rec.Session)
+		q.Run = cmp.Or(q.Run, rec.Placement.Run)
+		q.At = nonZeroTime(q.At, p.startAt)
+		q.EndAt = nonZeroTime(q.EndAt, p.endAt)
 	}
 	if !rec.Placed {
 		how = attribution{how: semconv.TermaRelayAttributionCatchAll}
@@ -182,15 +228,22 @@ func (r *Relay) decideTeams(key string, p *part) verdict {
 		v.final = true
 	case Hold:
 		if q.Enrollment != "" {
-			v.pin, v.how = &q, how
+			v.pin = &q
+			v.how = how
 		} else if held != "" && routed.Why == WhyUnknown {
 			v.why = held
 		}
 	case Send:
 		if pol, ok := r.teamReady(q.Enrollment, rec.Placement.Tool, p.account, false); ok {
-			v.ok, v.why, v.pol, v.q, v.how = true, "", pol, &q, how
+			v.ok = true
+			v.why = ""
+			v.pol = pol
+			v.q = &q
+			v.how = how
 		} else {
-			v.why, v.pin, v.how = whyNoKey, &q, how
+			v.why = whyNoKey
+			v.pin = &q
+			v.how = how
 		}
 	}
 	return v

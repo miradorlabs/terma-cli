@@ -159,7 +159,11 @@ func PurgeOldOutbox(dir string, now time.Time) (int, error) {
 			}
 		}
 		_ = os.Remove(filepath.Join(d, identity))
-		pruneEmptyUp(d, map[bool]int{true: 4, false: 3}[rt.account != ""])
+		levels := 3
+		if rt.account != "" {
+			levels = 4
+		}
+		pruneEmptyUp(d, levels)
 	}
 	if dropped > 0 {
 		recordLossesDir(dir, map[string]int{lostNoDestination: dropped}, now)

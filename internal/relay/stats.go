@@ -106,7 +106,11 @@ func (s *Stats) Snapshot() Snapshot {
 	defer s.mu.Unlock()
 	c := make(map[string]int, len(s.counters))
 	maps.Copy(c, s.counters)
-	return Snapshot{Since: s.started, Counters: c, Blocked: map[bool]map[string]int{true: maps.Clone(s.blocked)}[len(s.blocked) > 0]}
+	var blocked map[string]int
+	if len(s.blocked) > 0 {
+		blocked = maps.Clone(s.blocked)
+	}
+	return Snapshot{Since: s.started, Counters: c, Blocked: blocked}
 }
 
 // Keys lists the counters in order, for printing.

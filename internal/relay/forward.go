@@ -24,24 +24,37 @@ const (
 	idleWait          = 30 * time.Second
 )
 
-// sender delivers one route's outbox, so one refusing host never holds up another project.
+// sender delivers one outbox queue so one refusing host never holds up another destination.
+// It runs in one of two modes determined by whether team is nil:
+//   - Legacy mode (team == nil): delivers a single route from <dir>/<route>, resolving policy
+//     via Relay.resolve with no pre-POST admission fence.
+//   - Team mode (team != nil): delivers a routed enrollment queue from <dir>/.teams/<team>,
+//     reading per-file Queued headers, rechecking each entry via Router.Recheck, and running a
+//     pre-POST admission fence before sending.
 type sender struct {
-	r     *Relay
-	route route
-	wake  chan struct{}
+	// Shared across both modes.
+	r    *Relay
+	dir  string
+	name string
+	wake chan struct{}
 
 	mu sync.Mutex
-	// queue is the route's outbox in arrival order, one queue per signal, so the sender never
-	// lists the directory again after recoverOutbox: a backed-up route drains in linear time.
+	// queue is the outbox in arrival order, one queue per signal, so the sender never
+	// lists the directory again after recovery: a backed-up destination drains in linear time.
 	queue   map[Signal][]entry
-	keyless bool // a keyless route waits and keeps no relay awake
+	keyless bool // a waiting route keeps no relay awake
 
-	team                         *teamRoute
-	dir, name                    string
-	stateChange                  chan struct{}
-	blocked, scanFound, scanWait bool
-	gen                          int64
-	scanAfter                    map[Signal]string
+	// Legacy mode only (team == nil).
+	route route
+
+	// Team mode only (team != nil).
+	team        *teamRoute
+	stateChange chan struct{}
+	blocked     bool              // guarded by mu; true while team is waiting on state/policy
+	gen         int64             // routing state generation observed by nextBatch
+	scanAfter   map[Signal]string // cursor for incremental scan across waiting entries
+	scanFound   bool              // whether the current scan pass sent at least one batch
+	scanWait    bool              // whether the current scan pass saw any waiting entry
 }
 
 func (r *Relay) sender(rt route) *sender {
@@ -126,6 +139,12 @@ func (s *sender) loop() {
 			return false
 		}
 	}
+	resetScan := func() {
+		backoff = 0
+		s.scanAfter = nil
+		s.scanFound = false
+		s.scanWait = false
+	}
 	sleep := func(d time.Duration) bool {
 		t := time.NewTimer(d)
 		defer t.Stop()
@@ -143,7 +162,7 @@ func (s *sender) loop() {
 		case <-t.C:
 		case <-wake:
 		case <-s.stateChange:
-			backoff, s.scanAfter, s.scanFound, s.scanWait = 0, nil, false, false
+			resetScan()
 		case <-stop:
 			if backoff > 0 {
 				return false // a failing host is not retried on the way out
@@ -154,7 +173,7 @@ func (s *sender) loop() {
 	for ctx.Err() == nil {
 		select {
 		case <-s.stateChange:
-			backoff, s.scanAfter, s.scanFound, s.scanWait = 0, nil, false, false
+			resetScan()
 		default:
 		}
 		limit := maxMergeFiles

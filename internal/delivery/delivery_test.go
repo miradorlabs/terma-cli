@@ -184,7 +184,7 @@ func TestContentSpooledUnderAnOlderPolicyLeavesWithoutIt(t *testing.T) {
 	}
 	r := m.router(nil)
 	r.OTLPPinned = true
-	res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, ServerKeyAuthURL: routedAuth, OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
+	res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, ServerKeyAuthURL: routedAuth, OTLPURL: srv.URL, ServerKeySignIn: true, Team: "p1"}, true, 0)
 	if res.Sent != 3 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
@@ -374,7 +374,7 @@ func TestALockedKeychainKeepsEventsQueued(t *testing.T) {
 	}
 	r := m.router(nil)
 	r.OTLPPinned = true
-	res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, ServerKeyAuthURL: routedAuth, OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
+	res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, ServerKeyAuthURL: routedAuth, OTLPURL: srv.URL, ServerKeySignIn: true, Team: "p1"}, true, 0)
 	if sent != 0 || res.Sent != 0 || !secret.IsUnavailable(res.Err) {
 		t.Fatalf("Flush = %+v, sent %d; want nothing sent and the keychain named", res, sent)
 	}

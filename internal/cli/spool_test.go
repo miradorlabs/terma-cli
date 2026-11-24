@@ -57,23 +57,47 @@ func appendEvent(t *testing.T, s *spool.Spool, projectID string, at time.Time) {
 	}
 	if projectID != "" {
 		e.Attrs = map[string]any{hookrun.AttrProjectID: projectID}
-		if st, found, err := routing.Load(testApp.stateDir, config.DefaultProfile); err == nil && found {
-			for _, tm := range st.Teams {
-				if tm.TeamID == projectID {
-					e.Profile, e.Enrollment = config.DefaultProfile, tm.EnrollmentID
-					if len(tm.Policy.Repositories) > 0 {
-						e.Repository = config.Repository{Origin: tm.Policy.Repositories[0]}
-					} else if tm.Personal {
-						e.Repository = config.Repository{Origin: "github.com/personal/side"}
-					}
-					break
-				}
+		if profile, tm, ok := findEnrolledTeam(projectID); ok {
+			e.Profile, e.Enrollment = profile, tm.EnrollmentID
+			if len(tm.Policy.Repositories) > 0 {
+				e.Repository = config.Repository{Origin: tm.Policy.Repositories[0]}
+			} else if tm.Personal {
+				e.Repository = config.Repository{Origin: "github.com/personal/side"}
 			}
 		}
 	}
 	if err := s.Append(e); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func findEnrolledTeam(projectID string) (string, routing.Team, bool) {
+	check := func(profile string) (routing.Team, bool) {
+		st, found, err := routing.Load(testApp.stateDir, profile)
+		if err != nil || !found {
+			return routing.Team{}, false
+		}
+		for _, tm := range st.Teams {
+			if tm.TeamID == projectID {
+				return tm, true
+			}
+		}
+		return routing.Team{}, false
+	}
+	if tm, ok := check(config.DefaultProfile); ok {
+		return config.DefaultProfile, tm, true
+	}
+	if file, err := config.LoadFile(testApp.dir); err == nil {
+		for name := range file.Profiles {
+			if name == "" || name == config.DefaultProfile {
+				continue
+			}
+			if tm, ok := check(name); ok {
+				return name, tm, true
+			}
+		}
+	}
+	return "", routing.Team{}, false
 }
 
 // An event with no destination enrollment is counted as unroutable, apart from one that aged out.

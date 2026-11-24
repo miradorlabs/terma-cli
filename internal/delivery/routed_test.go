@@ -669,7 +669,8 @@ func TestRoutedAuthHeadersUserTokenVsServerKey(t *testing.T) {
 		m.queueRaw(routedEvent(sendas.NoPersonLane, config.DefaultProfile, enr["team-srv"], "github.com/acme/app", semconv.TermaToolCallEvent))
 
 		res := r.Flush(t.Context(), m.spool, &config.Config{
-			OTLPURL: "http://127.0.0.1:1", ProfileName: config.DefaultProfile, AuthURL: routedAuth, ServerKeySignIn: true, ServerKeyAuthURL: routedAuth,
+			OTLPURL: "http://127.0.0.1:1", ProfileName: config.DefaultProfile, AuthURL: routedAuth,
+			ServerKeySignIn: true, Team: "team-srv", ServerKeyAuthURL: routedAuth,
 		}, true, 0)
 		if res.Sent != 1 || res.Err != nil {
 			t.Fatalf("server-key Flush = %+v", res)
@@ -688,19 +689,37 @@ func TestRoutedAuthHeadersUserTokenVsServerKey(t *testing.T) {
 			t.Errorf("server-key delivery must not stamp terma.user.id: %s", reqs[0].body)
 		}
 
-		// Server-key cross-environment guard: mismatched ServerKeyAuthURL or cfg.AuthURL holds.
+		// Server-key cross-environment and team-binding guards: mismatched ServerKeyAuthURL,
+		// mismatched cfg.AuthURL, or a changed/empty cfg.Team holds even while team-srv's key
+		// remains in keystore.
 		m.queueRaw(routedEvent(sendas.NoPersonLane, config.DefaultProfile, enr["team-srv"], "github.com/acme/app", semconv.TermaToolCallEvent))
 		resWrongSrvAuth := r.Flush(t.Context(), m.spool, &config.Config{
-			OTLPURL: keyHost.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth, ServerKeySignIn: true, ServerKeyAuthURL: "https://other-env.example",
+			OTLPURL: keyHost.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth,
+			ServerKeySignIn: true, Team: "team-srv", ServerKeyAuthURL: "https://other-env.example",
 		}, true, 0)
 		if resWrongSrvAuth.Sent != 0 || resWrongSrvAuth.Held != 1 || len(keySent()) != 1 {
 			t.Fatalf("mismatched ServerKeyAuthURL should hold: res=%+v sent=%d", resWrongSrvAuth, len(keySent()))
 		}
 		resWrongEnv := r.Flush(t.Context(), m.spool, &config.Config{
-			OTLPURL: keyHost.URL, ProfileName: config.DefaultProfile, AuthURL: "https://other-env.example", ServerKeySignIn: true, ServerKeyAuthURL: "https://other-env.example",
+			OTLPURL: keyHost.URL, ProfileName: config.DefaultProfile, AuthURL: "https://other-env.example",
+			ServerKeySignIn: true, Team: "team-srv", ServerKeyAuthURL: "https://other-env.example",
 		}, true, 0)
 		if resWrongEnv.Sent != 0 || resWrongEnv.Held != 1 || len(keySent()) != 1 {
 			t.Fatalf("mismatched team.AuthURL should hold: res=%+v sent=%d", resWrongEnv, len(keySent()))
+		}
+		resWrongTeam := r.Flush(t.Context(), m.spool, &config.Config{
+			OTLPURL: keyHost.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth,
+			ServerKeySignIn: true, Team: "team-other", ServerKeyAuthURL: routedAuth,
+		}, true, 0)
+		if resWrongTeam.Sent != 0 || resWrongTeam.Held != 1 || len(keySent()) != 1 {
+			t.Fatalf("changed server-key cfg.Team should hold: res=%+v sent=%d", resWrongTeam, len(keySent()))
+		}
+		resEmptyTeam := r.Flush(t.Context(), m.spool, &config.Config{
+			OTLPURL: keyHost.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth,
+			ServerKeySignIn: true, ServerKeyAuthURL: routedAuth,
+		}, true, 0)
+		if resEmptyTeam.Sent != 0 || resEmptyTeam.Held != 1 || len(keySent()) != 1 {
+			t.Fatalf("empty server-key cfg.Team should hold: res=%+v sent=%d", resEmptyTeam, len(keySent()))
 		}
 	})
 }
@@ -1313,17 +1332,20 @@ func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
 	}
 
 	// Simulate a crash right after ImportLosses for evA (before ackBatch), followed by
-	// intervening hooks appending a distinct event evB and an identical copy of evA before
-	// the retry flush reads all three together as one batch.
+	// a heartbeat TakeNewLosses reading that pre-crash loss AND intervening hooks appending
+	// a distinct event evB and an identical copy of evA before the retry flush replays all
+	// three together as one batch.
 	crashed := &pass{r: r, s: m.spool}
 	if err := crashed.recordNoDestination(t.Context(), []spool.Event{evA}); err != nil {
 		t.Fatalf("simulated pre-crash recordNoDestination: %v", err)
 	}
+	if preTaken, err := spool.TakeNewLosses(spoolDir); err != nil || preTaken[LossNoDestination] != 1 {
+		t.Fatalf("pre-crash TakeNewLosses = %v (err=%v), want 1", preTaken, err)
+	}
 	evB := routedEvent(aliceLane, config.DefaultProfile, "", "github.com/acme/other", semconv.TermaToolCallEvent)
 	m.queueRaw(evB, evA)
 
-	// Also plant an expired imported~nodest-* loss file (and clear throttle marker) to
-	// prove independent retention pruning runs.
+	// Also plant an expired imported~nodest-* loss file to prove retention pruning runs.
 	stalePath := filepath.Join(spoolDir, "losses", "imported~nodest-stale.jsonl")
 	if err := os.WriteFile(stalePath, spool.EncodeLoss(LossNoDestination, 1, time.Now().Add(-spool.LossWindow-48*time.Hour)), 0o600); err != nil {
 		t.Fatal(err)
@@ -1332,11 +1354,11 @@ func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
 	if err := os.Chtimes(stalePath, oldTime, oldTime); err != nil {
 		t.Fatal(err)
 	}
-	_ = os.Remove(filepath.Join(spoolDir, "losses", noDestPruneMarker))
 
 	// Pass 2: endpoint recovers -> spool replays [team-slow, evA, evB, evA] in one batch.
-	// evA-0 overwrites the pre-crash file with identical bytes; evB-0 and evA-1 are new,
-	// yielding exactly 3 no_destination losses for 3 dropped events, and stale file is pruned.
+	// The batch file overwrites the pre-crash file with identical leading bytes for evA plus
+	// two new lines for evB and evA, so ReadLosses sees 3 and TakeNewLosses sees only the 2
+	// newly appended events (total 1 + 2 = 3), and the stale file is pruned.
 	stall.Store(false)
 	res2 := r.Flush(t.Context(), m.spool, cfg, true, 0)
 	if res2.Sent != 1 || res2.Unroutable != 3 || res2.Err != nil || m.pending() != 0 {
@@ -1345,15 +1367,16 @@ func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
 	if losses, err := spool.ReadLosses(spoolDir, time.Now()); err != nil || losses.Counts[LossNoDestination] != 3 {
 		t.Fatalf("ReadLosses after intervening-append replay = %+v (err=%v), want 3", losses, err)
 	}
-	if taken, err := spool.TakeNewLosses(spoolDir); err != nil || taken[LossNoDestination] != 3 {
-		t.Fatalf("TakeNewLosses after intervening-append replay = %v (err=%v), want 3", taken, err)
+	if taken, err := spool.TakeNewLosses(spoolDir); err != nil || taken[LossNoDestination] != 2 {
+		t.Fatalf("TakeNewLosses after intervening-append replay = %v (err=%v), want 2 (1 already taken pre-crash)", taken, err)
 	}
 	if _, err := os.Stat(stalePath); !os.IsNotExist(err) {
 		t.Fatalf("expired imported~nodest-* loss file must be pruned, stat err = %v", err)
 	}
 
 	// Pass 3: 201 byte-identical events spanning two default spool batches (200 + 1) must
-	// all be counted without collision because ackBatch atomically replaces events.jsonl.
+	// all be counted without collision and write one loss file per batch (not 201 files).
+	beforeFiles, _ := filepath.Glob(filepath.Join(spoolDir, "losses", "imported~nodest-*.jsonl"))
 	identicalBatch := make([]spool.Event, 201)
 	for i := range identicalBatch {
 		identicalBatch[i] = evA
@@ -1365,6 +1388,10 @@ func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
 	}
 	if taken, err := spool.TakeNewLosses(spoolDir); err != nil || taken[LossNoDestination] != 201 {
 		t.Fatalf("TakeNewLosses for 201 identical events across batches = %v (err=%v), want 201", taken, err)
+	}
+	afterFiles, _ := filepath.Glob(filepath.Join(spoolDir, "losses", "imported~nodest-*.jsonl"))
+	if created := len(afterFiles) - len(beforeFiles); created > 2 {
+		t.Fatalf("201 events across 2 batches created %d loss files, want <= 2", created)
 	}
 
 	// Pass 4: another byte-identical event in a separate subsequent flush must also count.

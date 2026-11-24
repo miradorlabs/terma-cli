@@ -124,7 +124,7 @@ func (r *Relay) judge(key string, p *part) verdict {
 	return verdict{c: c, pol: pol, why: why, ok: ok, how: how}
 }
 func (r *Relay) splitMixed(p *part, v verdict) (*part, *part) {
-	if !r.teams() || v.why != string(WhyMixed) || v.mixedAt.IsZero() || p.records <= 1 || p.at.IsZero() || !p.at.Before(v.mixedAt) {
+	if !r.teams() || v.why != string(WhyMixed) || v.mixedAt.IsZero() || p.records <= 1 || p.startAt.IsZero() || !p.startAt.Before(v.mixedAt) {
 		return nil, nil
 	}
 	return splitBeforeMixed(p, v.mixedAt)

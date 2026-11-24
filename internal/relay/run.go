@@ -116,7 +116,9 @@ func (r *Relay) dropHeldAtExit() {
 	for _, parts := range pinned {
 		for _, h := range parts {
 			why := cmp.Or(h.pin.why, "claimed")
-			lost += map[bool]int{true: h.p.records}[!h.awaitingPolicy.IsZero() || why == whyNoKey || why == "claimed"]
+			if !h.awaitingPolicy.IsZero() || why == whyNoKey || why == "claimed" {
+				lost += h.p.records
+			}
 			r.dropStats(h.p.signal, why+"_at_exit", h.pin.blocker, h.p.records)
 		}
 	}

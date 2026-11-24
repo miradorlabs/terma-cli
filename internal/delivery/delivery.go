@@ -127,8 +127,10 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 	if !serverKey && r.SignIn != nil {
 		account = r.SignIn.Account()
 	}
+	httpClient := newHTTPClient()
+	defer httpClient.CloseIdleConnections()
 	p := &pass{
-		r: r, s: s, cfg: cfg, force: force, now: now, res: &res,
+		r: r, s: s, cfg: cfg, force: force, now: now, res: &res, http: httpClient,
 		serverKey: serverKey, account: account,
 		failed: map[string]bool{}, waiting: map[string]bool{}, accepted: map[string]bool{},
 		routes: routeCache{}, ledgers: map[string]runs.Snapshot{}, profiles: map[string]*config.Config{},
@@ -156,6 +158,7 @@ type pass struct {
 	force     bool
 	now       time.Time
 	res       *Result
+	http      *http.Client
 	serverKey bool
 	account   string
 	// failed and waiting are keyed as retry windows are, by enrollment (retryDest);

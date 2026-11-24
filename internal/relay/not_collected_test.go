@@ -208,3 +208,64 @@ func TestNotCollectedSessionlessParts(t *testing.T) {
 		t.Fatalf("stats = %v, held %d", c, pr.r.heldN)
 	}
 }
+
+// cumulativeMetricAt is a cumulative histogram whose process started at start and whose
+// reading was recorded at at (as Gemini CLI and OMP emit).
+func cumulativeMetricAt(start, at time.Time) *metricspb.MetricsData {
+	m := codexMetric()
+	dp := m.ResourceMetrics[0].ScopeMetrics[0].Metrics[0].GetHistogram().DataPoints[0]
+	dp.StartTimeUnixNano = uint64(start.UnixNano())
+	dp.TimeUnixNano = uint64(at.UnixNano())
+	return m
+}
+
+// On the legacy single-team path, cumulative metrics whose StartTimeUnixNano is the process
+// start and whose TimeUnixNano is after a placement move must be placed by TimeUnixNano
+// (matching main's earliest), not StartTimeUnixNano:
+//   - marked -> p1: forwards to p1 (not dropped as not_collected)
+//   - p1 -> p2: forwards to p2 (not p1)
+//   - p1 -> marked: dropped as not_collected (not sent to p1)
+func TestRelayPlacesCumulativeMetricsByReadTimeNotProcessStart(t *testing.T) {
+	t.Parallel()
+	pr := newProcRelay(t)
+	t0 := pr.f.clock()
+	t1 := t0.Add(time.Minute)
+	after := t1.Add(time.Second)
+
+	// pid 100: marked (unlisted) -> p1 at t1.
+	pr.f.claim("M2P", claim.Claim{ProjectID: "p1", PIDs: []int{100}, Placements: []claim.Placement{
+		{PIDs: []int{100}, Since: t0.Add(-time.Hour)},
+		{ProjectID: "p1", PIDs: []int{100}, Since: t1},
+	}})
+	// pid 200: p1 -> p2 at t1.
+	pr.f.claim("P12", claim.Claim{ProjectID: "p2", PIDs: []int{200}, Placements: []claim.Placement{
+		{ProjectID: "p1", PIDs: []int{200}, Since: t0.Add(-time.Hour)},
+		{ProjectID: "p2", PIDs: []int{200}, Since: t1},
+	}})
+	// pid 300: p1 -> marked (excluded/unlisted) at t1.
+	pr.f.claim("P2M", claim.Claim{PIDs: []int{300}, Placements: []claim.Placement{
+		{ProjectID: "p1", PIDs: []int{300}, Since: t0.Add(-time.Hour)},
+		{PIDs: []int{300}, Since: t1},
+	}})
+
+	pr.send(100, "/v1/logs", logsAt("M2P", 1, after))
+	pr.send(100, "/v1/metrics", cumulativeMetricAt(t0, after))
+	pr.send(200, "/v1/logs", logsAt("P12", 1, after))
+	pr.send(200, "/v1/metrics", cumulativeMetricAt(t0, after))
+	pr.send(300, "/v1/logs", logsAt("P2M", 1, after))
+	pr.send(300, "/v1/metrics", cumulativeMetricAt(t0, after))
+	pr.exit(100)
+	pr.exit(200)
+	pr.exit(300)
+
+	waitFor(t, func() bool {
+		c := pr.r.Stats().Snapshot().Counters
+		return c["forwarded.metrics"] == 2 && c["dropped.not_collected.metrics"] == 1
+	})
+	if got := pr.metricsBy("Bearer key-p1"); len(got) != 1 {
+		t.Fatalf("p1 got %d metrics, want 1 (only marked->p1): %v", len(got), pr.r.Stats().Snapshot().Counters)
+	}
+	if got := pr.metricsBy("Bearer key-p2"); len(got) != 1 {
+		t.Fatalf("p2 got %d metrics, want 1 (p1->p2): %v", len(got), pr.r.Stats().Snapshot().Counters)
+	}
+}

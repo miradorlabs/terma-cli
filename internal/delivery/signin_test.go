@@ -183,7 +183,7 @@ func TestAServerKeyNeverSendsAPersonsEvents(t *testing.T) {
 	keys := eventFor(enr["p1"], "the-keys", "")
 	keys.NoPerson = true
 	m.queueRaw(eventFor(enr["p1"], "a-persons", aliceLane), keys, eventFor(enr["p1"], "older-termas", ""))
-	res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, ServerKeyAuthURL: routedAuth, OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
+	res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, ServerKeyAuthURL: routedAuth, OTLPURL: srv.URL, ServerKeySignIn: true, Team: "p1"}, true, 0)
 	if res.Sent != 1 || res.Held != 1 || res.Dropped != 1 {
 		t.Fatalf("Flush = %+v", res)
 	}

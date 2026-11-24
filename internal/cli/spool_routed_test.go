@@ -171,7 +171,7 @@ func TestCLISpoolFlushRoutedServerKeyOmitsProjectHeader(t *testing.T) {
 	useConfigDir(t, t.TempDir())
 	t.Setenv("TERMA_AUTH_URL", "https://auth.example")
 	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
-		p.ServerKeySignIn, p.ServerKeyAuthURL = true, "https://auth.example"
+		p.ServerKeySignIn, p.ServerKeyAuthURL, p.Team = true, "https://auth.example", "team-srv"
 	}); err != nil {
 		t.Fatal(err)
 	}

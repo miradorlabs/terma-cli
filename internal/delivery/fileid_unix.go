@@ -10,7 +10,8 @@ import (
 
 // fileIdentity returns a stable identifier for the current OS file instance at path.
 // O_APPEND writes by hooks preserve this identity, while spool.ackBatch's atomic rename
-// creates a fresh file instance with a new identity.
+// creates a fresh file instance (paired with the batch's first-event hash by callers so
+// eventual Unix inode reuse does not collide with an earlier distinct batch).
 func fileIdentity(path string) string {
 	info, err := os.Stat(path)
 	if err != nil {

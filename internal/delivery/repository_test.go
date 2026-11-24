@@ -64,7 +64,7 @@ func TestEveryEventLeavesNamingItsRepository(t *testing.T) {
 	r := m.router(nil)
 	r.OTLPPinned = true
 	r.Consent = func(string, hookrun.Consent) bool { return true }
-	if res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, ServerKeyAuthURL: routedAuth, OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0); res.Sent != 8 || res.Err != nil {
+	if res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, ServerKeyAuthURL: routedAuth, OTLPURL: srv.URL, ServerKeySignIn: true, Team: "p1"}, true, 0); res.Sent != 8 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
 	var payload struct {

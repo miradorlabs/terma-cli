@@ -8,13 +8,10 @@ package relay
 
 import (
 	"cmp"
-	"compress/gzip"
 	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"net/http"
 	"net/netip"
 	"strings"
@@ -22,10 +19,6 @@ import (
 	"time"
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
-	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
-	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -224,14 +217,22 @@ func New(opts Options) *Relay {
 	opts.Grace = cmp.Or(opts.Grace, 5*time.Second)
 	sendCtx, cancel := context.WithCancel(context.Background())
 	r := &Relay{
-		opts: opts, rules: compose(opts.Correlators, opts.Capturers), stats: newStats(),
-		cache:  lookupCache{claims: map[string]cachedClaim{}, policies: map[string]cachedPolicy{}},
-		held:   map[string][]heldPart{},
-		traces: map[string]traceSession{}, procs: map[int]*procState{}, senders: map[route]*sender{}, outbox: outbox{dir: opts.Dir},
-		lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
+		opts:            opts,
+		rules:           compose(opts.Correlators, opts.Capturers),
+		stats:           newStats(),
+		cache:           lookupCache{claims: map[string]cachedClaim{}, policies: map[string]cachedPolicy{}},
+		held:            map[string][]heldPart{},
+		traces:          map[string]traceSession{},
+		procs:           map[int]*procState{},
+		senders:         map[route]*sender{},
+		outbox:          outbox{dir: opts.Dir},
+		lastSeen:        opts.Now(),
+		sendCtx:         sendCtx,
+		cancelSend:      cancel,
+		stopping:        make(chan struct{}),
 		unreadableRetry: unreadableRetry,
+		teamState:       newTeamState(),
 	}
-	r.pinnedHold, r.teamSenders, r.teamRecovered, r.mixedSeen, r.nudging = map[string][]heldPart{}, map[teamRoute]*sender{}, map[teamRoute]bool{}, map[string]time.Time{}, map[string]bool{}
 	r.seedLane()
 	return r
 }
@@ -368,7 +369,8 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	narrow := (r.teams() || r.opts.CatchAll != nil) && !r.takesUnplaced()
 	for _, p := range parts {
 		p.pid, p.narrow, p.account, p.lost, p.arrived = pid, narrow, lane, lost, arrived
-		p.at, p.endAt = intervalOf(p.msg)
+		p.at = earliest(p.msg)
+		p.startAt, p.endAt = intervalOf(p.msg)
 		r.stats.received(s, p.records)
 		if p.session != "" && !strings.HasPrefix(p.session, tracePrefix) {
 			r.learnProcess(pid, p.session)
@@ -394,53 +396,4 @@ func (r *Relay) export(w http.ResponseWriter, req *http.Request, s Signal) {
 	}
 	w.Header().Set("Content-Type", "application/x-protobuf")
 	w.WriteHeader(http.StatusOK)
-}
-
-func readBody(req *http.Request) ([]byte, error) {
-	var rd io.Reader = http.MaxBytesReader(nil, req.Body, maxBody)
-	if strings.EqualFold(req.Header.Get("Content-Encoding"), "gzip") {
-		zr, err := gzip.NewReader(rd)
-		if err != nil {
-			return nil, err
-		}
-		defer func() { _ = zr.Close() }()
-		rd = io.LimitReader(zr, maxBody+1)
-	}
-	body, err := io.ReadAll(rd)
-	if err == nil && len(body) > maxBody {
-		err = fmt.Errorf("export larger than %d bytes", maxBody)
-	}
-	return body, err
-}
-
-func (r *Relay) decode(s Signal, body []byte, isJSON bool) (map[string]*part, error) {
-	unmarshal := proto.Unmarshal
-	if isJSON {
-		fixed, err := hexIDsToBase64(body)
-		if err != nil {
-			return nil, err
-		}
-		body = fixed
-		unmarshal = protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal
-	}
-	switch s {
-	case Logs:
-		var m logspb.LogsData
-		if err := unmarshal(body, &m); err != nil {
-			return nil, err
-		}
-		return r.rules.splitLogs(&m, r.learnTrace), nil
-	case Traces:
-		var m tracepb.TracesData
-		if err := unmarshal(body, &m); err != nil {
-			return nil, err
-		}
-		return r.rules.splitTraces(&m, r.learnTrace, r.traceOf), nil
-	default:
-		var m metricspb.MetricsData
-		if err := unmarshal(body, &m); err != nil {
-			return nil, err
-		}
-		return r.rules.splitMetrics(&m), nil
-	}
 }

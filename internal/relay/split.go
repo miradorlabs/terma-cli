@@ -34,10 +34,13 @@ type part struct {
 	records int
 	// pid is the process that exported it, 0 when unknown.
 	pid int
-	// at and endAt are the record's [start, end] interval (intervalOf): at picks the
-	// placement of a resumed session (claim.At), and !endAt.Before(mixedAt) gates Mixed.
-	at    time.Time
-	endAt time.Time
+	// at is the legacy placement timestamp (earliest: TimeUnixNano for metrics,
+	// StartTimeUnixNano for traces, TimeUnixNano/ObservedTimeUnixNano for logs).
+	// startAt and endAt are the record's [start, end] interval (intervalOf) used by
+	// routed placement-crossing and Mixed checks.
+	at      time.Time
+	startAt time.Time
+	endAt   time.Time
 	// start marks a conversation start, which waits as long as a trace: its claiming hook may be far off.
 	start bool
 	// narrow marks a part that arrived outside global mode, while the relay has one to
@@ -342,6 +345,46 @@ func unixTime(ns uint64) time.Time {
 	}
 	return time.Unix(0, int64(ns))
 }
+func earliest(msg proto.Message) time.Time {
+	var first uint64
+	see := func(t uint64) {
+		if t != 0 && (first == 0 || t < first) {
+			first = t
+		}
+	}
+	switch m := msg.(type) {
+	case *logspb.LogsData:
+		for _, rl := range m.GetResourceLogs() {
+			for _, sl := range rl.GetScopeLogs() {
+				for _, lr := range sl.GetLogRecords() {
+					if t := lr.GetTimeUnixNano(); t != 0 {
+						see(t)
+					} else {
+						see(lr.GetObservedTimeUnixNano())
+					}
+				}
+			}
+		}
+	case *tracepb.TracesData:
+		for _, rs := range m.GetResourceSpans() {
+			for _, ss := range rs.GetScopeSpans() {
+				for _, sp := range ss.GetSpans() {
+					see(sp.GetStartTimeUnixNano())
+				}
+			}
+		}
+	case *metricspb.MetricsData:
+		for _, rm := range m.GetResourceMetrics() {
+			for _, sm := range rm.GetScopeMetrics() {
+				for _, mt := range sm.GetMetrics() {
+					eachPointTime(mt, func(_, end uint64) { see(end) })
+				}
+			}
+		}
+	}
+	return unixTime(first)
+}
+
 func intervalOf(msg proto.Message) (time.Time, time.Time) {
 	var first, last uint64
 	see := func(iv timeInterval) {
@@ -371,7 +414,7 @@ func intervalOf(msg proto.Message) (time.Time, time.Time) {
 		for _, rm := range m.GetResourceMetrics() {
 			for _, sm := range rm.GetScopeMetrics() {
 				for _, mt := range sm.GetMetrics() {
-					eachPointTime(mt, see)
+					eachPointTime(mt, func(start, end uint64) { see(makeInterval(start, end)) })
 				}
 			}
 		}
@@ -379,27 +422,27 @@ func intervalOf(msg proto.Message) (time.Time, time.Time) {
 	return unixTime(first), unixTime(last)
 }
 
-func eachPointTime(m *metricspb.Metric, see func(timeInterval)) {
+func eachPointTime(m *metricspb.Metric, see func(start, end uint64)) {
 	switch d := m.GetData().(type) {
 	case *metricspb.Metric_Sum:
 		for _, p := range d.Sum.GetDataPoints() {
-			see(makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano()))
+			see(p.GetStartTimeUnixNano(), p.GetTimeUnixNano())
 		}
 	case *metricspb.Metric_Gauge:
 		for _, p := range d.Gauge.GetDataPoints() {
-			see(makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano()))
+			see(p.GetStartTimeUnixNano(), p.GetTimeUnixNano())
 		}
 	case *metricspb.Metric_Histogram:
 		for _, p := range d.Histogram.GetDataPoints() {
-			see(makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano()))
+			see(p.GetStartTimeUnixNano(), p.GetTimeUnixNano())
 		}
 	case *metricspb.Metric_ExponentialHistogram:
 		for _, p := range d.ExponentialHistogram.GetDataPoints() {
-			see(makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano()))
+			see(p.GetStartTimeUnixNano(), p.GetTimeUnixNano())
 		}
 	case *metricspb.Metric_Summary:
 		for _, p := range d.Summary.GetDataPoints() {
-			see(makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano()))
+			see(p.GetStartTimeUnixNano(), p.GetTimeUnixNano())
 		}
 	}
 }

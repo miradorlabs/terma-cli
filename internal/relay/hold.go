@@ -85,7 +85,10 @@ func (r *Relay) holdInto(p *part, awaitingPolicy bool, pin *pinnedDest) {
 	if awaitingPolicy {
 		h.awaitingPolicy = h.at
 	}
-	dst := map[bool]map[string][]heldPart{true: r.pinnedHold, false: r.held}[pin != nil]
+	dst := r.held
+	if pin != nil {
+		dst = r.pinnedHold
+	}
 	dst[p.session] = append(dst[p.session], h)
 	r.heldN += p.records
 	r.heldBytes += size
@@ -201,7 +204,14 @@ func (r *Relay) sweep() {
 			case ok:
 				out = append(out, verdictPart{v, h.p})
 			case v.pin != nil:
-				pin = append(pin, heldPart{p: h.p, awaitingPolicy: map[bool]time.Time{true: now}[why == whyNoKey || why == string(WhyBlocked) || why == string(WhyNoState)], pin: &pinnedDest{*v.pin, v.c, v.how, why, v.blocker}})
+				hp := heldPart{
+					p:   h.p,
+					pin: &pinnedDest{q: *v.pin, c: v.c, how: v.how, why: why, blocker: v.blocker},
+				}
+				if why == whyNoKey || why == string(WhyBlocked) || why == string(WhyNoState) {
+					hp.awaitingPolicy = now
+				}
+				pin = append(pin, hp)
 			case !r.teams() && why == whyNoKey && now.Sub(h.awaitingPolicy) < policyHold:
 				keep = append(keep, h)
 			case why == whyNoKey || why == whyWidened || why == whyNotCollected || v.final || now.Sub(h.at) >= limit:
@@ -256,23 +266,42 @@ func (r *Relay) expandHeldPieces(key string, parts []heldPart) (out []heldPart) 
 	}
 	return out
 }
+
+type readyPolicy struct {
+	pol Policy
+	ok  bool
+}
+
 func (r *Relay) sweepPinned(keys []string, now time.Time, lost *int) {
 	rcs := map[[2]string]Rechecker{}
+	ready := map[[3]string]readyPolicy{}
 	for _, key := range keys {
-		hold := map[bool]time.Duration{true: r.opts.TraceHold, false: r.opts.Hold}[strings.HasPrefix(key, tracePrefix) || strings.HasPrefix(key, procPrefix)]
+		hold := r.opts.Hold
+		if strings.HasPrefix(key, tracePrefix) || strings.HasPrefix(key, procPrefix) {
+			hold = r.opts.TraceHold
+		}
 		r.mu.Lock()
 		parts := r.pinnedHold[key]
 		r.mu.Unlock()
-		keep, out, dn, db := []heldPart(nil), []verdictPart(nil), 0, 0
-		retain := func(h heldPart) { keep, dn, db = append(keep, h), dn+h.p.records, db+h.size }
+		var keep []heldPart
+		var out []verdictPart
+		var dn, db int
+		retain := func(h heldPart) {
+			keep = append(keep, h)
+			dn += h.p.records
+			db += h.size
+		}
 		for _, h := range parts {
-			dn, db = dn-h.p.records, db-h.size
+			dn -= h.p.records
+			db -= h.size
 			pn := h.pin
 			if !r.teams() || !r.laneActive(h.p.account) {
 				if r.teams() && now.Sub(h.at) < hold {
 					retain(h)
 				} else {
-					*lost += map[bool]int{true: h.p.records}[h.awaitingPolicy != time.Time{}]
+					if !h.awaitingPolicy.IsZero() {
+						*lost += h.p.records
+					}
 					r.dropStats(h.p.signal, cmp.Or(pn.why, string(WhyBlocked)), pn.blocker, h.p.records)
 				}
 				continue
@@ -289,7 +318,10 @@ func (r *Relay) sweepPinned(keys []string, now time.Time, lost *int) {
 				if after != nil {
 					r.dropStats(after.signal, res.Why.reason(), res.Blocker, after.records)
 				}
-				h.p, h.size, pn.q.At, pn.q.EndAt = before, proto.Size(before.msg), before.at, before.endAt
+				h.p = before
+				h.size = proto.Size(before.msg)
+				pn.q.At = before.startAt
+				pn.q.EndAt = before.endAt
 				res = rcs[rk].Entry(pn.q)
 			}
 			switch res.Verdict {
@@ -297,21 +329,32 @@ func (r *Relay) sweepPinned(keys []string, now time.Time, lost *int) {
 				r.dropStats(h.p.signal, res.Why.reason(), res.Blocker, h.p.records)
 				continue
 			case SendNow:
-				if pol, ok := r.teamReady(pn.q.Enrollment, pn.c.Tool, h.p.account, true); ok {
-					out = append(out, verdictPart{verdict{ok: true, pol: pol, c: pn.c, q: &pn.q, how: pn.how}, h.p})
+				tk := [3]string{pn.q.Enrollment, pn.c.Tool, h.p.account}
+				tr, cached := ready[tk]
+				if !cached {
+					tr.pol, tr.ok = r.teamReady(tk[0], tk[1], tk[2], true)
+					ready[tk] = tr
+				}
+				if tr.ok {
+					out = append(out, verdictPart{verdict{ok: true, pol: tr.pol, c: pn.c, q: &pn.q, how: pn.how}, h.p})
 					continue
 				}
-				pn.why, res.Why = whyNoKey, WhyNoState
+				pn.why = whyNoKey
+				res.Why = WhyNoState
 			default:
-				pn.why, pn.blocker = res.Why.reason(), res.Blocker
+				pn.why = res.Why.reason()
+				pn.blocker = res.Blocker
 			}
 			if res.Why == WhyBlocked || res.Why == WhyNoState {
-				if h.awaitingPolicy = nonZeroTime(h.awaitingPolicy, now); now.Sub(h.awaitingPolicy) < policyHold {
+				h.awaitingPolicy = nonZeroTime(h.awaitingPolicy, now)
+				if now.Sub(h.awaitingPolicy) < policyHold {
 					retain(h)
 					continue
 				}
 				*lost += h.p.records
-				pn.why = map[bool]string{true: lostPolicyTimeout, false: pn.why}[res.Why == WhyNoState]
+				if res.Why == WhyNoState {
+					pn.why = lostPolicyTimeout
+				}
 			} else if now.Sub(h.at) < hold {
 				h.awaitingPolicy = time.Time{}
 				retain(h)
@@ -320,7 +363,8 @@ func (r *Relay) sweepPinned(keys []string, now time.Time, lost *int) {
 			r.dropStats(h.p.signal, pn.why, pn.blocker, h.p.records)
 		}
 		r.mu.Lock()
-		r.heldN, r.heldBytes = r.heldN+dn, r.heldBytes+db
+		r.heldN += dn
+		r.heldBytes += db
 		if len(keep) == 0 {
 			delete(r.pinnedHold, key)
 		} else {

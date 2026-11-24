@@ -87,8 +87,10 @@ func serverKeyProfile(t *testing.T) {
 	}
 }
 
-// routeProject stores a project's key with the host it belongs to and enrolls the team in
-// routing.State under sendas.NoPersonLane.
+// routeProject stores a project's key with the host it belongs to, binds a server-key
+// profile's Team to projectID (using default when unbound or already bound to projectID,
+// else a dedicated server-key profile so multi-project tests respect single-team server-key
+// binding), and enrolls the team in that profile's routing.State under sendas.NoPersonLane.
 func routeProject(t *testing.T, projectID, key, endpoint string) {
 	t.Helper()
 	if err := keystore.Set(testApp.dir, projectID, key, keystore.Hosts{OTLP: endpoint}); err != nil {
@@ -96,6 +98,15 @@ func routeProject(t *testing.T, projectID, key, endpoint string) {
 	}
 	cfg, err := testApp.loadConfig()
 	if err != nil {
+		t.Fatal(err)
+	}
+	profile := config.DefaultProfile
+	if cfg.Team != "" && cfg.Team != projectID {
+		profile = "srv-" + projectID
+	}
+	if err := config.UpdateProfile(testApp.dir, profile, func(p *config.Profile) {
+		p.OTLPURL, p.ServerKeySignIn, p.ServerKeyAuthURL, p.Team = cfg.OTLPURL, true, cfg.AuthURL, projectID
+	}); err != nil {
 		t.Fatal(err)
 	}
 	orgID := "org-" + projectID
@@ -122,12 +133,12 @@ func routeProject(t *testing.T, projectID, key, endpoint string) {
 		}
 		return s.Bind(repo, orgID, false)
 	}
-	st, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+	st, found, err := routing.Load(testApp.stateDir, profile)
 	switch {
 	case err != nil || !found || st.Account != sendas.NoPersonLane:
-		_, err = routing.Replace(testApp.stateDir, config.DefaultProfile, nil, sendas.NoPersonLane, add)
+		_, err = routing.Replace(testApp.stateDir, profile, nil, sendas.NoPersonLane, add)
 	default:
-		_, err = routing.Update(testApp.stateDir, config.DefaultProfile, st.ExpectConsent(), add)
+		_, err = routing.Update(testApp.stateDir, profile, st.ExpectConsent(), add)
 	}
 	if err != nil {
 		t.Fatal(err)
@@ -256,16 +267,11 @@ func TestSpoolFlushARefusedProjectWaitsAlone(t *testing.T) {
 		t.Fatalf("queue = %v, want the refused project's event only", queued)
 	}
 	// Only the refused enrollment waits out a retry window (keyed by enrollment/<enrollmentID>).
-	st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
-	if err != nil {
-		t.Fatal(err)
+	_, devTeam, ok := findEnrolledTeam(routeDevProject)
+	if !ok {
+		t.Fatalf("missing enrolled team for %s", routeDevProject)
 	}
-	var devEnr string
-	for _, tm := range st.Teams {
-		if tm.TeamID == routeDevProject {
-			devEnr = "enrollment/" + tm.EnrollmentID
-		}
-	}
+	devEnr := "enrollment/" + devTeam.EnrollmentID
 	if windows := testApp.openSpool().RetryWindows(time.Now()); len(windows) != 1 || windows[devEnr].IsZero() {
 		t.Fatalf("retry windows = %v, want only %s's (%s)", windows, routeDevProject, devEnr)
 	}
