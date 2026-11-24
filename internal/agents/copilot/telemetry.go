@@ -18,7 +18,8 @@ func (Agent) CaptureRules() shape.CaptureRules {
 			// The repository, organization, branch and commit as the runtime read them: the
 			// agent's word, unchecked, where the relay names the checkout from the claim
 			// (stampCheckout) under any policy. And the names a developer gave their skills and
-			// custom agents, which no rule lets out with content withheld.
+			// custom agents: content, the cautious side, though the names of their MCP servers
+			// below are safe.
 			"github.copilot.git.repository", "github.copilot.github.org", "github.copilot.git.branch", "github.copilot.git.commit_sha",
 			"github.copilot.context.skills", "github.copilot.context.custom_agent_names"},
 		// Strings only: a number or a flag passes whatever its key (a request's AI credits,
