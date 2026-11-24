@@ -736,7 +736,7 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(gitFileDir, ".git"), []byte("gitdir: //server/share/repo.git\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	scGitFile := newScan(gitFileDir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	scGitFile := newScan(gitFileDir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
 	if err := scGitFile.substitute(&gitBuf, csGit); err == nil || !scGitFile.unknown {
 		t.Fatalf("remote .git gitdir file did not fail closed: err=%v unknown=%v", err, scGitFile.unknown)
 	}
@@ -1050,7 +1050,7 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	// hasGoEnv only blocks GOPATH/GOMODCACHE when go/env actually overrides that key; on Windows, GOPATH defaults from USERPROFILE.
 	goEnvBenign := filepath.Join(dir, "go-env-benign")
 	goEnvOverride := filepath.Join(dir, "go-env-override")
-	if err := os.WriteFile(goEnvBenign, []byte("GOTOOLCHAIN=auto\n"), 0o600); err != nil {
+	if err := os.WriteFile(goEnvBenign, []byte("GOPROXY=https://proxy.golang.org,direct\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(goEnvOverride, []byte("GOPATH=/custom/gopath\n"), 0o600); err != nil {
@@ -2007,7 +2007,12 @@ func TestGitfilePrefixCommentsOverlongAndResolveMayCreate(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(wt, ".git"), []byte(tc.content), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		sc := newScan(wt, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+		sc := newScan(wt, func(k string) (string, bool) {
+			if k == "HOME" || k == "USERPROFILE" {
+				return root, true
+			}
+			return "", false
+		}, work{deadline: time.Now().Add(time.Minute)})
 		got, ok := sc.safeLocate(wt)
 		if ok != tc.wantOK || (tc.wantOK && got != wt) {
 			t.Errorf("safeLocate(%s) = (%q, %v), want ok=%v", tc.name, got, ok, tc.wantOK)
@@ -2893,7 +2898,11 @@ func TestReachCoreReviewRegressions(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(wtSpace, ".git"), []byte("gitdir: "+gdSpace+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	for _, val := range []string{" ../common-git\n", "../common-git \n"} {
+	wsVals := []string{" ../common-git\n"}
+	if runtime.GOOS != "windows" {
+		wsVals = append(wsVals, "../common-git \n")
+	}
+	for _, val := range wsVals {
 		if err := os.WriteFile(filepath.Join(gdSpace, "commondir"), []byte(val), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -2932,14 +2941,35 @@ func TestReachCoreReviewRegressions(t *testing.T) {
 		t.Errorf("format v1 + objectformat: safeLocate = (%q, %v), want (%q, true)", got, ok, fmtRepo)
 	}
 
-	// 16. GOFLAGS (set or unresolved) fails closed for go env GOPATH / GOMODCACHE.
-	scFlags := newScan(repo, makeEnv(map[string]string{
-		"HOME": parent, "USERPROFILE": parent, "GOFLAGS": "-C=" + parent,
-	}), work{deadline: time.Now().Add(time.Minute)})
-	if got, err := evalSubst(scFlags, "go env GOPATH"); err == nil {
-		t.Errorf("GOFLAGS set: substitute(go env GOPATH) = %q, want error", got)
+	// 16. GOFLAGS and GOTOOLCHAIN (set, unresolved, or in GOENV) fail closed for go env GOPATH / GOMODCACHE.
+	for _, env := range []map[string]string{
+		{"HOME": parent, "USERPROFILE": parent, "GOFLAGS": "-C=" + parent},
+		{"HOME": parent, "USERPROFILE": parent, "GOTOOLCHAIN": "bogus"},
+	} {
+		scGo := newScan(repo, makeEnv(env), work{deadline: time.Now().Add(time.Minute)})
+		if got, err := evalSubst(scGo, "go env GOPATH"); err == nil {
+			t.Errorf("%v: substitute(go env GOPATH) = %q, want error", env, got)
+		}
+		if got, err := evalSubst(scGo, "go env GOMODCACHE"); err == nil {
+			t.Errorf("%v: substitute(go env GOMODCACHE) = %q, want error", env, got)
+		}
 	}
-	if got, err := evalSubst(scFlags, "go env GOMODCACHE"); err == nil {
-		t.Errorf("GOFLAGS set: substitute(go env GOMODCACHE) = %q, want error", got)
+	goEnvTC := filepath.Join(parent, "goenv-tc")
+	if err := os.WriteFile(goEnvTC, []byte("GOTOOLCHAIN=bogus\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scGoTC := newScan(repo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, "GOENV": goEnvTC}), work{deadline: time.Now().Add(time.Minute)})
+	if got, err := evalSubst(scGoTC, "go env GOPATH"); err == nil {
+		t.Errorf("GOENV GOTOOLCHAIN: substitute(go env GOPATH) = %q, want error", got)
+	}
+
+	// 17. Invalid GIT_CONFIG_NOSYSTEM boolean fails closed in safeLocate.
+	scNoSysBad := newScan(repo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, "GIT_CONFIG_NOSYSTEM": "bogus"}), work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scNoSysBad.safeLocate(repo); ok {
+		t.Errorf("GIT_CONFIG_NOSYSTEM=bogus: safeLocate = (%q, true), want false", got)
+	}
+	scNoSysOK := newScan(repo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, "GIT_CONFIG_NOSYSTEM": "1"}), work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scNoSysOK.safeLocate(repo); !ok || got != repo {
+		t.Errorf("GIT_CONFIG_NOSYSTEM=1: safeLocate = (%q, %v), want (%q, true)", got, ok, repo)
 	}
 }

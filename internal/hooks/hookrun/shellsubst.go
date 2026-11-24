@@ -63,8 +63,8 @@ func (sc *scan) trustedCmd(name string) (string, bool) {
 			} else if found && !info.IsDir() && (runtime.GOOS == "windows" || info.Mode()&0o111 != 0) {
 				p := filepath.ToSlash(r[len(filepath.VolumeName(r)):])
 				p, same := pick(runtime.GOOS == "windows", strings.ToLower(p), p), pick(runtime.GOOS == "windows", strings.EqualFold(filepath.Base(r), name+ext), filepath.Base(r) == name)
-				_, _, pi, pOK := sc.walkPath(parent, true)
-				return r, same && isSysBin(info) && pOK && isSysBin(pi) && slices.ContainsFunc(roots, func(pre string) bool { return strings.HasPrefix(p, pre) })
+				_, _, pInfo, pOK := sc.walkPath(parent, true)
+				return r, same && isSysBin(r, info) && pOK && isSysBin(parent, pInfo) && slices.ContainsFunc(roots, func(pre string) bool { return strings.HasPrefix(p, pre) })
 			}
 		}
 	}
@@ -86,19 +86,25 @@ func (sc *scan) hasGoEnv(key string) bool {
 	}
 	return bad || p != "" && p != "off" && (!filepath.IsAbs(p) || sc.fileHasLine(p, func(l string) bool { return strings.HasPrefix(strings.TrimSpace(l), key+"=") }))
 }
+func (sc *scan) badGoEnv() bool {
+	return slices.ContainsFunc([]string{"GOFLAGS", "GOTOOLCHAIN"}, func(k string) bool { return sc.isUnresolvedVar(k) || sc.envVal(k) != "" || sc.hasGoEnv(k) })
+}
 func gopath(sc *scan, args []*syntax.Word) (string, bool) {
-	if v, ok := sc.lookup("GOPATH"); len(args) != 0 || sc.isUnresolvedVar("GOFLAGS") || sc.envVal("GOFLAGS") != "" || sc.isUnresolvedVar("GOPATH") || ok && v != "" {
-		ok = len(args) == 0 && !sc.isUnresolvedVar("GOFLAGS") && sc.envVal("GOFLAGS") == "" && !sc.hasGoEnv("GOFLAGS") && !sc.isUnresolvedVar("GOPATH") && ok && v != "" && !slices.ContainsFunc(filepath.SplitList(v), func(p string) bool { return !filepath.IsAbs(p) })
+	if len(args) != 0 || sc.isUnresolvedVar("GOPATH") || sc.badGoEnv() {
+		return "", false
+	} else if v, ok := sc.lookup("GOPATH"); ok && v != "" {
+		ok = !slices.ContainsFunc(filepath.SplitList(v), func(p string) bool { return !filepath.IsAbs(p) })
 		return pick(ok, v, ""), ok
 	}
 	key := pick(runtime.GOOS == "windows", "USERPROFILE", "HOME")
 	home, ok := sc.lookup(key)
-	return filepath.Join(home, "go"), !sc.isUnresolvedVar(key) && !sc.hasGoEnv("GOPATH") && !sc.hasGoEnv("GOFLAGS") && ok && filepath.IsAbs(home)
+	return filepath.Join(home, "go"), !sc.isUnresolvedVar(key) && !sc.hasGoEnv("GOPATH") && ok && filepath.IsAbs(home)
 }
 func modcache(sc *scan, args []*syntax.Word) (string, bool) {
-	if v, ok := sc.lookup("GOMODCACHE"); len(args) != 0 || sc.isUnresolvedVar("GOFLAGS") || sc.envVal("GOFLAGS") != "" || sc.isUnresolvedVar("GOMODCACHE") || ok && v != "" {
-		ok = len(args) == 0 && !sc.isUnresolvedVar("GOFLAGS") && sc.envVal("GOFLAGS") == "" && !sc.hasGoEnv("GOFLAGS") && !sc.isUnresolvedVar("GOMODCACHE") && ok && filepath.IsAbs(v)
-		return pick(ok, v, ""), ok
+	if len(args) != 0 || sc.isUnresolvedVar("GOMODCACHE") || sc.badGoEnv() {
+		return "", false
+	} else if v, ok := sc.lookup("GOMODCACHE"); ok && v != "" {
+		return pick(filepath.IsAbs(v), v, ""), filepath.IsAbs(v)
 	} else if gp, ok := gopath(sc, nil); !sc.hasGoEnv("GOMODCACHE") && ok {
 		first, _, _ := strings.Cut(gp, string(os.PathListSeparator))
 		return filepath.Join(first, "pkg", "mod"), first != ""
@@ -161,9 +167,9 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 		absGD, ok1 := sc.resolveJoined(cmp.Or(sc.dir, sc.cwd), gd, false)
 		absWT, ok2 := sc.resolveJoined(cmp.Or(sc.dir, sc.cwd), wt, false)
 		if gd != "" && wt != "" && ok1 && ok2 && !sc.hasRemoteLink(absGD) && !sc.hasRemoteLink(absWT) {
-			rw, _, wi, okW := sc.walkPath(absWT, true)
-			ok := okW && sameOwner(rw, wi) && sc.validGitDir(absGD, true) && !sc.hasWorktreeConfig(absGD)
-			return pick(ok, absWT, ""), ok
+			if rw, _, wi, okW := sc.walkPath(absWT, true); okW && sameOwner(rw, wi) && sc.validGitDir(absGD, true) && !sc.hasWorktreeConfig(absGD) {
+				return absWT, true
+			}
 		}
 		return "", false
 	}
@@ -178,9 +184,8 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 			if rdg, _, info, ok := sc.walkPath(dotGit, false); ok {
 				if !sameOwner(rc, ci) || !sameOwner(rdg, info) {
 					return "", false
-				} else if info.IsDir() {
-					ok := sc.validGitDir(dotGit, true) && !sc.hasWorktreeConfig(dotGit)
-					return pick(ok, cur, ""), ok
+				} else if info.IsDir() && sc.validGitDir(dotGit, true) && !sc.hasWorktreeConfig(dotGit) {
+					return cur, true
 				} else if info.Mode().IsRegular() {
 					if data, err := sc.readSmallFile(dotGit); err != nil {
 						sc.unknown = sc.unknown || errors.Is(err, errOpaque)
@@ -233,7 +238,9 @@ func (sc *scan) hasWorktreeConfig(gitDir string) bool {
 		return true
 	}
 	paths := append([]string{filepath.Join(gitDir, "config"), filepath.Join(gitDir, "config.worktree")}, pick(present, []string{filepath.Join(r, "config")}, nil)...)
-	if !slices.Contains([]string{"1", "true", "yes", "on"}, strings.ToLower(sc.envVal("GIT_CONFIG_NOSYSTEM"))) {
+	if ns := strings.ToLower(sc.envVal("GIT_CONFIG_NOSYSTEM")); ns != "" && !slices.Contains([]string{"1", "true", "yes", "on", "0", "false", "no", "off"}, ns) {
+		return true
+	} else if !slices.Contains([]string{"1", "true", "yes", "on"}, ns) {
 		if gitBin, ok := sc.trustedCmd("git"); !ok {
 			return true
 		} else if gitBin != "" {
@@ -308,15 +315,15 @@ func (sc *scan) fileHasLine(path string, match func(string) bool) bool {
 }
 func (sc *scan) isUnresolvedVar(name string) bool { v, set := sc.vars[name]; return set && v == nil }
 func (sc *scan) readSmallFile(path string) (string, error) {
-	_, _, info, f, ok := sc.walk(path, true, 1)
-	if !ok {
+	if _, _, info, f, ok := sc.walk(path, true, 1); !ok {
 		return "", pick(sc.unknown || info != nil, errOpaque, fs.ErrNotExist)
+	} else {
+		defer f.Close()
+		var buf [maxPathBytes]byte
+		n, err := io.ReadFull(f, buf[:])
+		bad := n == len(buf) || err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF)
+		return pick(bad, "", string(buf[:n])), pick(bad, errOpaque, nil)
 	}
-	defer f.Close()
-	var buf [maxPathBytes]byte
-	n, err := io.ReadFull(f, buf[:])
-	bad := n == len(buf) || err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF)
-	return pick(bad, "", string(buf[:n])), pick(bad, errOpaque, nil)
 }
 func (sc *scan) below(dir string, levels int) {
 	c := candidate{dir, strconv.Itoa(levels), walked}
@@ -331,18 +338,15 @@ func (sc *scan) below(dir string, levels int) {
 		var next []string
 		for _, d := range level {
 			for _, e := range sc.readDir(d) {
-				sub := filepath.Join(d, e.Name())
+				sub, isDir := filepath.Join(d, e.Name()), e.IsDir()
 				if e.Type()&fs.ModeSymlink != 0 {
-					if _, _, info, found := sc.walkPath(sub, true); sc.unknown {
-						return
-					} else if !found || !info.IsDir() {
-						continue
-					}
-				} else if !e.IsDir() {
-					continue
+					_, _, info, found := sc.walkPath(sub, true)
+					isDir = found && info.IsDir()
 				}
-				if depth == maxBelowDepth && sc.fail() || !sc.spend(1) {
+				if sc.unknown || isDir && (depth == maxBelowDepth && sc.fail() || !sc.spend(1)) {
 					return
+				} else if !isDir {
+					continue
 				} else if _, _, _, ok := sc.walkPath(filepath.Join(sub, ".git"), false); ok {
 					sc.place(sub)
 				} else if !sc.holdsNone(sub) {
@@ -378,22 +382,22 @@ func (sc *scan) holdsNone(p string) bool {
 
 // readDir lists dir via validated dirHandle (FIFO- and TOCTOU-safe), failing closed on unexpected errors.
 func (sc *scan) readDir(dir string) []fs.DirEntry {
-	if !sc.spend(1) {
-		return nil
-	} else if _, _, _, f, ok := sc.walk(dir, true, 2); ok {
-		defer f.Close()
-		var entries []fs.DirEntry
-		for room := maxShellLookups - sc.lookups + 1; len(entries) < room; {
-			chunk, err := f.ReadDir(min(256, room-len(entries)))
-			if entries = append(entries, chunk...); errors.Is(err, io.EOF) || err == nil && (len(chunk) == 0 || !sc.spend(0)) {
-				break
-			} else if err != nil && sc.fail() {
-				return nil
+	if sc.spend(1) {
+		if _, _, _, f, ok := sc.walk(dir, true, 2); ok {
+			defer f.Close()
+			var entries []fs.DirEntry
+			for room := maxShellLookups - sc.lookups + 1; len(entries) < room; {
+				chunk, err := f.ReadDir(min(256, room-len(entries)))
+				if entries = append(entries, chunk...); errors.Is(err, io.EOF) || err == nil && (len(chunk) == 0 || !sc.spend(0)) {
+					break
+				} else if err != nil && sc.fail() {
+					return nil
+				}
 			}
-		}
-		if sc.spend(len(entries)) {
-			slices.SortFunc(entries, func(a, b fs.DirEntry) int { return strings.Compare(a.Name(), b.Name()) })
-			return entries
+			if sc.spend(len(entries)) {
+				slices.SortFunc(entries, func(a, b fs.DirEntry) int { return strings.Compare(a.Name(), b.Name()) })
+				return entries
+			}
 		}
 	}
 	return nil

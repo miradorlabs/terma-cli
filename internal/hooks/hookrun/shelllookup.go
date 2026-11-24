@@ -85,12 +85,11 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 		return "", "", nil, nil, false
 	}
 	stack, paths := []dirHandle{root}, []string{vol + string(filepath.Separator)}
-	closeAll := func() {
+	defer func() {
 		for _, h := range stack {
 			h.close()
 		}
-	}
-	defer closeAll()
+	}()
 	for parts, hops := strings.FieldsFunc(p[len(vol):], isSep), 0; len(parts) > 0; {
 		if len(parts)+len(stack) > maxPathComponents || !sc.spendStat(1) {
 			return "", "", nil, nil, !sc.fail()
@@ -126,7 +125,9 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 				if err != nil {
 					return "", "", nil, nil, !sc.fail()
 				}
-				closeAll()
+				for _, h := range stack {
+					h.close()
+				}
 				stack, paths = []dirHandle{nr}, []string{newVol}
 			}
 			parts = append(strings.FieldsFunc(target[len(tVol):], isSep), parts...)
@@ -249,8 +250,7 @@ func urlPath(w string) (string, bool, bool) {
 	if ok = ok && len(scheme) > 1 && strings.IndexByte(alnum[:52], scheme[0]) >= 0 && strings.Trim(scheme, alnum+"+-.") == ""; !ok || !strings.EqualFold(scheme, "file") {
 		return "", ok, false
 	}
-	rest, _, _ = strings.Cut(rest, "?")
-	rest, _, _ = strings.Cut(rest, "#")
+	rest, _, _ = strings.Cut(strings.Split(rest, "?")[0], "#")
 	rest = pick(len(rest) > 9 && strings.EqualFold(rest[:9], "localhost") && rest[9] == '/', rest[min(len(rest), 9):], rest)
 	u, err := url.PathUnescape(rest)
 	if err != nil || strings.ContainsRune(u, 0) {

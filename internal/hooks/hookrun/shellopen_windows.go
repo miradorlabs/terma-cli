@@ -3,9 +3,11 @@
 package hookrun
 
 import (
+	"cmp"
 	"errors"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -46,12 +48,19 @@ func (d dirHandle) open(name string, dir bool, want fs.FileInfo) (*os.File, erro
 	}
 }
 func sameDevice(_, _ fs.FileInfo) bool { return true }
-func isSysBin(_ fs.FileInfo) bool      { return true }
-func sameOwner(p string, _ fs.FileInfo) bool {
+func fileOwner(p string) (*windows.SID, bool) {
 	if sd, err := windows.GetNamedSecurityInfo(p, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION); err == nil && sd != nil {
 		owner, _, err := sd.Owner()
-		tu, tErr := windows.GetCurrentProcessToken().GetTokenUser()
-		return err == nil && tErr == nil && owner != nil && (owner.Equals(tu.User.Sid) || owner.IsWellKnown(windows.WinBuiltinAdministratorsSid) && windows.GetCurrentProcessToken().IsElevated())
+		return owner, err == nil && owner != nil
 	}
-	return false
+	return nil, false
+}
+func isSysBin(p string, _ fs.FileInfo) bool {
+	owner, ok := fileOwner(p)
+	return ok && strings.EqualFold(filepath.VolumeName(p), cmp.Or(os.Getenv("SystemDrive"), "C:")) && (owner.IsWellKnown(windows.WinLocalSystemSid) || owner.IsWellKnown(windows.WinBuiltinAdministratorsSid) || owner.String() == "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464")
+}
+func sameOwner(p string, _ fs.FileInfo) bool {
+	owner, ok := fileOwner(p)
+	tu, err := windows.GetCurrentProcessToken().GetTokenUser()
+	return ok && err == nil && (owner.Equals(tu.User.Sid) || owner.IsWellKnown(windows.WinBuiltinAdministratorsSid) && windows.GetCurrentProcessToken().IsElevated())
 }

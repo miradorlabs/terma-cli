@@ -76,7 +76,7 @@ func TestTrustedCmdRejectsSymlinkAliasAndNonRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if os.Geteuid() != 0 && isSysBin(fi) {
+	if os.Geteuid() != 0 && isSysBin(dir, fi) {
 		t.Fatalf("isSysBin(user-owned dir) = true, want false")
 	}
 }

@@ -32,24 +32,18 @@ func maskWords(command string, depth int) string {
 			words[i] = pick(redir == 2 || hasSubst || userinfo.MatchString(b), "…", words[i])
 			heredoc, redir = redir == 3, 0
 		} else if r := strings.TrimLeft(words[i], "0123456789"); strings.HasPrefix(r, "<") || strings.HasPrefix(r, ">") {
-			if strings.HasPrefix(r, "<<<") && len(r) > 3 {
-				words[i] = "<<<…"
-			} else if strings.HasPrefix(r, "<<") && !strings.HasPrefix(r, "<<<") && r != "<<" && r != "<<-" {
+			if strings.HasPrefix(r, "<<") && !strings.HasPrefix(r, "<<<") && r != "<<" && r != "<<-" {
 				heredoc, words[i] = true, pick(hasSubst || userinfo.MatchString(b), "…", words[i])
-			} else if hasSubst || strings.HasPrefix(r, "<(") || strings.HasPrefix(r, ">(") || userinfo.MatchString(b) {
-				words[i] = "…"
+			} else if strings.HasPrefix(r, "<<<") && len(r) > 3 || hasSubst || strings.HasPrefix(r, "<(") || strings.HasPrefix(r, ">(") || userinfo.MatchString(b) {
+				words[i] = pick(strings.HasPrefix(r, "<<<") && len(r) > 3, "<<<…", "…")
 			} else if strings.TrimLeft(r, "<>&-") == "" {
 				redir = cmp.Or(map[string]int{"<<": 3, "<<-": 3, "<<<": 2}[r], 1)
 			}
 		} else {
 			masked, short := userinfo.ReplaceAllString(b, "${1}…@"), len(b) > 2 && b[0] == '-' && b[1] != '-'
 			name, _, eq := strings.Cut(masked, "=")
-			if secret > 0 || hasSubst || depth >= 2 && strings.ContainsAny(b, " \t\n") {
-				words[i] = "…"
-			} else if short {
-				words[i] = b[:2] + "…"
-			} else if eq && name != "" && !strings.ContainsAny(name, " \t\n") {
-				words[i] = name + "=…"
+			if opaque := secret > 0 || hasSubst || depth >= 2 && strings.ContainsAny(b, " \t\n"); opaque || short || eq && name != "" && !strings.ContainsAny(name, " \t\n") {
+				words[i] = pick(opaque, "…", pick(short, b[:2]+"…", name+"=…"))
 			} else if strings.ContainsAny(b, " \t\n") {
 				inner := maskWords(b, depth+1)
 				words[i] = pick(inner != b, inner, words[i])
@@ -101,12 +95,10 @@ func shellFields(command string, n int) (raw, bare []string) {
 			switch {
 			case r == '\\' && quote != '\'':
 				escaped = true
-			case quote != 0 && r == quote:
-				quote = 0
+			case quote != 0 && r == quote, quote == 0 && cmdDepth == 0 && (r == '\'' || r == '"'):
+				quote = pick(quote != 0, 0, r)
 			case quote != 0, cmdDepth > 0 && r != '(' && r != ')':
 				buf.WriteRune(r)
-			case r == '\'' || r == '"':
-				quote = r
 			case r == '$':
 				dollar = true
 			case r == '`':
@@ -246,9 +238,7 @@ func parsable(src string) bool {
 			} else if n == 3 && word == "let" { // its words are expressions
 				for letUntil = j; letUntil < len(src) && strings.IndexByte("\n;&|", src[letUntil]) < 0; letUntil = max(skipCont(src, letUntil), letUntil+1) {
 				}
-				if letUntil-j > maxShellExpr {
-					return false
-				}
+				links = pick(letUntil-j > maxShellExpr, maxShellNesting+1, links)
 			}
 			i = j - 1
 		case !shellMeta[c]:
