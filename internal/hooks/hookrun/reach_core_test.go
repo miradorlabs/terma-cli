@@ -2147,6 +2147,69 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 	if sc6.dir != root {
 		t.Fatalf("invalid logical target mutated dir to %q, want %q", sc6.dir, root)
 	}
+
+	// 6. Logical cd .. from a normal (non-symlink) directory does not place the starting directory.
+	sc7 := newScan(logicalSibling, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	sc7.candidate(".."+sep+"missing", target)
+	if len(sc7.out) != 0 {
+		t.Fatalf("failed cd ../missing from non-symlink dir placed %q, want empty", sc7.out)
+	}
+
+	// 7. safeLocate fails closed on GIT_CONFIG_GLOBAL/SYSTEM/GIT_CONFIG and on ~/.gitconfig core.worktree.
+	gitRepo := filepath.Join(root, "git-repo")
+	if err := os.MkdirAll(filepath.Join(gitRepo, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	fakeHome := filepath.Join(root, "fake-home")
+	if err := os.MkdirAll(fakeHome, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, envKey := range []string{"GIT_CONFIG", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"} {
+		scEnv := newScan(gitRepo, func(k string) (string, bool) {
+			if k == envKey {
+				return filepath.Join(fakeHome, "alt.gitconfig"), true
+			}
+			if k == "HOME" {
+				return fakeHome, true
+			}
+			return "", false
+		}, work{deadline: time.Now().Add(time.Minute)})
+		if got, ok := scEnv.safeLocate(gitRepo); ok {
+			t.Fatalf("safeLocate(%s set) = (%q, true), want false", envKey, got)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(fakeHome, ".gitconfig"), []byte("[core]\n\tworktree = /outside\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scGlobal := newScan(gitRepo, func(k string) (string, bool) {
+		if k == "HOME" {
+			return fakeHome, true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scGlobal.safeLocate(gitRepo); ok {
+		t.Fatalf("safeLocate(~/.gitconfig worktree) = (%q, true), want false", got)
+	}
+
+	// 8. Eval-script options (-e, --eval, --ev, -pe) mask their script argument in firstWords.
+	for _, cmd := range []string{
+		`node -e 'console.log("SECRET")' /missing/path`,
+		`node --eval 'console.log("SECRET")' /missing/path`,
+		`node --ev 'SECRET' /missing/path`,
+		`node -pe 'SECRET'`,
+		`perl -e 'print "SECRET"'`,
+	} {
+		if got := firstWords(cmd); strings.Contains(got, "SECRET") {
+			t.Errorf("firstWords(%q) = %q, leaked SECRET", cmd, got)
+		}
+	}
+
+	// 9. parsable fast-skips 1 MiB whitespace payloads within the hook latency budget.
+	for _, ws := range []string{strings.Repeat(" ", maxShellBytes), strings.Repeat("\n", maxShellBytes), strings.Repeat(" \t\n", maxShellBytes/3)} {
+		if !parsable(ws) {
+			t.Fatalf("parsable(1MiB whitespace) = false, want true")
+		}
+	}
 }
 
 func FuzzParsable(f *testing.F) {

@@ -74,14 +74,19 @@ func newScan(cwd string, env func(string) (string, bool), done work) *scan {
 func (sc *scan) config() *expand.Config {
 	return &expand.Config{Env: sc, CmdSubst: sc.substitute, ProcSubst: func(*syntax.ProcSubst) (string, error) { return "", errOpaque }, NoUnset: true}
 }
+func pick[T any](cond bool, a, b T) T {
+	if cond {
+		return a
+	}
+	return b
+}
 func (sc *scan) Get(name string) expand.Variable {
 	if strings.HasPrefix(name, "HOME ") || sc.isUnresolvedVar(name) {
 		sc.opaque = true
 		return expand.Variable{Set: true, Kind: expand.String}
-	} else if v, ok := sc.lookup(name); ok {
-		return expand.Variable{Set: true, Kind: expand.String, Str: v}
 	}
-	return expand.Variable{}
+	v, ok := sc.lookup(name)
+	return expand.Variable{Set: ok, Kind: pick(ok, expand.String, expand.Unknown), Str: v}
 }
 func (sc *scan) Each(func(string, expand.Variable) bool) {}
 func (sc *scan) lookup(name string) (string, bool) {
@@ -132,9 +137,7 @@ func (sc *scan) sizeIn(w syntax.Node, opaqueSubst bool) (n int) {
 				n += sc.paramSize(x, opaqueSubst)
 				return false
 			case *syntax.CmdSubst, *syntax.ProcSubst:
-				if n += substitutionSize; opaqueSubst {
-					n = maxShellBytes + 1
-				}
+				n = pick(opaqueSubst, maxShellBytes+1, n+substitutionSize)
 				return false
 			case *syntax.ArithmExp:
 				n = maxShellBytes + 1
@@ -185,7 +188,7 @@ func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
 }
 func (sc *scan) ifs() string {
 	ifs, ok := sc.lookup("IFS")
-	return map[bool]string{true: ifs, false: " \t\n"}[ok]
+	return pick(ok, ifs, " \t\n")
 }
 func (sc *scan) chargeFields(v string) bool {
 	ifs := sc.ifs()
@@ -229,17 +232,14 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 	return rem
 }
 func (sc *scan) consumeFields(v, ifs string, rem int) int {
-	if n := countFields(v, ifs, rem); n > rem && sc.fail() {
-		return -1
-	} else {
-		return rem - max(n-1, 0)
-	}
+	n := countFields(v, ifs, rem)
+	return pick(n > rem && sc.fail(), -1, rem-max(n-1, 0))
 }
 func countFields(v, ifs string, limit int) int {
 	n, inWord := 0, false
 	for _, r := range v {
 		sep := strings.ContainsRune(ifs, r)
-		n += map[bool]int{true: 1}[!inWord && (!sep || r != ' ' && r != '\t' && r != '\n')]
+		n += pick(!inWord && (!sep || r != ' ' && r != '\t' && r != '\n'), 1, 0)
 		if inWord = !sep; n > limit {
 			return n
 		}

@@ -18,25 +18,23 @@ func (d dirHandle) close()                                 { _ = d.r.Close() }
 func (d dirHandle) lstat(name string) (fs.FileInfo, error) { return d.r.Lstat(name) }
 func (d dirHandle) readlink(name string) (string, error)   { return d.r.Readlink(name) }
 func (d dirHandle) openSubDir(name string, want fs.FileInfo) (dirHandle, error) {
-	r, err := d.r.OpenRoot(name)
-	if err == nil {
-		if got, sErr := r.Stat("."); sErr == nil && os.SameFile(want, got) {
-			return dirHandle{r}, nil
-		}
+	if r, err := d.r.OpenRoot(name); err != nil {
+		return dirHandle{}, err
+	} else if got, sErr := r.Stat("."); sErr == nil && os.SameFile(want, got) {
+		return dirHandle{r}, nil
+	} else {
 		_ = r.Close()
-		err = errOpaque
+		return dirHandle{}, errOpaque
 	}
-	return dirHandle{}, err
 }
 func (d dirHandle) open(name string, dir bool, want fs.FileInfo) (*os.File, error) {
-	f, err := d.r.Open(name)
-	if err == nil {
-		if got, sErr := f.Stat(); sErr == nil && os.SameFile(want, got) && (dir && got.IsDir() || !dir && got.Mode().IsRegular()) {
-			return f, nil
-		}
+	if f, err := d.r.Open(name); err != nil {
+		return nil, err
+	} else if got, sErr := f.Stat(); sErr == nil && os.SameFile(want, got) && (dir && got.IsDir() || !dir && got.Mode().IsRegular()) {
+		return f, nil
+	} else {
 		_ = f.Close()
-		err = errOpaque
+		return nil, errOpaque
 	}
-	return nil, err
 }
 func sameDevice(_, _ fs.FileInfo) bool { return true }

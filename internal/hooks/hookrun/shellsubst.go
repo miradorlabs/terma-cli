@@ -22,14 +22,10 @@ type operands struct {
 
 // outputs maps known command-substitution prefixes to static path evaluators.
 var outputs = map[string]func(sc *scan, args []*syntax.Word) (string, bool){
-	"pwd": where, "pwd -L": where, "pwd -P": func(sc *scan, a []*syntax.Word) (string, bool) {
-		return sc.real(map[bool]string{true: sc.dir}[len(a) == 0])
-	},
-	"git rev-parse --show-toplevel": func(sc *scan, a []*syntax.Word) (string, bool) {
-		return sc.safeLocate(map[bool]string{true: sc.dir}[len(a) == 0])
-	}, "mktemp": mktemp,
-	"go env GOPATH": gopath, "go env GOMODCACHE": modcache, "dirname": ofOperand(dirname),
-	"basename": ofOperand(func(_ *scan, p string) (string, bool) { return map[bool]string{true: filepath.Base(p)}[p != ""], true }),
+	"pwd": where, "pwd -L": where, "pwd -P": func(sc *scan, a []*syntax.Word) (string, bool) { return sc.real(pick(len(a) == 0, sc.dir, "")) },
+	"git rev-parse --show-toplevel": func(sc *scan, a []*syntax.Word) (string, bool) { return sc.safeLocate(pick(len(a) == 0, sc.dir, "")) },
+	"mktemp":                        mktemp, "go env GOPATH": gopath, "go env GOMODCACHE": modcache, "dirname": ofOperand(dirname),
+	"basename": ofOperand(func(_ *scan, p string) (string, bool) { return pick(p != "", filepath.Base(p), ""), true }),
 	"realpath": ofOperand((*scan).real), "readlink -f": ofOperand((*scan).real),
 }
 
@@ -58,8 +54,9 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 	return errOpaque
 }
 func where(s *scan, a []*syntax.Word) (string, bool) { return s.dir, s.dir != "" && len(a) == 0 }
+func (sc *scan) envVal(k string) string              { v, _ := sc.lookup(k); return v }
 func (sc *scan) hasGoEnv(key string) bool {
-	p, _ := sc.lookup("GOENV")
+	p := sc.envVal("GOENV")
 	if sc.isUnresolvedVar("GOENV") || p != "" && p != "off" && !filepath.IsAbs(p) {
 		return true
 	} else if p == "off" {
@@ -67,9 +64,8 @@ func (sc *scan) hasGoEnv(key string) bool {
 	} else if p == "" {
 		dir, bad := "", false
 		if runtime.GOOS == "windows" {
-			dir, _ = sc.lookup("AppData")
-			bad = sc.isUnresolvedVar("AppData")
-		} else if xdg, _ := sc.lookup("XDG_CONFIG_HOME"); runtime.GOOS != "darwin" && (xdg != "" || sc.isUnresolvedVar("XDG_CONFIG_HOME")) {
+			dir, bad = sc.envVal("AppData"), sc.isUnresolvedVar("AppData")
+		} else if xdg := sc.envVal("XDG_CONFIG_HOME"); runtime.GOOS != "darwin" && (xdg != "" || sc.isUnresolvedVar("XDG_CONFIG_HOME")) {
 			dir, bad = xdg, sc.isUnresolvedVar("XDG_CONFIG_HOME")
 		} else if home, ok := sc.lookup("HOME"); ok || sc.isUnresolvedVar("HOME") {
 			dir, bad = filepath.Join(home, map[bool]string{true: "Library/Application Support", false: ".config"}[runtime.GOOS == "darwin"]), sc.isUnresolvedVar("HOME")
@@ -96,9 +92,8 @@ func modcache(sc *scan, args []*syntax.Word) (string, bool) {
 	} else if v, ok := sc.lookup("GOMODCACHE"); ok && v != "" {
 		return v, filepath.IsAbs(v)
 	} else if gp, ok := gopath(sc, nil); !sc.hasGoEnv("GOMODCACHE") && ok {
-		if first, _, _ := strings.Cut(gp, string(os.PathListSeparator)); first != "" {
-			return filepath.Join(first, "pkg", "mod"), true
-		}
+		first, _, _ := strings.Cut(gp, string(os.PathListSeparator))
+		return filepath.Join(first, "pkg", "mod"), first != ""
 	}
 	return "", false
 }
@@ -117,8 +112,7 @@ func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 	}
 	dir := sc.dir
 	if name == "" || tmp {
-		v, _ := sc.lookup("TMPDIR")
-		if dir = cmp.Or(v, os.TempDir()); sc.isUnresolvedVar("TMPDIR") {
+		if dir = cmp.Or(sc.envVal("TMPDIR"), os.TempDir()); sc.isUnresolvedVar("TMPDIR") {
 			return "", false
 		}
 	}
@@ -157,17 +151,14 @@ func (sc *scan) real(p string) (string, bool) {
 
 // safeLocate finds the git worktree root for dir without statting remote targets or crossing mounts.
 func (sc *scan) safeLocate(dir string) (string, bool) {
-	gitEnv := []string{"GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_COMMON_DIR"}
+	gitEnv := []string{"GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM", "GIT_CONFIG", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_COMMON_DIR"}
 	if dir == "" || sc.hasRemoteLink(dir) || sc.isUnresolvedVar("GIT_DIR") || sc.isUnresolvedVar("GIT_WORK_TREE") ||
-		slices.ContainsFunc(gitEnv, func(k string) bool { v, _ := sc.lookup(k); return sc.isUnresolvedVar(k) || v != "" }) {
+		slices.ContainsFunc(gitEnv, func(k string) bool { return sc.isUnresolvedVar(k) || sc.envVal(k) != "" }) {
 		return "", false
 	}
-	gd, _ := sc.lookup("GIT_DIR")
-	wt, _ := sc.lookup("GIT_WORK_TREE")
-	if gd != "" || wt != "" {
-		base := cmp.Or(sc.dir, sc.cwd)
-		absGD, ok1 := sc.resolveTarget(base, gd, 1)
-		absWT, ok2 := sc.resolveTarget(base, wt, 1)
+	if gd, wt := sc.envVal("GIT_DIR"), sc.envVal("GIT_WORK_TREE"); gd != "" || wt != "" {
+		absGD, ok1 := sc.resolveTarget(cmp.Or(sc.dir, sc.cwd), gd, 1)
+		absWT, ok2 := sc.resolveTarget(cmp.Or(sc.dir, sc.cwd), wt, 1)
 		if gd == "" || wt == "" || !ok1 || !ok2 || sc.hasRemoteLink(absGD) || sc.hasRemoteLink(absWT) {
 			return "", false
 		}
@@ -196,13 +187,26 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 	return "", false
 }
 func (sc *scan) hasWorktreeConfig(gitDir string) bool {
+	if sc.isUnresolvedVar("HOME") || sc.isUnresolvedVar("USERPROFILE") || sc.isUnresolvedVar("XDG_CONFIG_HOME") || sc.isUnresolvedVar("ProgramData") {
+		return true
+	}
 	match := func(l string) bool {
 		t := strings.TrimSpace(strings.TrimPrefix(l, "\ufeff"))
 		_, after, bracket := strings.Cut(t, "]")
-		f := strings.FieldsFunc(map[bool]string{true: after, false: t}[strings.HasPrefix(t, "[") && bracket], func(r rune) bool { return r == '=' || r <= ' ' })
+		f := strings.FieldsFunc(pick(strings.HasPrefix(t, "[") && bracket, after, t), func(r rune) bool { return r == '=' || r <= ' ' })
 		return strings.HasPrefix(strings.ToLower(t), "[include") || len(f) > 0 && strings.EqualFold(f[0], "worktree")
 	}
-	return sc.fileHasLine(filepath.Join(gitDir, "config"), match) || sc.fileHasLine(filepath.Join(gitDir, "config.worktree"), match)
+	paths := []string{filepath.Join(gitDir, "config"), filepath.Join(gitDir, "config.worktree")}
+	if filepath.Separator == '/' || sc.envVal("ProgramData") != "" {
+		paths = append(paths, pick(filepath.Separator == '/', "/etc/gitconfig", filepath.Join(sc.envVal("ProgramData"), "Git", "config")))
+	}
+	if xdg := sc.envVal("XDG_CONFIG_HOME"); filepath.IsAbs(xdg) {
+		paths = append(paths, filepath.Join(xdg, "git", "config"))
+	}
+	if home, ok := sc.homeDir(); ok && home != "" {
+		paths = append(paths, filepath.Join(home, ".gitconfig"), filepath.Join(home, ".config", "git", "config"))
+	}
+	return slices.ContainsFunc(paths, func(p string) bool { return sc.fileHasLine(p, match) })
 }
 func (sc *scan) fileHasLine(path string, match func(string) bool) bool {
 	if p, ok := sc.resolveTarget(sc.dir, path, 0); ok {
@@ -215,7 +219,7 @@ func (sc *scan) isUnresolvedVar(name string) bool { v, set := sc.vars[name]; ret
 func (sc *scan) readSmallFile(path string) (string, error) {
 	_, _, info, f, ok := sc.walk(path, true, 1)
 	if !ok {
-		return "", map[bool]error{true: errOpaque, false: fs.ErrNotExist}[sc.unknown || info != nil]
+		return "", pick(sc.unknown || info != nil, errOpaque, fs.ErrNotExist)
 	}
 	defer f.Close()
 	var buf [maxPathBytes]byte

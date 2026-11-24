@@ -56,10 +56,7 @@ func (sc *scan) resolve(t string, r role, slashed bool) (res cached) {
 		}
 		if p, info := sc.reachRole(t, d, r); p != "" {
 			if res.named = res.named || info != nil; info != nil && info.IsDir() {
-				if i == 0 {
-					res.dir = p
-				}
-				res.folders = append(res.folders, p)
+				res.dir, res.folders = map[bool]string{true: p, false: res.dir}[i == 0], append(res.folders, p)
 			}
 		} else if r.mayCreate(slashed) && !res.named {
 			if p, ok := sc.path(t, d); ok {
@@ -191,10 +188,9 @@ func (sc *scan) resolveJoined(base, raw string, logical bool) (string, bool) {
 	}
 	if len(raw) > maxPathBytes {
 		return "", !sc.fail()
+	} else if !logical && !hasDot(raw) {
+		return filepath.Clean(raw), true
 	} else if !logical {
-		if !hasDot(raw) {
-			return filepath.Clean(raw), true
-		}
 		res, _, _, found := sc.walkPath(raw, false)
 		return res, found || !sc.unknown && res != ""
 	} else if !filepath.IsAbs(raw) {
@@ -211,10 +207,13 @@ func (sc *scan) resolveJoined(base, raw string, logical bool) (string, bool) {
 			continue
 		} else if part != ".." {
 			out = append(out, part)
-		} else if t, _, info, found := sc.walkPath(vol+sep+strings.Join(out, sep), true); !found || !info.IsDir() {
-			return "", false
-		} else if sc.place(t); len(out) > 0 {
-			out = out[:len(out)-1]
+		} else if cur := vol + sep + strings.Join(out, sep); cur != "" {
+			if t, _, info, found := sc.walkPath(cur, true); !found || !info.IsDir() {
+				return "", false
+			} else if _, _, li, ok := sc.walkPath(cur, false); ok && li.Mode()&fs.ModeSymlink != 0 {
+				sc.place(t)
+			}
+			out = out[:max(len(out)-1, 0)]
 		}
 	}
 	return vol + sep + strings.Join(out, sep), true
@@ -243,11 +242,11 @@ func (sc *scan) reachRole(w, dir string, r role) (string, os.FileInfo) {
 	return res, nil
 }
 func (sc *scan) away(w string, r role) bool {
-	if !remote(w, sc.cwd) {
-		return false
+	if remote(w, sc.cwd) {
+		sc.unknown = sc.unknown || (share(w) != "" || len(w) > 2 && !strings.ContainsAny(w, " \t\n") && strings.TrimLeft(w, `/\`) != "") && r.mustResolve(true)
+		return true
 	}
-	sc.unknown = sc.unknown || (share(w) != "" || len(w) > 2 && !strings.ContainsAny(w, " \t\n") && strings.TrimLeft(w, `/\`) != "") && r.mustResolve(true)
-	return true
+	return false
 }
 func (sc *scan) path(w, dir string) (string, bool) { return sc.resolvePath(w, dir, false) }
 func (sc *scan) resolvePath(w, dir string, logical bool) (string, bool) {
