@@ -214,6 +214,11 @@ func TestPiToolReachFailsClosedAndResultFallbackAwaitsUnderNode(t *testing.T) {
 	hook := filepath.Join(dir, "hook.sh")
 	hookSrc := "#!/bin/sh\n" +
 		"payload=$(cat)\n" +
+		"if [ \"$1\" = \"pi-session-start\" ]; then\n" +
+		"  case \"$payload\" in\n" +
+		"    *'\"reason\":\"resume-fail\"'*) exit 1 ;;\n" +
+		"  esac\n" +
+		"fi\n" +
 		"if [ \"$1\" = \"pi-tool-reach\" ]; then\n" +
 		"  case \"$payload\" in\n" +
 		"    *'\"session_id\":\"s-fail\"'*) exit 1 ;;\n" +
@@ -238,7 +243,13 @@ const mkCtx = (id) => ({ cwd: "/repoA", sessionManager: { getSessionId: () => id
 await handlers.session_start({ reason: "startup" }, mkCtx("s-fail"))
 await handlers.tool_call({ toolCallId: "c1", toolName: "read", input: { path: "/repoB/secret.go" } }, mkCtx("s-fail"))
 await handlers.tool_result({ toolCallId: "c1", toolName: "read", input: { path: "/repoB/secret.go" }, content: "SECRET" }, mkCtx("s-fail"))
-handlers.message_end({ message: { role: "assistant", model: "m", content: [{ type: "text", text: "SECRET" }] } }, mkCtx("s-fail"))
+handlers.message_end({ message: { role: "assistant", model: "m-tainted", content: [{ type: "text", text: "SECRET" }] } }, mkCtx("s-fail"))
+
+// 1b. A failing session_start on resume keeps s-fail tainted; a succeeding session_start clears it.
+await handlers.session_start({ reason: "resume-fail" }, mkCtx("s-fail"))
+handlers.message_end({ message: { role: "assistant", model: "m-still-tainted", content: [{ type: "text", text: "SECRET" }] } }, mkCtx("s-fail"))
+await handlers.session_start({ reason: "resume" }, mkCtx("s-fail"))
+handlers.message_end({ message: { role: "assistant", model: "m-resumed", content: [{ type: "text", text: "clean" }] } }, mkCtx("s-fail"))
 
 // 2. tool_result-only fallback (no tool_call) awaits reach BEFORE assigning end timestamp.
 await handlers.session_start({ reason: "startup" }, mkCtx("s-fallback"))
@@ -262,8 +273,13 @@ await handlers.session_shutdown({}, mkCtx("s-fallback"))
 	if !sawMarkerBeforeFallbackSpan {
 		t.Fatalf("expected execute_tool read span for s-fallback only after reach finished; spans=%+v", spans)
 	}
+	sawResumed := false
 	for _, sp := range spans {
 		if sp.Session == "s-fail" {
+			if sp.Name == "chat m-resumed" {
+				sawResumed = true
+				continue
+			}
 			t.Fatalf("failed pi-tool-reach leaked span %+v for tainted session s-fail", sp)
 		}
 		if sp.Session == "s-fallback" && sp.Name == "execute_tool read" {
@@ -271,5 +287,8 @@ await handlers.session_shutdown({}, mkCtx("s-fallback"))
 				t.Fatalf("fallback span end %d precedes reach completion %d", sp.EndNano, markerInfo.ModTime().UnixNano())
 			}
 		}
+	}
+	if !sawResumed {
+		t.Fatalf("expected resumed s-fail session to clear taint after session_start succeeded; spans=%+v", spans)
 	}
 }
