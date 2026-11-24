@@ -256,8 +256,11 @@ export default function (pi: any) {
   }
 
   pi.on("session_start", (event: any, ctx: any) => {
-    session = sessionOf(ctx)
-    return termaHook(AGENT + "-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason }).then(() => undefined)
+    const s = sessionOf(ctx)
+    session = s
+    return termaHook(AGENT + "-session-start", { session_id: s, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason }).then((ok) => {
+      if (ok && s) tainted.delete(s)
+    })
   })
 
   pi.on("session_shutdown", async (_event: any, ctx: any) => {
