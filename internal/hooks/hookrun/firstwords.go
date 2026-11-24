@@ -18,12 +18,11 @@ var (
 // firstWords returns command's first four words (<=60 runes) with secret-like values masked.
 func firstWords(command string) string {
 	cut := len(command) > 4096
-	if cut {
-		n := 4096
-		for n > 0 && !utf8.RuneStart(command[n]) {
-			n--
+	for n := min(len(command), 4096); cut; n-- {
+		if n == 0 || utf8.RuneStart(command[n]) {
+			command = command[:n]
+			break
 		}
-		command = command[:n]
 	}
 	words, bare := shellFields(command, 5)
 	more := cut || len(words) > 4
@@ -89,6 +88,11 @@ func shellFields(command string, n int) (raw, bare []string) {
 			continue
 		case ansiC:
 			buf.WriteRune(r)
+		case r == '\\' && quote != '\'' && i+1 < len(command) && (command[i+1] == '\n' || command[i+1] == '\r' && i+2 < len(command) && command[i+2] == '\n'):
+			if i += 2; command[i-1] == '\r' {
+				i++
+			}
+			continue
 		case dollar && (r == '\'' || r == '"'):
 			dollar, quote, ansiC = false, r, r == '\''
 		default:

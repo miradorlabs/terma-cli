@@ -786,10 +786,33 @@ func TestScanBoundsAndSafety(t *testing.T) {
 		{`curl $"--user" alice:hunter2 https://example.com`, "hunter2"},
 		{`curl $'--user=alice:hunter2' https://example.com`, "hunter2"},
 		{`curl $'-u'hunter2 https://example.com`, "hunter2"},
+		{"curl --us\\\ner alice:hunter2 https://example.com", "hunter2"},
+		{"curl --us\\\r\ner alice:hunter2 https://example.com", "hunter2"},
+		{"curl \"--us\\\ner\" alice:hunter2 https://example.com", "hunter2"},
+		{"curl \\\n  --user alice:hunter2 https://example.com", "hunter2"},
+		{"curl $\\\n'--user' alice:hunter2 https://example.com", "hunter2"},
 	} {
 		if got := firstWords(tc.cmd); strings.Contains(got, tc.leak) {
 			t.Errorf("firstWords(%q) = %q, leaked %q", tc.cmd, got, tc.leak)
 		}
+	}
+
+	// Quoted global replacement with CmdSubst ("${V//a/$(go env GOPATH)}") fails closed before allocating > maxShellBytes.
+	fQuotedRepl, err := syntax.NewParser().Parse(strings.NewReader(`echo "${V//a/$(go env GOPATH)}"`), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	scQuotedRepl := newScan(dir, func(k string) (string, bool) {
+		switch k {
+		case "V":
+			return strings.Repeat("a", 200), true
+		case "GOPATH":
+			return strings.Repeat("x", 64<<10), true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	if _, err := scQuotedRepl.fields(fQuotedRepl.Stmts[0].Cmd.(*syntax.CallExpr).Args[1]); err == nil || !scQuotedRepl.unknown {
+		t.Fatalf(`"${V//a/$(go env GOPATH)}" did not fail closed: err=%v unknown=%v`, err, scQuotedRepl.unknown)
 	}
 
 	// Remote HOME with ~ or ~/... fails closed (sc.unknown = true) without statting.
@@ -803,18 +826,18 @@ func TestScanBoundsAndSafety(t *testing.T) {
 		t.Fatalf("path(~/repo/file) with remote HOME: ok=%v unknown=%v, want (false, true)", ok, scRemoteHome.unknown)
 	}
 
-	// Non-cwd hasRemoteLink and safeLocate both charge the shared maxShellLookups budget.
+	// Non-cwd hasRemoteLink and safeLocate both charge the shared maxShellStats budget.
 	budgetDir := filepath.Join(dir, "budget-a", "budget-b", "budget-c")
 	if err := os.MkdirAll(budgetDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	scBudgetLink := newScan(dir, os.LookupEnv, work{lookups: maxShellLookups - 1, deadline: time.Now().Add(time.Minute)})
+	scBudgetLink := newScan(dir, os.LookupEnv, work{stats: maxShellStats - 1, deadline: time.Now().Add(time.Minute)})
 	if !scBudgetLink.hasRemoteLink(budgetDir) || !scBudgetLink.unknown {
-		t.Fatalf("hasRemoteLink near lookup limit did not exhaust budget: unknown=%v lookups=%d", scBudgetLink.unknown, scBudgetLink.lookups)
+		t.Fatalf("hasRemoteLink near stat limit did not exhaust budget: unknown=%v stats=%d", scBudgetLink.unknown, scBudgetLink.stats)
 	}
-	scBudgetLoc := newScan(dir, os.LookupEnv, work{lookups: maxShellLookups - 1, deadline: time.Now().Add(time.Minute)})
+	scBudgetLoc := newScan(dir, os.LookupEnv, work{stats: maxShellStats - 1, deadline: time.Now().Add(time.Minute)})
 	if _, ok := scBudgetLoc.safeLocate(budgetDir); ok || !scBudgetLoc.unknown {
-		t.Fatalf("safeLocate near lookup limit did not exhaust budget: ok=%v unknown=%v lookups=%d", ok, scBudgetLoc.unknown, scBudgetLoc.lookups)
+		t.Fatalf("safeLocate near stat limit did not exhaust budget: ok=%v unknown=%v stats=%d", ok, scBudgetLoc.unknown, scBudgetLoc.stats)
 	}
 }
 
