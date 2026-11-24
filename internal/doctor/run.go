@@ -12,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
@@ -33,6 +34,8 @@ type Env struct {
 	// Updates are the rows saying how this terma gets new releases and what it last
 	// installed by itself, among the context doctor prints first.
 	Updates []Row
+	// Routing is the profile's multi-org routing state and runtime observations.
+	Routing *Routing
 }
 
 // Probes reach the event spool and the platform's APIs for a run.
@@ -214,17 +217,7 @@ func Run(ctx context.Context, env Env, progress Progress) Report {
 	timed(KeyAuth, "signed in", d.signedIn)
 
 	d.nonGit = env.RepoErr == nil && env.GitDir == ""
-	// The policy the hooks apply, so doctor never admits a repository they would not.
-	d.pol = cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)
-	timed(KeyProject, "repository collected", func() Check {
-		if env.RepoErr == nil && d.pol.Global() {
-			return unlessCaptureOff(d.pol, Check{Status: Pass, Detail: "every session, in global mode: " + GlobalDestination(cfg)})
-		}
-		c := RepositoryCheck(d.pol, TeamLabel(cfg), env.GitDir, env.RepoErr)
-		d.admitted = c.Status == Pass
-		return unlessCaptureOff(d.pol, c)
-	})
-	d.projectID = cmp.Or(cfg.ProjectID, cfg.Policy.TeamID)
+	d.collectionChecks(timed)
 
 	timed(KeyHooks, "commit hooks in effect", d.commitHooks)
 
@@ -260,6 +253,7 @@ type run struct {
 	nonGit    bool
 	admitted  bool
 	projectID string
+	team      *routing.Team
 }
 
 // unlessCaptureOff keeps a passing collection check from reading as working while pol
@@ -335,7 +329,7 @@ func (d *run) commitHooks() Check {
 		return Check{Status: Skip, Detail: "not inside a repository"}
 	}
 	now := time.Now()
-	verdict := JudgeCommitHooks(d.env.GitDir, d.pol, now)
+	verdict := d.judgeCommitHooks(now)
 	c := CommitHooksCheck(verdict)
 	// Only on the Off verdict: hooks installed under a policy since switched off still
 	// record and stamp, so recommending them there would be wrong. The → line on a skip is
