@@ -256,7 +256,7 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 		"git rev-parse --show-toplevel": side,
 		"go env GOPATH":                 filepath.Join(parent, "go"),
 		"go env GOMODCACHE":             filepath.Join(parent, "go", "pkg", "mod"),
-		"dirname /a/b/c":                "/a/b",
+		"dirname /a/b/c":                filepath.FromSlash("/a/b"),
 		"basename /a/b/c":               "c",
 		"realpath .":                    side,
 		"readlink -f .":                 side,
@@ -599,6 +599,66 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	}
 	if took := time.Since(startGP); took > 50*time.Millisecond {
 		t.Fatalf("whitespace-heavy $(go env GOPATH) took %v, want < 50ms", took)
+	}
+
+	// Dangling symlink (out -> ../api/new.txt) records the target's nearest existing parent.
+	apiDir := filepath.Join(dir, "dangling-api")
+	sideDir := filepath.Join(dir, "dangling-side")
+	for _, d := range []string{apiDir, sideDir} {
+		if err := os.MkdirAll(d, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(filepath.Join("..", "dangling-api", "new.txt"), filepath.Join(sideDir, "out")); err != nil {
+		t.Fatal(err)
+	}
+	scDang := newScan(sideDir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	scDang.candidate("out", creates)
+	if scDang.unknown || !slices.Contains(scDang.out, apiDir) {
+		t.Fatalf("dangling symlink out -> ../dangling-api/new.txt: out=%q unknown=%v, want %q", scDang.out, scDang.unknown, apiDir)
+	}
+
+	// Symlink target with ".." past a remote symlink (out -> jump/../file, jump -> //host/share/subdir) fails closed.
+	jumpLink := filepath.Join(dir, "jump")
+	if err := os.Symlink("//host/share/subdir", jumpLink); err != nil {
+		t.Fatal(err)
+	}
+	bypassLink := filepath.Join(dir, "bypass-out")
+	if err := os.Symlink("jump/../file", bypassLink); err != nil {
+		t.Fatal(err)
+	}
+	scBypass := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	scBypass.candidate(bypassLink, creates)
+	if !scBypass.unknown {
+		t.Fatal("symlink target jump/../file through remote jump did not fail closed")
+	}
+
+	// Remote GIT_DIR and .git file gitdir targets fail closed before LocateFS stats them.
+	fGit, err := syntax.NewParser().Parse(strings.NewReader("echo $(git rev-parse --show-toplevel)"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	csGit := fGit.Stmts[0].Cmd.(*syntax.CallExpr).Args[1].Parts[0].(*syntax.CmdSubst)
+	scGitEnv := newScan(dir, func(k string) (string, bool) {
+		if k == "GIT_DIR" {
+			return "//server/share/repo.git", true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	var gitBuf strings.Builder
+	if err := scGitEnv.substitute(&gitBuf, csGit); err == nil || !scGitEnv.unknown {
+		t.Fatalf("remote GIT_DIR did not fail closed: err=%v unknown=%v", err, scGitEnv.unknown)
+	}
+	gitFileDir := filepath.Join(dir, "remote-gitfile")
+	if err := os.MkdirAll(gitFileDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gitFileDir, ".git"), []byte("gitdir: //server/share/repo.git\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scGitFile := newScan(gitFileDir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	if err := scGitFile.substitute(&gitBuf, csGit); err == nil || !scGitFile.unknown {
+		t.Fatalf("remote .git gitdir file did not fail closed: err=%v unknown=%v", err, scGitFile.unknown)
 	}
 }
 

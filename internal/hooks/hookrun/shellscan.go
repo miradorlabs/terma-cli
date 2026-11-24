@@ -13,39 +13,40 @@ import (
 
 // Bounds on a shell reach scan (maxShellTime is overridden to 1s in tests).
 const (
-	shellTime       = 20 * time.Millisecond
-	maxShellPlaces  = 256
-	maxShellLookups = 4096
-	maxShellWords   = 4 * maxShellLookups
-	maxShellBytes   = 1 << 20
-	maxShellDepth   = 4
-	maxShellBraces  = 16
-	maxGlobSegments = 3
+	shellTime        = 20 * time.Millisecond
+	maxShellPlaces   = 256
+	maxShellLookups  = 4096
+	maxShellWords    = 4 * maxShellLookups
+	maxShellBytes    = 1 << 20
+	maxShellDepth    = 4
+	maxShellBraces   = 16
+	maxGlobSegments  = 3
+	substitutionSize = 4096
+	// UnknownReach marks an unresolved reach (NUL-prefixed so it cannot collide with a path).
+	UnknownReach = "\x00unknown"
 )
 
-var maxShellTime = shellTime
-
-// UnknownReach marks an unresolved reach (NUL-prefixed so it cannot collide with a path).
-const UnknownReach = "\x00unknown"
+var (
+	maxShellTime = shellTime
+	errOpaque    = errors.New("an expansion ShellPaths cannot resolve")
+)
 
 func unknownReach(command string) string { return UnknownReach + "\x00" + firstWords(command) }
 func isUnknownReach(p string) bool       { return strings.HasPrefix(p, UnknownReach) }
 
-var errOpaque = errors.New("an expansion ShellPaths cannot resolve")
-
 type role uint8
 
 const (
-	plain       role = iota // argument: path if present, or new file if slashed
-	program                 // program name: reach only when slashed and present
-	target                  // cd target: unknown when unresolved
-	folder                  // folder option (-C, --git-dir): unknown when unresolved
-	creates                 // > target: nearest existing folder when absent
-	data                    // heredoc or whitespace-holding prose: only when slashed and present
-	part                    // colon/comma fragment (-v ../x:/src): slashed and present, operand
-	slashedOnly             // assignment value or inline script word: only when slashed
-	globbed                 // glob pattern cache key
-	walked                  // folder-below walk cache key
+	plain role = iota // argument: path if present, or new file if slashed
+	program
+	target
+	folder
+	creates
+	data
+	part
+	slashedOnly
+	globbed
+	walked
 )
 
 func (r role) whole() bool      { return r == program || r == target }
@@ -59,31 +60,26 @@ func (r role) mustResolve(slashed bool) bool {
 
 // scan holds the state of one bounded shell reach scan.
 type scan struct {
-	cwd, dir, prev string
-	cwdRoot        string
-	cwdRootDone    bool
-	none           []string
-	env            func(string) (string, bool)
-	vars           map[string]*string
-	cfg            *expand.Config
-	reads          *operands
-	out            []string
-	places         map[string]bool
-	examined       map[candidate]cached
+	cwd, dir, prev, cwdRoot string
+	cwdRootDone, unknown    bool
+	none, out               []string
+	env                     func(string) (string, bool)
+	vars                    map[string]*string
+	cfg                     *expand.Config
+	reads                   *operands
+	places                  map[string]bool
+	examined                map[candidate]cached
 	work
-	unknown bool
 }
 
 type work struct {
 	lookups, bytes, words int
 	deadline              time.Time
 }
-
 type candidate struct {
 	word, dir string
 	r         role
 }
-
 type cached struct {
 	dir     string
 	named   bool
@@ -98,22 +94,16 @@ func newScan(cwd string, env func(string) (string, bool), done work) *scan {
 	sc.cfg = sc.config()
 	return sc
 }
-
 func (sc *scan) config() *expand.Config {
 	return &expand.Config{Env: sc, CmdSubst: sc.substitute, ProcSubst: func(*syntax.ProcSubst) (string, error) { return "", errOpaque }, NoUnset: true}
 }
-
-// Get resolves a shell variable for expand (unset fails under NoUnset unless a fallback is given).
 func (sc *scan) Get(name string) expand.Variable {
 	if v, ok := sc.lookup(name); ok {
 		return expand.Variable{Set: true, Kind: expand.String, Str: v}
 	}
 	return expand.Variable{}
 }
-
-// Each lists no variables: expand asks for each it expands.
 func (sc *scan) Each(func(string, expand.Variable) bool) {}
-
 func (sc *scan) lookup(name string) (string, bool) {
 	if name == "PWD" {
 		return sc.dir, sc.dir != ""
@@ -164,9 +154,6 @@ func (sc *scan) charge(n int) bool {
 	sc.bytes += n
 	return true
 }
-
-const substitutionSize = 4096
-
 func (sc *scan) size(w *syntax.Word) int {
 	n := 0
 	syntax.Walk(w, func(node syntax.Node) bool {
@@ -186,7 +173,6 @@ func (sc *scan) size(w *syntax.Word) int {
 	})
 	return min(n, maxShellBytes+1)
 }
-
 func (sc *scan) paramValue(pe *syntax.ParamExp) string {
 	var v string
 	if pe.Param != nil {
@@ -225,50 +211,45 @@ func (sc *scan) fieldsBounded(w *syntax.Word, limit int) bool {
 func (sc *scan) chargeFields(v string) bool {
 	if ifs := sc.ifs(); ifs != "" {
 		rem := maxShellWords - sc.words
-		n := countFields(v, ifs, rem)
-		if n > rem {
+		if n := countFields(v, ifs, rem); n > rem {
 			sc.unknown = true
 			return false
+		} else {
+			sc.words += n
 		}
-		sc.words += n
 	}
 	return true
 }
 func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, inParam bool) int {
 	for _, p := range parts {
-		switch p := p.(type) {
-		case *syntax.DblQuoted:
-			if inParam {
-				rem = sc.checkPartsFields(p.Parts, ifs, rem, true)
-			}
-		case *syntax.Lit:
-			if inParam {
-				rem = sc.consumeFields(p.Value, ifs, rem)
-			}
-		case *syntax.SglQuoted:
-			if inParam {
-				rem = sc.consumeFields(p.Value, ifs, rem)
-			}
-		case *syntax.ParamExp:
-			v := sc.paramValue(p)
-			if p.Repl != nil && p.Repl.All && len(v) > rem {
+		if pe, ok := p.(*syntax.ParamExp); ok {
+			v := sc.paramValue(pe)
+			if pe.Repl != nil && pe.Repl.All && len(v) > rem {
 				sc.unknown = true
 				return -1
 			}
-			if rem = sc.consumeFields(v, ifs, rem); rem >= 0 && p.Exp != nil && p.Exp.Word != nil {
-				rem = sc.checkPartsFields(p.Exp.Word.Parts, ifs, rem, true)
+			if rem = sc.consumeFields(v, ifs, rem); rem >= 0 && pe.Exp != nil && pe.Exp.Word != nil {
+				rem = sc.checkPartsFields(pe.Exp.Word.Parts, ifs, rem, true)
 			}
-			if rem >= 0 && p.Repl != nil && p.Repl.With != nil {
+			if rem >= 0 && pe.Repl != nil && pe.Repl.With != nil {
 				before := rem
-				rem = sc.checkPartsFields(p.Repl.With.Parts, ifs, rem, true)
-				if rem >= 0 && p.Repl.All && len(v) > 0 {
-					perMatch := 1 + (before - rem)
-					if len(v) > rem/perMatch {
+				if rem = sc.checkPartsFields(pe.Repl.With.Parts, ifs, rem, true); rem >= 0 && pe.Repl.All && len(v) > 0 {
+					if per := 1 + (before - rem); len(v) > rem/per {
 						sc.unknown = true
 						return -1
+					} else {
+						rem -= len(v) * per
 					}
-					rem -= len(v) * perMatch
 				}
+			}
+		} else if inParam {
+			switch p := p.(type) {
+			case *syntax.DblQuoted:
+				rem = sc.checkPartsFields(p.Parts, ifs, rem, true)
+			case *syntax.Lit:
+				rem = sc.consumeFields(p.Value, ifs, rem)
+			case *syntax.SglQuoted:
+				rem = sc.consumeFields(p.Value, ifs, rem)
 			}
 		}
 		if rem < 0 {
@@ -289,18 +270,19 @@ func (sc *scan) consumeFields(v, ifs string, rem int) int {
 func countFields(v, ifs string, limit int) int {
 	n, inWord := 0, false
 	for _, r := range v {
-		if strings.ContainsRune(ifs, r) {
+		if !strings.ContainsRune(ifs, r) {
+			if !inWord {
+				inWord = true
+				n++
+			}
+		} else {
 			if !inWord && r != ' ' && r != '\t' && r != '\n' {
-				if n++; n > limit {
-					return n
-				}
+				n++
 			}
 			inWord = false
-		} else if !inWord {
-			inWord = true
-			if n++; n > limit {
-				return n
-			}
+		}
+		if n > limit {
+			return n
 		}
 	}
 	return n
@@ -315,8 +297,7 @@ func (sc *scan) fields(w *syntax.Word) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, f...)
-		if len(out) > maxShellWords {
+		if out = append(out, f...); len(out) > maxShellWords {
 			sc.unknown = true
 			return nil, errOpaque
 		}
@@ -332,13 +313,12 @@ func (sc *scan) braces(w *syntax.Word) iter.Seq2[*syntax.Word, error] {
 			}
 		}
 		braced := *w // SplitBraces replaces its parts
-		switch {
-		case n > maxShellBraces:
+		if n > maxShellBraces {
 			sc.unknown = true
 			yield(nil, errOpaque)
-		case n == 0 || !syntax.SplitBraces(&braced):
+		} else if n == 0 || !syntax.SplitBraces(&braced) {
 			yield(w, nil)
-		default:
+		} else {
 			for b, err := range expand.BracesSeq(sc.cfg, &braced) {
 				if err != nil || !sc.spend(1) {
 					sc.unknown = true

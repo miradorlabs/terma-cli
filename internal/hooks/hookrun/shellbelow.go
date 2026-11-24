@@ -1,6 +1,7 @@
 package hookrun
 
 import (
+	"cmp"
 	"errors"
 	"io"
 	"io/fs"
@@ -9,8 +10,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-
-	"github.com/miradorlabs/terma-cli/internal/gitx"
 )
 
 type operands struct {
@@ -20,16 +19,81 @@ type operands struct {
 
 const maxBelowDepth = 4
 
+// safeLocate finds the git worktree root for dir without statting remote GIT_DIR or .git gitdir targets.
+func (sc *scan) safeLocate(dir string) (string, bool) {
+	if dir == "" || sc.hasRemoteLink(dir) {
+		return "", false
+	}
+	if gd, ok := sc.lookup("GIT_DIR"); ok && gd != "" {
+		if r, ok := sc.resolveTarget(sc.dir, gd, 1); !ok || sc.hasRemoteLink(r) {
+			return "", false
+		}
+	}
+	if gd := os.Getenv("GIT_DIR"); gd != "" {
+		wd, _ := os.Getwd()
+		base := cmp.Or(wd, sc.cwd)
+		absGD, ok1 := sc.resolveTarget(base, gd, 1)
+		absWT, ok2 := sc.resolveTarget(base, cmp.Or(os.Getenv("GIT_WORK_TREE"), dir), 1)
+		if !ok1 || !ok2 || sc.hasRemoteLink(absGD) || sc.hasRemoteLink(absWT) {
+			return "", false
+		}
+		info, err := os.Stat(absGD)
+		return absWT, err == nil && info.IsDir()
+	}
+	cur, err := filepath.Abs(dir)
+	if err != nil {
+		return "", false
+	}
+	for sc.spend(0) {
+		dotGit := filepath.Join(cur, ".git")
+		if info, err := os.Lstat(dotGit); err == nil {
+			if info.IsDir() {
+				return cur, true
+			}
+			if info.Mode().IsRegular() {
+				return sc.locateGitdirFile(dotGit, cur)
+			}
+			return "", false
+		}
+		if parent := filepath.Dir(cur); parent == cur {
+			return "", false
+		} else {
+			cur = parent
+		}
+	}
+	return "", false
+}
+func (sc *scan) locateGitdirFile(path, cur string) (string, bool) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", false
+	}
+	defer f.Close()
+	var buf [maxPathBytes]byte
+	n, _ := f.Read(buf[:])
+	line, _, hasNL := strings.Cut(string(buf[:n]), "\n")
+	if !hasNL && n == len(buf) {
+		sc.unknown = true
+		return "", false
+	}
+	target, ok := strings.CutPrefix(strings.TrimSpace(line), "gitdir:")
+	if target = strings.TrimSpace(target); !ok || target == "" {
+		return "", false
+	}
+	if resolved, ok := sc.resolveTarget(cur, target, 1); ok && !sc.hasRemoteLink(resolved) {
+		info, err := os.Stat(resolved)
+		return cur, err == nil && info.IsDir()
+	}
+	return "", false
+}
+
 func (sc *scan) below(dir string, levels int) {
 	c := candidate{dir, strconv.Itoa(levels), walked}
 	if _, seen := sc.examined[c]; seen || !sc.spend(1) {
 		return
 	}
 	sc.examined[c] = cached{}
-	if sc.hasRemoteLink(dir) {
-		return
-	}
-	if root, _, ok := gitx.LocateFS(dir); ok && !sc.enclosingCheckout(root) || sc.holdsNone(dir) {
+	if root, ok := sc.safeLocate(dir); ok && !sc.enclosingCheckout(root) || sc.unknown || sc.holdsNone(dir) {
 		return
 	}
 	level := []string{dir}
@@ -39,11 +103,11 @@ func (sc *scan) below(dir string, levels int) {
 			for _, e := range sc.readDir(d) {
 				sub := filepath.Join(d, e.Name())
 				if e.Type()&fs.ModeSymlink != 0 {
-					if !sc.spend(1) || sc.linkTargetRemote(sub, 0) {
-						if sc.unknown {
-							return
-						}
-						continue
+					if !sc.spend(1) {
+						return
+					}
+					if _, bad := sc.resolveLink(sub, 0); bad {
+						return
 					}
 					if info, err := os.Stat(sub); err != nil || !info.IsDir() {
 						continue
@@ -57,9 +121,7 @@ func (sc *scan) below(dir string, levels int) {
 				}
 				if _, err := os.Lstat(filepath.Join(sub, ".git")); err == nil {
 					sc.place(sub)
-					continue
-				}
-				if !sc.holdsNone(sub) {
+				} else if !sc.holdsNone(sub) {
 					next = append(next, sub)
 				}
 			}
@@ -67,7 +129,6 @@ func (sc *scan) below(dir string, levels int) {
 		level = next
 	}
 }
-
 func (sc *scan) enclosingCheckout(root string) bool {
 	if root == "" {
 		return false
@@ -82,18 +143,14 @@ func (sc *scan) enclosingCheckout(root string) bool {
 	}
 	if !sc.cwdRootDone {
 		sc.cwdRootDone = true
-		if r, _, ok := gitx.LocateFS(sc.cwd); ok {
-			sc.cwdRoot = r
-		}
+		sc.cwdRoot, _ = sc.safeLocate(sc.cwd)
 	}
-	return sc.cwdRoot != "" && !samePath(root, sc.cwdRoot) && isStrictlyBelow(sc.cwdRoot, root)
-}
-
-func isStrictlyBelow(child, parent string) bool {
-	rel, err := filepath.Rel(parent, child)
+	if sc.cwdRoot == "" || samePath(root, sc.cwdRoot) {
+		return false
+	}
+	rel, err := filepath.Rel(root, sc.cwdRoot)
 	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
-
 func (sc *scan) holdsNone(p string) bool {
 	sep := string(filepath.Separator)
 	if filepath.Base(p) == "node_modules" || strings.Contains(p, sep+"node_modules"+sep) {
@@ -111,8 +168,6 @@ func (sc *scan) holdsNone(p string) bool {
 	return slices.ContainsFunc(sc.none, func(root string) bool { return p == root || strings.HasPrefix(p, root+sep) })
 }
 
-const readChunk = 256
-
 // readDir lists dir via O_DIRECTORY|O_CLOEXEC (FIFO-safe), failing closed on unexpected errors.
 func (sc *scan) readDir(dir string) []fs.DirEntry {
 	if !sc.spend(1) {
@@ -120,15 +175,13 @@ func (sc *scan) readDir(dir string) []fs.DirEntry {
 	}
 	f, err := openDirNoBlock(dir)
 	if err != nil {
-		if !isBenignDirErr(err) {
-			sc.unknown = true
-		}
+		sc.unknown = sc.unknown || !isBenignDirErr(err)
 		return nil
 	}
 	defer f.Close()
 	var entries []fs.DirEntry
 	for room := maxShellLookups - sc.lookups + 1; len(entries) < room; {
-		chunk, err := f.ReadDir(min(readChunk, room-len(entries)))
+		chunk, err := f.ReadDir(min(256, room-len(entries)))
 		entries = append(entries, chunk...)
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
