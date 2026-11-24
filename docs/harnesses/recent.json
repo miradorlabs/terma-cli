@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-24T19:32:27.467177502Z",
+  "generated_at": "2026-11-24T20:20:08.975404456Z",
   "versions": [
     {
       "harness": "copilot",
@@ -87,19 +87,21 @@
       ],
       "support": "supported",
       "previous": "0.71.0",
-      "changes": 2,
+      "changes": 3,
       "categories": {
         "binary": 1,
+        "hooks": 1,
         "storage": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 2,
+        "informational": 3,
         "notable": 0
       },
-      "undocumented": 2,
+      "undocumented": 3,
       "highlights": [
+        "AfterAgent hook takes a matcher: true → false",
         "On-disk transcript path changed",
         "Binary size: 98,574,960 → 121,875,875 bytes (98.6 MB → 121.9 MB)"
       ],
@@ -113,7 +115,7 @@
       "name": "Gemini CLI",
       "version": "0.71.0",
       "released_at": "2026-11-24T01:21:20.379Z",
-      "captured_at": "2026-11-24T14:02:30.079399036Z",
+      "captured_at": "2026-11-24T20:20:08.975404456Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -138,8 +140,8 @@
       ],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-24T14:02:30.079399036Z",
-      "attempts": 3
+      "attempted_at": "2026-11-24T20:20:08.975404456Z",
+      "attempts": 4
     },
     {
       "harness": "codex-desktop",

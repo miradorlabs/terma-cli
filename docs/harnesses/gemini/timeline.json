@@ -7,6 +7,14 @@
       "previous": "0.71.0",
       "changes": [
         {
+          "id": "hooks.events.AfterAgent.matcher",
+          "category": "hooks",
+          "op": "changed",
+          "title": "AfterAgent hook takes a matcher: true → false",
+          "impact": "informational",
+          "documented": false
+        },
+        {
           "id": "storage.transcript.path",
           "category": "storage",
           "op": "changed",
