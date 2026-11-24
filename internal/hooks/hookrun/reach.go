@@ -10,10 +10,7 @@ import (
 
 	"mvdan.cc/sh/v3/pattern"
 
-	"github.com/miradorlabs/terma-cli/internal/relay/claim"
-	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/runs"
-	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
@@ -35,20 +32,7 @@ func (e Env) Classify(ctx context.Context, r *Repo, sess session.Session, paths 
 		return r
 	}
 	if r == nil {
-		var err error
-		if r, err = e.routeHere(ctx); err != nil {
-			var locs []routing.Location
-			for _, t := range e.reached(nil, paths) {
-				if t.repo.dest != nil {
-					locs = append(locs, t.repo.dest.loc)
-				}
-			}
-			if len(locs) > 0 || unknown.Reason != "" {
-				agent, _ := extra[semconv.TermaAgentIDKey].(string)
-				e.judge(sess.ID, agent, claim.Claim{Tool: sess.Tool, PIDs: claimPIDs(), Parent: e.parent}, locs, false, unknown)
-			}
-			return nil
-		}
+		r, _ = e.routeHere(ctx)
 	}
 	e.classifyTouches(r, sess, extra, e.reached(r, paths), unknown)
 	return r
@@ -59,9 +43,8 @@ func (e Env) reached(r *Repo, paths []string) (out []touched) {
 		if !filepath.IsAbs(p) {
 			p = filepath.Join(e.Cwd, p)
 		}
-		p = filepath.Clean(p)
-		at := []string{p}
-		if target, err := filepath.EvalSymlinks(p); err == nil && target != p {
+		at := []string{filepath.Clean(p)}
+		if target, err := filepath.EvalSymlinks(at[0]); err == nil && target != at[0] {
 			at = append(at, target)
 		}
 		for _, dir := range at {

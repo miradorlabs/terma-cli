@@ -1,6 +1,8 @@
 package hookrun
 
 import (
+	"cmp"
+	"context"
 	"encoding/json"
 	"maps"
 	"os"
@@ -24,13 +26,28 @@ type titleState struct {
 	Mixed bool   `json:"mixed,omitempty"`
 }
 
+// PinTitleOrigin records sessionID's first observed route under stateDir, marking the title
+// state mixed if the session is later seen on another route or resumes without prior state.
+func PinTitleOrigin(ctx context.Context, e Env, stateDir, sessionID string, resumed bool) {
+	if e.Routing != nil && e.StateDir != "" {
+		spoolTitle(e, nil, stateDir, sessionID, cmp.Or(e.Turns(ctx).RouteKey(e.Cwd), "\x00other"), resumed, nil, nil)
+	}
+}
+
 // SpoolTitle spools a session's name as terma.session.title when it differs from the one last
 // spooled for the session, keeping state under stateDir: read reads it under the session's
 // lock, found false before the agent has named the session. The name is cut to TitleMaxBytes
 // on a character's edge. attrs are the agent's own (its name, where the name was read); the
 // caller has checked the consent the name travels under.
 func SpoolTitle(e Env, r *Repo, stateDir, sessionID string, attrs map[string]any, read func() (title string, found bool, err error)) {
-	if e.Spool == nil || !session.ValidID(sessionID) {
+	route := ""
+	if e.Routing != nil && r != nil {
+		route = r.RouteKey()
+	}
+	spoolTitle(e, r, stateDir, sessionID, route, false, attrs, read)
+}
+func spoolTitle(e Env, r *Repo, stateDir, sessionID, route string, resumed bool, attrs map[string]any, read func() (title string, found bool, err error)) {
+	if (read != nil && e.Spool == nil) || !session.ValidID(sessionID) {
 		return
 	}
 	dir := filepath.Join(e.StateDir, stateDir)
@@ -48,11 +65,21 @@ func SpoolTitle(e Env, r *Repo, stateDir, sessionID string, attrs map[string]any
 	if readErr == nil && json.Unmarshal(b, &last) != nil {
 		last = titleState{}
 	}
-	if e.Routing != nil && (last.Mixed || (last.Route != "" && last.Route != r.RouteKey())) {
+	if e.Routing != nil && (last.Mixed || (last.Route != "" && last.Route != route) || (read == nil && last.Route == "" && resumed)) {
 		if !last.Mixed {
-			last.Mixed = true
-			if b, err := json.Marshal(last); err == nil {
+			if b, err := json.Marshal(titleState{Hash: last.Hash, Route: cmp.Or(last.Route, route), Mixed: true}); err == nil {
 				_ = WriteState(path, b)
+			}
+		}
+		return
+	}
+	if read == nil {
+		if e.Routing != nil && last.Route == "" {
+			if b, err := json.Marshal(titleState{Hash: last.Hash, Route: route}); err == nil {
+				_ = WriteState(path, b)
+			}
+			if os.IsNotExist(readErr) {
+				PruneState(dir, e.Time().Add(-spool.MaxAge))
 			}
 		}
 		return
@@ -73,11 +100,7 @@ func SpoolTitle(e Env, r *Repo, stateDir, sessionID string, attrs map[string]any
 		e.Logf("title: %v", err)
 		return
 	}
-	next := titleState{Hash: hash}
-	if e.Routing != nil {
-		next.Route = r.RouteKey()
-	}
-	if b, err := json.Marshal(next); err == nil {
+	if b, err := json.Marshal(titleState{Hash: hash, Route: route}); err == nil {
 		if err := WriteState(path, b); err != nil {
 			e.Logf("title state: %v", err)
 		}

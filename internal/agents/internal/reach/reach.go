@@ -17,35 +17,30 @@ func (s Spec) Of(input json.RawMessage, cwd string) (out []string) {
 	if json.Unmarshal(input, &args) != nil {
 		return nil
 	}
-	var globs []string
-	for _, k := range s.Paths {
-		out = append(out, readStrings(args[k])...)
+	vals := func(keys []string) (got []string) {
+		for _, k := range keys {
+			got = append(got, readStrings(args[k])...)
+		}
+		return got
 	}
-	for _, k := range s.Globs {
-		globs = append(globs, readStrings(args[k])...)
+	out = vals(s.Paths)
+	if globs := vals(s.Globs); len(globs) > 0 {
+		if len(out) > 0 {
+			out = append(out, hookrun.Search(out[0], globs...)[1:]...)
+		} else if cwd != "" {
+			out = hookrun.Search(cwd, globs...)
+		}
 	}
-	if len(globs) > 0 && len(out) > 0 {
-		out = append(out, hookrun.Search(out[0], globs...)[1:]...)
-	} else if len(globs) > 0 && cwd != "" {
-		out = hookrun.Search(cwd, globs...)
-	}
-	for _, k := range s.Lists {
-		out = append(out, hookrun.Alone(readStrings(args[k])...)...)
-	}
+	out = append(out, hookrun.Alone(vals(s.Lists)...)...)
 	dir := cwd
-	for _, k := range s.Dirs {
-		if v := readStrings(args[k]); len(v) > 0 {
-			if dir = v[0]; !filepath.IsAbs(dir) && cwd != "" {
-				dir = filepath.Join(cwd, dir)
-			}
-			out = append(out, hookrun.Alone(dir)...)
-			break
+	if dirs := vals(s.Dirs); len(dirs) > 0 {
+		if dir = dirs[0]; !filepath.IsAbs(dir) && cwd != "" {
+			dir = filepath.Join(cwd, dir)
 		}
+		out = append(out, hookrun.Alone(dir)...)
 	}
-	for _, k := range s.Commands {
-		for _, c := range readStrings(args[k]) {
-			out = append(out, hookrun.Alone(hookrun.ShellPaths(c, dir)...)...)
-		}
+	for _, c := range vals(s.Commands) {
+		out = append(out, hookrun.Alone(hookrun.ShellPaths(c, dir)...)...)
 	}
 	return out
 }

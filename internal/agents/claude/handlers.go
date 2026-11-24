@@ -131,7 +131,7 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 		env.Logf("%v", err)
 		return nil
 	}
-	if session.ValidID(in.SessionID) && claudeReadTools[in.ToolName] {
+	if session.ValidID(in.SessionID) && !isClaudeAgentTool(in.ToolName) {
 		env.Cwd = cmp.Or(in.Cwd, env.Cwd)
 		env.Classify(ctx, nil, session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}, reachedPaths(in, env.Cwd), hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType))
 	}

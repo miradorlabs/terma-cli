@@ -74,7 +74,9 @@ func (e Env) StartRun(sessionID string) {
 	if run, err := runs.Start(e.StateDir, sessionID, e.Time()); err != nil {
 		e.Logf("start run: %v", err)
 	} else {
-		e.Routing.setRun(sessionID, run, e.Time())
+		e.Routing.mu.Lock()
+		e.Routing.runs[sessionID] = &ledgerRun{id: run, active: e.Time()}
+		e.Routing.mu.Unlock()
 	}
 }
 func (e Env) repoClaim(r *Repo, tool string) claim.Claim {
@@ -132,17 +134,12 @@ func (e Env) recordRun(sessionID string, cur ledgerRun, locs []routing.Location,
 			if n := len(prev.Placements); n > 0 && !prev.Placements[n-1].Since.IsZero() {
 				since = prev.Placements[n-1].Since
 			}
-		} else {
-			if w, crossed := e.Routing.crossing(prev, havePrev, cur.id, locs, cur.locations, now); crossed {
-				why = w
-			} else if full {
-				why = runs.Why{Reason: runs.LocationBound}
-			} else {
-				why = unknown
-			}
-			if why.Reason != "" {
-				mixed, since = true, e.mixedCutoff(now)
-			}
+		} else if w, crossed := e.Routing.crossing(prev, havePrev, cur.id, locs, cur.locations, now); crossed {
+			mixed, since, why = true, e.mixedCutoff(now), w
+		} else if full {
+			mixed, since, why = true, e.mixedCutoff(now), runs.Why{Reason: runs.LocationBound}
+		} else if unknown.Reason != "" {
+			mixed, since, why = true, e.mixedCutoff(now), unknown
 		}
 		if !since.IsZero() {
 			recorded = e.markMixed(sessionID, cur.id, since, why)
@@ -199,11 +196,12 @@ func (e Env) placeRun(sessionID, agentID string, c claim.Claim, mixed bool, now 
 			e.Logf("alias subagent: %v", err)
 		}
 	}
-	if mixed {
-		aliases, err := runs.Aliases(e.StateDir, sessionID)
-		if err != nil {
-			e.Logf("subagents of a mixed run: %v", err)
-		}
+	if !mixed {
+		return
+	}
+	if aliases, err := runs.Aliases(e.StateDir, sessionID); err != nil {
+		e.Logf("subagents of a mixed run: %v", err)
+	} else {
 		for _, alias := range aliases {
 			if alias != agentID {
 				claim.Write(e.StateDir, alias, c, at)

@@ -346,3 +346,56 @@ func TestClaudeRoutedTitleWithheldAcrossDestinations(t *testing.T) {
 		t.Fatalf("pure orgB titles = %+v; want 1 title for %s", got, sidPure)
 	}
 }
+
+func TestClaudePreToolUseEditMarksMixedBeforeExecution(t *testing.T) {
+	// Edit tools must be matched by PreToolUse so cross-org edits mark the run Mixed before execution.
+	matcher := ""
+	for _, h := range claudeHooks {
+		if h.Event == "PreToolUse" {
+			matcher = h.Matcher
+		}
+	}
+	if !strings.Contains(matcher, "Edit") || !strings.Contains(matcher, "Write") ||
+		!strings.Contains(matcher, "MultiEdit") || !strings.Contains(matcher, "NotebookEdit") {
+		t.Fatalf("PreToolUse matcher = %q; must include Edit|Write|MultiEdit|NotebookEdit", matcher)
+	}
+	stateDir := t.TempDir()
+	repoA := initOriginRepo(t, "alpha", "git@github.com:orgA/alpha.git")
+	repoB := initOriginRepo(t, "beta", "git@github.com:orgB/beta.git")
+	fileB := filepath.Join(repoB, "target.go")
+	if err := os.WriteFile(fileB, []byte("package b\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	env, _ := makeRoutedClaudeEnv(t, stateDir, repoA)
+	ctx := context.Background()
+
+	cases := []struct {
+		name  string
+		sid   string
+		tool  string
+		input map[string]any
+	}{
+		{"Edit", "018f3a2c-cl04-7000-8000-000000000001", "Edit", map[string]any{"file_path": fileB}},
+		{"Write", "018f3a2c-cl04-7000-8000-000000000002", "Write", map[string]any{"file_path": fileB}},
+		{"MultiEdit", "018f3a2c-cl04-7000-8000-000000000003", "MultiEdit", map[string]any{"edits": []map[string]any{{"file_path": fileB}}}},
+		{"NotebookEdit", "018f3a2c-cl04-7000-8000-000000000004", "NotebookEdit", map[string]any{"notebook_path": fileB}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			startB, _ := json.Marshal(map[string]any{"session_id": tc.sid, "cwd": repoA, "source": "startup"})
+			env.Stdin = bytes.NewReader(startB)
+			if err := sessionStart(ctx, env); err != nil {
+				t.Fatal(err)
+			}
+			preB, _ := json.Marshal(map[string]any{"session_id": tc.sid, "cwd": repoA, "tool_name": tc.tool, "tool_input": tc.input})
+			env.Stdin = bytes.NewReader(preB)
+			if err := preToolUse(ctx, env); err != nil {
+				t.Fatal(err)
+			}
+			c, ok := claim.Read(stateDir, tc.sid, env.Time())
+			if !ok || c.Kind != claim.KindMixed {
+				t.Fatalf("after PreToolUse(%s) targeting orgB: claim = %+v (ok=%v); want KindMixed before PostToolUse", tc.tool, c, ok)
+			}
+		})
+	}
+}

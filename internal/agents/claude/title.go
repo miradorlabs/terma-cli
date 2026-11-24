@@ -58,7 +58,7 @@ func readRoutedTranscriptTitle(path, sessionID string, matches func(string) bool
 	f, err := os.Open(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			err = nil
+			return "", false, nil
 		}
 		return "", false, err
 	}

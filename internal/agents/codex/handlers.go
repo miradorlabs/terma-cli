@@ -221,9 +221,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	if env.Routing != nil {
-		env.MixedSince = env.TurnSince(in.SessionID)
-	}
+	env.MixedSince = env.TurnSince(in.SessionID)
 	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
 	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 	candidates, commits := codexEditedPaths(in, env.Cwd)

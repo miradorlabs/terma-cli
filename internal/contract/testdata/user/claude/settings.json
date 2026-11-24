@@ -14,7 +14,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Read|Grep|Glob|NotebookRead|LS|Bash",
+        "matcher": "Read|Grep|Glob|NotebookRead|LS|Bash|Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",

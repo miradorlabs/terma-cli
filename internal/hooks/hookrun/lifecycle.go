@@ -12,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/project"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -198,7 +199,7 @@ func (e Env) report(r *Repo, sess session.Session, toolName string, paths []stri
 }
 
 func (e Env) classifyTouches(r *Repo, sess session.Session, extra map[string]any, touched []touched, unknown runs.Why) {
-	if e.Routing == nil || r.dest == nil {
+	if e.Routing == nil || (r != nil && r.dest == nil) {
 		return
 	}
 	var locs []routing.Location
@@ -211,6 +212,10 @@ func (e Env) classifyTouches(r *Repo, sess session.Session, extra map[string]any
 		return
 	}
 	agent, _ := extra[semconv.TermaAgentIDKey].(string)
+	if r == nil {
+		e.judge(sess.ID, agent, claim.Claim{Tool: sess.Tool, PIDs: claimPIDs(), Parent: e.parent}, locs, false, unknown)
+		return
+	}
 	e.judge(sess.ID, agent, e.repoClaim(r, sess.Tool), append([]routing.Location{r.dest.loc}, locs...), true, unknown)
 }
 

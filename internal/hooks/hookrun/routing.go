@@ -98,36 +98,34 @@ func (e Env) resolveRouted(ctx context.Context, r *Repo) (*Repo, error) {
 	if !r.dest.collected() {
 		return nil, ErrNotAdmitted
 	}
-	if storeDir, err := project.StoreDir(e.StateDir, r.Root, r.GitDir); err != nil {
+	storeDir, err := project.StoreDir(e.StateDir, r.Root, r.GitDir)
+	if err != nil {
 		return nil, err
-	} else {
-		r.Store = e.store(storeDir)
-		return r, nil
 	}
+	r.Store = e.store(storeDir)
+	return r, nil
 }
 func (e Env) routeHere(ctx context.Context) (*Repo, error) {
 	root, gitDir, id, remote, err := e.locate(ctx)
 	if err != nil {
 		return nil, err
 	}
-	r := &Repo{Root: root, GitDir: gitDir, Repository: id, Remote: remote, dest: e.Routing.route(locationOf(gitDir, id.Origin), e.Time())}
-	r.Name, r.Worktree = CheckoutNames(root, gitDir)
-	return r, nil
+	name, wt := CheckoutNames(root, gitDir)
+	return &Repo{Root: root, GitDir: gitDir, Name: name, Worktree: wt, Repository: id, Remote: remote, dest: e.Routing.route(locationOf(gitDir, id.Origin), e.Time())}, nil
 }
 func (e Env) sandboxedGitRepo(ctx context.Context) *Repo {
 	if e.Routing == nil || e.Routing.Usable() || !e.inSandbox() {
 		return nil
 	}
-	root, gitDir, id, remote, err := e.locate(ctx)
-	if err != nil || gitDir == "" {
+	r, err := e.routeHere(ctx)
+	if err != nil || r.GitDir == "" {
 		return nil
 	}
-	storeDir, err := project.StoreDir(e.StateDir, root, gitDir)
+	storeDir, err := project.StoreDir(e.StateDir, r.Root, r.GitDir)
 	if err != nil {
-		storeDir = filepath.Join(gitDir, project.GitStoreDir)
+		storeDir = filepath.Join(r.GitDir, project.GitStoreDir)
 	}
-	r := &Repo{Root: root, GitDir: gitDir, Repository: id, Remote: remote, Store: e.store(storeDir)}
-	r.Name, r.Worktree = CheckoutNames(root, gitDir)
+	r.dest, r.Store = nil, e.store(storeDir)
 	return r
 }
 func locationOf(gitDir, origin string) routing.Location {
@@ -145,6 +143,7 @@ type dest struct {
 func (d *dest) collected() bool {
 	return d != nil && (d.d.Outcome == routing.Send || d.d.Outcome == routing.Hold)
 }
+func (d *dest) key() string { return d.d.EnrollmentID + "\x00" + holdKey(d.d) }
 
 // Collected reports whether records in r may leave the machine.
 func (r *Repo) Collected() bool {
@@ -157,15 +156,15 @@ func (r *Repo) Collected() bool {
 // RouteKey identifies r's routing destination for deduplicating repeated evidence snapshots.
 func (r *Repo) RouteKey() string {
 	if r.dest != nil {
-		return r.dest.d.EnrollmentID + "\x00" + holdKey(r.dest.d)
+		return r.dest.key()
 	}
 	return r.ProjectID
 }
 func (r *Repo) routeSalt() string {
-	if r.dest == nil {
-		return ""
+	if r.dest != nil {
+		return "\x00" + r.dest.key()
 	}
-	return "\x00" + r.RouteKey()
+	return ""
 }
 func holdKey(d routing.Decision) string {
 	if d.Outcome == routing.Hold && d.Reason == routing.ReasonPending {
@@ -212,11 +211,6 @@ func (e Env) currentRun(sessionID string) ledgerRun {
 	out.locations = slices.Clip(out.locations)
 	return out
 }
-func (rt *Routing) setRun(sessionID, run string, at time.Time) {
-	rt.mu.Lock()
-	defer rt.mu.Unlock()
-	rt.runs[sessionID] = &ledgerRun{id: run, active: at}
-}
 func (e Env) keepRun(sessionID string, now time.Time) {
 	due := false
 	e.Routing.updateRun(sessionID, func(cur *ledgerRun) {
@@ -232,10 +226,10 @@ func (e Env) keepRun(sessionID string, now time.Time) {
 }
 func (rt *Routing) updateRun(sessionID string, fn func(*ledgerRun)) {
 	rt.mu.Lock()
-	defer rt.mu.Unlock()
 	if cur, ok := rt.runs[sessionID]; ok {
 		fn(cur)
 	}
+	rt.mu.Unlock()
 }
 
 // Turns judges and routes per-turn agent records by each turn's working directory.
@@ -253,14 +247,11 @@ func (e Env) Turns(ctx context.Context) *Turns {
 
 // Admits reports whether a turn in cwd may be spooled.
 func (t *Turns) Admits(cwd string) bool {
-	if cwd == "" {
-		return false
-	}
 	if t.env.Routing != nil {
-		return t.dest(cwd).collected()
+		return cwd != "" && t.dest(cwd).collected()
 	}
-	if ok, seen := t.admits[cwd]; seen {
-		return ok
+	if ok, seen := t.admits[cwd]; cwd == "" || seen {
+		return cwd != "" && ok
 	}
 	t.admits[cwd] = t.env.Admits(t.ctx, cwd)
 	return t.admits[cwd]
@@ -269,7 +260,7 @@ func (t *Turns) Admits(cwd string) bool {
 // RouteKey returns cwd's routed destination key (matching Repo.RouteKey), or "" if unrouted/uncollected.
 func (t *Turns) RouteKey(cwd string) string {
 	if d := t.dest(cwd); t.env.Routing != nil && cwd != "" && d.collected() {
-		return d.d.EnrollmentID + "\x00" + holdKey(d.d)
+		return d.key()
 	}
 	return ""
 }

@@ -63,9 +63,7 @@ func afterTool(ctx context.Context, env hookrun.Env) error {
 	if !ok {
 		return nil
 	}
-	if env.Routing != nil {
-		env.MixedSince = env.TurnSince(in.SessionID)
-	}
+	env.MixedSince = env.TurnSince(in.SessionID)
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
 	sess := session.Session{ID: in.SessionID, Tool: geminiTool}
 	if !geminiEditTools[in.ToolName] {

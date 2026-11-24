@@ -16,6 +16,7 @@ import (
 type hookInput struct {
 	SessionID string          `json:"session_id"`
 	Cwd       string          `json:"cwd"`
+	Source    string          `json:"source"`
 	ToolName  string          `json:"tool_name"`
 	ToolInput json.RawMessage `json:"tool_input"`
 	// ToolResult is the Copilot runtime's, in the CLI and in VS Code's agent host.
@@ -33,7 +34,7 @@ var editTools = map[string]bool{
 	"insert_edit_into_file": true, "edit_notebook_file": true,
 }
 
-func readInput(env hookrun.Env) (*hookInput, bool) {
+func readInput(ctx context.Context, env *hookrun.Env) (*hookInput, bool) {
 	in, err := hookrun.ReadInput[hookInput](env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
@@ -43,15 +44,16 @@ func readInput(env hookrun.Env) (*hookInput, bool) {
 		env.Logf("ignoring a missing or unsafe session id")
 		return nil, false
 	}
+	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	hookrun.PinTitleOrigin(ctx, *env, copilotTitleStateDir, in.SessionID, in.Source != "" && in.Source != "new")
 	return in, true
 }
 
 func sessionStart(ctx context.Context, env hookrun.Env) error {
-	in, ok := readInput(env)
+	in, ok := readInput(ctx, &env)
 	if !ok {
 		return nil
 	}
-	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
 	env.StartRun(in.SessionID)
 	r, err := env.Repo(ctx)
 	if err != nil {
@@ -63,22 +65,19 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 
 // prompt is UserPromptSubmit, which the CLI fires before SessionStart: the caller claims
 // the session from the payload and records the turn start for post-tool reach cutoffs.
-func prompt(_ context.Context, env hookrun.Env) error {
-	if in, ok := readInput(env); ok {
+func prompt(ctx context.Context, env hookrun.Env) error {
+	if in, ok := readInput(ctx, &env); ok {
 		env.StartTurn(in.SessionID)
 	}
 	return nil
 }
 
 func postToolUse(ctx context.Context, env hookrun.Env) error {
-	in, ok := readInput(env)
+	in, ok := readInput(ctx, &env)
 	if !ok {
 		return nil
 	}
-	if env.Routing != nil {
-		env.MixedSince = env.TurnSince(in.SessionID)
-	}
-	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	env.MixedSince = env.TurnSince(in.SessionID)
 	sess := session.Session{ID: in.SessionID, Tool: name}
 	if !editTools[in.ToolName] {
 		if env.Routing != nil {
@@ -142,11 +141,10 @@ func editedPaths(raw json.RawMessage) []string {
 // stop is the end of a turn: the caller claims the session and flushes the spool; the
 // session's name is recorded when new or renamed.
 func stop(ctx context.Context, env hookrun.Env) error {
-	in, ok := readInput(env)
+	in, ok := readInput(ctx, &env)
 	if !ok {
 		return nil
 	}
-	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
 	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
@@ -157,11 +155,10 @@ func stop(ctx context.Context, env hookrun.Env) error {
 
 // sessionEnd clears the active session; manifests stay for the commit to come.
 func sessionEnd(ctx context.Context, env hookrun.Env) error {
-	in, ok := readInput(env)
+	in, ok := readInput(ctx, &env)
 	if !ok {
 		return nil
 	}
-	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
 	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
