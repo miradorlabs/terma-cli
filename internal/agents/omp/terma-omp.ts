@@ -328,19 +328,49 @@ export default async function (omp: any) {
       slot.then((s) => s.result, () => false).then(settle, () => settle(false))
     })
   }
+  const awaitWithin = <T>(p: Promise<T>, ms: number, fallback: T): Promise<T> =>
+    Promise.race([
+      p,
+      new Promise<T>((resolve) => {
+        const t: any = setTimeout(() => resolve(fallback), ms)
+        t?.unref?.()
+      }),
+    ])
   const tainted = new Set<string>()
-  const taint = (s: string, cwd: unknown, parent: string) => {
-    if (!s || tainted.has(s)) return
-    tainted.add(s)
-    // Fail-closed fence: attempt once after the queue drains to flip the run to Mixed via
-    // an unresolvable shell reach so OMP's native OTLP export cannot route under a stale claim.
-    void lifecycle.then(() => spawnHook("omp-tool-reach", {
-      session_id: s,
-      cwd,
-      tool: "bash",
-      command: "eval $TERMA_REACH_FAILED",
-      parent_session_id: parent || undefined,
-    }, true, HOOK_TIMEOUT_MS).result)
+  const fenced = new Set<string>()
+  const fencing = new Map<string, Promise<boolean>>()
+  const markSet = (set: Set<string>, s: string, parent: string) => {
+    if (s) set.add(s)
+    if (parent) set.add(parent)
+  }
+  const isTainted = (s: string, parent = "") => !!(s && tainted.has(s)) || !!(parent && tainted.has(parent))
+  const isFenced = (s: string, parent = "") => !!(s && fenced.has(s)) || !!(parent && fenced.has(parent))
+  const taint = (s: string, cwd: unknown, parent: string): Promise<boolean> => {
+    if (!s) return Promise.resolve(false)
+    markSet(tainted, s, parent)
+    if (isFenced(s, parent)) return Promise.resolve(true)
+    const active = fencing.get(s)
+    if (active) return active
+    // Fail-closed fence: await lifecycle drain (bounded) and flip the run to Mixed via
+    // an unresolvable shell reach before tool execution continues. If fencing also fails,
+    // tool_call blocks execution so OMP's native OTLP export cannot leak under a stale claim.
+    const p = (async () => {
+      const drained = await awaitWithin(lifecycle.then(() => true, () => true), HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS, false)
+      if (!drained) return false
+      const run = spawnHook("omp-tool-reach", {
+        session_id: s,
+        cwd,
+        tool: "bash",
+        command: "eval $TERMA_REACH_FAILED",
+        parent_session_id: parent || undefined,
+      }, true, HOOK_TIMEOUT_MS)
+      lifecycle = lifecycle.then(() => run.exit, () => run.exit)
+      const ok = await awaitWithin(run.result, HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS + 500, false)
+      if (ok) markSet(fenced, s, parent)
+      return ok
+    })().finally(() => { fencing.delete(s) })
+    fencing.set(s, p)
+    return p
   }
   const reached = new Map<string, Promise<boolean>>()
   const emitReach = (event: any, ctx: any): Promise<boolean> | null => {
@@ -349,16 +379,15 @@ export default async function (omp: any) {
     const s = sessionOf(ctx)
     if (!s) return null
     const parent = parentOf(ctx)
+    if (isFenced(s, parent)) return Promise.resolve(true)
+    if (isTainted(s, parent)) return taint(s, ctx?.cwd, parent)
     return queuedHook("omp-tool-reach", {
       session_id: s,
       cwd: ctx?.cwd,
       tool: String(event?.toolName ?? ""),
       parent_session_id: parent || undefined,
       ...reach,
-    }).then((ok) => {
-      if (!ok) taint(s, ctx?.cwd, parent)
-      return ok
-    })
+    }).then((ok) => (ok ? true : taint(s, ctx?.cwd, parent)))
   }
 
   omp.on("session_start", (event: any, ctx: any) => {
@@ -372,14 +401,14 @@ export default async function (omp: any) {
   omp.on("session_shutdown", async (_event: any, ctx: any) => {
     const s = sessionOf(ctx)
     const end = s ? queuedHook("omp-session-end", { session_id: s, cwd: ctx?.cwd }).then(() => undefined) : Promise.resolve()
-    await Promise.all([end, tainted.has(s) ? Promise.resolve() : sendTitleBefore(ctx, 1500)])
+    await Promise.all([end, isTainted(s, parentOf(ctx)) ? Promise.resolve() : sendTitleBefore(ctx, 1500)])
   })
 
   // /new, /resume and a fork leave the session without a shutdown: its name, given or
   // changed since the last turn, goes now. ctx is still the session being left. The handler
   // returns nothing, which lets the switch go ahead.
   omp.on("session_before_switch", async (_event: any, ctx: any) => {
-    if (tainted.has(sessionOf(ctx))) return
+    if (isTainted(sessionOf(ctx), parentOf(ctx))) return
     await sendTitleBefore(ctx, 1500)
   })
 
@@ -387,36 +416,40 @@ export default async function (omp: any) {
   // that stopped between turns, is covered before the turn exports anything.
   omp.on("before_agent_start", (_event: any, ctx: any) => {
     const s = sessionOf(ctx)
-    if (tainted.has(s)) return
+    if (isTainted(s, parentOf(ctx))) return
     void queuedHook("omp-prompt", { session_id: s, cwd: ctx?.cwd })
     sendTitle(ctx)
   })
 
   omp.on("agent_end", (_event: any, ctx: any) => {
-    if (tainted.has(sessionOf(ctx))) return
+    if (isTainted(sessionOf(ctx), parentOf(ctx))) return
     sendTitle(ctx)
   })
 
   omp.on("tool_call", async (event: any, ctx: any) => {
     const pendingReach = emitReach(event, ctx)
-    if (pendingReach && event?.toolCallId) {
+    if (!pendingReach) return
+    if (event?.toolCallId) {
       reached.set(event.toolCallId, pendingReach)
       if (reached.size > 1024) reached.delete(reached.keys().next().value!)
     }
-    if (pendingReach) await pendingReach
+    if (!(await pendingReach)) {
+      return { block: true, reason: "terma reach fence failed" }
+    }
   })
 
   omp.on("tool_result", async (event: any, ctx: any) => {
     const s = sessionOf(ctx)
+    const parent = parentOf(ctx)
     const id = event?.toolCallId
     const prior = id ? reached.get(id) : undefined
     if (id) reached.delete(id)
     if (prior && !(await prior)) return
-    if (!prior || event?.details?.resolvedPath) {
+    if ((!prior || event?.details?.resolvedPath) && !isFenced(s, parent)) {
       const extra = emitReach(event, ctx)
       if (extra && !(await extra)) return
     }
-    if (s && tainted.has(s)) return
+    if (isTainted(s, parent)) return
     const files = editedFiles(event)
     if (files.length > 0) {
       void queuedHook("omp-file-edit", {
@@ -425,7 +458,7 @@ export default async function (omp: any) {
         tool: String(event?.toolName ?? ""),
         files,
         tool_call_id: event?.toolCallId,
-        parent_session_id: parentOf(ctx) || undefined,
+        parent_session_id: parent || undefined,
       })
     }
   })

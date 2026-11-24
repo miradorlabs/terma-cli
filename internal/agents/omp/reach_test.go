@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -148,3 +151,122 @@ export default function () {}
 		t.Fatalf("RefreshMachine(current) = (%v, %v); want (false, nil)", changed, err)
 	}
 }
+
+func TestOmpToolReachAwaitsFenceAndBlocksOnDoubleFailureUnderNode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell hook test")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not installed")
+	}
+	if out, err := exec.Command(node, "-p", "process.features.typescript").Output(); err != nil || !slices.Contains([]string{"strip", "transform"}, strings.TrimSpace(string(out))) {
+		t.Skip("node does not run TypeScript")
+	}
+
+	// Subtest 1: first reach fails, fence sleeps 250ms then writes marker and exits 0.
+	// tool_call must NOT return until the fence marker is already on disk, and must not block.
+	t.Run("awaits_fence_before_returning", func(t *testing.T) {
+		dir := t.TempDir()
+		fencedFile := filepath.Join(dir, "fenced")
+		editFile := filepath.Join(dir, "edit.called")
+		hook := filepath.Join(dir, "hook.sh")
+		hookSrc := "#!/bin/sh\nbody=$(cat)\n" +
+			"if [ \"$1\" = \"omp-tool-reach\" ]; then\n" +
+			"  case \"$body\" in\n" +
+			"    *TERMA_REACH_FAILED*) sleep 0.25; echo ok > " + strconv.Quote(fencedFile) + "; exit 0 ;;\n" +
+			"    *) exit 1 ;;\n" +
+			"  esac\n" +
+			"fi\n" +
+			"if [ \"$1\" = \"omp-file-edit\" ]; then echo called > " + strconv.Quote(editFile) + "; fi\n" +
+			"exit 0\n"
+		if err := os.WriteFile(hook, []byte(hookSrc), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		ext := filepath.Join(dir, "terma-ext.ts")
+		if _, err := writeExtension(ext, []string{hook}, relayConfig().Endpoint); err != nil {
+			t.Fatal(err)
+		}
+		script := `
+import { existsSync } from "node:fs"
+const [ext, marker] = process.argv.slice(2)
+const h = {}
+const mod = await import(ext)
+await mod.default({ on: (n, fn) => { h[n] = fn } })
+const ctx = { cwd: "/work", sessionManager: { getSessionId: () => "ses_fence", getSessionFile: () => "", getHeader: () => ({}) } }
+await h.session_start({ reason: "startup" }, ctx)
+const res = await h.tool_call({ toolName: "read", toolCallId: "c1", input: { path: "/other/secret.go" } }, ctx)
+const fencedBeforeReturn = existsSync(marker)
+await h.tool_result({ toolName: "write", toolCallId: "c2", isError: false, input: { path: "a.go" }, details: { resolvedPath: "/work/a.go" } }, ctx)
+console.log(JSON.stringify({ res: res ?? null, fencedBeforeReturn }))
+`
+		driverPath := filepath.Join(dir, "driver.mjs")
+		if err := os.WriteFile(driverPath, []byte(script), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		out, err := exec.Command(node, driverPath, ext, fencedFile).CombinedOutput()
+		if err != nil {
+			t.Fatalf("node: %v\n%s", err, out)
+		}
+		var got struct {
+			Res                map[string]any `json:"res"`
+			FencedBeforeReturn bool           `json:"fencedBeforeReturn"`
+		}
+		if err := json.Unmarshal(out, &got); err != nil {
+			t.Fatalf("parse output %q: %v", out, err)
+		}
+		if !got.FencedBeforeReturn {
+			t.Fatalf("tool_call returned before unknown-reach fence completed: %+v", got)
+		}
+		if got.Res != nil {
+			t.Fatalf("tool_call unexpectedly blocked after fence succeeded: %+v", got.Res)
+		}
+		if _, err := os.Stat(editFile); !os.IsNotExist(err) {
+			t.Fatalf("tainted session still emitted omp-file-edit")
+		}
+	})
+
+	// Subtest 2: both reach and fence fail -> tool_call must fail closed with { block: true }.
+	t.Run("blocks_tool_call_when_fence_fails", func(t *testing.T) {
+		dir := t.TempDir()
+		hook := filepath.Join(dir, "hook.sh")
+		hookSrc := "#!/bin/sh\ncat > /dev/null\nif [ \"$1\" = \"omp-tool-reach\" ]; then exit 1; fi\nexit 0\n"
+		if err := os.WriteFile(hook, []byte(hookSrc), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		ext := filepath.Join(dir, "terma-ext.ts")
+		if _, err := writeExtension(ext, []string{hook}, relayConfig().Endpoint); err != nil {
+			t.Fatal(err)
+		}
+		script := `
+const [ext] = process.argv.slice(2)
+const h = {}
+const mod = await import(ext)
+await mod.default({ on: (n, fn) => { h[n] = fn } })
+const ctx = { cwd: "/work", sessionManager: { getSessionId: () => "ses_block", getSessionFile: () => "", getHeader: () => ({}) } }
+await h.session_start({ reason: "startup" }, ctx)
+const first = await h.tool_call({ toolName: "read", toolCallId: "c1", input: { path: "/other/secret.go" } }, ctx)
+const second = await h.tool_call({ toolName: "bash", toolCallId: "c2", input: { command: "cat /other/secret.go" } }, ctx)
+console.log(JSON.stringify({ first, second }))
+`
+		driverPath := filepath.Join(dir, "driver.mjs")
+		if err := os.WriteFile(driverPath, []byte(script), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		out, err := exec.Command(node, driverPath, ext).CombinedOutput()
+		if err != nil {
+			t.Fatalf("node: %v\n%s", err, out)
+		}
+		var got struct {
+			First  struct{ Block bool `json:"block"` } `json:"first"`
+			Second struct{ Block bool `json:"block"` } `json:"second"`
+		}
+		if err := json.Unmarshal(out, &got); err != nil {
+			t.Fatalf("parse output %q: %v", out, err)
+		}
+		if !got.First.Block || !got.Second.Block {
+			t.Fatalf("expected tool_call to fail closed with block=true when fence fails; got %s", out)
+		}
+	})
+}
+

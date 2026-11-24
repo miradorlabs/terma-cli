@@ -440,9 +440,28 @@ export const TermaPlugin = async ({ directory, worktree }) => {
   function parentOf(sessionID) {
     return sessionID ? parents.get(sessionID) : undefined
   }
+  function taint(sessionID) {
+    let cur = sessionID
+    for (let i = 0; i < 16 && cur; i++) {
+      remember(tainted, cur)
+      const p = parents.get(cur)
+      if (!p || p === cur) break
+      cur = p
+    }
+  }
+  function isTainted(sessionID) {
+    let cur = sessionID
+    for (let i = 0; i < 16 && cur; i++) {
+      if (tainted.has(cur)) return true
+      const p = parents.get(cur)
+      if (!p || p === cur) break
+      cur = p
+    }
+    return false
+  }
 
   function record(sessionID, name, body, extra = {}, severity = 9, time = Date.now()) {
-    if (sessionID && tainted.has(sessionID)) return
+    if (isTainted(sessionID)) return
     exporter.record({
       timeUnixNano: nanos(time),
       severityNumber: severity,
@@ -458,7 +477,7 @@ export const TermaPlugin = async ({ directory, worktree }) => {
     if (seenMessages.has(info.id)) return
     remember(seenMessages, info.id)
     const sid = sessionOf(info.sessionID)
-    if (sid && tainted.has(sid)) return
+    if (isTainted(sid)) return
     const tokens = info.tokens ?? {}
     const cache = tokens.cache ?? {}
     const attributes = {
@@ -566,7 +585,7 @@ export const TermaPlugin = async ({ directory, worktree }) => {
             break
           }
           case "file.edited":
-            if (p.file && !tainted.has(lastSession)) hook("opencode-file-edit", { session_id: lastSession, cwd: worktree || directory, file: p.file, parent_session_id: parentOf(lastSession) })
+            if (p.file && !isTainted(lastSession)) hook("opencode-file-edit", { session_id: lastSession, cwd: worktree || directory, file: p.file, parent_session_id: parentOf(lastSession) })
             break
           case "message.updated":
             modelCall(p.info)
@@ -630,7 +649,7 @@ export const TermaPlugin = async ({ directory, worktree }) => {
               parent_session_id: parentOf(sid),
               ...reach,
             }).then((ok) => {
-              if (!ok) remember(tainted, sid)
+              if (!ok) taint(sid)
               return ok
             })
           : null
@@ -648,7 +667,7 @@ export const TermaPlugin = async ({ directory, worktree }) => {
         const sid = sessionOf(input.sessionID || started?.sessionID)
         const args = input.args ?? {}
         if (started?.reachPromise && !(await started.reachPromise)) {
-          if (sid) remember(tainted, sid)
+          taint(sid)
           return
         }
         if (sid) {
@@ -662,11 +681,11 @@ export const TermaPlugin = async ({ directory, worktree }) => {
               ...reach,
             })
             if (!ok) {
-              remember(tainted, sid)
+              taint(sid)
               return
             }
           }
-          if (tainted.has(sid)) return
+          if (isTainted(sid)) return
         }
         const end = Date.now()
         const start = started?.start ?? end
