@@ -54,12 +54,6 @@ func checklistDiff(v teamsView, slots []checklistSlot, result []prompt.Item, bas
 	return ff
 }
 
-// teamsChecklist lists all organizations concurrently on the single user token and runs
-// the interactive team checklist, committing changes via CAS against st.
-func (app *App) teamsChecklist(cmd *cobra.Command, cfg *config.Config, st routing.State, f teamsFlags) (teamsView, error) {
-	return app.runTeamsChecklist(cmd, cfg, st, app.listTeams(cmd.Context(), cfg, st), f)
-}
-
 // runTeamsChecklist shows the interactive checklist for an already-fetched teamsView v
 // and commits toggles via CAS against st.
 func (app *App) runTeamsChecklist(cmd *cobra.Command, cfg *config.Config, st routing.State, v teamsView, f teamsFlags) (teamsView, error) {

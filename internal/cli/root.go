@@ -224,6 +224,7 @@ type App struct {
 	canAsk func() bool
 	// runForm runs an interactive checkbox form; defaults to prompt.Run.
 	runForm func(*prompt.Form) ([]prompt.Item, error)
+	pickOne func(*cobra.Command, string, []pickRow, func(string) (int, error)) (int, error)
 	// binary is the executable as this process started from it, for the updater: a command
 	// that ran a while, or the relay, may outlive its version, once another install
 	// replaces the binary.
@@ -239,7 +240,7 @@ func New(agentsFor func(configDir string) *agents.Registry, version string) *App
 	app := &App{agentsFor: agentsFor, version: version, binDirs: doctor.WellKnownBinDirs, hookExecutable: procinfo.AbsExecutable,
 		managedRoot: "/", runUpdateStep: runUpdateStep, nateRemoveBinary: removeNateBinary, spawnRelay: daemon.SpawnFrom,
 		backgroundStep: runBackgroundStep,
-		canAsk:         canPrompt, runForm: prompt.Run}
+		canAsk:         canPrompt, runForm: prompt.Run, pickOne: pick}
 	app.nateBinaryCandidates = app.installedTermaBinaries
 	if exe, err := os.Executable(); err == nil {
 		app.binary, _ = os.Stat(exe)

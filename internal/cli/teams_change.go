@@ -86,7 +86,7 @@ func (app *App) applyTeamsWithView(cmd *cobra.Command, cfg *config.Config, st ro
 			if err != nil {
 				return teamsView{}, err
 			}
-			if err := decideBindings(&planned, tk, tickAsker{cmd: cmd, ask: ask, assumeYes: f.assumeYes, names: names}); err != nil {
+			if err := decideBindings(&planned, tk, tickAsker{cmd: cmd, ask: ask, assumeYes: f.assumeYes, names: names, pick: app.pickOne}); err != nil {
 				return teamsView{}, err
 			}
 			ch.ticks = append(ch.ticks, tk)

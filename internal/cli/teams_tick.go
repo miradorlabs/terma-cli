@@ -60,12 +60,18 @@ func prepareTick(ctx context.Context, client *api.Client, authURL string, o orgR
 	return tk, nil
 }
 
-var tickPick = pick
-
 type tickAsker struct {
 	cmd            *cobra.Command
 	ask, assumeYes bool
 	names          teamNames
+	pick           func(*cobra.Command, string, []pickRow, func(string) (int, error)) (int, error)
+}
+
+func (a tickAsker) choose(title string, rows []pickRow) (int, error) {
+	if a.pick == nil {
+		a.pick = pick
+	}
+	return a.pick(a.cmd, title, rows, func(string) (int, error) { return -1, errors.New("answer with a number") })
 }
 
 // decideBindings resolves the undecided bindings tk's policy needs: prompts interactively,
@@ -158,11 +164,11 @@ func decideOwners(planned *routing.State, tk *tick, need []routing.Entry, a tick
 	for _, owner := range owners {
 		keys := byOwner[owner]
 		if a.ask {
-			i, err := tickPick(a.cmd, fmt.Sprintf("%s lists %d of %s's repositories. Bind to %s:", tk.teamName, len(keys), owner, cmp.Or(tk.orgName, tk.team.OrganizationID)), []pickRow{
+			i, err := a.choose(fmt.Sprintf("%s lists %d of %s's repositories. Bind to %s:", tk.teamName, len(keys), owner, cmp.Or(tk.orgName, tk.team.OrganizationID)), []pickRow{
 				{Label: "just the listed repositories", Note: "the owner's other repositories stay free: personal may collect them", Default: true},
 				{Label: "the whole owner " + owner, Note: "every repository under it belongs to " + cmp.Or(tk.orgName, "the organization")},
 				{Label: "decide later", Note: "what they match is held until you decide"},
-			}, func(string) (int, error) { return -1, errors.New("answer with a number") })
+			})
 			if err != nil {
 				return err
 			}
@@ -192,11 +198,11 @@ func askBinding(a tickAsker, tk *tick, key, why string) (*bindingOp, error) {
 		return nil, nil
 	}
 	org := cmp.Or(tk.orgName, tk.team.OrganizationID)
-	i, err := tickPick(a.cmd, fmt.Sprintf("%s (%s):", key, why), []pickRow{
+	i, err := a.choose(fmt.Sprintf("%s (%s):", key, why), []pickRow{
 		{Label: "bind it to " + org, Note: "only " + org + " collects it; personal never does", Default: true},
 		{Label: "refuse it", Note: "no organization collects it; personal may"},
 		{Label: "decide later", Note: "what it matches is held until you decide"},
-	}, func(string) (int, error) { return -1, errors.New("answer with a number") })
+	})
 	if err != nil || i == 2 {
 		return nil, err
 	}

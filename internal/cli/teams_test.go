@@ -899,10 +899,10 @@ func TestTeamsSignInNeededMessageAndInvalidStateFailure(t *testing.T) {
 				routedMachine(t, "alice", func(_ *fakeAuth, s *routing.State) error {
 					return s.Bind("github.com/acme/other", orgB().ID, false)
 				})
-				prevAsk, prevPick := testApp.canAsk, tickPick
-				t.Cleanup(func() { testApp.canAsk, tickPick = prevAsk, prevPick })
+				prevAsk, prevPick := testApp.canAsk, testApp.pickOne
+				t.Cleanup(func() { testApp.canAsk, testApp.pickOne = prevAsk, prevPick })
 				testApp.canAsk = func() bool { return true }
-				tickPick = func(*cobra.Command, string, []pickRow, func(string) (int, error)) (int, error) { return 1, nil }
+				testApp.pickOne = func(*cobra.Command, string, []pickRow, func(string) (int, error)) (int, error) { return 1, nil }
 				cmd := testApp.NewRootCommand()
 				var out strings.Builder
 				cmd.SetIn(strings.NewReader(answer))

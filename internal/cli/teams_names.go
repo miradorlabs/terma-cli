@@ -50,11 +50,9 @@ func (n *teamNames) set(m map[string]string, id, name string) {
 }
 
 func (n teamNames) save(stateDir, profile string) {
-	path, ok := teamNamesPath(stateDir, profile)
-	if !n.changed || !ok || os.MkdirAll(filepath.Dir(path), 0o700) != nil {
-		return
-	}
-	if b, err := json.MarshalIndent(n, "", "  "); err == nil {
-		_ = config.WriteFileAtomic(path, b, 0o600)
+	if path, ok := teamNamesPath(stateDir, profile); n.changed && ok && os.MkdirAll(filepath.Dir(path), 0o700) == nil {
+		if b, err := json.MarshalIndent(n, "", "  "); err == nil {
+			_ = config.WriteFileAtomic(path, b, 0o600)
+		}
 	}
 }
