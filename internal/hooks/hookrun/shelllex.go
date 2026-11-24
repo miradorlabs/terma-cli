@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	secretOptions          = []string{"-c", "-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-ascii", "--data-raw", "--data-binary", "--data-urlencode", "--json", "--oauth2-bearer"}
+	secretOptions          = []string{"-c", "-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-ascii", "--data-raw", "--data-binary", "--data-urlencode", "--json", "--oauth2-bearer", "-E", "--cert", "--proxy-cert"}
 	secretNames, compounds = []string{"pass", "token", "secret", "key", "auth"}, []string{"if", "for", "while", "until", "case", "select"}
 	userinfo               = regexp.MustCompile(`(://)[^/\s]+@|[^/\s:@]*:[^/\s@]+@`)
 )
@@ -235,7 +235,7 @@ func parsable(src string) bool {
 		if top != '"' && top != 'h' && top != 'q' && strings.IndexByte(separators, c) < 0 && strings.IndexByte(separators, prev) >= 0 {
 			words++
 		}
-		if c == '$' && top != 'q' {
+		if (c == '$' || c == '`') && top != 'q' {
 			dollars++
 		}
 		if strings.IndexByte("\n;&|", c) >= 0 {

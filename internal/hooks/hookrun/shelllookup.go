@@ -15,8 +15,7 @@ func (sc *scan) candidate(t string, r role) {
 	if !r.whole() {
 		t = shellValue(t)
 	}
-	if p, isURL, bad := urlPath(t); bad {
-		sc.fail()
+	if p, isURL, bad := urlPath(t); bad && sc.fail() {
 		return
 	} else if isURL {
 		t = p
@@ -142,10 +141,9 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 			return nextPath, curPath, fi, f, ok
 		} else if !fi.IsDir() {
 			return "", "", nil, nil, false
-		} else if next, err := cur.openSubDir(part); err != nil {
-			if errors.Is(err, fs.ErrNotExist) || errors.Is(err, fs.ErrPermission) {
-				return "", curPath, nil, nil, false
-			}
+		} else if next, err := cur.openSubDir(part); errors.Is(err, fs.ErrNotExist) {
+			return "", curPath, nil, nil, false
+		} else if err != nil {
 			return "", "", nil, nil, !sc.fail()
 		} else {
 			stack, paths = append(stack, next), append(paths, nextPath)
@@ -159,10 +157,8 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 	return curPath, filepath.Dir(curPath), nil, nil, false
 }
 func (sc *scan) openLeaf(cur dirHandle, part string, fi fs.FileInfo, openMode uint8) (*os.File, bool) {
-	if openMode == 0 {
-		return nil, true
-	} else if openMode == 1 && !fi.Mode().IsRegular() || openMode == 2 && !fi.IsDir() {
-		return nil, false
+	if openMode == 0 || openMode == 1 && !fi.Mode().IsRegular() || openMode == 2 && !fi.IsDir() {
+		return nil, openMode == 0
 	}
 	f, err := cur.open(part, openMode == 2)
 	if err != nil {
@@ -242,6 +238,9 @@ func hasDotDot(p string) bool {
 }
 func urlPath(w string) (string, bool, bool) {
 	scheme, rest, ok := strings.Cut(w, "://")
+	if !ok && len(w) > 5 && strings.EqualFold(w[:5], "file:") && w[5] == '/' {
+		scheme, rest, ok = "file", w[5:], true
+	}
 	if !ok || !isScheme(scheme) || !strings.EqualFold(scheme, "file") {
 		return "", ok && isScheme(scheme), false
 	}

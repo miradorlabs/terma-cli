@@ -1718,6 +1718,63 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 			t.Fatalf("real(%q) = (%q, true), want false", p, got)
 		}
 	}
+
+	// 26. Unquoted heredoc backticks bound parsable, execute-only intermediate dirs fail closed, authority-less file:/path resolves, curl cert options mask secrets, and UTF-8 BOM git config is detected.
+	heredocTicks := "cat <<EOF\n" + strings.Repeat("`x`", maxShellWords) + "\nEOF"
+	if parsable(heredocTicks) {
+		t.Fatalf("parsable(heredoc with %d backtick substs) = true, want false", maxShellWords)
+	}
+	if p, isURL, bad := urlPath("file:/ws/repo/file"); p != "/ws/repo/file" || !isURL || bad {
+		t.Fatalf("urlPath(file:/ws/repo/file) = (%q, %v, %v), want (\"/ws/repo/file\", true, false)", p, isURL, bad)
+	}
+	authlessURL := "file:" + filepath.ToSlash(privFile)
+	if !strings.HasPrefix(filepath.ToSlash(privFile), "/") {
+		authlessURL = "file:/" + filepath.ToSlash(privFile)
+	}
+	scAuthless := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	scAuthless.candidate(authlessURL, plain)
+	if !scAuthless.places[privDir] {
+		t.Fatalf("authority-less file: URL %q did not place %q (out=%q)", authlessURL, privDir, scAuthless.out)
+	}
+	for _, cmd := range []string{
+		`curl --cert client.pem:SECRET https://example.com`,
+		`curl -E client.pem:SECRET https://example.com`,
+		`curl --proxy-cert client.pem:SECRET https://example.com`,
+	} {
+		if got := firstWords(cmd); strings.Contains(got, "SECRET") {
+			t.Fatalf("firstWords(%q) = %q, leaked curl cert password", cmd, got)
+		}
+	}
+	bomRepo := filepath.Join(dir, "bom-repo")
+	if err := os.MkdirAll(filepath.Join(bomRepo, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bomRepo, ".git", "config"), []byte("\ufeff[core] worktree = /private\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scBOM := newScan(bomRepo, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scBOM.safeLocate(bomRepo); ok {
+		t.Fatalf("safeLocate(UTF-8 BOM worktree config) = (%q, true), want false", got)
+	}
+	if filepath.Separator == '/' && os.Geteuid() != 0 {
+		execOnly := filepath.Join(dir, "exec-only")
+		hidden := filepath.Join(execOnly, "hidden")
+		if err := os.MkdirAll(hidden, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(hidden, "file"), []byte("ok"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(execOnly, 0o111); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(execOnly, 0o700) })
+		scExec := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+		scExec.candidate(filepath.Join(hidden, "file"), plain)
+		if !scExec.unknown {
+			t.Fatalf("traversal through execute-only dir failed to set unknown=true")
+		}
+	}
 }
 
 func FuzzParsable(f *testing.F) {
