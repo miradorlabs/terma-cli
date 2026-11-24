@@ -267,7 +267,7 @@ func parsable(src string) bool {
 				}
 			}
 		case c == '#' && strings.IndexByte(" \t\n;&|()", prev) >= 0:
-			i = lineEnd(src, i) - 1
+			words, i = words+1, lineEnd(src, i)-1
 		case c == '(' || c == '[' || c == '{': // (( [[ [ open expressions
 			n := map[bool]int{true: 2, false: 1}[c != '{' && next == c]
 			i += n - 1

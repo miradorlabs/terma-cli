@@ -13,7 +13,7 @@ import (
 
 // Bounds on a shell reach scan (maxShellTime is overridden to 1s in tests).
 const (
-	shellTime, maxShellPlaces, maxShellLookups, maxShellWords, maxShellStats                       = 20 * time.Millisecond, 256, 4096, 16384, 32768
+	shellTime, maxShellPlaces, maxShellLookups, maxShellWords, maxShellStats                       = 20 * time.Millisecond, 256, 4096, 16384, 131072
 	maxShellBytes, maxShellDepth, maxShellBraces, maxGlobSegments, substitutionSize, maxBelowDepth = 1 << 20, 4, 16, 3, 4096, 4
 	UnknownReach                                                                                   = "\x00unknown" // NUL-prefixed so it cannot collide with a path
 )

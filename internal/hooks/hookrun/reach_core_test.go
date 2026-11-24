@@ -1981,6 +1981,75 @@ func TestDirHandleIdentityCheck(t *testing.T) {
 	}
 }
 
+func TestGitfilePrefixCommentsOverlongAndResolveMayCreate(t *testing.T) {
+	t.Parallel()
+	root, _ := filepath.EvalSymlinks(t.TempDir())
+	realGit := filepath.Join(root, "real.git")
+	if err := os.MkdirAll(realGit, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name    string
+		content string
+		wantOK  bool
+	}{
+		{"valid-lf", "gitdir: " + realGit + "\n", true},
+		{"valid-crlf", "gitdir: " + realGit + "\r\n", true},
+		{"missing-space", "gitdir:" + realGit + "\n", false},
+		{"leading-space", " gitdir: " + realGit + "\n", false},
+		{"extra-newline", "gitdir: " + realGit + "\n\n", false},
+	} {
+		wt := filepath.Join(root, tc.name)
+		if err := os.MkdirAll(wt, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(wt, ".git"), []byte(tc.content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		sc := newScan(wt, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+		got, ok := sc.safeLocate(wt)
+		if ok != tc.wantOK || (tc.wantOK && got != wt) {
+			t.Errorf("safeLocate(%s) = (%q, %v), want ok=%v", tc.name, got, ok, tc.wantOK)
+		}
+	}
+
+	// Comment lines are bounded before invoking the shell parser.
+	if parsable(strings.Repeat("#\n", maxShellWords/2+1)) {
+		t.Fatalf("parsable(repeated #\\n) = true, want false")
+	}
+
+	// Overlong non-slashed plain words do not fail closed; overlong slashed plain paths and targets do.
+	side := filepath.Join(root, "side")
+	api := filepath.Join(root, "acme-api")
+	if err := os.MkdirAll(side, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(api, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(api, "NOTES.md"), []byte("hi"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scLong := newScan(side, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	scLong.candidate(strings.Repeat("a", 200<<10), plain)
+	scLong.candidate(strings.Repeat("b", 300), plain)
+	if scLong.unknown {
+		t.Fatalf("overlong non-slashed plain candidates set unknown=true")
+	}
+	scLong.candidate("/"+strings.Repeat("a/", maxPathBytes/2+2), plain)
+	if !scLong.unknown {
+		t.Fatalf("overlong slashed plain candidate did not fail closed")
+	}
+
+	// resolve does not fall back to mayCreate on sc.cwd when sc.dir already matched an existing file.
+	scDir := newScan(side, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	scDir.dir = root
+	scDir.candidate("acme-api/NOTES.md", plain)
+	if !slices.Equal(scDir.out, []string{api}) {
+		t.Fatalf("out after dir-matched relative file = %q, want [%q]", scDir.out, api)
+	}
+}
+
 func FuzzParsable(f *testing.F) {
 	for _, seed := range []string{
 		"ls -la",

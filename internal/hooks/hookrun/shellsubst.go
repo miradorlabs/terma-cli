@@ -234,12 +234,10 @@ func (sc *scan) readSmallFile(path string) (string, error) {
 func (sc *scan) locateGitdirFile(path, cur string) (string, bool) {
 	if data, err := sc.readSmallFile(path); err != nil {
 		sc.unknown = sc.unknown || errors.Is(err, errOpaque)
-	} else if line, _, _ := strings.Cut(data, "\n"); strings.HasPrefix(strings.TrimSpace(line), "gitdir:") {
-		if target := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "gitdir:")); target != "" {
-			if resolved, ok := sc.resolveTarget(cur, target, 1); ok {
-				if r, _, info, found := sc.walkPath(resolved, true); found && info.IsDir() {
-					return cur, !sc.hasWorktreeConfig(r)
-				}
+	} else if target, ok := strings.CutPrefix(strings.TrimSuffix(strings.TrimSuffix(data, "\n"), "\r"), "gitdir: "); ok && target != "" {
+		if resolved, ok := sc.resolveTarget(cur, target, 1); ok {
+			if r, _, info, found := sc.walkPath(resolved, true); found && info.IsDir() {
+				return cur, !sc.hasWorktreeConfig(r)
 			}
 		}
 	}

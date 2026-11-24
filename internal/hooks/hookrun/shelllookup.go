@@ -26,6 +26,9 @@ func (sc *scan) candidate(t string, r role) {
 	slashed, keyDir := pathLike(t), sc.dir
 	if t == "" || !slashed && r.needsSlash() || sc.away(t, r) {
 		return
+	} else if len(t) > maxPathBytes || !filepath.IsAbs(t) && len(t)+max(len(sc.dir), len(sc.cwd))+1 > maxPathBytes || !slashed && len(t) > 255 {
+		sc.unknown = sc.unknown || r.mustResolve(slashed)
+		return
 	}
 	if t == "~" || strings.HasPrefix(t, "~/") {
 		home, _ := sc.homeDir()
@@ -58,7 +61,7 @@ func (sc *scan) resolve(t string, r role, slashed bool) (res cached) {
 				}
 				res.folders = append(res.folders, p)
 			}
-		} else if r.mayCreate(slashed) {
+		} else if r.mayCreate(slashed) && !res.named {
 			if p, ok := sc.path(t, d); ok {
 				if _, parent, _, found := sc.walkPath(p, true); !found && !sc.unknown && parent != "" {
 					sc.place(parent)
