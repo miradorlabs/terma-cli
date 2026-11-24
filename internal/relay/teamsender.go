@@ -225,7 +225,7 @@ func (s *sender) postBatch(ctx context.Context, pol Policy, batch []entry, body 
 	if s.team == nil {
 		return s.send(ctx, pol, batch[0], body, nil)
 	}
-	fence := func() (outcome, time.Duration, string) {
+	return s.send(ctx, pol, batch[0], body, func() (outcome, time.Duration, string) {
 		if !s.r.laneActive(s.team.account) || !s.r.mayLeaveAccount(s.team.account, pol.Key != "") {
 			return keyless, keylessRetry, "lane changed before send"
 		}
@@ -248,8 +248,7 @@ func (s *sender) postBatch(ctx context.Context, pol Policy, batch []entry, body 
 			return keyless, keylessRetry, "entry waiting before send"
 		}
 		return sent, 0, ""
-	}
-	return s.send(ctx, pol, batch[0], body, fence)
+	})
 }
 func (r *Relay) dropMixed(session, run string, from time.Time) {
 	key := session + "\x00" + run

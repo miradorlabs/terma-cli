@@ -1,7 +1,6 @@
 package relay
 
 import (
-	"strings"
 	"time"
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
@@ -28,21 +27,25 @@ func (r *Relay) pieces(key string, p *part) []*part {
 	if session == "" || !ok || len(c.Placements) < 2 {
 		return []*part{p}
 	}
-	placeKey := func(t uint64) string {
-		if pl, ok := c.At(p.pid, unixTime(t)); ok {
-			return strings.Join([]string{string(pl.Kind), pl.ProjectID, pl.Run, pl.Profile, pl.Account, pl.Repository.Origin, pl.Root, pl.Cwd, pl.Tool}, "\x00")
-		}
-		return "\x00unplaced"
-	}
 	return partitionPart(p, func(iv timeInterval) string {
-		ks, ke := placeKey(iv.start), placeKey(iv.end)
-		return map[bool]string{true: ks + "\x01" + ke, false: ks}[iv.end != iv.start && ke != ks]
+		start, end := unixTime(iv.start), unixTime(iv.end)
+		pl, ok := c.At(p.pid, start)
+		if !ok {
+			return "\x00unplaced"
+		}
+		if why := crossedPlacement(c, p.pid, pl, start, end); why != "" {
+			return "\x01cross\x00" + why
+		}
+		seg := byte('0')
+		for _, pc := range c.Placements {
+			if !pc.Since.After(start) {
+				seg++
+			}
+		}
+		return placementKey(pl) + "\x02" + string([]byte{seg})
 	})
 }
 func splitBeforeMixed(p *part, mixedAt time.Time) (before, atOrAfter *part) {
-	if p.records <= 1 || mixedAt.IsZero() {
-		return nil, p
-	}
 	parts := partitionPart(p, func(iv timeInterval) string {
 		return map[bool]string{true: "b", false: "m"}[!unixTime(iv.end).IsZero() && unixTime(iv.end).Before(mixedAt)]
 	})
@@ -50,7 +53,7 @@ func splitBeforeMixed(p *part, mixedAt time.Time) (before, atOrAfter *part) {
 		return nil, p
 	}
 	if parts[0].endAt.IsZero() || !parts[0].endAt.Before(mixedAt) {
-		parts[0], parts[1] = parts[1], parts[0]
+		return parts[1], parts[0]
 	}
 	return parts[0], parts[1]
 }

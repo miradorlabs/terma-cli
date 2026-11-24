@@ -245,15 +245,13 @@ func (r *Relay) sweep() {
 	}
 	r.sweepPinned(pinnedKeys, now, &lost)
 }
-func (r *Relay) expandHeldPieces(key string, parts []heldPart) []heldPart {
-	out := make([]heldPart, 0, len(parts))
+func (r *Relay) expandHeldPieces(key string, parts []heldPart) (out []heldPart) {
 	for _, h := range parts {
 		for _, pc := range r.pieces(key, h.p) {
-			hp := h
 			if pc != h.p {
-				hp.p, hp.size = pc, proto.Size(pc.msg)
+				h.p, h.size = pc, proto.Size(pc.msg)
 			}
-			out = append(out, hp)
+			out = append(out, h)
 		}
 	}
 	return out
@@ -274,9 +272,7 @@ func (r *Relay) sweepPinned(keys []string, now time.Time, lost *int) {
 				if r.teams() && now.Sub(h.at) < hold {
 					retain(h)
 				} else {
-					if !h.awaitingPolicy.IsZero() {
-						*lost += h.p.records
-					}
+					*lost += map[bool]int{true: h.p.records}[h.awaitingPolicy != time.Time{}]
 					r.dropStats(h.p.signal, cmp.Or(pn.why, string(WhyBlocked)), pn.blocker, h.p.records)
 				}
 				continue

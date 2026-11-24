@@ -206,7 +206,7 @@ func (r *Relay) recoverTeamOutbox() {
 			entries, lerr := r.outbox.listTeam(rt)
 			if lerr != nil {
 				r.warnf("outbox %s: %v", rt, lerr)
-				retry = retry || len(entries) == 0
+				retry = true
 			}
 			if entries = slices.DeleteFunc(entries, func(e entry) bool { return e.corrupt }); len(entries) > 0 {
 				s := r.teamSender(rt)
@@ -215,7 +215,7 @@ func (r *Relay) recoverTeamOutbox() {
 				}
 				s.poke()
 			}
-			r.teamRecovered[rt] = lerr == nil || len(entries) > 0
+			r.teamRecovered[rt] = lerr == nil
 		}
 		r.deliverMu.Unlock()
 	}

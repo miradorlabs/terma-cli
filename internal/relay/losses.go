@@ -30,8 +30,6 @@ const (
 // waited for their team's policy or key, which the relay couldn't read: past policyHold, for
 // room, or as the relay stopped.
 const lostPolicyTimeout = "policy_timeout"
-
-// lostNoDestination counts pre-cutover outbox parts purged at cutover.
 const lostNoDestination = "no_destination"
 
 // OutboxLosses are the claimed records the relay lost, counted from the first loss since a

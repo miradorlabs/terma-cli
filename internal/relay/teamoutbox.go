@@ -46,7 +46,7 @@ func (o outbox) putTeam(rt teamRoute, q Queued, e entry, body []byte) error {
 	if err != nil {
 		return err
 	}
-	return config.WriteFileAtomicNoSync(filepath.Join(o.teamDir(rt), e.name), append(append(append(make([]byte, 0, len(header)+1+len(body)), header...), '\n'), body...), 0o600)
+	return config.WriteFileAtomicNoSync(filepath.Join(o.teamDir(rt), e.name), append(append(header, '\n'), body...), 0o600)
 }
 func readTeamHeader(path, account string) (Queued, error) {
 	f, err := os.Open(path)
@@ -148,9 +148,6 @@ func pruneEmptyUp(dir string, levels int) {
 // PurgeOldOutbox deletes pre-cutover parts outside .teams/ under dir, leaves .teams/ untouched,
 // and records dropped records in losses.json under "no_destination".
 func PurgeOldOutbox(dir string, now time.Time) (int, error) {
-	if dir == "" {
-		return 0, nil
-	}
 	o, dropped := outbox{dir: dir}, 0
 	routes, err := o.routes()
 	for _, rt := range routes {

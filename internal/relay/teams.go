@@ -29,11 +29,11 @@ type Rechecker interface {
 }
 
 type (
-	// Outcome classifies Router.Route's placement decision for a telemetry part.
+	// Outcome classifies Router.Route's placement decision.
 	Outcome int
 	// Why names the reason a routed part is held or dropped.
 	Why string
-	// Verdict classifies a Rechecker's decision for a destination-pinned or queued part.
+	// Verdict classifies a Rechecker's decision for a pinned or queued part.
 	Verdict int
 	// Record is the telemetry interval and placement metadata supplied to Router.Route.
 	Record struct {
@@ -127,6 +127,27 @@ func (r *Relay) sessionOf(key string, pid int) (session, held string) {
 	}
 	return session, cmp.Or(held, whyNoTrace)
 }
+func placementKey(pl claim.Claim) string {
+	return strings.Join([]string{string(pl.Kind), pl.ProjectID, pl.Run, pl.Profile, pl.Account, pl.Repository.Origin, pl.Root, pl.Cwd, pl.Tool}, "\x00")
+}
+func crossedPlacement(raw claim.Claim, pid int, c claim.Claim, start, end time.Time) string {
+	if end.IsZero() || end.Equal(start) {
+		return ""
+	}
+	want := placementKey(c)
+	for i := -1; i < len(raw.Placements); i++ {
+		at := end
+		if i >= 0 {
+			if at = raw.Placements[i].Since; !at.After(start) || !at.Before(end) {
+				continue
+			}
+		}
+		if pl, ok := raw.At(pid, at); !ok || placementKey(pl) != want {
+			return map[bool]string{true: whyNotCollected, false: string(WhyMixed)}[ok && pl.Kind == "" && pl.ProjectID == ""]
+		}
+	}
+	return ""
+}
 func (r *Relay) decideTeams(key string, p *part) verdict {
 	if ppid, ok := procOf(key); ok && r.collectsNone(ppid, p.at) && (p.endAt.IsZero() || p.endAt.Equal(p.at) || r.collectsNone(ppid, p.endAt)) {
 		return verdict{why: whyNotCollected, final: true}
@@ -141,11 +162,8 @@ func (r *Relay) decideTeams(key string, p *part) verdict {
 		if raw, ok := r.lookup(rec.Session); ok {
 			held = whyProcess
 			if c, ok := raw.At(p.pid, p.at); ok {
-				if endC, ok := raw.At(p.pid, p.endAt); !p.endAt.IsZero() && !p.endAt.Equal(p.at) && ok && (endC.Kind == claim.KindMixed || endC.Kind == "" && endC.ProjectID == "") {
-					c = endC
-				}
-				if c.Kind == "" && c.ProjectID == "" {
-					return verdict{why: whyNotCollected, final: true}
+				if why := map[bool]string{true: whyNotCollected, false: crossedPlacement(raw, p.pid, c, p.at, p.endAt)}[c.Kind == "" && c.ProjectID == ""]; why != "" {
+					return verdict{why: why, blocker: map[bool]string{true: "mixed:" + rec.Session}[why == string(WhyMixed)], final: true}
 				}
 				rec.Placement, rec.Placed, held = c, true, ""
 			}
@@ -219,9 +237,7 @@ func (r *Relay) OnStateChange(enrollments ...string) {
 	r.invalidateTeamPolicy(enrollments...)
 	for _, s := range r.allTeamSenders() {
 		if len(enrollments) == 0 || slices.Contains(enrollments, s.team.enrollment) {
-			s.mu.Lock()
-			s.blocked = false
-			s.mu.Unlock()
+			s.setKeyless(false)
 			select {
 			case s.stateChange <- struct{}{}:
 			default:

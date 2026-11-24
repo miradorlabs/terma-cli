@@ -111,9 +111,7 @@ func (r *Relay) dropHeldAtExit() {
 	for _, parts := range pinned {
 		for _, h := range parts {
 			why := cmp.Or(h.pin.why, "claimed")
-			if !h.awaitingPolicy.IsZero() || why == whyNoKey || why == "claimed" {
-				lost += h.p.records
-			}
+			lost += map[bool]int{true: h.p.records}[!h.awaitingPolicy.IsZero() || why == whyNoKey || why == "claimed"]
 			r.dropStats(h.p.signal, why+"_at_exit", h.pin.blocker, h.p.records)
 		}
 	}
@@ -161,12 +159,17 @@ func (r *Relay) quiesce(quiet time.Duration, dropPolicyWaits bool) bool {
 	defer r.mu.Unlock()
 	waiting := r.heldN
 	if dropPolicyWaits {
-		for _, m := range []map[string][]heldPart{r.held, r.pinnedHold} {
-			for _, parts := range m {
-				for _, h := range parts {
-					if !h.awaitingPolicy.IsZero() {
-						waiting -= h.p.records
-					}
+		for _, parts := range r.held {
+			for _, h := range parts {
+				if !h.awaitingPolicy.IsZero() {
+					waiting -= h.p.records
+				}
+			}
+		}
+		for _, parts := range r.pinnedHold {
+			for _, h := range parts {
+				if !h.awaitingPolicy.IsZero() {
+					waiting -= h.p.records
 				}
 			}
 		}

@@ -21,6 +21,7 @@ import (
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
@@ -1251,6 +1252,163 @@ func TestReviewEdgeCases(t *testing.T) {
 		}
 		if got := r.Stats().Snapshot().Counters["dropped.not_collected.traces"]; got != 1 {
 			t.Fatalf("dropped.not_collected.traces = %d, want 1", got)
+		}
+	})
+
+	t.Run("interval_crossing_collected_placements_is_dropped", func(t *testing.T) {
+		t.Parallel()
+		var routeCalls atomic.Int32
+		router := &stubRouter{
+			active: true,
+			routeFn: func(rec Record) Routed {
+				routeCalls.Add(1)
+				return Routed{Outcome: Send, Queued: Queued{Enrollment: "enr_a", Project: "proj_a", Account: rec.Account, Kind: "repository"}}
+			},
+		}
+		movedAt := t0.Add(10 * time.Second)
+		r := New(Options{
+			Dir: t.TempDir(), Router: router, SignIn: &testSignIn{account: accountA},
+			Now: func() time.Time { return t0.Add(time.Minute) },
+			Lookup: func(session string, _ time.Time) (claim.Claim, bool) {
+				if session != "s_cross_ab" {
+					return claim.Claim{}, false
+				}
+				return claim.Claim{
+					Tool: "claude-code",
+					Placements: []claim.Placement{
+						{Since: t0, Kind: claim.KindRepository, PIDs: []int{7171}, Repository: config.Repository{Origin: "github.com/acme/a"}, Run: "r1"},
+						{Since: movedAt, Kind: claim.KindRepository, PIDs: []int{7171}, Repository: config.Repository{Origin: "github.com/beta/b"}, Run: "r2"},
+					},
+				}, true
+			},
+		})
+		spans := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{
+			Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("session.id", "s_cross_ab")}},
+			ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{{
+				Name:              "straddle-ab",
+				StartTimeUnixNano: uint64(t0.Add(5 * time.Second).UnixNano()),
+				EndTimeUnixNano:   uint64(t0.Add(15 * time.Second).UnixNano()),
+			}}}},
+		}}}
+		p := &part{signal: Traces, msg: spans, records: 1, pid: 7171, session: "s_cross_ab", account: accountA, arrived: t0.Add(time.Minute)}
+		p.at, p.endAt = intervalOf(p.msg)
+		r.route(p)
+		if routeCalls.Load() != 0 {
+			t.Fatalf("Router.Route called %d times for span crossing A->B, want 0", routeCalls.Load())
+		}
+		if got := r.Stats().Snapshot().Counters["dropped.mixed_run.traces"]; got != 1 {
+			t.Fatalf("dropped.mixed_run.traces = %d, want 1", got)
+		}
+	})
+
+	t.Run("batch_with_A_B_A_isolates_straddler_and_delivers_clean_segments", func(t *testing.T) {
+		t.Parallel()
+		var routedOrigins []string
+		router := &stubRouter{
+			active: true,
+			routeFn: func(rec Record) Routed {
+				routedOrigins = append(routedOrigins, rec.Placement.Repository.Origin)
+				enr := "enr_a"
+				if rec.Placement.Repository.Origin == "github.com/beta/b" {
+					enr = "enr_b"
+				}
+				return Routed{Outcome: Send, Queued: Queued{Enrollment: enr, Project: "p_" + enr, Account: rec.Account, Kind: "repository"}}
+			},
+			resolveFn: func(_, _, account string) (Policy, error) {
+				return Policy{Endpoint: "https://example.invalid", Account: account, IncludePrompts: true, IncludeToolContent: true}, nil
+			},
+		}
+		r := New(Options{
+			Dir: t.TempDir(), Router: router, SignIn: &testSignIn{account: accountA},
+			Now: func() time.Time { return t0.Add(time.Minute) },
+			Lookup: func(session string, _ time.Time) (claim.Claim, bool) {
+				if session != "s_aba" {
+					return claim.Claim{}, false
+				}
+				return claim.Claim{
+					Tool: "claude-code",
+					Placements: []claim.Placement{
+						{Since: t0, Kind: claim.KindRepository, PIDs: []int{8181}, Repository: config.Repository{Origin: "github.com/acme/a"}, Run: "r1"},
+						{Since: t0.Add(10 * time.Second), Kind: claim.KindRepository, PIDs: []int{8181}, Repository: config.Repository{Origin: "github.com/beta/b"}, Run: "r2"},
+						{Since: t0.Add(20 * time.Second), Kind: claim.KindRepository, PIDs: []int{8181}, Repository: config.Repository{Origin: "github.com/acme/a"}, Run: "r1"},
+					},
+				}, true
+			},
+		})
+		spans := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{
+			Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("session.id", "s_aba")}},
+			ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{
+				{Name: "clean-a1", StartTimeUnixNano: uint64(t0.Add(1 * time.Second).UnixNano()), EndTimeUnixNano: uint64(t0.Add(2 * time.Second).UnixNano())},
+				{Name: "clean-b", StartTimeUnixNano: uint64(t0.Add(12 * time.Second).UnixNano()), EndTimeUnixNano: uint64(t0.Add(13 * time.Second).UnixNano())},
+				{Name: "clean-a2", StartTimeUnixNano: uint64(t0.Add(25 * time.Second).UnixNano()), EndTimeUnixNano: uint64(t0.Add(26 * time.Second).UnixNano())},
+				{Name: "straddle-aba", StartTimeUnixNano: uint64(t0.Add(1 * time.Second).UnixNano()), EndTimeUnixNano: uint64(t0.Add(26 * time.Second).UnixNano())},
+			}}},
+		}}}
+		p := &part{signal: Traces, msg: spans, records: 4, pid: 8181, session: "s_aba", account: accountA, arrived: t0.Add(time.Minute)}
+		p.at, p.endAt = intervalOf(p.msg)
+		r.route(p)
+		if len(routedOrigins) != 3 {
+			t.Fatalf("routed %d clean segments (%v), want 3", len(routedOrigins), routedOrigins)
+		}
+		if got := r.Stats().Snapshot().Counters["dropped.mixed_run.traces"]; got != 1 {
+			t.Fatalf("dropped.mixed_run.traces = %d, want 1", got)
+		}
+	})
+
+	t.Run("partial_listTeam_error_retries_recovery_without_duplicating", func(t *testing.T) {
+		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+			t.Skip("requires POSIX non-root chmod 000")
+		}
+		dir := t.TempDir()
+		rt := teamRoute{accountA, "enr_retry", "claude-code"}
+		o := outbox{dir: dir}
+		e1 := newEntry(t0, Logs, 1)
+		e2 := newEntry(t0.Add(time.Second), Logs, 1)
+		q := Queued{Enrollment: "enr_retry", Project: "p", Account: accountA, Session: "s1"}
+		if err := o.putTeam(rt, q, e1, []byte("b1")); err != nil {
+			t.Fatal(err)
+		}
+		if err := o.putTeam(rt, q, e2, []byte("b2")); err != nil {
+			t.Fatal(err)
+		}
+		p2 := filepath.Join(o.teamDir(rt), e2.name)
+		if err := os.Chmod(p2, 0o000); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = os.Chmod(p2, 0o600) })
+
+		r := New(Options{
+			Dir: dir, SignIn: &testSignIn{account: accountA},
+			Router: &stubRouter{active: true, recheckFn: func(_, _ string) Rechecker {
+				return stubRechecker{waits: true, waitRes: Rechecked{Verdict: Wait, Why: WhyBlocked}}
+			}},
+		})
+		t.Cleanup(func() { r.cancelSend(); r.wg.Wait() })
+		r.recoverTeamOutbox()
+		r.mu.Lock()
+		discoverErr := r.teamDiscoverErr
+		recovered := r.teamRecovered[rt]
+		r.mu.Unlock()
+		if !discoverErr || recovered {
+			t.Fatalf("after partial listTeam error: teamDiscoverErr=%v teamRecovered=%v, want true, false", discoverErr, recovered)
+		}
+		if err := os.Chmod(p2, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		r.recoverTeamOutbox()
+		r.mu.Lock()
+		discoverErr = r.teamDiscoverErr
+		recovered = r.teamRecovered[rt]
+		s := r.teamSenders[rt]
+		r.mu.Unlock()
+		if discoverErr || !recovered {
+			t.Fatalf("after chmod restore: teamDiscoverErr=%v teamRecovered=%v, want false, true", discoverErr, recovered)
+		}
+		s.mu.Lock()
+		got := len(s.queue[Logs])
+		s.mu.Unlock()
+		if got != 2 {
+			t.Fatalf("queued entries after retry = %d, want 2 (no duplicates)", got)
 		}
 	})
 }

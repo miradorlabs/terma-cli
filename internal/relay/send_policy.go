@@ -27,11 +27,12 @@ func (r *Relay) count(sig Signal, tl sendTally) {
 // took; nil drops all of it, as does a body that no longer decodes, since it cannot be
 // checked against a stricter policy.
 func (r *Relay) withholdQueued(sig Signal, body []byte, pol Policy) ([]byte, sendTally) {
-	return r.filterQueued(sig, body, pol, "", false)
+	return r.filterQueued(sig, body, pol, nil)
 }
 
-func (r *Relay) filterQueued(sig Signal, body []byte, pol Policy, account string, restampUser bool) ([]byte, sendTally) {
-	if !restampUser && pol.IncludePrompts && pol.IncludeToolContent && !pol.RequireClaim {
+func (r *Relay) filterQueued(sig Signal, body []byte, pol Policy, team *teamRoute) ([]byte, sendTally) {
+	restamp := team != nil
+	if !restamp && pol.IncludePrompts && pol.IncludeToolContent && !pol.RequireClaim {
 		return body, sendTally{}
 	}
 	var msg proto.Message
@@ -46,7 +47,7 @@ func (r *Relay) filterQueued(sig Signal, body []byte, pol Policy, account string
 	if proto.Unmarshal(body, msg) != nil {
 		return nil, sendTally{}
 	}
-	p := &part{signal: sig, msg: msg, account: account}
+	p := &part{signal: sig, msg: msg}
 	if pol.RequireClaim && hasCatchAll(p) {
 		return nil, sendTally{}
 	}
@@ -54,10 +55,11 @@ func (r *Relay) filterQueued(sig Signal, body []byte, pol Policy, account string
 	if !pol.IncludePrompts || !pol.IncludeToolContent {
 		tl.withheld = r.rules.withhold(p, pol.IncludePrompts, pol.IncludeToolContent, tl.unclassified)
 	}
-	if restampUser {
+	if restamp {
+		p.account = team.account
 		nameUser(p, pol)
 	}
-	if !restampUser && tl.withheld == 0 && len(tl.unclassified) == 0 {
+	if !restamp && tl.withheld == 0 && len(tl.unclassified) == 0 {
 		return body, tl
 	}
 	out, err := proto.Marshal(msg)

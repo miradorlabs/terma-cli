@@ -157,14 +157,12 @@ func (r *Relay) account() string {
 func (r *Relay) mayLeave(rt route, serverKey bool) bool {
 	return r.mayLeaveAccount(rt.account, serverKey)
 }
-
 func (r *Relay) mayLeaveAccount(account string, serverKey bool) bool {
 	if serverKey {
 		return account == sendas.NoPersonLane
 	}
 	return auth.ValidAccountKey(account) && account == r.account()
 }
-
 func (r *Relay) laneActive(account string) bool {
 	return r.account() == account && (account == sendas.NoPersonLane || auth.ValidAccountKey(account))
 }
