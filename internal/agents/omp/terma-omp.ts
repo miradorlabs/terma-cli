@@ -31,20 +31,50 @@ type TermaConfig = {
 // runs as the agent exits awaits: the agent's exit would otherwise cut the payload off; with
 // untilExit, once the hook has exited, for a caller that orders its hooks. It reports whether
 // the hook took the payload: with untilExit, whether it exited cleanly.
-function termaHook(event: string, payload: Record<string, unknown>, untilExit = false): Promise<boolean> {
+const HOOK_TIMEOUT_MS = 2000
+const HOOK_KILL_GRACE_MS = 250
+const MAX_HOOK_QUEUE = 64
+
+function termaHook(event: string, payload: Record<string, unknown>, untilExit = false, timeoutMs = 0): Promise<boolean> {
   if (!CONFIG) return Promise.resolve(false)
   return new Promise((resolve) => {
+    let settled = false
+    let child: ReturnType<typeof spawn> | null = null
+    let timer: any
+    let killTimer: any
+    const finish = (ok: boolean) => {
+      if (settled) return
+      settled = true
+      if (timer) clearTimeout(timer)
+      if (killTimer) clearTimeout(killTimer)
+      resolve(ok)
+    }
     try {
       const [cmd, ...args] = CONFIG!.hookCommand
-      const child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"], detached: false })
-      child.on("error", () => resolve(false))
-      child.stdin.on("error", () => resolve(false))
-      if (untilExit) child.on("close", (code: number | null) => resolve(code === 0))
+      child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"], detached: false })
+      child.on("error", () => finish(false))
+      child.stdin.on("error", () => { if (!untilExit) finish(false) })
+      if (untilExit) {
+        child.on("close", (code: number | null) => finish(code === 0))
+        if (timeoutMs > 0) {
+          timer = setTimeout(() => {
+            if (!child) return finish(false)
+            try { child.kill("SIGTERM") } catch {}
+            killTimer = setTimeout(() => {
+              try { child?.kill("SIGKILL") } catch {}
+              child?.unref?.()
+              finish(false)
+            }, HOOK_KILL_GRACE_MS)
+            killTimer?.unref?.()
+          }, timeoutMs)
+          timer?.unref?.()
+        }
+      }
       child.stdin.end(JSON.stringify(payload), () => {
-        if (!untilExit) resolve(true)
+        if (!untilExit) finish(true)
       })
     } catch {
-      resolve(false)
+      finish(false)
     }
   })
 }
@@ -249,19 +279,16 @@ async function askForContent() {
 export default async function (omp: any) {
   if (!CONFIG) return
   await askForContent()
-  // Serialize lifecycle and reach hooks so session-start always finishes before tool-reach
-  // (a delayed StartRun can never clear an earlier Mixed mark); titles keep their own queue.
+  // Serialize lifecycle and reach hooks so session-start always finishes (or is terminated)
+  // before tool-reach; titles keep their own queue.
   let lifecycle: Promise<void> = Promise.resolve()
+  let pending = 0
   const queuedHook = (event: string, payload: Record<string, unknown>): Promise<void> => {
-    const step = lifecycle.then(() =>
-      Promise.race([
-        termaHook(event, payload, true).then(() => undefined),
-        new Promise<void>((resolve) => {
-          const t: any = setTimeout(resolve, 2000)
-          t?.unref?.()
-        }),
-      ]),
-    )
+    if (pending >= MAX_HOOK_QUEUE) return Promise.resolve()
+    pending++
+    const step = lifecycle
+      .then(() => termaHook(event, payload, true, HOOK_TIMEOUT_MS).then(() => undefined))
+      .finally(() => { pending-- })
     lifecycle = step.then(() => undefined, () => undefined)
     return step
   }

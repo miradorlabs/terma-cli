@@ -6,7 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -62,14 +65,14 @@ func TestOpenCodeStartRunAndToolReachCrossOrgMixed(t *testing.T) {
 
 	parentID := "ses_parent_oc"
 	childID := "ses_child_oc"
-	if err := events["opencode-session-start"](ctx, env(`{"session_id":"`+parentID+`","cwd":"`+repoA+`"}`)); err != nil {
+	if err := events["opencode-session-start"](ctx, env(`{"session_id":"`+parentID+`","cwd":`+strconv.Quote(repoA)+`}`)); err != nil {
 		t.Fatal(err)
 	}
 	parentRun, ok := runs.Locate(stateDir, parentID)
 	if !ok || parentRun.Run == "" {
 		t.Fatalf("opencode-session-start did not start run: %+v (ok=%v)", parentRun, ok)
 	}
-	if err := events["opencode-session-start"](ctx, env(`{"session_id":"`+childID+`","cwd":"`+repoA+`","parent_session_id":"`+parentID+`"}`)); err != nil {
+	if err := events["opencode-session-start"](ctx, env(`{"session_id":"`+childID+`","cwd":`+strconv.Quote(repoA)+`,"parent_session_id":"`+parentID+`"}`)); err != nil {
 		t.Fatal(err)
 	}
 	if p, ok := runs.Locate(stateDir, childID); !ok || p.Run != parentRun.Run {
@@ -84,7 +87,7 @@ func TestOpenCodeStartRunAndToolReachCrossOrgMixed(t *testing.T) {
 	}
 	for i, payload := range reaches {
 		sid := "ses_reach_" + string(rune('a'+i))
-		if err := events["opencode-session-start"](ctx, env(`{"session_id":"`+sid+`","cwd":"`+repoA+`"}`)); err != nil {
+		if err := events["opencode-session-start"](ctx, env(`{"session_id":"`+sid+`","cwd":`+strconv.Quote(repoA)+`}`)); err != nil {
 			t.Fatal(err)
 		}
 		payload["session_id"] = sid
@@ -99,7 +102,62 @@ func TestOpenCodeStartRunAndToolReachCrossOrgMixed(t *testing.T) {
 	}
 }
 
+func TestOpenCodeRefreshConnectDisconnectConcurrentLockSafety(t *testing.T) {
+	h, path := opencodeIn(t)
+	e := opencodeExporter(t, h, true)
+	if err := h.Connect(e, false); err != nil {
+		t.Fatalf("initial connect: %v", err)
+	}
+
+	var wg sync.WaitGroup
+	errs := make(chan error, 60)
+	for range 3 {
+		wg.Add(3)
+		go func() {
+			defer wg.Done()
+			for range 10 {
+				if err := h.Connect(e, false); err != nil {
+					errs <- err
+					return
+				}
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			for range 10 {
+				if _, _, err := h.RefreshPlugin(); err != nil {
+					errs <- err
+					return
+				}
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			for range 10 {
+				if _, err := h.Disconnect(); err != nil {
+					errs <- err
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatalf("concurrent opencode connect/refresh/disconnect error: %v", err)
+	}
+	if _, err := h.Disconnect(); err != nil {
+		t.Fatalf("final disconnect: %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("plugin still present after final disconnect: err=%v", err)
+	}
+}
+
 func TestOpenCodePluginToolReachContractUnderNode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell hook test")
+	}
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is not installed")
@@ -178,5 +236,69 @@ await hooks["tool.execute.after"]({ tool: "edit", sessionID: "ses_oc", callID: "
 	}
 	if byTool["bash"]["command"] != "cat ../repoB/a" || byTool["bash"]["dir"] != "/repoB" {
 		t.Fatalf("bash reach = %v", byTool["bash"])
+	}
+}
+
+func TestOpenCodeHookRunnerKillsTimedOutChildBeforeNextHook(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell hook test")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not installed")
+	}
+	dir := t.TempDir()
+	pidFile := filepath.Join(dir, "hung.pid")
+	statusFile := filepath.Join(dir, "reach.status")
+	hook := filepath.Join(dir, "hook.sh")
+	hookSrc := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"opencode-session-start\" ]; then\n" +
+		"  echo $$ > " + strconv.Quote(pidFile) + "\n" +
+		"  exec sleep 30\n" +
+		"fi\n" +
+		"if [ \"$1\" = \"opencode-tool-reach\" ]; then\n" +
+		"  pid=$(cat " + strconv.Quote(pidFile) + " 2>/dev/null || true)\n" +
+		"  if [ -n \"$pid\" ] && kill -0 \"$pid\" 2>/dev/null; then\n" +
+		"    echo alive > " + strconv.Quote(statusFile) + "\n" +
+		"  else\n" +
+		"    echo dead > " + strconv.Quote(statusFile) + "\n" +
+		"  fi\n" +
+		"fi\n"
+	if err := os.WriteFile(hook, []byte(hookSrc), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	src, err := renderPlugin(opencodeConfig{
+		Version:     1,
+		Endpoint:    "http://127.0.0.1:43180",
+		Signals:     []string{"traces"},
+		HookCommand: []string{hook},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pluginPath := filepath.Join(dir, "terma.mjs")
+	if err := os.WriteFile(pluginPath, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	driver := `
+import { pathToFileURL } from "node:url"
+const mod = await import(pathToFileURL(process.argv[2]).href)
+const hooks = await mod.TermaPlugin({ directory: "/repoA", worktree: "/repoA" })
+hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_hang", directory: "/repoA" } } } })
+await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_hang", callID: "c1" }, { args: { filePath: "/repoB/secret.go" } })
+`
+	script := filepath.Join(dir, "driver.mjs")
+	if err := os.WriteFile(script, []byte(driver), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command(node, script, pluginPath).CombinedOutput(); err != nil {
+		t.Fatalf("node: %v\n%s", err, out)
+	}
+	got, err := os.ReadFile(statusFile)
+	if err != nil {
+		t.Fatalf("read statusFile: %v", err)
+	}
+	if strings.TrimSpace(string(got)) != "dead" {
+		t.Fatalf("previous hung hook status when next hook started = %q; want dead", strings.TrimSpace(string(got)))
 	}
 }

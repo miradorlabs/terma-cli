@@ -3,10 +3,16 @@ package dsh
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -62,14 +68,14 @@ func TestDshStartRunAndToolReachCrossOrgMixed(t *testing.T) {
 
 	parentID := "session-dsh-parent"
 	childID := "session-dsh-child"
-	if err := events["dsh-session-start"](ctx, env(`{"session_id":"`+parentID+`","cwd":"`+repoA+`"}`)); err != nil {
+	if err := events["dsh-session-start"](ctx, env(`{"session_id":"`+parentID+`","cwd":`+strconv.Quote(repoA)+`}`)); err != nil {
 		t.Fatal(err)
 	}
 	parentRun, ok := runs.Locate(stateDir, parentID)
 	if !ok || parentRun.Run == "" {
 		t.Fatalf("dsh-session-start did not start run: %+v (ok=%v)", parentRun, ok)
 	}
-	if err := events["dsh-session-start"](ctx, env(`{"session_id":"`+childID+`","cwd":"`+repoA+`","parent_session_id":"`+parentID+`"}`)); err != nil {
+	if err := events["dsh-session-start"](ctx, env(`{"session_id":"`+childID+`","cwd":`+strconv.Quote(repoA)+`,"parent_session_id":"`+parentID+`"}`)); err != nil {
 		t.Fatal(err)
 	}
 	if p, ok := runs.Locate(stateDir, childID); !ok || p.Run != parentRun.Run {
@@ -84,7 +90,7 @@ func TestDshStartRunAndToolReachCrossOrgMixed(t *testing.T) {
 	}
 	for i, payload := range reaches {
 		sid := "session-dsh-reach-" + string(rune('1'+i))
-		if err := events["dsh-session-start"](ctx, env(`{"session_id":"`+sid+`","cwd":"`+repoA+`"}`)); err != nil {
+		if err := events["dsh-session-start"](ctx, env(`{"session_id":"`+sid+`","cwd":`+strconv.Quote(repoA)+`}`)); err != nil {
 			t.Fatal(err)
 		}
 		payload["session_id"] = sid
@@ -135,6 +141,9 @@ export function apply() {}
 }
 
 func TestDshPluginToolReachContractUnderNode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell hook test")
+	}
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is not installed")
@@ -163,12 +172,12 @@ const handlers = {}
 mod.apply({ on: (name, fn) => { handlers[name] = fn } })
 const sess = { id: "session-dsh-1" }
 handlers["agent/created"]({ agent: { sessionId: "session-dsh-1", cwd: "/repoA" } })
-handlers["session/event"](sess, { type: "tool/call", time: 1, data: { callId: "1", name: "read", arguments: JSON.stringify({ file_path: "/repoB/secret.go" }) } })
-handlers["session/event"](sess, { type: "tool/call", time: 2, data: { callId: "2", name: "grep", arguments: { path: "/repoB", glob: "*.go" } } })
-handlers["session/event"](sess, { type: "tool/call", time: 3, data: { callId: "3", name: "glob", arguments: { pattern: "../repoB/**/*.go" } } })
-handlers["session/event"](sess, { type: "tool/call", time: 4, data: { callId: "4", name: "ls", arguments: { path: "/repoB" } } })
-handlers["session/event"](sess, { type: "tool/call", time: 5, data: { callId: "5", name: "bash", arguments: { command: "cat ../repoB/a", cwd: "/repoB" } } })
-handlers["session/event"](sess, { type: "tool/call", time: 6, data: { callId: "6", name: "edit", arguments: { file_path: "/repoA/a.go" } } })
+await handlers["session/event"](sess, { type: "tool/call", time: 1, data: { callId: "1", name: "read", arguments: JSON.stringify({ file_path: "/repoB/secret.go" }) } })
+await handlers["session/event"](sess, { type: "tool/call", time: 2, data: { callId: "2", name: "grep", arguments: { path: "/repoB", glob: "*.go" } } })
+await handlers["session/event"](sess, { type: "tool/call", time: 3, data: { callId: "3", name: "glob", arguments: { pattern: "../repoB/**/*.go" } } })
+await handlers["session/event"](sess, { type: "tool/call", time: 4, data: { callId: "4", name: "ls", arguments: { path: "/repoB" } } })
+await handlers["session/event"](sess, { type: "tool/call", time: 5, data: { callId: "5", name: "bash", arguments: { command: "cat ../repoB/a", cwd: "/repoB" } } })
+await handlers["session/event"](sess, { type: "tool/call", time: 6, data: { callId: "6", name: "edit", arguments: { file_path: "/repoA/a.go" } } })
 `
 	script := filepath.Join(dir, "driver.mjs")
 	if err := os.WriteFile(script, []byte(driver), 0o600); err != nil {
@@ -208,5 +217,109 @@ handlers["session/event"](sess, { type: "tool/call", time: 6, data: { callId: "6
 	}
 	if byTool["bash"]["command"] != "cat ../repoB/a" || byTool["bash"]["dir"] != "/repoB" {
 		t.Fatalf("bash reach = %v", byTool["bash"])
+	}
+}
+
+func TestDshToolCallAwaitsReachAndFailsClosedUnderNode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell hook test")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not installed")
+	}
+	dir := t.TempDir()
+	reachDoneMarker := filepath.Join(dir, "reach.done")
+
+	var mu sync.Mutex
+	var spanNames []string
+	var sawMarkerBeforeSpan bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if r.URL.Path == "/v1/traces" {
+			var req struct {
+				ResourceSpans []struct {
+					ScopeSpans []struct {
+						Spans []struct {
+							Name string `json:"name"`
+						} `json:"spans"`
+					} `json:"scopeSpans"`
+				} `json:"resourceSpans"`
+			}
+			if json.Unmarshal(body, &req) == nil {
+				_, markerErr := os.Stat(reachDoneMarker)
+				mu.Lock()
+				for _, rs := range req.ResourceSpans {
+					for _, ss := range rs.ScopeSpans {
+						for _, sp := range ss.Spans {
+							spanNames = append(spanNames, sp.Name)
+							if sp.Name == "execute_tool read" && markerErr == nil {
+								sawMarkerBeforeSpan = true
+							}
+						}
+					}
+				}
+				mu.Unlock()
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	hook := filepath.Join(dir, "hook.sh")
+	hookSrc := "#!/bin/sh\n" +
+		"payload=$(cat)\n" +
+		"if [ \"$1\" = \"dsh-tool-reach\" ]; then\n" +
+		"  case \"$payload\" in\n" +
+		"    *'\"tool\":\"grep\"'*) exit 1 ;;\n" +
+		"  esac\n" +
+		"  sleep 0.15\n" +
+		"  touch " + strconv.Quote(reachDoneMarker) + "\n" +
+		"fi\n"
+	if err := os.WriteFile(hook, []byte(hookSrc), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	text, err := renderPlugin(pluginConfig{Endpoint: srv.URL, HookCommand: []string{hook}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pluginPath := filepath.Join(dir, "terma.mjs")
+	if err := os.WriteFile(pluginPath, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	driver := `
+import { pathToFileURL } from "node:url"
+const mod = await import(pathToFileURL(process.argv[2]).href)
+const handlers = {}
+mod.apply({ on: (name, fn) => { handlers[name] = fn } })
+const sess = { id: "session-dsh-await" }
+handlers["agent/created"]({ agent: { sessionId: "session-dsh-await", cwd: "/repoA" } })
+// Simulate fire-and-forget host firing tool/call and tool/result back to back.
+const p1 = handlers["session/event"](sess, { type: "tool/call", time: Date.now(), data: { callId: "1", name: "read", arguments: { file_path: "/repoB/secret.go" } } })
+const p2 = handlers["session/event"](sess, { type: "tool/result", time: Date.now(), data: { message: { source: { callId: "1" }, content: "ok" } } })
+// Failing reach hook must suppress execute_tool span (fail closed).
+const p3 = handlers["session/event"](sess, { type: "tool/call", time: Date.now(), data: { callId: "2", name: "grep", arguments: { path: "/repoB", glob: "*.go" } } })
+const p4 = handlers["session/event"](sess, { type: "tool/result", time: Date.now(), data: { message: { source: { callId: "2" }, content: "ok" } } })
+await Promise.all([p1, p2, p3, p4])
+// Trigger flush via turn/end and wait briefly for POST to complete.
+await handlers["session/event"](sess, { type: "turn/end", time: Date.now(), data: {} })
+await new Promise((r) => setTimeout(r, 200))
+`
+	script := filepath.Join(dir, "driver.mjs")
+	if err := os.WriteFile(script, []byte(driver), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command(node, script, pluginPath).CombinedOutput(); err != nil {
+		t.Fatalf("node: %v\n%s", err, out)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if !sawMarkerBeforeSpan {
+		t.Fatalf("expected execute_tool read span only after dsh-tool-reach finished; spans=%v", spanNames)
+	}
+	for _, name := range spanNames {
+		if name == "execute_tool grep" {
+			t.Fatalf("failed dsh-tool-reach leaked execute_tool grep span: %v", spanNames)
+		}
 	}
 }

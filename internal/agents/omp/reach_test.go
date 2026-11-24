@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -62,14 +63,15 @@ func TestOmpStartRunAndToolReachCrossOrgMixed(t *testing.T) {
 	// Subagent session-start does not call StartRun; parent session-start does.
 	parentID := "018f3a2c-9101-7000-8000-000000000001"
 	childID := "018f3a2c-9101-7000-8000-000000000002"
-	if err := events["omp-session-start"](ctx, env(`{"session_id":"`+parentID+`","cwd":"`+repoA+`"}`)); err != nil {
+	qA := strconv.Quote(repoA)
+	if err := events["omp-session-start"](ctx, env(`{"session_id":"`+parentID+`","cwd":`+qA+`}`)); err != nil {
 		t.Fatal(err)
 	}
 	parentRun, ok := runs.Locate(stateDir, parentID)
 	if !ok || parentRun.Run == "" {
 		t.Fatalf("omp-session-start did not start run: %+v (ok=%v)", parentRun, ok)
 	}
-	if err := events["omp-session-start"](ctx, env(`{"session_id":"`+childID+`","cwd":"`+repoA+`","parent_session_id":"`+parentID+`"}`)); err != nil {
+	if err := events["omp-session-start"](ctx, env(`{"session_id":"`+childID+`","cwd":`+qA+`,"parent_session_id":"`+parentID+`"}`)); err != nil {
 		t.Fatal(err)
 	}
 	if p, ok := runs.Locate(stateDir, childID); !ok || p.Run != parentRun.Run {
@@ -85,7 +87,7 @@ func TestOmpStartRunAndToolReachCrossOrgMixed(t *testing.T) {
 	}
 	for i, payload := range reaches {
 		sid := "018f3a2c-9102-7000-8000-00000000000" + string(rune('1'+i))
-		if err := events["omp-session-start"](ctx, env(`{"session_id":"`+sid+`","cwd":"`+repoA+`"}`)); err != nil {
+		if err := events["omp-session-start"](ctx, env(`{"session_id":"`+sid+`","cwd":`+qA+`}`)); err != nil {
 			t.Fatal(err)
 		}
 		payload["session_id"] = sid

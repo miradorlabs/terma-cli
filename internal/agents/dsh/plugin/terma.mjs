@@ -138,34 +138,53 @@ function usageAttrs(u) {
 
 // termaHook hands an event to `terma hook dsh-*` in FIFO order, as this process's child —
 // which lets its claim name this process and ensures session-start finishes before tool-reach.
+// A timed-out child is terminated before the queue advances so it cannot race later hooks.
+const HOOK_TIMEOUT_MS = 2000
+const HOOK_KILL_GRACE_MS = 250
+const MAX_HOOK_QUEUE = 64
 let hookQueue = Promise.resolve()
+let hookPending = 0
 
 function spawnHook(event, payload) {
   return new Promise((resolve) => {
     let settled = false
-    const done = () => {
+    let child = null
+    let killTimer
+    const done = (ok) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
-      resolve()
+      if (killTimer) clearTimeout(killTimer)
+      resolve(ok)
     }
-    const timer = setTimeout(done, 2000)
+    const timer = setTimeout(() => {
+      if (!child) return done(false)
+      try { child.kill("SIGTERM") } catch {}
+      killTimer = setTimeout(() => {
+        try { child.kill("SIGKILL") } catch {}
+        if (typeof child.unref === "function") child.unref()
+        done(false)
+      }, HOOK_KILL_GRACE_MS)
+      if (typeof killTimer.unref === "function") killTimer.unref()
+    }, HOOK_TIMEOUT_MS)
     if (typeof timer.unref === "function") timer.unref()
     try {
       const [cmd, ...args] = CONFIG.hookCommand
-      const child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"] })
-      child.on("error", done)
-      child.on("close", done)
+      child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"] })
+      child.on("error", () => done(false))
+      child.on("close", (code) => done(code === 0))
       child.stdin.on("error", () => {})
       child.stdin.end(JSON.stringify(payload))
     } catch {
-      done()
+      done(false)
     }
   })
 }
 
 function termaHook(event, payload) {
-  const step = hookQueue.then(() => spawnHook(event, payload))
+  if (hookPending >= MAX_HOOK_QUEUE) return Promise.resolve(false)
+  hookPending++
+  const step = hookQueue.then(() => spawnHook(event, payload)).finally(() => { hookPending-- })
   hookQueue = step.then(() => undefined, () => undefined)
   return step
 }
@@ -176,7 +195,7 @@ const EDIT_TOOLS = new Set(["write", "edit", "multi_edit"])
 
 const cwds = new Map() // session → workspace
 const stepStart = new Map() // session → when its model step began
-const calls = new Map() // callId → { name, args, start }
+const calls = new Map() // callId → { name, args, start, reachDone }
 const ended = new Set()
 
 function sessionOf(session, event) {
@@ -264,7 +283,7 @@ export function apply(ctx) {
     termaHook("dsh-session-start", { session_id: s, cwd })
   })
 
-  ctx.on("session/event", (session, event) => {
+  ctx.on("session/event", async (session, event) => {
     const s = sessionOf(session, event)
     if (!s || !event) return
     const d = event.data || {}
@@ -300,9 +319,10 @@ export function apply(ctx) {
       }
       case "tool/call": {
         const name = String(d.name || "")
-        if (d.callId) calls.set(d.callId, { name, args: d.arguments, start: at })
         const reach = toolReach(name, d.arguments)
-        if (reach) termaHook("dsh-tool-reach", { session_id: s, cwd, tool: name, ...reach })
+        const reachDone = reach ? termaHook("dsh-tool-reach", { session_id: s, cwd, tool: name, ...reach }) : null
+        if (d.callId) calls.set(d.callId, { name, args: d.arguments, start: at, reachDone })
+        if (reachDone) await reachDone
         break
       }
       case "tool/result": {
@@ -310,7 +330,12 @@ export function apply(ctx) {
         const call = calls.get(id)
         if (!call) break
         calls.delete(id)
-        span(s, "execute_tool " + call.name, call.start, at, {
+        let end = at
+        if (call.reachDone) {
+          if (!(await call.reachDone)) break
+          end = Math.max(at, Date.now())
+        }
+        span(s, "execute_tool " + call.name, call.start, end, {
           "gen_ai.operation.name": "execute_tool",
           "gen_ai.tool.name": call.name,
           "gen_ai.tool.call.id": id,
