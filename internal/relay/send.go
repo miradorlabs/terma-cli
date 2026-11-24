@@ -188,6 +188,10 @@ func jitter(d, floor time.Duration) time.Duration {
 }
 
 func (r *Relay) recoverOutbox() {
+	if r.teams() {
+		r.recoverTeamOutbox()
+		return
+	}
 	routes, _ := r.outbox.routes()
 	for _, rt := range routes {
 		r.recoverRoute(rt)

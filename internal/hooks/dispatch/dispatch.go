@@ -94,8 +94,11 @@ func Run(ctx context.Context, d Deps, r Request) int {
 	}
 	if render, ok := d.Agents.Render(r.Event); ok {
 		p := d.Profile()
+		if p.Routing == nil {
+			p.Routing = hookrun.NewRouting("", nil)
+		}
 		env := hookrun.Env{Now: time.Now(), Cwd: r.Cwd, Args: r.Args, Stdin: r.Stdin, Stdout: r.Stdout, Stderr: r.Stderr,
-			ConfigDir: d.ConfigDir, StateDir: d.StateDir, Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: p.Policy, Team: p.Team,
+			ConfigDir: d.ConfigDir, StateDir: d.StateDir, Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: config.NoPolicy("", ""),
 			Routing: p.Routing, Account: p.Account, ServerKey: p.ServerKey}
 		if !r.HooksOff {
 			env.Spool = bound(d.Spool(), p)
@@ -121,6 +124,9 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		return 0
 	}
 	p := d.Profile()
+	if p.Routing == nil {
+		p.Routing = hookrun.NewRouting("", nil)
+	}
 	if r.Cwd == "" {
 		return 0
 	}
@@ -145,8 +151,7 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		Version:   r.Version,
 		Debug:     r.Debug,
 		Spool:     bound(d.Spool(), p),
-		Policy:    p.Policy,
-		Team:      p.Team,
+		Policy:    config.NoPolicy("", ""),
 		Agents:    p.Agents,
 		Routing:   p.Routing,
 		Account:   p.Account,
@@ -166,11 +171,8 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 	if strings.HasSuffix(r.Event, "-tool-reach") && env.Routing.TakeWriteErr() != nil {
 		return 1
 	}
-	switch {
-	case claimed && p.Routing != nil && d.ClaimedRouted != nil:
+	if claimed && d.ClaimedRouted != nil {
 		d.ClaimedRouted(claimedIn, p.Routing)
-	case claimed:
-		d.Claimed(claimedIn, p.Policy)
 	}
 	if flush && env.Spool != nil && !flushed {
 		d.Flush()

@@ -2,7 +2,6 @@ package delivery
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"flag"
 	"io"
@@ -17,7 +16,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -112,24 +113,27 @@ func TestOutgoingDropsASkillLinkThePolicyNoLongerAdmits(t *testing.T) {
 // does: nothing of it is sent.
 func TestFlushWithholdsASkillDefinitionQueuedBeforeThePolicyChanged(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	m := newRoutedMachine(t)
 	sent := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { sent++ }))
 	defer srv.Close()
-	if err := keystore.Set(dir, "p1", testKey, keystore.Hosts{}); err != nil {
+	if err := keystore.Set(m.config, "p1", testKey, keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
-	s, err := spool.Open(t.TempDir())
-	if err != nil {
+	tm := orgTeam("org-a", "p1", listed...)
+	tm.Policy.IncludeToolContent = false
+	enr := m.createState(config.DefaultProfile, sendas.NoPersonLane, []routing.Team{tm}, func(s *routing.State, _ map[string]string) error {
+		return s.Bind(app.Origin, "org-a", false)
+	})
+	m.spool.BindNoPerson()
+	ev := skillDefinition()
+	ev.Profile, ev.Enrollment = config.DefaultProfile, enr["p1"]
+	if err := m.spool.Append(ev); err != nil {
 		t.Fatal(err)
 	}
-	s.BindNoPerson()
-	if err := s.Append(skillDefinition()); err != nil {
-		t.Fatal(err)
-	}
-	now := config.Policy{Mode: config.ModeRepo, Repositories: listed, TeamID: "p1", IncludePrompts: true, FetchedAt: time.Now()}
-	r := Router{ConfigDir: dir, OTLPPinned: true, Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return now, nil }}
-	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
+	r := m.router(nil)
+	r.OTLPPinned = true
+	res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, ServerKeyAuthURL: routedAuth, OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
 	if res.Withheld != 1 || res.Sent != 0 || sent != 0 || res.Err != nil {
 		t.Fatalf("Flush = %+v, %d requests", res, sent)
 	}
@@ -140,15 +144,20 @@ func TestFlushWithholdsASkillDefinitionQueuedBeforeThePolicyChanged(t *testing.T
 // account that collected it; another person's waits for their own sign-in.
 func TestASkillDefinitionLeavesUnderTheSignInThatCollectedIt(t *testing.T) {
 	t.Parallel()
+	m := newRoutedMachine(t)
 	srv, sent := recordingIngest(t, http.StatusOK)
-	signIn := &fakeSignIn{account: "aaaaaaaaaaaaaaaa", token: "token-a"}
+	signIn := &fakeSignIn{account: aliceLane, token: "token-a"}
+	enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{orgTeam("org-a", "p1", listed...)}, func(s *routing.State, _ map[string]string) error {
+		return s.Bind(app.Origin, "org-a", false)
+	})
 	mine, theirs := skillDefinition(), skillDefinition()
-	mine.Account, theirs.Account, theirs.SessionID = "aaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbb", "s2"
+	mine.Account, mine.Profile, mine.Enrollment = aliceLane, config.DefaultProfile, enr["p1"]
+	theirs.Account, theirs.SessionID, theirs.Profile, theirs.Enrollment = bobLane, "s2", config.DefaultProfile, enr["p1"]
 	theirs.Attrs[semconv.TermaSkillDescriptionKey] = "someone else's description"
-	s := spoolOf(t, mine, theirs)
-	pol := config.Policy{Mode: config.ModeRepo, Repositories: listed, IncludePrompts: true, IncludeToolContent: true, FetchedAt: time.Now()}
-	r := Router{OTLPPinned: true, SignIn: signIn, Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return pol, nil }}
-	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL}, true, 0)
+	m.queueRaw(mine, theirs)
+	r := m.router(signIn)
+	r.OTLPPinned = true
+	res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, OTLPURL: srv.URL}, true, 0)
 	if res.Sent != 1 || res.Held != 1 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}

@@ -71,16 +71,16 @@ func TestHookProfileFailsClosedOnAccountMismatchCorruptAndMidReadRace(t *testing
 	acctA := auth.AccountKey("https://api.example.com", "user-a")
 	acctB := auth.AccountKey("https://api.example.com", "user-b")
 
-	t.Run("pre-activation fallback when no routing state exists", func(t *testing.T) {
+	t.Run("missing routing state fails closed with zero fallback to Profile.Team", func(t *testing.T) {
 		dir, stateDir := t.TempDir(), t.TempDir()
 		seedProfileWithTeam(t, dir, stateDir, "", true)
 		app := &App{dir: dir, stateDir: stateDir, version: "0.5.0"}
 		p := app.hookProfile()
-		if p.Routing != nil {
-			t.Fatalf("Routing = %v; want nil when no routing state exists", p.Routing)
+		if p.Routing == nil || p.Routing.Usable() {
+			t.Fatalf("Routing = %+v; want unusable fail-closed Routing when no routing state exists", p.Routing)
 		}
-		if p.Team != "legacy_team" || !p.ServerKey {
-			t.Fatalf("pre-activation fallback broken: team=%q serverKey=%v", p.Team, p.ServerKey)
+		if p.Team != "" || p.ServerKey || p.Account != sendas.AccountUnreadable {
+			t.Fatalf("missing routing state must fail closed: team=%q serverKey=%v account=%q", p.Team, p.ServerKey, p.Account)
 		}
 	})
 

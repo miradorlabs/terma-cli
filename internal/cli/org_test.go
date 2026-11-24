@@ -102,7 +102,8 @@ func chooseHere(t *testing.T, want orgRef, ask orgAsker) (int, error) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return testApp.chooseOrganization(context.Background(), cfg, cred, want, ask)
+	_, n, err := testApp.chooseOrganization(context.Background(), cfg, cred, want, ask)
+	return n, err
 }
 
 // A working stored session is verified and reused; no browser opens.

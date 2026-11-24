@@ -55,7 +55,7 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 				StateDir: app.stateDir, Addr: addr, Idle: idle, Service: asService, Follow: follow, Launch: launch, Environment: cfg.Environment, Version: app.version, Log: log,
 				Engine:  engine,
 				OnRelay: onRelay,
-				Workers: []func(context.Context){deps.Refresher().Run, teamWorker, app.sweepHookState},
+				Workers: []func(context.Context){teamWorker, app.sweepHookState},
 				Updater: app.relayUpdater(install),
 				Listening: func(at net.Addr, hold time.Duration) {
 					if !quiet {

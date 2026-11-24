@@ -102,7 +102,7 @@ func TestHookKillSwitch(t *testing.T) {
 	}
 	events := filepath.Join(testApp.stateDir, spool.Dir, spool.EventsFile)
 	before, _ := os.ReadFile(events)
-	git("commit", "-q", "-m", "by hand")
+	git("-c", "core.hooksPath="+t.TempDir(), "commit", "-q", "-m", "by hand")
 	run("", "post-commit")
 	if after, _ := os.ReadFile(events); len(after) != len(before) {
 		t.Fatalf("post-commit spooled on a machine torn down:\n%s", after[len(before):])

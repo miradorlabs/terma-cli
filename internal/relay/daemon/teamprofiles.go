@@ -36,10 +36,9 @@ func expectedAccount(cfg *config.Config) string {
 	return cfg.Account
 }
 
-// Active reports whether routing is active for the relay's profile (routing/<profile>.json
-// exists on disk, even if corrupt or mismatched so it fails closed rather than falling
-// back to the pre-cutover single-team path).
-func (t *Teams) Active() bool { return t.route("", false).exists }
+// Active reports that routed multi-team mode is unconditionally active after cutover, so
+// missing, corrupt, or wrong-account routing state fails closed rather than falling back.
+func (t *Teams) Active() bool { return true }
 
 // Invalidate clears cached routing-state snapshots so the next lookup reloads from disk.
 func (t *Teams) Invalidate() {

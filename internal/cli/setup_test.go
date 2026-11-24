@@ -606,6 +606,9 @@ func (h *recordingIngest) take() []otlpRequest {
 // new team's wider policy. A switch back collects for the old team under its own policy.
 func TestDesktopGrantCutoverKeepsInFlightWorkWithItsTeam(t *testing.T) {
 	gateway := grantSandbox(t)
+	pers := personalOrg()
+	pers.Type = "personal"
+	gateway.orgs = []organization{orgA(), pers}
 	t.Setenv("TERMA_POLICY_STUB", "") // the real fetches, which the auth gateway scopes
 	gateway.scopedPolicies = true
 	teamA, personal := teamOrgTeam(), personalTeam()

@@ -19,6 +19,8 @@ import (
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
+	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -139,6 +141,9 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer, keepToken bool) er
 		}
 		fmt.Fprintln(out, "Stopped the relay and removed its state.")
 	}
+	if err := app.removeRoutingState(); err != nil {
+		return fmt.Errorf("remove routing state: %w", err)
+	}
 	// Only a warning: everything that had to happen in order has, and --sign-out still should.
 	if err := app.removeHookState(); err != nil {
 		fmt.Fprintf(out, "Warning: %v; run `terma teardown` again to finish.\n", err)
@@ -146,11 +151,42 @@ func (app *App) undoSetup(ctx context.Context, out io.Writer, keepToken bool) er
 	return nil
 }
 
+// removeRoutingState deletes the active profile's routing/<profile>.json via CAS Delete
+// (retrying once on a concurrent refresh), and removes unreadable corrupt files directly.
+func (app *App) removeRoutingState() error {
+	profile := config.DefaultProfile
+	if cfg, err := app.loadConfig(); err == nil && cfg.ProfileName != "" {
+		profile = cfg.ProfileName
+	}
+	for range 2 {
+		st, found, err := routing.Load(app.stateDir, profile)
+		if err != nil {
+			if path, perr := routing.StatePath(app.stateDir, profile); perr == nil {
+				_ = os.Remove(path)
+			}
+			break
+		}
+		if !found {
+			break
+		}
+		err = routing.Delete(app.stateDir, profile, st.Expect())
+		if err == nil || errors.Is(err, routing.ErrNoState) {
+			break
+		}
+		if errors.Is(err, routing.ErrStaleGeneration) {
+			continue
+		}
+		return err
+	}
+	_ = os.Remove(filepath.Join(app.stateDir, routing.StatesDir))
+	return nil
+}
+
 // removeHookState removes what hooks kept per session, which only they would prune, and
 // the policies they ran under.
 func (app *App) removeHookState() error {
 	var errs []error
-	for _, name := range append(app.hookStateDirs(), hookrun.AgentsDir, termaproject.WorkspacesDir, spool.Dir, config.PoliciesDir) {
+	for _, name := range append(app.hookStateDirs(), hookrun.AgentsDir, hookrun.PushesDir, runs.Dir, termaproject.WorkspacesDir, spool.Dir, config.PoliciesDir) {
 		errs = append(errs, os.RemoveAll(filepath.Join(app.stateDir, name)))
 	}
 	if err := errors.Join(errs...); err != nil {

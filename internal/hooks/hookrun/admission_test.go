@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -264,59 +263,6 @@ func TestWhereAHookMarks(t *testing.T) {
 	mark(personal, "global", "", global)
 	if c, ok := claim.Read(stateDir, "global", time.Now()); !ok || c.ProjectID != "p-default" || len(c.Placements) != 1 {
 		t.Errorf("global mode: claim %+v, %v; want the default project's, no mark", c, ok)
-	}
-}
-
-// A policy the relay has stopped refreshing may not list a repository the team now
-// collects: a hook outside the list still marks its session and starts a refresh, at most
-// once a minute per team, so the next hook under the refreshed policy claims the session.
-func TestAStalePolicyStartsARefresh(t *testing.T) {
-	t.Parallel()
-	stateDir := t.TempDir()
-	personal := namedRepo(t, "personal", "git@github.com:me/personal.git")
-	ctx := t.Context()
-	at := time.Now()
-	stale := fetched(listing("github.com/acme/work"))
-	stale.FetchedAt = at.Add(-10 * time.Minute)
-	otherTeam := stale
-	otherTeam.TeamID = "t2"
-	flushes := 0
-	hook := func(sid string, pol config.Policy, now time.Time) bool {
-		return ClaimFromPayload(ctx, Env{StateDir: stateDir, Now: now, Cwd: personal, Team: "t1", Account: hookruntest.Account, Policy: pol, Flush: func() { flushes++ }}, PayloadSession{ID: sid, Cwd: personal}, "claude-code")
-	}
-	hook("s1", stale, at)
-	markOf(t, stateDir, "s1")
-	hook("s1", stale, at.Add(30*time.Second))
-	if flushes != 1 {
-		t.Fatalf("%d refreshes in a minute, want 1", flushes)
-	}
-	hook("s2", otherTeam, at.Add(30*time.Second))
-	if flushes != 2 {
-		t.Fatalf("another team's refresh waited on this one's: %d refreshes", flushes)
-	}
-	hook("s1", stale, at.Add(2*time.Minute))
-	if flushes != 3 {
-		t.Fatalf("%d refreshes after a minute, want 3", flushes)
-	}
-	unlock, err := flock.TryLock(filepath.Join(stateDir, config.PoliciesDir, refreshedDir, "t1.lock"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	hook("s1", stale, at.Add(5*time.Minute))
-	unlock()
-	if flushes != 3 {
-		t.Fatal("a hook started a refresh while another held the stamp")
-	}
-	hook("fresh", fetched(listing("github.com/acme/work")), at)
-	markOf(t, stateDir, "fresh")
-	if flushes != 3 {
-		t.Fatal("a fresh policy started a refresh")
-	}
-	if !hook("s1", fetched(listing("github.com/acme/work", "github.com/me/personal")), at.Add(3*time.Minute)) {
-		t.Fatal("the refreshed listing did not claim the session")
-	}
-	if c, _ := claim.Read(stateDir, "s1", at.Add(3*time.Minute)); c.ProjectID != "t1" || len(c.Placements) != 2 {
-		t.Fatalf("claim %+v: want the mark, then the listed placement", c)
 	}
 }
 

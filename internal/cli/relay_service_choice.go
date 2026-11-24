@@ -115,11 +115,11 @@ func (app *App) awaitServiceRelay(dir string) {
 	}
 }
 
-// foreignRelay reports whether the running relay delivers to another environment than
-// env, so it cannot be left as it is. A relay from before relays recorded themselves (ok
-// false) cannot be judged, and stays.
+// foreignRelay reports whether the running relay cannot be left as it is: either a
+// pre-routing relay (!running.Routing) or one delivering to another environment than env.
+// A relay from before relays recorded themselves (ok false) cannot be judged, and stays.
 func foreignRelay(running daemon.RunInfo, ok bool, env string) bool {
-	return ok && running.Environment != "" && env != "" && running.Environment != env
+	return ok && (!running.Routing || (running.Environment != "" && env != "" && running.Environment != env))
 }
 
 // keepService reports whether install leaves the relay service as it is: only one this

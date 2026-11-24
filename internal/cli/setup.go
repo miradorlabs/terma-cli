@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
-	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/globalmode"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
@@ -19,7 +18,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 	"github.com/miradorlabs/terma-cli/internal/setup"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
-	"github.com/miradorlabs/terma-cli/internal/ui/prompt"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
@@ -45,20 +43,6 @@ type setupFlags struct {
 	desktopGrant bool
 }
 
-// agentChoice is an onboarding surface: one repository adapter may be offered as several
-// launch surfaces a developer picks independently.
-type agentChoice struct {
-	name      string
-	display   string
-	installed func(context.Context) bool
-}
-
-func (a agentChoice) Name() string        { return a.name }
-func (a agentChoice) DisplayName() string { return a.display }
-func (a agentChoice) Installed(ctx context.Context) bool {
-	return a.installed(ctx)
-}
-
 func (app *App) newSetupCommand() *cobra.Command {
 	var f setupFlags
 	cmd := &cobra.Command{
@@ -71,8 +55,8 @@ func (app *App) newSetupCommand() *cobra.Command {
   1. Signs you in (a browser handoff; --no-browser prints the URL instead) and, when
      you belong to several organizations, asks which one (--org names it).
   2. Records which coding agents you work with.
-  3. Chooses your team (--team names it) and fetches its collection policy, which
-     lists the repositories it collects.
+  3. Chooses your team (--team names it), activates its routing state, and fetches
+     its collection policy, which lists the repositories it collects.
   4. Points those agents' telemetry at terma's local relay, and runs the relay in
      the background (--relay-service off: started on demand instead).
   5. Writes the agents' machine-wide hooks, so a session in a repository the
@@ -82,10 +66,10 @@ func (app *App) newSetupCommand() *cobra.Command {
      .git/hooks, chaining to any hook already there. Nothing is written into a
      repository's working tree or committed files.
 
-Run it again any time: it reuses a working sign-in, offers the team chosen before
-as the default when the organization has several, --team switches team, --org
-switches organization, and --relay-addr moves the relay off a port another program
-holds.
+Run it again any time: it reuses a working sign-in, refreshes enrolled teams, offers
+the team chosen before as the default when the organization has several, --team
+selects a team, --org selects an organization, and --relay-addr moves the relay off a
+port another program holds.
 
 With TERMA_API_KEY set to a team server key (Ingest permission), setup signs in with
 the key instead, with no browser: it sets up the key's own team, so --org and --team
@@ -167,15 +151,16 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	ui.title, ui.warnTitle = "Setup complete", "Almost done — finish the steps marked ! below"
 	recorded := false
 	team := ""
+	var chosenOrg *organization
 	steps := setup.Steps{
 		SignIn: func(_ context.Context, cfg *config.Config) (*config.Config, error) {
 			var kept int
 			var err error
 			if f.desktopGrant {
-				cfg, err = app.signInWithGrant(cmd, cfg, parseOrgRef(f.org).ID)
+				cfg, chosenOrg, err = app.signInWithGrant(cmd, cfg, parseOrgRef(f.org).ID)
 			} else {
 				opts := signInOptions{org: parseOrgRef(f.org), noBrowser: f.noBrowser, pauseBeforeBrowser: !f.assumeYes}
-				cfg, kept, err = app.setupSignIn(cmd, cfg, opts, askOrganization(cmd, f.assumeYes))
+				cfg, chosenOrg, kept, err = app.setupSignIn(cmd, cfg, opts, askOrganization(cmd, f.assumeYes))
 			}
 			if err == nil {
 				fmt.Fprintln(out)
@@ -206,20 +191,10 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 				ui.Summary("Agents", strings.Join(app.adapterDisplayNames(names), ", "))
 			}
 		},
-		SelectTeam: func(_ context.Context, cfg *config.Config) error {
-			name, err := app.selectPolicyTeam(cmd, cfg, !f.assumeYes && canPrompt())
+		SetupTeams: func(_ context.Context, cfg *config.Config) (config.Policy, error) {
+			pol, name, err := app.setupTeams(cmd, cfg, chosenOrg, f, ui)
 			team = name
-			return err
-		},
-		FetchPolicy: app.policies().Fetch,
-		StopRelay: func() {
-			if dir, err := daemon.Dir(app.stateDir); err == nil {
-				daemon.Stop(dir)
-			}
-		},
-		Fetched: func(pol config.Policy) {
-			ui.policyFetched(team, pol)
-			app.recordTeamName(cfg.ProfileName, pol.TeamID, team)
+			return pol, err
 		},
 		ConnectRelay: func(ctx context.Context, names []string) error {
 			if f.relayAddr != "" {
@@ -301,142 +276,4 @@ func (app *App) reportUpdates(ui *setupUI) {
 		return
 	}
 	ui.Summary("Updates", updatesSummary(selfupdate.InstallOf(exe, app.version), p.Auto))
-}
-
-// chooseHarnesses resolves the machine-level agent list: --harness, else a picker,
-// else (with --yes or no terminal) the available recorded or detected agents.
-func (app *App) chooseHarnesses(cmd *cobra.Command, cfg *config.Config, f setupFlags) ([]string, error) {
-	if strings.TrimSpace(f.harnesses) != "" {
-		return app.parseAgentList(f.harnesses)
-	}
-	ctx := cmd.Context()
-	preselect := map[string]bool{}
-	for _, n := range cfg.Harnesses {
-		preselect[n] = true
-	}
-	for _, n := range app.detectedAgents(ctx) {
-		preselect[n] = true
-	}
-	if f.assumeYes || !canPrompt() {
-		return app.selectedInRegistryOrder(preselect), nil
-	}
-
-	fmt.Fprintln(cmd.OutOrStdout())
-	form := app.harnessSelectionForm(ctx, preselect)
-	result, err := prompt.Run(form)
-	if errors.Is(err, prompt.ErrCancelled) {
-		return nil, errCancelled
-	}
-	if err != nil {
-		return nil, err
-	}
-	var names []string
-	for i, a := range app.harnessSelectionAgents() {
-		if app.agents.IsSupported(a.Name()) && result[i].Selected {
-			names = append(names, a.Name())
-		}
-	}
-	return names, nil
-}
-
-func (app *App) availableAgentNames() []string {
-	var names []string
-	for _, a := range app.harnessSelectionAgents() {
-		if app.agents.IsSupported(a.Name()) {
-			names = append(names, a.Name())
-		}
-	}
-	return names
-}
-
-// harnessSelectionAgents puts available agents first in registry order; the form and its
-// result mapping must share this order.
-func (app *App) harnessSelectionAgents() []agentChoice {
-	var choices []agentChoice
-	for _, available := range []bool{true, false} {
-		for _, a := range app.agents.All() {
-			if app.agents.IsSupported(a.Name()) == available {
-				surfaces := agents.Surfaces(a)
-				if !available { // Coming Soon: one row under its own name, no surface's beta mark
-					surfaces = []agents.Surface{{Name: a.Name(), DisplayName: a.DisplayName(), Installed: a.Installed}}
-				}
-				for _, surface := range surfaces {
-					choices = append(choices, agentChoice{name: surface.Name, display: surface.DisplayName, installed: surface.Installed})
-				}
-			}
-		}
-	}
-	return choices
-}
-
-func (app *App) harnessSelectionForm(ctx context.Context, preselect map[string]bool) *prompt.Form {
-	form := &prompt.Form{Title: "Which coding agents do you use? (space toggles, enter confirms)"}
-	for _, a := range app.harnessSelectionAgents() {
-		item := prompt.Item{Label: a.DisplayName(), Kind: prompt.Check}
-		if app.agents.IsSupported(a.Name()) {
-			item.Detail = app.agentDetail(ctx, a.Name())
-			item.Selected = preselect[a.Name()]
-		} else {
-			item.Disabled = true
-			item.Reason = "Coming Soon"
-		}
-		form.Items = append(form.Items, item)
-	}
-	for _, name := range app.agents.UpcomingNames() {
-		form.Items = append(form.Items, prompt.Item{Label: name, Kind: prompt.Check, Disabled: true, Reason: "Coming Soon"})
-	}
-	return form
-}
-
-func (app *App) parseAgentList(raw string) ([]string, error) {
-	seen := map[string]bool{}
-	for _, n := range splitCommas(raw) {
-		if _, _, ok := app.agents.Surface(n); !ok {
-			return nil, fmt.Errorf("unknown agent %q (want %s)", n, joinNames(app.availableAgentNames()))
-		}
-		if !app.agents.IsSupported(n) {
-			return nil, fmt.Errorf("agent %q: Coming Soon; available agents: %s", n, joinNames(app.availableAgentNames()))
-		}
-		seen[n] = true
-	}
-	return app.selectedInRegistryOrder(seen), nil
-}
-
-func (app *App) selectedInRegistryOrder(chosen map[string]bool) []string {
-	var names []string
-	for _, a := range app.harnessSelectionAgents() {
-		if app.agents.IsSupported(a.Name()) && chosen[a.Name()] {
-			names = append(names, a.Name())
-		}
-	}
-	return names
-}
-
-func (app *App) detectedAgents(ctx context.Context) []string {
-	var names []string
-	for _, a := range app.harnessSelectionAgents() {
-		if app.agents.IsSupported(a.Name()) && a.Installed(ctx) {
-			names = append(names, a.Name())
-		}
-	}
-	return names
-}
-
-func (app *App) agentDetail(ctx context.Context, name string) string {
-	if s, _, ok := app.agents.Surface(name); ok && s.Installed(ctx) {
-		return "installed"
-	}
-	return ""
-}
-
-func (app *App) adapterDisplayNames(names []string) []string {
-	out := make([]string, 0, len(names))
-	for _, n := range names {
-		if s, _, ok := app.agents.Surface(n); ok {
-			out = append(out, s.DisplayName)
-		} else {
-			out = append(out, n)
-		}
-	}
-	return out
 }

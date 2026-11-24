@@ -440,7 +440,7 @@ func failureFix(f Failure) string {
 		return "the key this machine holds for team " + f.ProjectID + " was refused by " + f.Endpoint + " — it may have been revoked, or belong to another environment"
 	}
 	if f.SignInRefused {
-		return "your sign-in was refused for team " + f.ProjectID + " by " + f.Endpoint + " — check you still belong to its organization, or run `terma switch` to choose another"
+		return "your sign-in was refused for team " + f.ProjectID + " by " + f.Endpoint + " — check you still belong to its organization, or run `terma setup` to choose another"
 	}
 	if f.TokenRefused {
 		return "your sign-in's token was refused by " + f.Endpoint + " — run `terma doctor` again, or `terma login` to sign in again"

@@ -147,7 +147,7 @@ func Supersede(stateDir, version string) { supersede("", stateDir, version) }
 func supersede(exe, stateDir, version string) {
 	dir := claim.Dir(stateDir)
 	running, ok := RunningRelay(dir)
-	if !ok || !selfupdate.Newer(running.Version, version) {
+	if !ok || (running.Routing && !selfupdate.Newer(running.Version, version)) {
 		return
 	}
 	service := running.Launch == LaunchService
@@ -158,6 +158,60 @@ func supersede(exe, stateDir, version string) {
 	_ = config.WriteFileAtomicNoSync(filepath.Join(dir, ReplaceFile), []byte(strconv.Itoa(running.PID)+"\n"), 0o600)
 	if !service && (!ours || !serviceWaiting(dir)) {
 		follow(dir, exe)
+	}
+}
+
+// preRoutingWait bounds how long EnsureRoutingRelay waits for a pre-routing relay to step aside.
+var preRoutingWait = 1500 * time.Millisecond
+
+// EnsureRoutingRelay verifies no pre-routing relay (!RunInfo.Routing) holds stateDir's
+// lock before activation writes routing.State. If a pre-routing relay is running it asks
+// it to make way (Supersede, then SIGTERM / StopFile) and returns an error if a
+// pre-routing relay still holds the lock.
+func EnsureRoutingRelay(stateDir, version string) error {
+	if stateDir == "" {
+		return nil
+	}
+	dir := claim.Dir(stateDir)
+	if preRoutingGone(dir) {
+		return nil
+	}
+	Supersede(stateDir, version)
+	if awaitPreRoutingGone(dir, preRoutingWait) {
+		return nil
+	}
+	if pid := relayPID(dir); pid > 1 && pid != os.Getpid() {
+		if proc, err := os.FindProcess(pid); err == nil {
+			if proc.Signal(syscall.SIGTERM) != nil {
+				_ = config.WriteFileAtomicNoSync(filepath.Join(dir, StopFile), []byte(strconv.Itoa(pid)+"\n"), 0o600)
+			}
+			if awaitPreRoutingGone(dir, preRoutingWait) {
+				return nil
+			}
+		}
+	}
+	if preRoutingGone(dir) {
+		return nil
+	}
+	return errors.New("a pre-routing relay is still running and must stop before activating team routing")
+}
+
+func preRoutingGone(dir string) bool {
+	if !Running(dir) {
+		return true
+	}
+	info, ok := RunningRelay(dir)
+	return ok && info.Routing
+}
+
+func awaitPreRoutingGone(dir string, wait time.Duration) bool {
+	for deadline := time.Now().Add(wait); ; time.Sleep(25 * time.Millisecond) {
+		if preRoutingGone(dir) {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
 	}
 }
 

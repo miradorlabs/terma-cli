@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,6 +17,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
+	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // testApp is the command line every test runs, with this build's agents and no other termas.
@@ -73,8 +76,9 @@ func runIsolated(m *testing.M) int {
 // appRepo is the working copy the package's stub policy lists.
 var appRepo = config.Repository{Origin: "github.com/acme/app"}
 
-// selectPolicy stores pol as its team's and makes that team the default profile's, as
-// `terma setup` leaves them.
+// selectPolicy stores pol as its team's, makes that team the default profile's, and
+// commits it to routing/<profile>.json for the profile's active lane, as `terma setup`
+// leaves them.
 func selectPolicy(t *testing.T, pol config.Policy) {
 	t.Helper()
 	if err := config.WritePolicy(testApp.stateDir, pol); err != nil {
@@ -83,13 +87,59 @@ func selectPolicy(t *testing.T, pol config.Policy) {
 	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.Team = pol.TeamID }); err != nil {
 		t.Fatal(err)
 	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	lane := ""
+	switch {
+	case cfg.ServerKeySignIn:
+		lane = sendas.NoPersonLane
+	case cfg.Account != "":
+		lane = cfg.Account
+	default:
+		lane = auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL)
+	}
+	if !routing.ValidAccount(lane) || pol.TeamID == "" || pol.FetchedAt.IsZero() {
+		return
+	}
+	orgID := cmp.Or(pol.OrganizationID, cfg.OrganizationID, "org-test")
+	authURL := cmp.Or(pol.AuthURL, cfg.AuthURL, "https://auth.example.test")
+	pol.OrganizationID, pol.AuthURL = orgID, authURL
+	tm := routing.Team{
+		OrganizationID: orgID,
+		AuthURL:        authURL,
+		TeamID:         pol.TeamID,
+		Personal:       pol.Global(),
+		Policy:         pol,
+	}
+	if _, err := routing.Replace(testApp.stateDir, cfg.ProfileName, nil, lane, func(s *routing.State) error {
+		if _, err := s.Select(tm); err != nil {
+			return err
+		}
+		if !tm.Personal {
+			for _, raw := range pol.Repositories {
+				if e, ok := routing.ParseEntry(raw, pol.Wildcards); ok {
+					if err := s.Bind(e.Key(), orgID, false); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // admitHere signs the profile into a validated repository-mode policy for team, listing
 // root's origin, github.com/acme/<root's folder>, as `terma setup` would leave it.
 func admitHere(t *testing.T, root, team string) {
 	t.Helper()
-	pol := config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/" + filepath.Base(root)}, IncludePrompts: true, IncludeToolContent: true,
+	if cfg, err := testApp.loadConfig(); err == nil && !cfg.ServerKeySignIn && cfg.Account == "" && auth.Account(cfg.Dir, cfg.ProfileName, cfg.AuthURL) == "" {
+		signInHereAs(t, "u-test")
+	}
+	pol := config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/" + filepath.Base(root)}, IncludePrompts: true, IncludeToolContent: true, GitHooks: true,
 		TeamID: team, Revision: 1, FetchedAt: time.Now()}
 	selectPolicy(t, pol)
 }
@@ -103,7 +153,30 @@ func signInHereAs(t *testing.T, user string) string {
 		AuthURL: authURL, ExpiresAt: time.Now().Add(time.Hour)}); err != nil {
 		t.Fatal(err)
 	}
-	return auth.AccountKey(authURL, user)
+	acct := auth.AccountKey(authURL, user)
+	if st, found, err := routing.Load(testApp.stateDir, config.DefaultProfile); err == nil && found && st.Account != acct {
+		_, err := routing.Replace(testApp.stateDir, config.DefaultProfile, nil, acct, func(s *routing.State) error {
+			for _, tm := range st.Teams {
+				if _, err := s.Select(tm); err != nil {
+					return err
+				}
+			}
+			for k, b := range st.Bindings {
+				if b.Refused {
+					if err := s.Refuse(k); err != nil {
+						return err
+					}
+				} else if err := s.Bind(k, b.Organization, false); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	return acct
 }
 
 func newTestRelay(o relay.Options) *relay.Relay {

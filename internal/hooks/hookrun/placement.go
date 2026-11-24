@@ -322,9 +322,10 @@ func (rt *Routing) crossing(prev claim.Claim, havePrev bool, run string, locs []
 				at = i
 			}
 			where := string(all[at].Kind)
-			if all[at].Kind == routing.Repository {
+			switch all[at].Kind {
+			case routing.Repository:
 				where = routing.Normalize(all[at].Repository)
-			} else if all[at].Kind == routing.OutsideGit {
+			case routing.OutsideGit:
 				where = "outside git"
 			}
 			return runs.Why{Reason: runs.Crossed, Where: where}, true

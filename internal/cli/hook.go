@@ -62,9 +62,6 @@ func (app *App) hookDeps() dispatch.Deps {
 		Agents:    app.agents,
 		Profile:   app.hookProfile,
 		Spool:     app.openSpool,
-		Claimed: func(cwd string, policy config.Policy) {
-			app.claimed(cwd, func(gitDir string) bool { return repohooks.Wanted(policy, time.Now(), gitDir) })
-		},
 		ClaimedRouted: func(cwd string, rt *hookrun.Routing) {
 			app.claimed(cwd, func(gitDir string) bool { return rt.GitHooks(gitDir, time.Now()) })
 		},
@@ -84,34 +81,32 @@ func (app *App) claimed(cwd string, wanted func(gitDir string) bool) {
 	}
 }
 
-// hookProfile reads config.json, sign-in, and routing/<profile>.json (when present) as one
-// snapshot; mid-read changes, corrupt routing state, or Account != lane fail closed.
+// hookProfile reads config.json, sign-in, and routing/<profile>.json as one snapshot;
+// missing, mid-read changed, corrupt, or wrong-account routing state fails closed with
+// zero fallback to Profile.Team.
 func (app *App) hookProfile() dispatch.Profile {
-	p := dispatch.Profile{Policy: config.NoPolicy("", "")}
+	p := dispatch.Profile{Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting("", nil)}
 	lane, _ := readLaneAsOne(app.dir, func() string {
 		cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
 		if err != nil {
 			return sendas.AccountUnreadable
 		}
+		p = dispatch.Profile{Agents: cfg.Harnesses, Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting(cfg.ProfileName, nil)}
 		rpath, rperr := routing.StatePath(app.stateDir, cfg.ProfileName)
 		before := statOrNil(rpath)
 		lane := app.profileLane(cfg)
 		st, found, rerr := routing.Load(app.stateDir, cfg.ProfileName)
-		if stable := rperr == nil && unchanged(before, statOrNil(rpath)); !stable || found || rerr != nil {
-			p = dispatch.Profile{Agents: cfg.Harnesses, Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting(cfg.ProfileName, nil)}
-			if stable && rerr == nil && lane != "" && lane != sendas.AccountUnreadable && st.Account == lane {
-				p.Routing = hookrun.NewRouting(cfg.ProfileName, &st)
-				return lane
-			}
-			if stable && lane == "" {
-				return ""
-			}
-			return sendas.AccountUnreadable
+		stable := rperr == nil && unchanged(before, statOrNil(rpath))
+		if stable && found && rerr == nil && lane != "" && lane != sendas.AccountUnreadable && st.Account == lane {
+			p.Routing = hookrun.NewRouting(cfg.ProfileName, &st)
+			return lane
 		}
-		p = dispatch.Profile{Team: cfg.Policy.TeamID, Agents: cfg.Harnesses, Policy: cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)}
-		return lane
+		if stable && lane == "" {
+			return ""
+		}
+		return sendas.AccountUnreadable
 	})
-	if lane == sendas.AccountUnreadable && p.Routing != nil {
+	if lane == sendas.AccountUnreadable {
 		p.Routing = hookrun.NewRouting(p.Routing.Profile, nil)
 	}
 	if p.ServerKey = lane == sendas.NoPersonLane; !p.ServerKey {

@@ -123,16 +123,3 @@ func (app *App) selectPolicyTeam(cmd *cobra.Command, cfg *config.Config, ask boo
 	cfg.ProjectID = team.ID
 	return cmp.Or(team.Name, team.ID), nil
 }
-
-// recordTeamName keeps name as the profile's team id's, for doctor to name; only that, so
-// a failure costs nothing but the name.
-func (app *App) recordTeamName(profile, id, name string) {
-	if name == "" || name == id {
-		return
-	}
-	_ = config.UpdateProfile(app.dir, profile, func(p *config.Profile) {
-		if p.Team == id {
-			p.TeamName = name
-		}
-	})
-}

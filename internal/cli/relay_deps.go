@@ -2,13 +2,10 @@ package cli
 
 import (
 	"bytes"
-	"cmp"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"slices"
 	"strings"
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
@@ -89,29 +86,7 @@ func (app *App) relayHeartbeatSend(ctx context.Context, src *signInSource, beat 
 	if loadErr != nil {
 		return loadErr
 	}
-	if handled, err := app.teamHeartbeatSend(ctx, src, cfg, lane, beat); handled {
-		return err
-	}
-	selected := cmp.Or(cfg.Policy.TeamID, cfg.Policy.DefaultProjectID, cfg.ProjectID)
-	// The profile decides, as for the relay, the hooks and delivery: TERMA_API_KEY is setup's
-	// input, recorded as the profile's server-key sign-in.
-	if lane != sendas.NoPersonLane {
-		return app.signedInHeartbeat(ctx, src, cfg, lane, selected, beat)
-	}
-	others := keystore.CollectionProjects(app.dir)
-	slices.Sort(others)
-	for _, projectID := range append([]string{selected}, others...) {
-		key, err := keystore.Get(app.dir, projectID)
-		if err != nil {
-			return err // every key sits in the one keychain: asking for the next would wait as long
-		}
-		if projectID != "" && key != "" {
-			endpoint := app.delivery().Endpoint(cfg, projectID)
-			relay.NameHeartbeatUser(beat, app.teamUser(cfg, projectID, endpoint))
-			return sendHeartbeat(ctx, endpoint, key, "", beat)
-		}
-	}
-	return relay.ErrNoKey
+	return app.teamHeartbeatSend(ctx, src, cfg, lane, beat)
 }
 
 // relayUser is who the relay's parts sent to projectID at endpoint name: teamUser, under the
@@ -167,34 +142,6 @@ func signedInUser(cfg *config.Config) string {
 		return ""
 	}
 	return cred.UserID
-}
-
-// signedInHeartbeat sends beat to team's ingest with the person's sign-in, naming the team.
-// account was read in the same snapshot as cfg and team (readLaneAsOne), so a sign-in
-// switch can never pair one account's token with another's team.
-func (app *App) signedInHeartbeat(ctx context.Context, src *signInSource, cfg *config.Config, account, team string, beat *logspb.LogsData) error {
-	if team == "" || !auth.ValidAccountKey(account) || account != cfg.Account || src == nil || src.cfg == nil || !sameHost(cfg.AuthURL, src.cfg.AuthURL) {
-		return relay.ErrNoKey
-	}
-	token, err := src.Token(ctx, account)
-	if err != nil {
-		return err
-	}
-	if token == "" {
-		return relay.ErrNoKey // signed out, retired, or another person's: no beat goes
-	}
-	endpoint := app.delivery().Endpoint(cfg, team)
-	relay.NameHeartbeatUser(beat, app.accountUser(cfg, team, endpoint, account))
-	err = sendHeartbeat(ctx, endpoint, token, team, beat)
-	if refusal, ok := errors.AsType[*heartbeatError](err); ok {
-		switch {
-		case refusal.reason == sendas.ReasonSignInRetired: // whatever its status
-			src.Retired(token)
-		case refusal.status == http.StatusUnauthorized:
-			src.Refused(ctx, token)
-		}
-	}
-	return err
 }
 
 // heartbeatError is the ingest's refusal of a beat, with the reason a user token's carries.

@@ -24,6 +24,9 @@ func (app *App) refreshRelayService(ctx context.Context) (path string, changed b
 		path, changed, err = daemon.RefreshService(ctx, app.stateDir)
 	}
 	daemon.Supersede(app.stateDir, app.version)
+	if gerr := daemon.EnsureRoutingRelay(app.stateDir, app.version); gerr != nil && err == nil {
+		err = gerr
+	}
 	return path, changed, err
 }
 
