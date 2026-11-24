@@ -81,24 +81,26 @@ func (app *App) claimed(cwd string, wanted func(gitDir string) bool) {
 	}
 }
 
-// hookProfile reads config.json, sign-in, and routing/<profile>.json as one snapshot;
-// missing, mid-read changed, corrupt, or wrong-account routing state fails closed with
-// zero fallback to Profile.Team.
-func (app *App) hookProfile() dispatch.Profile {
-	p := dispatch.Profile{Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting("", nil)}
+// routedSnapshot reads config.json, sign-in, and routing/<profile>.json as one stable
+// snapshot; missing, mid-read changed, corrupt, or wrong-account routing state fails
+// closed with zero fallback to Profile.Team.
+func (app *App) routedSnapshot(loadCfg func() (*config.Config, error)) (*config.Config, string, *hookrun.Routing) {
+	var cfg *config.Config
+	rt := hookrun.NewRouting("", nil)
 	lane, _ := readLaneAsOne(app.dir, func() string {
-		cfg, err := config.Load(app.dir, app.stateDir, config.Overrides{})
+		c, err := loadCfg()
 		if err != nil {
+			cfg, rt = nil, hookrun.NewRouting("", nil)
 			return sendas.AccountUnreadable
 		}
-		p = dispatch.Profile{Agents: cfg.Harnesses, Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting(cfg.ProfileName, nil)}
-		rpath, rperr := routing.StatePath(app.stateDir, cfg.ProfileName)
+		cfg, rt = c, hookrun.NewRouting(c.ProfileName, nil)
+		rpath, rperr := routing.StatePath(app.stateDir, c.ProfileName)
 		before := statOrNil(rpath)
-		lane := app.profileLane(cfg)
-		st, found, rerr := routing.Load(app.stateDir, cfg.ProfileName)
+		lane := app.profileLane(c)
+		st, found, rerr := routing.Load(app.stateDir, c.ProfileName)
 		stable := rperr == nil && unchanged(before, statOrNil(rpath))
 		if stable && found && rerr == nil && lane != "" && lane != sendas.AccountUnreadable && st.Account == lane {
-			p.Routing = hookrun.NewRouting(cfg.ProfileName, &st)
+			rt = hookrun.NewRouting(c.ProfileName, &st)
 			return lane
 		}
 		if stable && lane == "" {
@@ -107,7 +109,21 @@ func (app *App) hookProfile() dispatch.Profile {
 		return sendas.AccountUnreadable
 	})
 	if lane == sendas.AccountUnreadable {
-		p.Routing = hookrun.NewRouting(p.Routing.Profile, nil)
+		rt = hookrun.NewRouting(rt.Profile, nil)
+	}
+	return cfg, lane, rt
+}
+
+// hookProfile reads config.json, sign-in, and routing/<profile>.json as one snapshot;
+// missing, mid-read changed, corrupt, or wrong-account routing state fails closed with
+// zero fallback to Profile.Team.
+func (app *App) hookProfile() dispatch.Profile {
+	cfg, lane, rt := app.routedSnapshot(func() (*config.Config, error) {
+		return config.Load(app.dir, app.stateDir, config.Overrides{})
+	})
+	p := dispatch.Profile{Routing: rt}
+	if cfg != nil {
+		p.Agents = cfg.Harnesses
 	}
 	if p.ServerKey = lane == sendas.NoPersonLane; !p.ServerKey {
 		p.Account = lane

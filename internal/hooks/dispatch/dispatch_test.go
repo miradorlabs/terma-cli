@@ -62,13 +62,13 @@ func newHarness(t *testing.T) *harness {
 		t.Fatal(err)
 	}
 	h.deps = Deps{
-		ConfigDir: t.TempDir(),
-		StateDir:  t.TempDir(),
-		Agents:    agents.New(fake{ran: &h.ran}),
-		Profile:   func() Profile { return Profile{Policy: config.Policy{Mode: config.ModeRepo}} },
-		Spool:     func() *spool.Spool { return s },
-		Claimed:   func(string, config.Policy) { h.claims++ },
-		Flush:     func() { h.flushes++ },
+		ConfigDir:     t.TempDir(),
+		StateDir:      t.TempDir(),
+		Agents:        agents.New(fake{ran: &h.ran}),
+		Profile:       func() Profile { return Profile{} },
+		Spool:         func() *spool.Spool { return s },
+		ClaimedRouted: func(string, *hookrun.Routing) { h.claims++ },
+		Flush:         func() { h.flushes++ },
 	}
 	hookruntest.RelayOn(t, h.deps.StateDir)
 	return h
@@ -200,9 +200,7 @@ func TestRunWithoutRoutingStateFailsClosed(t *testing.T) {
 	h := newHarness(t)
 	h.deps.Agents = agents.New(reading{fake{ran: &h.ran}})
 	h.deps.Profile = func() Profile {
-		p := hookruntest.Admitting(root)
-		p.TeamID, p.FetchedAt = hookruntest.Team, time.Now()
-		return Profile{Team: hookruntest.Team, Account: hookruntest.Account, Policy: p}
+		return Profile{Account: hookruntest.Account}
 	}
 	r := request("fake-edit")
 	r.Cwd = root
@@ -303,7 +301,7 @@ func TestAHooksSpoolIsBoundToItsProfilesLane(t *testing.T) {
 			}
 			d := Deps{ConfigDir: t.TempDir(), StateDir: t.TempDir(), Agents: agents.New(appender{}),
 				Profile: func() Profile { return tc.profile }, Spool: func() *spool.Spool { return s },
-				Claimed: func(string, config.Policy) {}, Flush: func() {}}
+				Flush: func() {}}
 			hookruntest.RelayOn(t, d.StateDir)
 			Run(context.Background(), d, request("appender-edit"))
 			evs, err := s.Peek(10)

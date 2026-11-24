@@ -148,7 +148,7 @@ func renderTeams(w io.Writer, v teamsView) {
 			fmt.Fprintf(tw, "    %s\n", p.Dim(o.Note))
 		}
 		for _, t := range o.Teams {
-			fmt.Fprintf(tw, "    %s %s\t%s%s\n", map[bool]string{false: "[ ]", true: "[x]"}[t.Selected], cmp.Or(t.Name, t.ID), t.Collects, teamStateNote(t))
+			fmt.Fprintf(tw, "    %s %s\t%s%s\n", checkbox(t.Selected), cmp.Or(t.Name, t.ID), t.Collects, teamStateNote(t))
 		}
 	}
 	_ = tw.Flush()
@@ -156,7 +156,7 @@ func renderTeams(w io.Writer, v teamsView) {
 		fmt.Fprintf(out, "\n%s\n", p.Bold("Bindings:"))
 		tw = tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
 		for _, b := range v.Bindings {
-			fmt.Fprintf(tw, "  %s\t%s\n", b.Key, map[bool]string{false: cmp.Or(b.Name, b.Organization), true: "refused to every organization"}[b.Refused])
+			fmt.Fprintf(tw, "  %s\t%s\n", b.Key, bindingTarget(b))
 		}
 		_ = tw.Flush()
 	}
@@ -167,6 +167,20 @@ func renderTeams(w io.Writer, v teamsView) {
 				p.Warn("!"), pr.Key, pr.Entry, quoteArg(pr.Key+"="+cmp.Or(v.orgName(pr.Organization), pr.Organization)), quoteArg(pr.Key))
 		}
 	}
+}
+
+func checkbox(selected bool) string {
+	if selected {
+		return "[x]"
+	}
+	return "[ ]"
+}
+
+func bindingTarget(b bindingRow) string {
+	if b.Refused {
+		return "refused to every organization"
+	}
+	return cmp.Or(b.Name, b.Organization)
 }
 
 func orgTitle(o orgRow) string { return cmp.Or(o.Name, o.ID) }

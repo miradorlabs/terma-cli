@@ -164,6 +164,13 @@ type recheck struct {
 	runs                 map[string]runs.Snapshot
 }
 
+func (p *recheck) StateID() string {
+	if !p.ok {
+		return ""
+	}
+	return p.st.StateID
+}
+
 func (p *recheck) Generation() int64 {
 	if !p.ok {
 		return 0

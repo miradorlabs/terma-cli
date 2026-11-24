@@ -16,6 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -35,7 +36,7 @@ func TestDispatchUsesClaimedRoutedWhenRoutingActive(t *testing.T) {
 	stateDir := t.TempDir()
 	hookruntest.RelayOn(t, stateDir)
 	rt := hookrun.NewRouting("default", nil)
-	var legacyCalled, routedCalled bool
+	var routedCalled bool
 	var gotRT *hookrun.Routing
 
 	deps := Deps{
@@ -49,17 +50,16 @@ func TestDispatchUsesClaimedRoutedWhenRoutingActive(t *testing.T) {
 			}
 			return nil
 		}}),
-		Profile:       func() Profile { return Profile{Policy: config.NoPolicy("", ""), Routing: rt} },
+		Profile:       func() Profile { return Profile{Routing: rt} },
 		Spool:         func() *spool.Spool { return nil },
-		Claimed:       func(string, config.Policy) { legacyCalled = true },
 		ClaimedRouted: func(_ string, got *hookrun.Routing) { routedCalled, gotRT = true, got },
 	}
 	status := Run(context.Background(), deps, Request{Event: "rfake-hook", Cwd: t.TempDir(), Stdin: strings.NewReader("{}")})
 	if status != 0 {
 		t.Fatalf("status = %d; want 0", status)
 	}
-	if legacyCalled || !routedCalled || gotRT != rt {
-		t.Fatalf("legacy=%v routed=%v gotRT=%v; want false, true, %v", legacyCalled, routedCalled, gotRT, rt)
+	if !routedCalled || gotRT != rt {
+		t.Fatalf("routed=%v gotRT=%v; want true, %v", routedCalled, gotRT, rt)
 	}
 }
 
@@ -71,6 +71,26 @@ func (extFake) Installed(context.Context) bool { return true }
 func (extFake) FlushAfter() []string           { return nil }
 func (extFake) Events() map[string]agents.Handler {
 	return hookrun.Extension{Tool: "omp"}.Events("extfake")
+}
+
+type nativeReachFake struct {
+	event string
+	tool  string
+	path  string
+	sid   string
+}
+
+func (n nativeReachFake) Name() string                   { return n.tool }
+func (n nativeReachFake) DisplayName() string            { return n.tool }
+func (n nativeReachFake) Installed(context.Context) bool { return true }
+func (n nativeReachFake) FlushAfter() []string           { return []string{n.event} }
+func (n nativeReachFake) Events() map[string]agents.Handler {
+	return map[string]agents.Handler{
+		n.event: func(ctx context.Context, env hookrun.Env) error {
+			env.Classify(ctx, nil, session.Session{ID: n.sid, Tool: n.tool}, []string{n.path}, nil)
+			return nil
+		},
+	}
 }
 
 func TestDispatchToolReachFailsClosedOnWriteError(t *testing.T) {
@@ -110,9 +130,8 @@ func TestDispatchToolReachFailsClosedOnWriteError(t *testing.T) {
 	deps := Deps{
 		StateDir: stateDir,
 		Agents:   agents.New(extFake{}),
-		Profile:  func() Profile { return Profile{Policy: config.NoPolicy("", ""), Routing: rt, Account: acct} },
+		Profile:  func() Profile { return Profile{Routing: rt, Account: acct} },
 		Spool:    func() *spool.Spool { return nil },
-		Claimed:  func(string, config.Policy) {},
 	}
 	ctx := context.Background()
 	sid := "018f3a2c-9109-7000-8000-000000000001"
@@ -149,10 +168,34 @@ func TestDispatchToolReachFailsClosedOnWriteError(t *testing.T) {
 	if code := Run(ctx, deps, Request{Event: "extfake-tool-reach", Cwd: repoB, Stdin: strings.NewReader(localInB)}); code == 0 {
 		t.Fatalf("fallback ClaimFromPayload tool-reach exited 0 despite unwritable stateDir; want non-zero")
 	}
+	// Native pre-tool reach hooks (Claude pre-tool-use and Codex codex-pre-tool-use)
+	// must also exit non-zero and skip ClaimedRouted/Flush when persistence fails.
+	for _, tc := range []struct {
+		event, tool string
+	}{
+		{"pre-tool-use", "claude-code"},
+		{"codex-pre-tool-use", "codex"},
+	} {
+		var claimed, flushed bool
+		nativeDeps := Deps{
+			StateDir:      stateDir,
+			Agents:        agents.New(nativeReachFake{event: tc.event, tool: tc.tool, path: fileB, sid: sid}),
+			Profile:       func() Profile { return Profile{Routing: hookrun.NewRouting("default", &st), Account: acct} },
+			Spool:         func() *spool.Spool { return nil },
+			ClaimedRouted: func(string, *hookrun.Routing) { claimed = true },
+			Flush:         func() { flushed = true },
+		}
+		if code := Run(ctx, nativeDeps, Request{Event: tc.event, Cwd: repoA, Stdin: strings.NewReader("{}")}); code == 0 {
+			t.Fatalf("%s exited 0 despite unwritable stateDir; want non-zero", tc.event)
+		}
+		if claimed || flushed {
+			t.Fatalf("%s invoked ClaimedRouted=%v Flush=%v on persistence failure", tc.event, claimed, flushed)
+		}
+	}
 	// Unusable routing state also fails closed with non-zero exit.
 	unusableDeps := deps
 	unusableDeps.Profile = func() Profile {
-		return Profile{Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting("default", nil)}
+		return Profile{Routing: hookrun.NewRouting("default", nil)}
 	}
 	if code := Run(ctx, unusableDeps, Request{Event: "extfake-tool-reach", Cwd: repoA, Stdin: strings.NewReader(reachBody)}); code == 0 {
 		t.Fatalf("unusable routing tool-reach exited 0; want non-zero")

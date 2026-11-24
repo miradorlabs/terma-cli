@@ -56,31 +56,10 @@ func (app *App) newSpoolAwaitPushCommand() *cobra.Command {
 
 // pushEnv is what reporting a push needs: the spool, routing state, and a flush once spooled.
 func (app *App) pushEnv() hookrun.Env {
-	env := hookrun.Env{StateDir: app.stateDir, ConfigDir: app.dir, Spool: app.openSpool(), Flush: spawnFlush,
-		Stderr: os.Stderr, Debug: os.Getenv("TERMA_DEBUG") != "", Routing: hookrun.NewRouting("", nil)}
-	// One snapshot, as a hook's profile (hookProfile): a mixed one is unreadable, and lost.
-	lane, _ := readLaneAsOne(app.dir, func() string {
-		cfg, err := app.loadConfig()
-		if err != nil {
-			return sendas.AccountUnreadable
-		}
-		env.Routing = hookrun.NewRouting(cfg.ProfileName, nil)
-		rpath, rperr := routing.StatePath(app.stateDir, cfg.ProfileName)
-		before := statOrNil(rpath)
-		lane := app.profileLane(cfg)
-		st, found, rerr := routing.Load(app.stateDir, cfg.ProfileName)
-		stable := rperr == nil && unchanged(before, statOrNil(rpath))
-		if stable && found && rerr == nil && lane != "" && lane != sendas.AccountUnreadable && st.Account == lane {
-			env.Routing = hookrun.NewRouting(cfg.ProfileName, &st)
-			return lane
-		}
-		if stable && lane == "" {
-			return ""
-		}
-		return sendas.AccountUnreadable
-	})
-	if lane == sendas.AccountUnreadable {
-		env.Routing = hookrun.NewRouting(env.Routing.Profile, nil)
+	_, lane, rt := app.routedSnapshot(app.loadConfig)
+	env := hookrun.Env{
+		StateDir: app.stateDir, ConfigDir: app.dir, Spool: app.openSpool(), Flush: spawnFlush,
+		Stderr: os.Stderr, Debug: os.Getenv("TERMA_DEBUG") != "", Routing: rt,
 	}
 	if lane == sendas.NoPersonLane {
 		env.ServerKey = true

@@ -265,7 +265,13 @@ func (t *Turns) RouteKey(cwd string) string {
 
 // Exclusive reports whether cwd is admitted, respects GIT_DIR isolation, and routes to r.
 func (t *Turns) Exclusive(r *Repo, cwd string) bool {
-	return cwd != "" && (os.Getenv("GIT_DIR") == "" || cwd == t.env.Cwd) && t.Admits(cwd) && (t.env.Routing == nil || (r != nil && r.dest != nil && t.RouteKey(cwd) == r.RouteKey()))
+	if cwd == "" || (os.Getenv("GIT_DIR") != "" && cwd != t.env.Cwd) || !t.Admits(cwd) {
+		return false
+	}
+	if t.env.Routing == nil {
+		return true
+	}
+	return r != nil && r.dest != nil && t.RouteKey(cwd) == r.RouteKey()
 }
 
 // Routed stamps ev using cwd's routed destination (OwnLocation: true) while keeping the session run.

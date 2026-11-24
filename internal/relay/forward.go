@@ -51,6 +51,7 @@ type sender struct {
 	team        *teamRoute
 	stateChange chan struct{}
 	blocked     bool              // guarded by mu; true while team is waiting on state/policy
+	stateID     string            // routing state id observed by nextBatch
 	gen         int64             // routing state generation observed by nextBatch
 	scanAfter   map[Signal]string // cursor for incremental scan across waiting entries
 	scanFound   bool              // whether the current scan pass sent at least one batch

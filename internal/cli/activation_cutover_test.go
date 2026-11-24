@@ -91,10 +91,10 @@ func TestRoutingStateFailClosedAcrossHooksRelayAndDelivery(t *testing.T) {
 			// Break routing.State while Profile.Team remains set to acmeWeb.
 			tc.breakState(t, testApp.stateDir, f.srv.URL, activeAcct)
 
-			// 1. Hooks fail closed: Routing is unusable, Team is empty, zero fallback to Profile.Team.
+			// 1. Hooks fail closed: Routing is unusable, zero fallback to Profile.Team.
 			hp := testApp.hookProfile()
-			if hp.Routing.Usable() || hp.Team != "" || hp.Account != sendas.AccountUnreadable {
-				t.Fatalf("hookProfile = usable:%v team:%q account:%q, want fail-closed", hp.Routing.Usable(), hp.Team, hp.Account)
+			if hp.Routing.Usable() || hp.Account != sendas.AccountUnreadable {
+				t.Fatalf("hookProfile = usable:%v account:%q, want fail-closed", hp.Routing.Usable(), hp.Account)
 			}
 
 			// 2. Relay fails closed: Router.Route holds with WhyNoState (never Send) and heartbeat refuses.

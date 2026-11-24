@@ -50,11 +50,8 @@ type Deps struct {
 	// Profile is the developer's setup as hooks read it locally.
 	Profile func() Profile
 	Spool   func() *spool.Spool
-	// Claimed runs once a hook has claimed its session, with the checkout it claimed and
-	// the policy in force: the relay, and that repository's commit hooks.
-	Claimed func(cwd string, policy config.Policy)
-	// ClaimedRouted runs in Claimed's place when routing is active, once routing sends or
-	// holds the checkout a hook placed its session in.
+	// ClaimedRouted runs once routing sends or holds the checkout a hook placed its
+	// session in: the relay, and that repository's commit hooks.
 	ClaimedRouted func(cwd string, routing *hookrun.Routing)
 	Flush         func()
 	// AwaitPush starts a detached hookrun.AwaitPush for a recorded push.
@@ -63,11 +60,8 @@ type Deps struct {
 
 // Profile is what a hook reads of the developer's setup.
 type Profile struct {
-	Team   string
 	Agents []string
-	// Policy is the collection policy, NoPolicy until one is validated.
-	Policy config.Policy
-	// Routing is the profile's routing state when active, replacing Team and Policy.
+	// Routing is the profile's routing state (non-nil and unusable when failing closed).
 	Routing *hookrun.Routing
 	// Account is the sign-in in place as auth.Account names it, which what the hook queues
 	// is bound to: its account key; "" signed out, or under a server key; or
@@ -82,6 +76,12 @@ const maxPayload = 4 << 20
 
 // handlerTimeout bounds an event handler; a render hook keeps its own deadline.
 const handlerTimeout = 5 * time.Second
+
+// isReachEvent reports whether event is a pre-tool reach hook whose persistence
+// failure must exit non-zero so the hook fails closed.
+func isReachEvent(event string) bool {
+	return strings.HasSuffix(event, "-tool-reach") || event == "pre-tool-use" || strings.HasSuffix(event, "-pre-tool-use")
+}
 
 // Run handles the request and returns the status the process exits with.
 func Run(ctx context.Context, d Deps, r Request) int {
@@ -168,7 +168,7 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 			claimed, claimedIn = hookrun.ClaimFromPayload(ctx, env, s, tool), cmp.Or(s.Cwd, r.Cwd)
 		}
 	}
-	if strings.HasSuffix(r.Event, "-tool-reach") && env.Routing.TakeWriteErr() != nil {
+	if isReachEvent(r.Event) && env.Routing.TakeWriteErr() != nil {
 		return 1
 	}
 	if claimed && d.ClaimedRouted != nil {

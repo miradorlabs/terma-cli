@@ -163,7 +163,10 @@ func (ch *teamsChange) write(s *routing.State, now time.Time) error {
 
 func (app *App) finishUnticks(next routing.State, ch *teamsChange, names teamNames) {
 	for _, t := range ch.untick {
-		verb := map[bool]string{false: "unticked ", true: "released "}[ch.released[t.EnrollmentID]]
+		verb := "unticked "
+		if ch.released[t.EnrollmentID] {
+			verb = "released "
+		}
 		ch.changes = append(ch.changes, verb+teamLabel(names, t)+": what was queued for it will be discarded")
 		if slices.ContainsFunc(next.Teams, func(o routing.Team) bool { return o.OrganizationID == t.OrganizationID }) {
 			continue

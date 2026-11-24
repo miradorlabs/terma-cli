@@ -148,8 +148,54 @@ func groupBy[T any](items []T, ivOf func(T) timeInterval, keyOf func(timeInterva
 	}
 	return out
 }
-func splitPts[P timedPoint](m *metricspb.Metric, pts []P, keyOf func(timeInterval) string, set func(*metricspb.Metric, []P), emit func(string, *metricspb.Metric, int)) {
-	for _, g := range groupBy(pts, func(p P) timeInterval { return makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano()) }, keyOf) {
+func isDelta(t metricspb.AggregationTemporality) bool {
+	return t == metricspb.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA
+}
+
+// pointInterval returns a metric data point's placement interval: [StartTimeUnixNano,
+// TimeUnixNano] for DELTA points, and [TimeUnixNano, TimeUnixNano] for cumulative,
+// gauge, summary, or unspecified points whose StartTimeUnixNano is process start.
+func pointInterval(p timedPoint, delta bool) timeInterval {
+	if delta {
+		return makeInterval(p.GetStartTimeUnixNano(), p.GetTimeUnixNano())
+	}
+	if t := p.GetTimeUnixNano(); t != 0 {
+		return timeInterval{t, t}
+	}
+	t := p.GetStartTimeUnixNano()
+	return timeInterval{t, t}
+}
+
+func eachPointInterval(m *metricspb.Metric, see func(timeInterval)) {
+	switch d := m.GetData().(type) {
+	case *metricspb.Metric_Sum:
+		delta := isDelta(d.Sum.GetAggregationTemporality())
+		for _, p := range d.Sum.GetDataPoints() {
+			see(pointInterval(p, delta))
+		}
+	case *metricspb.Metric_Gauge:
+		for _, p := range d.Gauge.GetDataPoints() {
+			see(pointInterval(p, false))
+		}
+	case *metricspb.Metric_Histogram:
+		delta := isDelta(d.Histogram.GetAggregationTemporality())
+		for _, p := range d.Histogram.GetDataPoints() {
+			see(pointInterval(p, delta))
+		}
+	case *metricspb.Metric_ExponentialHistogram:
+		delta := isDelta(d.ExponentialHistogram.GetAggregationTemporality())
+		for _, p := range d.ExponentialHistogram.GetDataPoints() {
+			see(pointInterval(p, delta))
+		}
+	case *metricspb.Metric_Summary:
+		for _, p := range d.Summary.GetDataPoints() {
+			see(pointInterval(p, false))
+		}
+	}
+}
+
+func splitPts[P timedPoint](m *metricspb.Metric, pts []P, delta bool, keyOf func(timeInterval) string, set func(*metricspb.Metric, []P), emit func(string, *metricspb.Metric, int)) {
+	for _, g := range groupBy(pts, func(p P) timeInterval { return pointInterval(p, delta) }, keyOf) {
 		c := &metricspb.Metric{Name: m.GetName(), Description: m.GetDescription(), Unit: m.GetUnit(), Metadata: m.GetMetadata()}
 		set(c, g.v)
 		emit(g.k, c, len(g.v))
@@ -158,23 +204,23 @@ func splitPts[P timedPoint](m *metricspb.Metric, pts []P, keyOf func(timeInterva
 func splitMetricBy(m *metricspb.Metric, keyOf func(timeInterval) string, emit func(string, *metricspb.Metric, int)) {
 	switch d := m.GetData().(type) {
 	case *metricspb.Metric_Sum:
-		splitPts(m, d.Sum.GetDataPoints(), keyOf, func(c *metricspb.Metric, v []*metricspb.NumberDataPoint) {
+		splitPts(m, d.Sum.GetDataPoints(), isDelta(d.Sum.GetAggregationTemporality()), keyOf, func(c *metricspb.Metric, v []*metricspb.NumberDataPoint) {
 			c.Data = &metricspb.Metric_Sum{Sum: &metricspb.Sum{DataPoints: v, AggregationTemporality: d.Sum.GetAggregationTemporality(), IsMonotonic: d.Sum.GetIsMonotonic()}}
 		}, emit)
 	case *metricspb.Metric_Gauge:
-		splitPts(m, d.Gauge.GetDataPoints(), keyOf, func(c *metricspb.Metric, v []*metricspb.NumberDataPoint) {
+		splitPts(m, d.Gauge.GetDataPoints(), false, keyOf, func(c *metricspb.Metric, v []*metricspb.NumberDataPoint) {
 			c.Data = &metricspb.Metric_Gauge{Gauge: &metricspb.Gauge{DataPoints: v}}
 		}, emit)
 	case *metricspb.Metric_Histogram:
-		splitPts(m, d.Histogram.GetDataPoints(), keyOf, func(c *metricspb.Metric, v []*metricspb.HistogramDataPoint) {
+		splitPts(m, d.Histogram.GetDataPoints(), isDelta(d.Histogram.GetAggregationTemporality()), keyOf, func(c *metricspb.Metric, v []*metricspb.HistogramDataPoint) {
 			c.Data = &metricspb.Metric_Histogram{Histogram: &metricspb.Histogram{DataPoints: v, AggregationTemporality: d.Histogram.GetAggregationTemporality()}}
 		}, emit)
 	case *metricspb.Metric_ExponentialHistogram:
-		splitPts(m, d.ExponentialHistogram.GetDataPoints(), keyOf, func(c *metricspb.Metric, v []*metricspb.ExponentialHistogramDataPoint) {
+		splitPts(m, d.ExponentialHistogram.GetDataPoints(), isDelta(d.ExponentialHistogram.GetAggregationTemporality()), keyOf, func(c *metricspb.Metric, v []*metricspb.ExponentialHistogramDataPoint) {
 			c.Data = &metricspb.Metric_ExponentialHistogram{ExponentialHistogram: &metricspb.ExponentialHistogram{DataPoints: v, AggregationTemporality: d.ExponentialHistogram.GetAggregationTemporality()}}
 		}, emit)
 	case *metricspb.Metric_Summary:
-		splitPts(m, d.Summary.GetDataPoints(), keyOf, func(c *metricspb.Metric, v []*metricspb.SummaryDataPoint) {
+		splitPts(m, d.Summary.GetDataPoints(), false, keyOf, func(c *metricspb.Metric, v []*metricspb.SummaryDataPoint) {
 			c.Data = &metricspb.Metric_Summary{Summary: &metricspb.Summary{DataPoints: v}}
 		}, emit)
 	}

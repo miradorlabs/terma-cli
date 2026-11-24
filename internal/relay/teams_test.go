@@ -82,12 +82,14 @@ func (r *stubRouter) Selected(enrollment, account string) bool {
 }
 
 type stubRechecker struct {
+	stateID string
 	gen     int64
 	waits   bool
 	waitRes Rechecked
 	entryFn func(Queued) Rechecked
 }
 
+func (s stubRechecker) StateID() string              { return s.stateID }
 func (s stubRechecker) Generation() int64            { return s.gen }
 func (s stubRechecker) TeamWaits() (Rechecked, bool) { return s.waitRes, s.waits }
 func (s stubRechecker) Entry(q Queued) Rechecked     { return s.entryFn(q) }
@@ -176,11 +178,13 @@ func TestIntervalTimestampsAndMixedStraddleSplit(t *testing.T) {
 		t.Fatalf("after span = %q, want straddle", got)
 	}
 
-	// Metrics: all 5 metric types (Sum, Gauge, Histogram, ExponentialHistogram, Summary).
+	// Metrics: all 5 metric types (delta Sum/Histogram/ExponentialHistogram keep [start, time],
+	// while Gauge and Summary place by TimeUnixNano).
+	delta := metricspb.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA
 	metrics := &metricspb.MetricsData{ResourceMetrics: []*metricspb.ResourceMetrics{{
 		Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("session.id", "s1")}},
 		ScopeMetrics: []*metricspb.ScopeMetrics{{Metrics: []*metricspb.Metric{
-			{Name: "sum", Data: &metricspb.Metric_Sum{Sum: &metricspb.Sum{DataPoints: []*metricspb.NumberDataPoint{
+			{Name: "sum", Data: &metricspb.Metric_Sum{Sum: &metricspb.Sum{AggregationTemporality: delta, DataPoints: []*metricspb.NumberDataPoint{
 				{StartTimeUnixNano: ns(t0), TimeUnixNano: ns(t1)},
 				{StartTimeUnixNano: ns(t1), TimeUnixNano: ns(t3)},
 			}}}},
@@ -188,11 +192,11 @@ func TestIntervalTimestampsAndMixedStraddleSplit(t *testing.T) {
 				{StartTimeUnixNano: ns(t0), TimeUnixNano: ns(t1)},
 				{StartTimeUnixNano: ns(t1), TimeUnixNano: ns(mixedAt)},
 			}}}},
-			{Name: "hist", Data: &metricspb.Metric_Histogram{Histogram: &metricspb.Histogram{DataPoints: []*metricspb.HistogramDataPoint{
+			{Name: "hist", Data: &metricspb.Metric_Histogram{Histogram: &metricspb.Histogram{AggregationTemporality: delta, DataPoints: []*metricspb.HistogramDataPoint{
 				{StartTimeUnixNano: ns(t0), TimeUnixNano: ns(t1)},
 				{StartTimeUnixNano: ns(t1), TimeUnixNano: ns(t3)},
 			}}}},
-			{Name: "exp", Data: &metricspb.Metric_ExponentialHistogram{ExponentialHistogram: &metricspb.ExponentialHistogram{DataPoints: []*metricspb.ExponentialHistogramDataPoint{
+			{Name: "exp", Data: &metricspb.Metric_ExponentialHistogram{ExponentialHistogram: &metricspb.ExponentialHistogram{AggregationTemporality: delta, DataPoints: []*metricspb.ExponentialHistogramDataPoint{
 				{StartTimeUnixNano: ns(t0), TimeUnixNano: ns(t1)},
 				{StartTimeUnixNano: ns(t1), TimeUnixNano: ns(t3)},
 			}}}},
@@ -1501,4 +1505,170 @@ func (u *signInUpstream) bodies() [][]byte {
 		out[i] = bytes.Clone(b)
 	}
 	return out
+}
+
+// On the routed relay path, cumulative metrics (Sum, Histogram, ExponentialHistogram
+// with CUMULATIVE temporality, plus Summary and Gauge) whose StartTimeUnixNano is process
+// start and whose TimeUnixNano is after a placement move must be placed by TimeUnixNano
+// rather than dropped as mixed_run, while DELTA metrics spanning a move still drop.
+func TestRoutedRelayPlacesCumulativeMetricsByReadTimeNotProcessStart(t *testing.T) {
+	t.Parallel()
+	t0 := time.Unix(1_700_000_000, 0).UTC()
+	movedAt := t0.Add(time.Minute)
+	after := movedAt.Add(5 * time.Second)
+	ns := func(tm time.Time) uint64 { return uint64(tm.UnixNano()) }
+
+	u := newSignInUpstream(t)
+	si := &testSignIn{account: accountA}
+	var routedOrigins []string
+	var routedMu sync.Mutex
+	router := &stubRouter{
+		active: true,
+		routeFn: func(rec Record) Routed {
+			routedMu.Lock()
+			routedOrigins = append(routedOrigins, rec.Placement.Repository.Origin)
+			routedMu.Unlock()
+			return Routed{
+				Outcome: Send,
+				Queued: Queued{
+					Enrollment: "enr_acme", Project: "proj_acme", Account: accountA,
+					Kind: "repository", Repository: rec.Placement.Repository.Origin,
+					Session: rec.Session, Run: rec.Placement.Run, At: rec.At, EndAt: rec.EndAt,
+				},
+			}
+		},
+		resolveFn: func(_, _, account string) (Policy, error) {
+			return Policy{Endpoint: u.srv.URL, Account: account, User: "usr_a", UserAccount: account, IncludePrompts: true, IncludeToolContent: true}, nil
+		},
+	}
+
+	claims := map[string]claim.Claim{
+		"s_move": {Tool: "gemini-cli", Placements: []claim.Placement{
+			{Since: t0.Add(-time.Hour), Kind: claim.KindRepository, Repository: config.Repository{Origin: "github.com/acme/a"}, Run: "r1"},
+			{Since: movedAt, Kind: claim.KindRepository, Repository: config.Repository{Origin: "github.com/acme/b"}, Run: "r1"},
+		}},
+		"s_to_nc": {Tool: "gemini-cli", Placements: []claim.Placement{
+			{Since: t0.Add(-time.Hour), Kind: claim.KindRepository, Repository: config.Repository{Origin: "github.com/acme/a"}, Run: "r1"},
+			{Since: movedAt}, // moved to not-collected mark
+		}},
+	}
+	r, srv := startTeamRelay(t, Options{
+		SignIn: si, Router: router,
+		Lookup: func(session string, _ time.Time) (claim.Claim, bool) {
+			c, ok := claims[session]
+			return c, ok
+		},
+	})
+
+	cum := metricspb.AggregationTemporality_AGGREGATION_TEMPORALITY_CUMULATIVE
+	delta := metricspb.AggregationTemporality_AGGREGATION_TEMPORALITY_DELTA
+
+	// Batch for s_move contains all 5 cumulative/read-time metric kinds (all with
+	// StartTimeUnixNano = t0 before movedAt, TimeUnixNano = after) plus 1 DELTA
+	// point straddling movedAt. The 5 read-time points must forward to github.com/acme/b;
+	// only the 1 DELTA straddler must drop as mixed_run.
+	moveBatch := &metricspb.MetricsData{ResourceMetrics: []*metricspb.ResourceMetrics{{
+		Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("session.id", "s_move")}},
+		ScopeMetrics: []*metricspb.ScopeMetrics{{Metrics: []*metricspb.Metric{
+			{Name: "cum_sum", Data: &metricspb.Metric_Sum{Sum: &metricspb.Sum{
+				AggregationTemporality: cum,
+				DataPoints:             []*metricspb.NumberDataPoint{{StartTimeUnixNano: ns(t0), TimeUnixNano: ns(after)}},
+			}}},
+			{Name: "cum_hist", Data: &metricspb.Metric_Histogram{Histogram: &metricspb.Histogram{
+				AggregationTemporality: cum,
+				DataPoints:             []*metricspb.HistogramDataPoint{{StartTimeUnixNano: ns(t0), TimeUnixNano: ns(after)}},
+			}}},
+			{Name: "cum_exp", Data: &metricspb.Metric_ExponentialHistogram{ExponentialHistogram: &metricspb.ExponentialHistogram{
+				AggregationTemporality: cum,
+				DataPoints:             []*metricspb.ExponentialHistogramDataPoint{{StartTimeUnixNano: ns(t0), TimeUnixNano: ns(after)}},
+			}}},
+			{Name: "summary", Data: &metricspb.Metric_Summary{Summary: &metricspb.Summary{
+				DataPoints: []*metricspb.SummaryDataPoint{{StartTimeUnixNano: ns(t0), TimeUnixNano: ns(after)}},
+			}}},
+			{Name: "gauge", Data: &metricspb.Metric_Gauge{Gauge: &metricspb.Gauge{
+				DataPoints: []*metricspb.NumberDataPoint{{StartTimeUnixNano: ns(t0), TimeUnixNano: ns(after)}},
+			}}},
+			{Name: "delta_straddle", Data: &metricspb.Metric_Sum{Sum: &metricspb.Sum{
+				AggregationTemporality: delta,
+				DataPoints:             []*metricspb.NumberDataPoint{{StartTimeUnixNano: ns(t0), TimeUnixNano: ns(after)}},
+			}}},
+		}}},
+	}}}
+	if code := post(t, srv, "/v1/metrics", mustMarshal(t, moveBatch), "application/x-protobuf", token, false); code != http.StatusOK {
+		t.Fatalf("post moveBatch = %d, want 200", code)
+	}
+
+	// Cumulative metric read after moving to a not-collected mark must drop as not_collected.
+	ncBatch := &metricspb.MetricsData{ResourceMetrics: []*metricspb.ResourceMetrics{{
+		Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("session.id", "s_to_nc")}},
+		ScopeMetrics: []*metricspb.ScopeMetrics{{Metrics: []*metricspb.Metric{
+			{Name: "cum_sum", Data: &metricspb.Metric_Sum{Sum: &metricspb.Sum{
+				AggregationTemporality: cum,
+				DataPoints:             []*metricspb.NumberDataPoint{{StartTimeUnixNano: ns(t0), TimeUnixNano: ns(after)}},
+			}}},
+		}}},
+	}}}
+	if code := post(t, srv, "/v1/metrics", mustMarshal(t, ncBatch), "application/x-protobuf", token, false); code != http.StatusOK {
+		t.Fatalf("post ncBatch = %d, want 200", code)
+	}
+
+	waitFor(t, func() bool {
+		c := r.Stats().Snapshot().Counters
+		return c["forwarded.metrics"] == 5 && c["dropped.mixed_run.metrics"] == 1 && c["dropped.not_collected.metrics"] == 1
+	})
+	routedMu.Lock()
+	defer routedMu.Unlock()
+	if len(routedOrigins) != 1 || routedOrigins[0] != "github.com/acme/b" {
+		t.Fatalf("routed origins = %v, want [github.com/acme/b]", routedOrigins)
+	}
+}
+
+// Pre-POST fence must abort and invalidate cached policy when StateID changes even if
+// Generation stays at 1 (as happens after routing.ReplaceCorrupt).
+func TestPrePOSTFenceAbortsOnStateIDChange(t *testing.T) {
+	t.Parallel()
+	u := newSignInUpstream(t)
+	si := &testSignIn{account: accountA}
+	var stateID atomic.Value
+	stateID.Store("state-1")
+	var resolveCalls atomic.Int32
+	router := &stubRouter{
+		active: true,
+		routeFn: func(rec Record) Routed {
+			return Routed{
+				Outcome: Send,
+				Queued: Queued{
+					Enrollment: "enr_1", Project: "proj_1", Account: accountA,
+					Kind: "repository", Session: rec.Session, At: rec.At, EndAt: rec.EndAt,
+				},
+			}
+		},
+		recheckFn: func(_, _ string) Rechecker {
+			return stubRechecker{
+				stateID: stateID.Load().(string),
+				gen:     1,
+				entryFn: func(Queued) Rechecked { return Rechecked{Verdict: SendNow} },
+			}
+		},
+		resolveFn: func(_, _, account string) (Policy, error) {
+			if resolveCalls.Add(1) == 2 {
+				// Simulate ReplaceCorrupt: fresh StateID, Generation still 1.
+				stateID.Store("state-2")
+			}
+			return Policy{Endpoint: u.srv.URL, Account: account, User: "usr_a", UserAccount: account, IncludePrompts: true, IncludeToolContent: true}, nil
+		},
+	}
+	_, srv := startTeamRelay(t, Options{
+		SignIn: si, Router: router,
+		Lookup: func(string, time.Time) (claim.Claim, bool) {
+			return claim.Claim{Kind: claim.KindRepository, ProjectID: "proj_1"}, true
+		},
+	})
+	if code := post(t, srv, "/v1/logs", mustMarshal(t, oneSessionLog("s_stateid", "hello")), "application/x-protobuf", token, false); code != http.StatusOK {
+		t.Fatalf("post logs = %d, want 200", code)
+	}
+	waitFor(t, func() bool { return len(u.requests()) == 1 })
+	if got := resolveCalls.Load(); got < 3 {
+		t.Fatalf("Resolve called %d times, want >= 3 (initial + aborted pre-POST + re-resolved after StateID fence)", got)
+	}
 }

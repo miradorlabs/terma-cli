@@ -79,12 +79,12 @@ func TestHookProfileFailsClosedOnAccountMismatchCorruptAndMidReadRace(t *testing
 		if p.Routing == nil || p.Routing.Usable() {
 			t.Fatalf("Routing = %+v; want unusable fail-closed Routing when no routing state exists", p.Routing)
 		}
-		if p.Team != "" || p.ServerKey || p.Account != sendas.AccountUnreadable {
-			t.Fatalf("missing routing state must fail closed: team=%q serverKey=%v account=%q", p.Team, p.ServerKey, p.Account)
+		if p.ServerKey || p.Account != sendas.AccountUnreadable {
+			t.Fatalf("missing routing state must fail closed: serverKey=%v account=%q", p.ServerKey, p.Account)
 		}
 	})
 
-	t.Run("matching routing state activates routing and clears legacy fallback", func(t *testing.T) {
+	t.Run("matching routing state activates routing", func(t *testing.T) {
 		dir, stateDir := t.TempDir(), t.TempDir()
 		seedProfileWithTeam(t, dir, stateDir, "user-a", false)
 		seedRoutingState(t, stateDir, acctA)
@@ -93,8 +93,8 @@ func TestHookProfileFailsClosedOnAccountMismatchCorruptAndMidReadRace(t *testing
 		if p.Routing == nil || !p.Routing.Usable() {
 			t.Fatalf("Routing not usable: %+v", p.Routing)
 		}
-		if p.Team != "" || p.Account != acctA {
-			t.Fatalf("profile = (team=%q account=%q); want empty team and account %q", p.Team, p.Account, acctA)
+		if p.Account != acctA {
+			t.Fatalf("profile account = %q; want %q", p.Account, acctA)
 		}
 	})
 
@@ -106,9 +106,6 @@ func TestHookProfileFailsClosedOnAccountMismatchCorruptAndMidReadRace(t *testing
 		p := app.hookProfile()
 		if p.Routing == nil || p.Routing.Usable() {
 			t.Fatalf("Routing should be non-nil and unusable on account mismatch: %+v", p.Routing)
-		}
-		if p.Team != "" || p.Policy.Validated() {
-			t.Fatalf("fell back to legacy team/policy on account mismatch: team=%q policy=%+v", p.Team, p.Policy)
 		}
 		if p.Account != sendas.AccountUnreadable {
 			t.Fatalf("Account = %q; want %q", p.Account, sendas.AccountUnreadable)
@@ -133,8 +130,8 @@ func TestHookProfileFailsClosedOnAccountMismatchCorruptAndMidReadRace(t *testing
 		if p.Routing == nil || p.Routing.Usable() {
 			t.Fatalf("corrupt routing state should fail closed: %+v", p.Routing)
 		}
-		if p.Team != "" || p.Policy.Validated() {
-			t.Fatalf("corrupt routing state fell back to legacy team/policy: team=%q", p.Team)
+		if p.Account != sendas.AccountUnreadable {
+			t.Fatalf("corrupt routing state account = %q; want %q", p.Account, sendas.AccountUnreadable)
 		}
 	})
 
@@ -155,8 +152,8 @@ func TestHookProfileFailsClosedOnAccountMismatchCorruptAndMidReadRace(t *testing
 		if p.Routing == nil || p.Routing.Usable() {
 			t.Fatalf("mid-read mutation did not fail closed: %+v", p.Routing)
 		}
-		if p.Team != "" || p.Account != sendas.AccountUnreadable {
-			t.Fatalf("mid-read mutation profile = (team=%q account=%q); want empty team and unreadable", p.Team, p.Account)
+		if p.Account != sendas.AccountUnreadable {
+			t.Fatalf("mid-read mutation account = %q; want unreadable", p.Account)
 		}
 	})
 }
