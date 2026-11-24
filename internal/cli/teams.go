@@ -148,11 +148,7 @@ func renderTeams(w io.Writer, v teamsView) {
 			fmt.Fprintf(tw, "    %s\n", p.Dim(o.Note))
 		}
 		for _, t := range o.Teams {
-			box := "[ ]"
-			if t.Selected {
-				box = "[x]"
-			}
-			fmt.Fprintf(tw, "    %s %s\t%s%s\n", box, cmp.Or(t.Name, t.ID), t.Collects, teamStateNote(t))
+			fmt.Fprintf(tw, "    %s %s\t%s%s\n", map[bool]string{false: "[ ]", true: "[x]"}[t.Selected], cmp.Or(t.Name, t.ID), t.Collects, teamStateNote(t))
 		}
 	}
 	_ = tw.Flush()
@@ -160,11 +156,7 @@ func renderTeams(w io.Writer, v teamsView) {
 		fmt.Fprintf(out, "\n%s\n", p.Bold("Bindings:"))
 		tw = tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
 		for _, b := range v.Bindings {
-			who := cmp.Or(b.Name, b.Organization)
-			if b.Refused {
-				who = "refused to every organization"
-			}
-			fmt.Fprintf(tw, "  %s\t%s\n", b.Key, who)
+			fmt.Fprintf(tw, "  %s\t%s\n", b.Key, map[bool]string{false: cmp.Or(b.Name, b.Organization), true: "refused to every organization"}[b.Refused])
 		}
 		_ = tw.Flush()
 	}
@@ -189,23 +181,22 @@ func teamStateNote(t teamRow) string {
 	note := "  — " + strings.ReplaceAll(string(t.State), "_", " ")
 	switch t.State {
 	case routing.SignInNeeded:
-		note += ": run `terma setup` to sign in again"
+		return note + ": run `terma setup` to sign in again"
 	case routing.Suspended, routing.Refused:
 		if t.LastError == routing.OrgAccessLost {
 			note += " (" + orgInaccessibleNote + ")"
 		}
-		note += ", blocking what it lists: `terma teams --release " + quoteArg(cmp.Or(t.Name, t.ID)) + "` removes it"
+		return note + ", blocking what it lists: `terma teams --release " + quoteArg(cmp.Or(t.Name, t.ID)) + "` removes it"
 	case routing.Expired:
-		note += ": not refreshed for a week, blocking what it lists"
+		return note + ": not refreshed for a week, blocking what it lists"
 	}
 	return note
 }
 
 func quoteArg(s string) string {
-	unsafe := func(r rune) bool {
+	if s == "" || strings.ContainsFunc(s, func(r rune) bool {
 		return (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && !strings.ContainsRune("._/@:=-", r)
-	}
-	if s == "" || strings.ContainsFunc(s, unsafe) {
+	}) {
 		return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 	}
 	return s

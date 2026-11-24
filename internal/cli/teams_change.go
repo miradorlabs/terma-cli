@@ -117,7 +117,7 @@ func (app *App) applyTeamsWithView(cmd *cobra.Command, cfg *config.Config, st ro
 		v = app.listTeamsWithClient(ctx, cfg, next, c, cerr)
 	}
 	app.finishUnticks(next, ch, loadTeamNames(app.stateDir, cfg.ProfileName))
-	v.Changes, v.Warnings = append(v.Changes, ch.changes...), append(v.Warnings, ch.warnings...)
+	v.Changes, v.Warnings, v.state = append(v.Changes, ch.changes...), append(v.Warnings, ch.warnings...), next
 	return v, nil
 }
 

@@ -1129,4 +1129,66 @@ func TestSetupInteractiveChecklistHookup(t *testing.T) {
 			t.Fatalf("setupTeams -y: %v", err)
 		}
 	})
+
+	t.Run("checklist cancellation propagates errCancelled to stop setup", func(t *testing.T) {
+		f, account := routedMachine(t, "alice", nil)
+		prevAsk, prevForm := testApp.canAsk, testApp.runForm
+		t.Cleanup(func() { testApp.canAsk, testApp.runForm = prevAsk, prevForm })
+		testApp.canAsk = func() bool { return true }
+		testApp.runForm = func(*prompt.Form) ([]prompt.Item, error) { return nil, prompt.ErrCancelled }
+		_, err := runSetup(t, f, account, setupFlags{})
+		if !errors.Is(err, errCancelled) {
+			t.Fatalf("err = %v, want errCancelled", err)
+		}
+	})
+
+	t.Run("deselecting initial Personal team returns final org policy and updates recorded team", func(t *testing.T) {
+		f, account := routedMachine(t, "alice", nil)
+		f.orgs = []organization{orgPersonal(), orgA(), orgB()}
+		f.projects = map[string][]project{
+			teamsPersonalOrg: {{ID: teamsPersonalTeam, Name: "Personal", OrganizationID: teamsPersonalOrg}},
+			orgA().ID:        projectsIn(orgA().ID),
+			orgB().ID:        projectsIn(orgB().ID),
+		}
+		prevAsk, prevForm, prevPick := testApp.canAsk, testApp.runForm, testApp.pickOne
+		t.Cleanup(func() { testApp.canAsk, testApp.runForm, testApp.pickOne = prevAsk, prevForm, prevPick })
+		testApp.canAsk = func() bool { return true }
+		testApp.pickOne = func(*cobra.Command, string, []pickRow, func(string) (int, error)) (int, error) { return 0, nil }
+		testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
+			items := slices.Clone(form.Items)
+			for i := range items {
+				items[i].Selected = items[i].Label == "Beta Core"
+			}
+			return items, nil
+		}
+		cfg, err := testApp.loadConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg.Account = account
+		cfg.OrganizationID = orgPersonal().ID
+		cfg.OrganizationName = orgPersonal().Name
+		cfg.ProjectID = teamsPersonalTeam
+		cmd := &cobra.Command{}
+		var out strings.Builder
+		cmd.SetOut(&out)
+		cmd.SetErr(&out)
+		cmd.SetContext(t.Context())
+		ui := newSetupUI(&out, false)
+		org := orgPersonal()
+		pol, name, err := testApp.setupTeams(cmd, cfg, &org, setupFlags{}, ui)
+		if err != nil {
+			t.Fatalf("setupTeams: %v", err)
+		}
+		if pol.Global() || pol.TeamID != betaCore || name != "Beta Core" {
+			t.Fatalf("returned (%+v, %q), want non-global Beta Core (%s)", pol, name, betaCore)
+		}
+		updated, err := testApp.loadConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if updated.Team != betaCore || updated.TeamName != "Beta Core" {
+			t.Fatalf("recorded team = (%q, %q), want (%q, %q)", updated.Team, updated.TeamName, betaCore, "Beta Core")
+		}
+	})
 }

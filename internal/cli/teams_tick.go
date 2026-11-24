@@ -74,8 +74,6 @@ func (a tickAsker) choose(title string, rows []pickRow) (int, error) {
 	return a.pick(a.cmd, title, rows, func(string) (int, error) { return -1, errors.New("answer with a number") })
 }
 
-// decideBindings resolves the undecided bindings tk's policy needs: prompts interactively,
-// takes defaults under --yes, or leaves them pending.
 func decideBindings(planned *routing.State, tk *tick, a tickAsker) error {
 	t := tk.team
 	if t.Personal || t.Policy.Global() {
@@ -90,11 +88,10 @@ func decideBindings(planned *routing.State, tk *tick, a tickAsker) error {
 		}
 		exactOnly = exactOnly && !e.Wildcard()
 		switch who, decided := decisionFor(*planned, e); {
-		case decided && who == t.OrganizationID:
-		case decided:
-			skipped = append(skipped, e)
-		default:
+		case !decided:
 			need = append(need, e)
+		case who != t.OrganizationID:
+			skipped = append(skipped, e)
 		}
 	}
 	if len(need) > 0 && exactOnly {

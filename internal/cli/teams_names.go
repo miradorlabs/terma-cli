@@ -9,9 +9,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 )
 
-const teamNamesDir = "team-names"
-
-// teamNames caches the organization and team names `terma teams` last listed per profile.
 type teamNames struct {
 	Teams   map[string]string `json:"teams"`
 	Orgs    map[string]string `json:"organizations"`
@@ -22,7 +19,7 @@ func teamNamesPath(stateDir, profile string) (string, bool) {
 	if stateDir == "" || profile == "" || profile != filepath.Base(profile) {
 		return "", false
 	}
-	return filepath.Join(stateDir, teamNamesDir, profile+".json"), true
+	return filepath.Join(stateDir, "team-names", profile+".json"), true
 }
 
 func loadTeamNames(stateDir, profile string) teamNames {
@@ -37,15 +34,13 @@ func loadTeamNames(stateDir, profile string) teamNames {
 	return n
 }
 
-func (n *teamNames) team(id, name string) { n.set(n.Teams, id, name) }
-func (n *teamNames) org(id, name string)  { n.set(n.Orgs, id, name) }
-
 func (n *teamNames) set(m map[string]string, id, name string) {
 	if id != "" && name != "" && m[id] != name {
 		m[id], n.changed = name, true
 	}
 }
-
+func (n *teamNames) team(id, name string) { n.set(n.Teams, id, name) }
+func (n *teamNames) org(id, name string)  { n.set(n.Orgs, id, name) }
 func (n teamNames) save(stateDir, profile string) {
 	if path, ok := teamNamesPath(stateDir, profile); n.changed && ok && os.MkdirAll(filepath.Dir(path), 0o700) == nil {
 		if b, err := json.MarshalIndent(n, "", "  "); err == nil {

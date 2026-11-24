@@ -95,16 +95,26 @@ func (app *App) setupTeams(cmd *cobra.Command, cfg *config.Config, org *organiza
 	if err := app.recordSetupTeam(cfg, account, primary.TeamID, teamName); err != nil {
 		return config.Policy{}, "", err
 	}
+	changed := false
+	if !f.desktopGrant && !f.assumeYes && app.canAsk != nil && app.canAsk() && config.PolicyStub() == "" && app.flags.projectID == "" && f.org == "" {
+		next, name, didChange, err := app.setupMultiTeamChecklist(cmd, cfg, committed, primary, teamName, ui)
+		if err != nil {
+			return config.Policy{}, cmp.Or(teamName, primary.TeamID), err
+		}
+		if didChange {
+			primary, teamName, changed = next, name, true
+			if err := app.recordSetupTeam(cfg, account, primary.TeamID, teamName); err != nil {
+				return config.Policy{}, "", err
+			}
+		}
+	}
 	if accountSwitched || cfg.Policy.OrganizationID != primary.OrganizationID || cfg.Policy.AuthURL != primary.AuthURL {
 		if dir, derr := daemon.Dir(app.stateDir); derr == nil {
 			daemon.Stop(dir)
 		}
 	}
-	ui.policyFetched(teamName, primary.Policy)
-	if !f.desktopGrant && !f.assumeYes && app.canAsk != nil && app.canAsk() && config.PolicyStub() == "" && app.flags.projectID == "" && f.org == "" {
-		if err := app.setupMultiTeamChecklist(cmd, cfg, committed, ui); err != nil {
-			return config.Policy{}, "", err
-		}
+	if !changed {
+		ui.policyFetched(teamName, primary.Policy)
 	}
 	return primary.Policy, teamName, nil
 }

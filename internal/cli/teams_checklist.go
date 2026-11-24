@@ -3,6 +3,7 @@ package cli
 import (
 	"cmp"
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -14,7 +15,6 @@ import (
 
 type checklistSlot struct{ org, team int }
 
-// teamsForm builds the grouped checkbox form for v. Reusable by `terma teams` and `terma setup`.
 func teamsForm(v teamsView) (*prompt.Form, []checklistSlot) {
 	form := &prompt.Form{Title: "Send telemetry from this machine to: (space toggles, enter confirms)"}
 	var slots []checklistSlot
@@ -22,7 +22,7 @@ func teamsForm(v teamsView) (*prompt.Form, []checklistSlot) {
 		heading := orgTitle(o)
 		if len(o.Teams) == 0 && o.Note != "" {
 			form.Items = append(form.Items, prompt.Item{Label: "(no teams listed)", Kind: prompt.Check, Disabled: true, Reason: o.Note, Heading: heading})
-			slots = append(slots, checklistSlot{org: -1, team: -1})
+			slots = append(slots, checklistSlot{-1, -1})
 			continue
 		}
 		for j, t := range o.Teams {
@@ -30,29 +30,25 @@ func teamsForm(v teamsView) (*prompt.Form, []checklistSlot) {
 			if (t.Unreadable != "" || o.Inaccessible) && !t.Selected {
 				item.Disabled, item.Reason = true, cmp.Or(t.Unreadable, o.Note)
 			}
-			form.Items = append(form.Items, item)
-			slots = append(slots, checklistSlot{org: i, team: j})
-			heading = ""
+			form.Items, slots, heading = append(form.Items, item), append(slots, checklistSlot{i, j}), ""
 		}
 	}
 	return form, slots
 }
 
 func checklistDiff(v teamsView, slots []checklistSlot, result []prompt.Item, base teamsFlags) teamsFlags {
-	ff := base
 	for k, s := range slots {
 		if s.org < 0 || k >= len(result) {
 			continue
 		}
-		t := v.Organizations[s.org].Teams[s.team]
-		switch {
+		switch t := v.Organizations[s.org].Teams[s.team]; {
 		case result[k].Selected && !t.Selected:
-			ff.selects = append(ff.selects, t.ID)
+			base.selects = append(base.selects, t.ID)
 		case !result[k].Selected && t.Selected:
-			ff.deselects = append(ff.deselects, t.EnrollmentID)
+			base.deselects = append(base.deselects, t.EnrollmentID)
 		}
 	}
-	return ff
+	return base
 }
 
 func (app *App) runTeamsChecklist(cmd *cobra.Command, cfg *config.Config, st routing.State, v teamsView, f teamsFlags) (teamsView, error) {
@@ -77,23 +73,17 @@ func (app *App) runTeamsChecklist(cmd *cobra.Command, cfg *config.Config, st rou
 	return v, nil
 }
 
-// setupMultiTeamChecklist lets interactive `terma setup` tick additional teams across all
-// organizations via the shared CAS checklist when the developer belongs to multiple teams.
-func (app *App) setupMultiTeamChecklist(cmd *cobra.Command, cfg *config.Config, st routing.State, ui *setupUI) error {
-	v := app.listTeams(cmd.Context(), cfg, st)
-	var count int
+func (app *App) setupMultiTeamChecklist(cmd *cobra.Command, cfg *config.Config, st routing.State, primary routing.Team, primaryName string, ui *setupUI) (routing.Team, string, bool, error) {
+	v, count := app.listTeams(cmd.Context(), cfg, st), 0
 	for _, o := range v.Organizations {
 		count += len(o.Teams)
 	}
 	if count <= 1 {
-		return nil
+		return primary, primaryName, false, nil
 	}
 	v, err := app.runTeamsChecklist(cmd, cfg, st, v, teamsFlags{})
-	if errors.Is(err, errCancelled) || (err == nil && len(v.Changes) == 0) {
-		return nil
-	}
-	if err != nil {
-		return err
+	if err != nil || len(v.Changes) == 0 {
+		return primary, primaryName, false, err
 	}
 	var ticked []string
 	for _, o := range v.Organizations {
@@ -115,5 +105,17 @@ func (app *App) setupMultiTeamChecklist(cmd *cobra.Command, cfg *config.Config, 
 	if len(v.Pending) > 0 {
 		ui.Then("Run `terma teams` to decide pending repository bindings.")
 	}
-	return nil
+	if len(v.state.Teams) == 0 {
+		return routing.Team{}, "", true, nil
+	}
+	if i := slices.IndexFunc(v.state.Teams, func(tm routing.Team) bool {
+		return tm.TeamID == primary.TeamID && tm.OrganizationID == primary.OrganizationID
+	}); i >= 0 {
+		return v.state.Teams[i], primaryName, true, nil
+	}
+	chosen := v.state.Teams[0]
+	if r := v.findTeam(chosen.OrganizationID, chosen.TeamID); r != nil && r.Name != "" {
+		return chosen, r.Name, true, nil
+	}
+	return chosen, chosen.TeamID, true, nil
 }

@@ -242,9 +242,12 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	// A team picker left after the agents were recorded is still a cancellation, but not
 	// one that recorded nothing.
 	if errors.Is(err, errCancelled) {
-		if recorded {
+		switch {
+		case team != "":
+			fmt.Fprintln(out, "Cancelled; the agents and initial team above stay recorded. Run `terma setup` again to finish.")
+		case recorded:
 			fmt.Fprintln(out, "Cancelled before a team was selected; the agents above stay recorded.")
-		} else {
+		default:
 			fmt.Fprintln(out, "Cancelled. Nothing was recorded.")
 		}
 		return nil

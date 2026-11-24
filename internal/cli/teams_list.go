@@ -25,6 +25,7 @@ type teamsView struct {
 	Pending       []pendingRow `json:"pending"`
 	Changes       []string     `json:"changes,omitempty"`
 	Warnings      []string     `json:"warnings,omitempty"`
+	state         routing.State
 }
 
 type orgRow struct {
@@ -79,9 +80,6 @@ func collectsSummary(pol config.Policy, personal bool) string {
 	return strings.Join(pol.Repositories, ", ")
 }
 
-// listTeams lists every organization and its teams concurrently on one shared user-token
-// client. 403 PROJECT_NOT_FOUND hides deleted teams; 403 ORG_NOT_ACCESSIBLE annotates the
-// org without failing other orgs or Personal. Selected teams are always shown from st.
 func (app *App) listTeams(ctx context.Context, cfg *config.Config, st routing.State) teamsView {
 	client, err := app.teamsAPIClient(cfg, st.Account)
 	return app.listTeamsWithClient(ctx, cfg, st, client, err)
@@ -91,9 +89,10 @@ func (app *App) listTeamsWithClient(ctx context.Context, cfg *config.Config, st 
 	var v teamsView
 	names := loadTeamNames(app.stateDir, cfg.ProfileName)
 	var orgs []organization
+	if clientErr == nil {
+		orgs, clientErr = fetchOrganizations(ctx, client)
+	}
 	if clientErr != nil {
-		v.Unlisted = clientErr.Error()
-	} else if orgs, clientErr = fetchOrganizations(ctx, client); clientErr != nil {
 		v.Unlisted = clientErr.Error()
 	}
 	for i, listed := range app.fetchTeams(ctx, client, cfg.AuthURL, orgs) {
@@ -114,8 +113,7 @@ func (app *App) listTeamsWithClient(ctx context.Context, cfg *config.Config, st 
 			t := teamRow{ID: p.ID, Name: p.Name}
 			switch {
 			case orgNotAccessibleErr(p.err):
-				row.Inaccessible, row.Note = true, orgInaccessibleNote
-				t.Unreadable, t.Collects = orgInaccessibleNote, "its policy could not be read"
+				row.Inaccessible, row.Note, t.Unreadable, t.Collects = true, orgInaccessibleNote, orgInaccessibleNote, "its policy could not be read"
 			case p.err != nil:
 				t.Unreadable, t.Collects = p.err.Error(), "its policy could not be read"
 			default:
@@ -230,10 +228,10 @@ func (v *teamsView) mergeState(st routing.State, names teamNames, now time.Time)
 	}
 	v.Pending = pendingBindings(st)
 	slices.SortStableFunc(v.Organizations, func(a, b orgRow) int {
-		switch {
-		case (a.Type == "personal") == (b.Type == "personal"):
+		if (a.Type == "personal") == (b.Type == "personal") {
 			return 0
-		case a.Type == "personal":
+		}
+		if a.Type == "personal" {
 			return 1
 		}
 		return -1

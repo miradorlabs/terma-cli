@@ -113,10 +113,10 @@ func bindingWords(b routing.Binding, names teamNames) string {
 }
 
 func confirmConflict(cmd *cobra.Command, question string, ask, assumeYes bool) error {
-	switch {
-	case assumeYes:
+	if assumeYes {
 		return nil
-	case !ask:
+	}
+	if !ask {
 		return errors.New(question + " Pass --yes to make it")
 	}
 	if ok, err := confirmDefault(cmd, question, false); err != nil || ok {
