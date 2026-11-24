@@ -97,25 +97,19 @@ func (app *App) hookProfile() dispatch.Profile {
 			return sendas.AccountUnreadable
 		}
 		rpath, rperr := routing.StatePath(app.stateDir, cfg.ProfileName)
-		if rperr != nil {
-			p = dispatch.Profile{Agents: cfg.Harnesses, Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting(cfg.ProfileName, nil)}
-			return sendas.AccountUnreadable
-		}
 		before := statOrNil(rpath)
 		lane := app.profileLane(cfg)
 		st, found, rerr := routing.Load(app.stateDir, cfg.ProfileName)
-		after := statOrNil(rpath)
-		if !unchanged(before, after) {
+		if rperr != nil || !unchanged(before, statOrNil(rpath)) {
 			p = dispatch.Profile{Agents: cfg.Harnesses, Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting(cfg.ProfileName, nil)}
 			return sendas.AccountUnreadable
 		}
 		if found || rerr != nil {
-			p = dispatch.Profile{Agents: cfg.Harnesses, Policy: config.NoPolicy("", "")}
+			p = dispatch.Profile{Agents: cfg.Harnesses, Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting(cfg.ProfileName, nil)}
 			if rerr == nil && lane != "" && lane != sendas.AccountUnreadable && st.Account == lane {
 				p.Routing = hookrun.NewRouting(cfg.ProfileName, &st)
 				return lane
 			}
-			p.Routing = hookrun.NewRouting(cfg.ProfileName, nil)
 			if lane == "" {
 				return ""
 			}
@@ -130,17 +124,13 @@ func (app *App) hookProfile() dispatch.Profile {
 	if p.ServerKey = lane == sendas.NoPersonLane; !p.ServerKey {
 		p.Account = lane
 	}
-	// Council 7 version-skew defense in depth: never write an empty-ProjectID claim while a
-	// live pre-routing relay (!RunInfo.Routing) holds the relay lock; supersede it immediately.
-	if p.Routing != nil && p.Routing.Usable() {
-		dir := claim.Dir(app.stateDir)
-		if daemon.Running(dir) {
-			if info, ok := daemon.RunningRelay(dir); !ok || !info.Routing {
-				if ok {
-					daemon.Supersede(app.stateDir, app.version)
-				}
-				p.Routing.WithholdPlacements = true
+	// Council 7 skew guard: supersede any live pre-routing relay (!RunInfo.Routing) and withhold placements.
+	if p.Routing.Usable() && daemon.Running(claim.Dir(app.stateDir)) {
+		if info, ok := daemon.RunningRelay(claim.Dir(app.stateDir)); !ok || !info.Routing {
+			if ok {
+				daemon.Supersede(app.stateDir, app.version)
 			}
+			p.Routing.WithholdPlacements = true
 		}
 	}
 	return p

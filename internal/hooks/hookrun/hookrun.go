@@ -182,19 +182,11 @@ func (e *Env) Open(ctx context.Context, sessionID, cwd string) (*Repo, bool) {
 // Repo resolves the repository, or outside Git the current directory, and its project,
 // or ErrNotAdmitted, before anything is written, for one the team policy does not collect.
 // It first hands on what hooks in an agent's sandbox parked there (unpark).
-func (e Env) Repo(ctx context.Context) (*Repo, error) {
-	return e.RepoAt(ctx, nil)
-}
+func (e Env) Repo(ctx context.Context) (*Repo, error) { return e.RepoAt(ctx, nil) }
 
 // RepoAt is Repo reusing a checkout already located by Classify.
 func (e Env) RepoAt(ctx context.Context, located *Repo) (*Repo, error) {
-	var r *Repo
-	var err error
-	if e.Routing != nil {
-		r, err = e.resolveRouted(ctx, located)
-	} else {
-		r, err = e.resolve(ctx)
-	}
+	r, err := e.resolveAt(ctx, located)
 	if err == nil {
 		e.unpark(r)
 	}
@@ -203,9 +195,11 @@ func (e Env) RepoAt(ctx context.Context, located *Repo) (*Repo, error) {
 
 // resolve is Repo without the unpark, for prepare-commit-msg, which has a commit's latency
 // budget to keep: the next hook hands the parked records on.
-func (e Env) resolve(ctx context.Context) (*Repo, error) {
+func (e Env) resolve(ctx context.Context) (*Repo, error) { return e.resolveAt(ctx, nil) }
+
+func (e Env) resolveAt(ctx context.Context, located *Repo) (*Repo, error) {
 	if e.Routing != nil {
-		return e.resolveRouted(ctx, nil)
+		return e.resolveRouted(ctx, located)
 	}
 	root, gitDir, id, remote, err := e.locate(ctx)
 	if err != nil {
@@ -257,16 +251,16 @@ func (e Env) locate(ctx context.Context) (root, gitDir string, id config.Reposit
 
 // EmitFor spools an event stamped with r's project or routed destination, parking it when
 // the spool cannot be written.
-func (e Env) EmitFor(r *Repo, ev spool.Event) bool {
-	return e.emitFor(r, ev, false, true)
-}
+func (e Env) EmitFor(r *Repo, ev spool.Event) bool { return e.emitFor(r, ev, false, true) }
 
 func (e Env) emitFor(r *Repo, ev spool.Event, own, inRun bool) bool {
 	if e.lost(r, 1) {
 		return true
 	}
 	ev = e.stampFor(r, ev, own, inRun)
-	e.claimForRelay(r, ev)
+	if inRun || e.Routing == nil {
+		e.claimForRelay(r, ev)
+	}
 	return e.emitOrPark(r, ev)
 }
 
@@ -281,11 +275,10 @@ func (e Env) stampFor(r *Repo, ev spool.Event, own, inRun bool) spool.Event {
 	if e.Routing == nil || r == nil || r.dest == nil {
 		return e.stamp(r, ev)
 	}
-	run := ""
 	if inRun {
-		run = e.runOf(ev.SessionID)
+		return e.destine(ev, r.dest, own, e.runOf(ev.SessionID))
 	}
-	return e.destine(ev, r.dest, own, run)
+	return e.destine(ev, r.dest, own, "")
 }
 
 // stamp names the event's repository, for delivery's admission, its project and the

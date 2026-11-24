@@ -403,10 +403,14 @@ func TestRoutedHookLatencyBudget(t *testing.T) {
 	})
 	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
 	measure("PrepareCommitMsg", func() {
-		_ = os.WriteFile(msgPath, []byte("feat: perf\n"), 0o644)
+		if err := os.WriteFile(msgPath, []byte("feat: perf\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
 		e := env
 		e.Args = []string{msgPath, "message"}
-		_ = PrepareCommitMsg(ctx, e)
+		if err := PrepareCommitMsg(ctx, e); err != nil {
+			t.Fatal(err)
+		}
 	})
 }
 
@@ -457,5 +461,119 @@ func TestRoutedOutsideGitPersonalAndSymlinkEditMixed(t *testing.T) {
 	env.Touch(rA, session.Session{ID: sid2, Tool: "claude_code"}, "Edit", []string{linkInA}, nil)
 	if c, ok := claim.Read(stateDir, sid2, env.Time()); !ok || c.Kind != claim.KindMixed {
 		t.Fatalf("claim after editing symlink into orgB = %+v (ok=%v); want KindMixed", c, ok)
+	}
+}
+
+func TestRoutedGitCommitDoesNotTaintActiveRunInOtherOrg(t *testing.T) {
+	stateDir := t.TempDir()
+	repoA := namedRepo(t, "alpha", "git@github.com:orgA/alpha.git")
+	repoB := namedRepo(t, "beta", "git@github.com:orgB/beta.git")
+	fA := filepath.Join(repoA, "a.txt")
+	if err := os.WriteFile(fA, []byte("from A\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rt := routedState(t, stateDir, testAccountA, []routing.Team{
+		makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true),
+		makeTeam("orgB", "team-b", []string{"github.com/orgB/beta"}, true),
+	}, map[string]string{"github.com/orgA/alpha": "orgA", "github.com/orgB/beta": "orgB"})
+	ctx := context.Background()
+	sid := "018f3a2c-0007-7000-8000-000000000001"
+
+	// Run 1: touch file in repoA and stage it.
+	envA, _, _ := routedEnv(t, stateDir, repoA, testAccountA, rt)
+	envA.StartRun(sid)
+	rA, err := envA.Repo(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	envA.Touch(rA, session.Session{ID: sid, Tool: "claude_code"}, "Edit", []string{fA}, nil)
+	gitRun(t, repoA, "add", "a.txt")
+
+	// Run 2 (fresh hook process): session resumes cleanly in repoB (orgB).
+	envB, _, _ := routedEnv(t, stateDir, repoB, testAccountA, LoadRouting(stateDir, "default"))
+	envB.StartRun(sid)
+	rB, err := envB.Repo(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	envB.EmitStart(rB, session.Session{ID: sid, Tool: "claude_code"}, nil)
+	before, ok := claim.Read(stateDir, sid, envB.Time())
+	if !ok || before.Kind != claim.KindRepository || before.Repository.Origin != "github.com/orgB/beta" {
+		t.Fatalf("claim before commit in A = %+v (ok=%v); want repoB", before, ok)
+	}
+
+	// Git commit hooks run in repoA stamping sid: must NOT place or mark repoB's active run Mixed.
+	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
+	if err := os.WriteFile(msgPath, []byte("feat: commit A\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prepEnv, _, _ := routedEnv(t, stateDir, repoA, testAccountA, LoadRouting(stateDir, "default"))
+	prepEnv.Args = []string{msgPath, "message"}
+	if err := PrepareCommitMsg(ctx, prepEnv); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, repoA, "commit", "-F", msgPath)
+	postEnv, _, _ := routedEnv(t, stateDir, repoA, testAccountA, LoadRouting(stateDir, "default"))
+	if err := PostCommit(ctx, postEnv); err != nil {
+		t.Fatal(err)
+	}
+	after, ok := claim.Read(stateDir, sid, postEnv.Time())
+	if !ok || after.Kind != claim.KindRepository || after.Repository.Origin != "github.com/orgB/beta" || after.Run != before.Run {
+		t.Fatalf("git hooks in repoA tainted repoB run: after=%+v (ok=%v), want repoB run %q", after, ok, before.Run)
+	}
+}
+
+func TestRoutedSkillsGatedPerDestinationTeam(t *testing.T) {
+	stateDir := t.TempDir()
+	repoA := namedRepo(t, "alpha", "git@github.com:orgA/alpha.git")
+	repoB := namedRepo(t, "beta", "git@github.com:orgB/beta.git")
+	teamA := makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true)
+	teamA.Policy.IncludePrompts, teamA.Policy.IncludeToolContent = false, false
+	teamB := makeTeam("orgB", "team-b", []string{"github.com/orgB/beta"}, true)
+	teamB.Policy.IncludePrompts, teamB.Policy.IncludeToolContent = true, true
+	rt := routedState(t, stateDir, testAccountA, []routing.Team{teamA, teamB}, map[string]string{
+		"github.com/orgA/alpha": "orgA",
+		"github.com/orgB/beta":  "orgB",
+	})
+	ctx := context.Background()
+	sid := "018f3a2c-0008-7000-8000-000000000001"
+	skills := []Skill{{Name: "deploy", Description: "ship it"}}
+
+	envA, _, _ := routedEnv(t, stateDir, repoA, testAccountA, rt)
+	rA, err := envA.Repo(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if envA.SkillsCollectedFor(rA) {
+		t.Fatal("SkillsCollectedFor(repoA) = true; want false when teamA withholds content")
+	}
+	if !SpoolSkills(envA, rA, "skills", sid, map[string]any{semconv.GenAIMainAgentNameKey: "claude_code"}, skills) {
+		t.Fatal("SpoolSkills(repoA) = false")
+	}
+	for _, ev := range hookruntest.Spooled(t, envA.Spool) {
+		if ev.Name == semconv.TermaSkillDefinitionEvent {
+			t.Fatalf("spooled skill definition for restrictive teamA: %+v", ev)
+		}
+	}
+
+	envB, _, _ := routedEnv(t, stateDir, repoB, testAccountA, LoadRouting(stateDir, "default"))
+	rB, err := envB.Repo(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !envB.SkillsCollectedFor(rB) {
+		t.Fatal("SkillsCollectedFor(repoB) = false; want true when teamB collects content")
+	}
+	if !SpoolSkills(envB, rB, "skills", sid, map[string]any{semconv.GenAIMainAgentNameKey: "claude_code"}, skills) {
+		t.Fatal("SpoolSkills(repoB) = false")
+	}
+	var got []spool.Event
+	for _, ev := range hookruntest.Spooled(t, envB.Spool) {
+		if ev.Name == semconv.TermaSkillDefinitionEvent {
+			got = append(got, ev)
+		}
+	}
+	if len(got) != 1 || got[0].Enrollment != rB.dest.d.EnrollmentID {
+		t.Fatalf("spooled skills = %+v; want 1 event for teamB %q", got, rB.dest.d.EnrollmentID)
 	}
 }

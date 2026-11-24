@@ -154,3 +154,52 @@ func TestCodexReachCrossOrgMixedAndPerTurnRouting(t *testing.T) {
 		t.Fatalf("turn B event = %+v; want enrollment %q with OwnLocation=true", byText["reply in B"], enrollments["orgB"])
 	}
 }
+
+func TestCodexResumedCrossOrgWithholdsThreadTitle(t *testing.T) {
+	t.Setenv("CODEX_HOME", t.TempDir())
+	stateDir, configDir := t.TempDir(), t.TempDir()
+	repoA := initCodexOriginRepo(t, "alpha", "git@github.com:orgA/alpha.git")
+	repoB := initCodexOriginRepo(t, "beta", "git@github.com:orgB/beta.git")
+	env, enrollments := makeRoutedCodexEnv(t, stateDir, configDir, repoA)
+	ctx := context.Background()
+
+	sid := "018f3a2c-cx03-7000-8000-000000000003"
+	turnA, turnB := "01a0bae4-aaaa-7910-9022-15897b3022a1", "01a0bae4-bbbb-7910-9022-15897b3022b2"
+	rollout := filepath.Join(os.Getenv("CODEX_HOME"), "sessions", "2026", "09", "19", "rollout-2026-09-19T12-18-12-"+sid+".jsonl")
+	titleIndex(t, `{"id":"`+sid+`","thread_name":"Secret Org A Prompt","updated_at":"2026-09-19T18:18:45Z"}`)
+
+	// Turn 1 in orgA -> stop in orgA queues the title for orgA.
+	turn1 := strings.Join([]string{
+		`{"type":"session_meta","payload":{"id":"` + sid + `","cwd":` + strconv.Quote(repoA) + `}}`,
+		`{"timestamp":"2026-09-19T18:18:39.000Z","type":"event_msg","payload":{"type":"task_started","turn_id":"` + turnA + `","trace_id":"ae2a5e6f8e0168ae5ec2efa2c8772c01"}}`,
+		strings.TrimSuffix(turnContext(turnA, repoA), "\n"),
+		`{"timestamp":"2026-09-19T18:18:41.000Z","type":"response_item","payload":{"type":"message","role":"assistant","id":"msg_a","phase":"final_answer","content":[{"type":"output_text","text":"reply in A"}]}}`,
+		`{"timestamp":"2026-09-19T18:18:42.000Z","type":"event_msg","payload":{"type":"task_complete","turn_id":"` + turnA + `"}}`,
+	}, "\n") + "\n"
+	hookruntest.WriteFile(t, filepath.Dir(rollout), filepath.Base(rollout), turn1)
+	stopA, _ := json.Marshal(map[string]any{"session_id": sid, "cwd": repoA, "transcript_path": rollout, "model": "gpt-5.6"})
+	env.Cwd, env.Stdin = repoA, bytes.NewReader(stopA)
+	if err := stop(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+
+	// Resume thread in orgB (Turn 2) -> stop in orgB must NOT spool the orgA-derived thread title to orgB.
+	turn2 := turn1 + strings.Join([]string{
+		`{"timestamp":"2026-09-19T18:20:00.000Z","type":"event_msg","payload":{"type":"task_started","turn_id":"` + turnB + `","trace_id":"ae2a5e6f8e0168ae5ec2efa2c8772c02"}}`,
+		strings.TrimSuffix(turnContext(turnB, repoB), "\n"),
+		`{"timestamp":"2026-09-19T18:20:01.000Z","type":"response_item","payload":{"type":"message","role":"assistant","id":"msg_b","phase":"final_answer","content":[{"type":"output_text","text":"reply in B"}]}}`,
+		`{"timestamp":"2026-09-19T18:20:02.000Z","type":"event_msg","payload":{"type":"task_complete","turn_id":"` + turnB + `"}}`,
+	}, "\n") + "\n"
+	hookruntest.WriteFile(t, filepath.Dir(rollout), filepath.Base(rollout), turn2)
+	stopB, _ := json.Marshal(map[string]any{"session_id": sid, "cwd": repoB, "transcript_path": rollout, "model": "gpt-5.6"})
+	env.Routing = hookrun.LoadRouting(stateDir, "default")
+	env.Cwd, env.Stdin = repoB, bytes.NewReader(stopB)
+	if err := stop(ctx, env); err != nil {
+		t.Fatal(err)
+	}
+
+	titles := hookruntest.Named(hookruntest.Spooled(t, env.Spool), semconv.TermaSessionTitleEvent)
+	if len(titles) != 1 || titles[0].Enrollment != enrollments["orgA"] {
+		t.Fatalf("spooled titles = %+v; want exactly 1 title for orgA (%q) and none for orgB (%q)", titles, enrollments["orgA"], enrollments["orgB"])
+	}
+}

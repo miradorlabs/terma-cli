@@ -49,9 +49,12 @@ type skillState struct {
 // SkillsCollected reports whether a skill's definition may leave: it is content of both
 // kinds, a description written for the model and a tool's file, so only a policy that
 // withholds nothing sends it.
-func (e Env) SkillsCollected() bool {
+func (e Env) SkillsCollected() bool { return e.SkillsCollectedFor(nil) }
+
+// SkillsCollectedFor reports whether a skill definition may leave for r's routed destination.
+func (e Env) SkillsCollectedFor(r *Repo) bool {
 	if e.Routing != nil {
-		return e.Routing.skillsCollected()
+		return e.Routing.skillsCollectedFor(r)
 	}
 	prompts, toolContent := e.Policy.Content()
 	return prompts && toolContent
@@ -73,7 +76,7 @@ func (e Env) SkillsCollected() bool {
 // read late leaves under the new sign-in; session ownership guards file attribution only.
 // Upgrade path: gate every session-content event on the owner together, not this one alone.
 func SpoolSkills(e Env, r *Repo, stateDir, sessionID string, attrs map[string]any, skills []Skill) bool {
-	if !e.SkillsCollected() || len(skills) == 0 {
+	if !e.SkillsCollectedFor(r) || len(skills) == 0 {
 		return true
 	}
 	if e.Spool == nil || !session.ValidID(sessionID) {
@@ -93,7 +96,7 @@ func SpoolSkills(e Env, r *Repo, stateDir, sessionID string, attrs map[string]an
 		lost := map[string]bool{}
 		for _, s := range skills {
 			one := skillAttrs(s)
-			hash := EvidenceID(s.Name)
+			hash := EvidenceID(s.Name + r.routeSalt())
 			if one == nil || slices.Contains(st.Reported, hash) || lost[hash] {
 				continue
 			}

@@ -29,7 +29,7 @@ func skillAttrs(source string) map[string]any {
 // the SKILL.md of: how the model loads a skill. A definition is content of both kinds, so
 // nothing is read while the team's policy withholds either.
 func captureCodexSkillReads(e hookrun.Env, r *hookrun.Repo, in *codexHookInput) {
-	if in.ToolName != codexShellTool || !session.ValidID(in.SessionID) || !e.SkillsCollected() {
+	if in.ToolName != codexShellTool || !session.ValidID(in.SessionID) || !e.SkillsCollectedFor(r) {
 		return
 	}
 	var input struct {
@@ -53,7 +53,7 @@ func captureCodexSkillReads(e hookrun.Env, r *hookrun.Repo, in *codexHookInput) 
 // captureCodexSkillMentions spools a terma.skill.definition for each $name skill the rollout
 // records since the last capture, in the turns the team collects.
 func captureCodexSkillMentions(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *codexHookInput) {
-	if e.Spool == nil || !session.ValidID(in.SessionID) || !e.SkillsCollected() {
+	if e.Spool == nil || !session.ValidID(in.SessionID) || !e.SkillsCollectedFor(r) {
 		return
 	}
 	dir := filepath.Join(e.StateDir, codexSkillCursorDir)

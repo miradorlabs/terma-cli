@@ -71,7 +71,7 @@ func antigravityRoots() antigravitySkillRoots {
 // antigravityUsedSkill is the skill this step loaded, when the team's policy collects prompts
 // and tool content: nothing is read from disk otherwise.
 func antigravityUsedSkill(e hookrun.Env, r *hookrun.Repo, in *antigravityHookInput) (hookrun.Skill, bool) {
-	if !e.SkillsCollected() {
+	if !e.SkillsCollectedFor(r) {
 		return hookrun.Skill{}, false
 	}
 	path := antigravitySkillRead(in, e.Cwd)

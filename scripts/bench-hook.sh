@@ -37,15 +37,11 @@ bench() {
   echo "feat: bench" > "$tmp/msg.txt"
   sh "$hook" "$tmp/msg.txt" message
   grep -q "Agent-Session-Id: $sid" "$tmp/msg.txt" || { echo "$2: the hook did not stamp: the timed path is not the real one" >&2; exit 1; }
-  times=""
-  i=0
+  times="" i=0
   while [ $i -lt 7 ]; do
     echo "feat: bench" > "$tmp/msg.txt"
-    start=$(ms)
-    sh "$hook" "$tmp/msg.txt" message
-    end=$(ms)
-    times="$times $((end - start))"
-    i=$((i + 1))
+    start=$(ms); sh "$hook" "$tmp/msg.txt" message; end=$(ms)
+    times="$times $((end - start))"; i=$((i + 1))
   done
   m=$(median "$times")
   echo "prepare-commit-msg, $2: median ${m}ms over 7 runs (${times# }) — budget ${BUDGET_MS}ms"
@@ -56,21 +52,15 @@ bench() {
 }
 
 run_mode() {
-  mode="$1"; shift
-  dir="$tmp/$mode"
+  mode="$1"; shift; dir="$tmp/$mode"
   export TERMA_CONFIG_DIR="$dir/home" TERMA_STATE_DIR="$dir/state" GIT_CONFIG_GLOBAL="$dir/gitconfig"
-  repo="$dir/repo"; mkdir -p "$repo" "$TERMA_CONFIG_DIR" "$TERMA_STATE_DIR/relay"
+  repo="$dir/repo"; mkdir -p "$repo" "$TERMA_CONFIG_DIR" "$TERMA_STATE_DIR/relay" "$TERMA_STATE_DIR/policies"
   printf local > "$TERMA_STATE_DIR/relay/token"
-  git -C "$repo" init -q
-  git -C "$repo" config user.email bench@example.com
-  git -C "$repo" config user.name bench
-  git -C "$repo" remote add origin git@github.com:acme/repo.git
-  git -C "$repo" commit -q --allow-empty -m init
-  git -C "$repo" worktree add -q "$dir/wt"
-  : > "$repo/NOTES.md"; : > "$dir/wt/NOTES.md"
+  git -C "$repo" init -q && git -C "$repo" config user.email bench@example.com && git -C "$repo" config user.name bench
+  git -C "$repo" remote add origin git@github.com:acme/repo.git && git -C "$repo" commit -q --allow-empty -m init
+  git -C "$repo" worktree add -q "$dir/wt"; : > "$repo/NOTES.md"; : > "$dir/wt/NOTES.md"
   now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf '{"active_profile":"default","profiles":{"default":{"team":"proj_bench","server_key_sign_in":true}}}' > "$TERMA_CONFIG_DIR/config.json"
-  mkdir -p "$TERMA_STATE_DIR/policies"
   printf '{"mode":"repo","repositories":["github.com/acme/repo"],"git_hooks":true,"include_prompts":true,"include_tool_content":true,"revision":1,"updated_at":"%s","team_id":"proj_bench","fetched_at":"%s"}' "$now" "$now" > "$TERMA_STATE_DIR/policies/proj_bench.json"
   (cd "$ROOT" && go run ./scripts/benchhooks "$@" "$BIN" "$repo")
   hook="$repo/.git/hooks/prepare-commit-msg"

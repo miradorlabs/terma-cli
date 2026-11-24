@@ -50,11 +50,10 @@ func (e Env) judge(sessionID, agentID string, c claim.Claim, locs []routing.Loca
 	cur := e.currentRun(sessionID)
 	e.keepRun(sessionID, now)
 	mixed := e.recordRun(sessionID, cur, locs, unknown, now)
-	if !placed && !mixed {
-		return
+	if placed || mixed {
+		c.ProjectID, c.Run = "", cur.id
+		e.placeRun(sessionID, agentID, c, mixed, now)
 	}
-	c.ProjectID, c.Run = "", cur.id
-	e.placeRun(sessionID, agentID, c, mixed, now)
 }
 
 func (e Env) recordRun(sessionID string, cur ledgerRun, locs []routing.Location, unknown runs.Why, now time.Time) bool {
@@ -73,8 +72,7 @@ func (e Env) recordRun(sessionID string, cur ledgerRun, locs []routing.Location,
 			mixed, why = true, runs.Why{Reason: runs.Aside}
 		} else {
 			var crossed bool
-			why, crossed = e.Routing.crossing(prev, havePrev, cur.id, locs, cur.locations, now)
-			if !crossed && full {
+			if why, crossed = e.Routing.crossing(prev, havePrev, cur.id, locs, cur.locations, now); !crossed && full {
 				why = runs.Why{Reason: runs.LocationBound}
 			} else if !crossed {
 				why = unknown
@@ -112,11 +110,8 @@ func (e Env) recordRun(sessionID string, cur ledgerRun, locs []routing.Location,
 		})
 	}
 	if !mixed && len(merged) > len(cur.locations)+len(seen) {
-		var w runs.Why
-		crossed := len(merged) > runs.MaxLocations
-		if crossed {
-			w = runs.Why{Reason: runs.LocationBound}
-		} else {
+		w, crossed := runs.Why{Reason: runs.LocationBound}, len(merged) > runs.MaxLocations
+		if !crossed {
 			w, crossed = e.Routing.crossing(prev, havePrev, cur.id, locs, merged, now)
 		}
 		if crossed {

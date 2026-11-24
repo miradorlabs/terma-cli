@@ -36,16 +36,23 @@ func (t *Turns) Admits(cwd string) bool {
 	return ok
 }
 
+// RouteKey returns cwd's routed destination key (matching Repo.RouteKey), or "" if unrouted/uncollected.
+func (t *Turns) RouteKey(cwd string) string {
+	if t.env.Routing == nil || cwd == "" {
+		return ""
+	}
+	if d := t.dest(cwd); d.collected() {
+		return d.d.EnrollmentID + "\x00" + holdKey(d.d)
+	}
+	return ""
+}
+
 // Matches reports whether cwd routes to the same destination as r (always true when unrouted).
 func (t *Turns) Matches(r *Repo, cwd string) bool {
 	if t.env.Routing == nil {
 		return true
 	}
-	if r == nil || r.dest == nil {
-		return false
-	}
-	d := t.dest(cwd)
-	return d.d.EnrollmentID == r.dest.d.EnrollmentID && holdKey(d.d) == holdKey(r.dest.d)
+	return r != nil && r.dest != nil && t.RouteKey(cwd) == r.RouteKey()
 }
 
 // Routed stamps ev using cwd's routed destination (OwnLocation: true) while keeping the session run.

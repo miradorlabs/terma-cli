@@ -60,23 +60,22 @@ func (rt *Routing) Usable() bool { return rt != nil && rt.router != nil }
 
 // GitHooks reports whether Route sends the repository at gitDir to a team with git_hooks on.
 func (rt *Routing) GitHooks(gitDir string, now time.Time) bool {
-	if !rt.Usable() || gitDir == "" {
-		return false
-	}
-	return rt.stampsCommits(rt.router.Route(locationOf(gitDir, gitx.RepositoryFS(gitDir)), now))
+	return rt.Usable() && gitDir != "" && rt.stampsCommits(rt.router.Route(locationOf(gitDir, gitx.RepositoryFS(gitDir)), now))
 }
 
 func (rt *Routing) stampsCommits(d routing.Decision) bool {
-	if d.Outcome != routing.Send {
-		return false
-	}
 	t, ok := rt.state.Team(d.EnrollmentID)
-	return ok && t.Policy.GitHooks
+	return d.Outcome == routing.Send && ok && t.Policy.GitHooks
 }
 
-func (rt *Routing) skillsCollected() bool {
+func (rt *Routing) skillsCollectedFor(r *Repo) bool {
 	if !rt.Usable() {
 		return false
+	}
+	if r != nil && r.dest != nil {
+		t, ok := rt.state.Team(r.dest.d.EnrollmentID)
+		p, tc := t.Policy.Content()
+		return r.dest.d.Outcome == routing.Send && ok && p && tc
 	}
 	for _, t := range rt.state.Teams {
 		if p, tc := t.Policy.Content(); p && tc {

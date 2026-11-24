@@ -136,7 +136,9 @@ func (e Env) emitRecord(r *Repo, ev spool.Event, accounts []string) bool {
 	}
 	ev = e.stampFor(r, ev, true, false)
 	ev.Account, ev.NoPerson = lane.Account, lane.NoPerson
-	e.claimForRelay(r, ev)
+	if e.Routing == nil {
+		e.claimForRelay(r, ev)
+	}
 	return e.emitOrPark(r, ev)
 }
 

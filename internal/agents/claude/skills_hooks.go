@@ -26,7 +26,7 @@ var (
 // definition is content of both kinds, so nothing is read while the team's policy withholds
 // either.
 func captureClaudeSkills(ctx context.Context, e hookrun.Env, r *hookrun.Repo, sessionID, transcript string) {
-	if transcript == "" || e.Spool == nil || !session.ValidID(sessionID) || !e.SkillsCollected() {
+	if transcript == "" || e.Spool == nil || !session.ValidID(sessionID) || !e.SkillsCollectedFor(r) {
 		return
 	}
 	dir := filepath.Join(e.StateDir, claudeSkillCursorDir)
