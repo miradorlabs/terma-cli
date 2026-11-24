@@ -228,7 +228,7 @@ func captureAntigravitySeat(e hookrun.Env, p *antigravityStatusLinePayload) bool
 		return false
 	}
 	// The lane is hashed, never sent: the same snapshot under another sign-in is new.
-	snapshot, _ := json.Marshal(map[string]any{"buckets": buckets, "account": account, "project": r.ProjectID, "lane": e.Spool.Lane()})
+	snapshot, _ := json.Marshal(map[string]any{"buckets": buckets, "account": account, "project": r.RouteKey(), "lane": e.Spool.Lane()})
 	next := antigravitySeatState{EmittedAt: now, Hash: hookrun.EvidenceID(string(snapshot)), Sequence: 1}
 	if prev != nil && prev.Hash == next.Hash && !now.Before(prev.EmittedAt) && now.Sub(prev.EmittedAt) < hookrun.QuotaHeartbeat {
 		return false
@@ -258,7 +258,7 @@ func captureAntigravitySeat(e hookrun.Env, p *antigravityStatusLinePayload) bool
 	if r.ProjectID != "" {
 		attrs[hookrun.AttrProjectID] = r.ProjectID
 	}
-	if err := e.Spool.Append(spool.Event{Time: now, Name: semconv.TermaSessionQuotaEvent, SessionID: id, Repository: r.Repository, Global: e.Policy.Global(), Attrs: attrs}); err != nil {
+	if err := e.Spool.Append(e.Routed(r, spool.Event{Time: now, Name: semconv.TermaSessionQuotaEvent, SessionID: id, Repository: r.Repository, Global: e.Policy.Global(), Attrs: attrs})); err != nil {
 		e.Logf("antigravity quota append: %v", err)
 		return false
 	}

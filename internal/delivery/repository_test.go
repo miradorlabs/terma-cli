@@ -1,7 +1,6 @@
 package delivery
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -10,13 +9,14 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -25,20 +25,20 @@ import (
 // outside git names none.
 func TestEveryEventLeavesNamingItsRepository(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	m := newRoutedMachine(t)
 	var body []byte
 	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		body, _ = io.ReadAll(r.Body)
 	}))
 	defer srv.Close()
-	if err := keystore.Set(dir, "p1", testKey, keystore.Hosts{}); err != nil {
+	if err := keystore.Set(m.config, "p1", testKey, keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
-	s, err := spool.Open(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	s.BindNoPerson()
+	tm := orgTeam("org-a", "p1")
+	tm.Personal = true
+	tm.Policy.Mode, tm.Policy.DefaultProjectID = config.ModeGlobal, "p1"
+	enr := m.createState(config.DefaultProfile, sendas.NoPersonLane, []routing.Team{tm}, nil)
+	m.spool.BindNoPerson()
 	const own = "https://github.com/acme/app"
 	attrs := func(extra ...string) map[string]any {
 		m := map[string]any{hookrun.AttrProjectID: "p1", semconv.GenAIMainAgentNameKey: "fake"}
@@ -48,25 +48,23 @@ func TestEveryEventLeavesNamingItsRepository(t *testing.T) {
 		return m
 	}
 	for _, e := range []spool.Event{
-		{Repository: app, Name: semconv.TermaSessionStartEvent, SessionID: "start", Attrs: attrs()},
-		{Repository: app, Name: semconv.TermaSessionTitleEvent, SessionID: "title", Attrs: attrs()},
-		{Repository: app, Name: semconv.TermaAssistantMessageEvent, SessionID: "reply", Attrs: attrs()},
-		{Repository: app, Name: semconv.TermaToolCallEvent, SessionID: "tool", Attrs: attrs()},
-		{Repository: app, Name: semconv.TermaSubagentStartEvent, SessionID: "subagent", Attrs: attrs()},
-		{Repository: app, Name: semconv.TermaSessionEndEvent, SessionID: "end", Attrs: attrs()},
-		{Repository: app, Name: semconv.TermaFilesTouchedEvent, SessionID: "touch", Attrs: attrs(semconv.VCSRepositoryURLFullKey, "https://github.com/acme/other")},
-		{Name: semconv.TermaSessionStartEvent, SessionID: "outside-git", Global: true, Attrs: attrs()},
+		{Repository: app, Name: semconv.TermaSessionStartEvent, SessionID: "start", Profile: config.DefaultProfile, Enrollment: enr["p1"], Attrs: attrs()},
+		{Repository: app, Name: semconv.TermaSessionTitleEvent, SessionID: "title", Profile: config.DefaultProfile, Enrollment: enr["p1"], Attrs: attrs()},
+		{Repository: app, Name: semconv.TermaAssistantMessageEvent, SessionID: "reply", Profile: config.DefaultProfile, Enrollment: enr["p1"], Attrs: attrs()},
+		{Repository: app, Name: semconv.TermaToolCallEvent, SessionID: "tool", Profile: config.DefaultProfile, Enrollment: enr["p1"], Attrs: attrs()},
+		{Repository: app, Name: semconv.TermaSubagentStartEvent, SessionID: "subagent", Profile: config.DefaultProfile, Enrollment: enr["p1"], Attrs: attrs()},
+		{Repository: app, Name: semconv.TermaSessionEndEvent, SessionID: "end", Profile: config.DefaultProfile, Enrollment: enr["p1"], Attrs: attrs()},
+		{Repository: app, Name: semconv.TermaFilesTouchedEvent, SessionID: "touch", Profile: config.DefaultProfile, Enrollment: enr["p1"], Attrs: attrs(semconv.VCSRepositoryURLFullKey, "https://github.com/acme/other")},
+		{Name: semconv.TermaSessionStartEvent, SessionID: "outside-git", Global: true, Profile: config.DefaultProfile, Enrollment: enr["p1"], Attrs: attrs()},
 	} {
-		if err := s.Append(e); err != nil {
+		if err := m.spool.Append(e); err != nil {
 			t.Fatal(err)
 		}
 	}
-	pol := config.Policy{Mode: config.ModeGlobal, DefaultProjectID: "p1", TeamID: "p1", IncludePrompts: true, IncludeToolContent: true, FetchedAt: time.Now()}
-	r := Router{ConfigDir: dir, OTLPPinned: true,
-		Policy:  func(context.Context, *config.Config, string) (config.Policy, error) { return pol, nil },
-		Consent: func(string, hookrun.Consent) bool { return true },
-	}
-	if res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0); res.Sent != 8 || res.Err != nil {
+	r := m.router(nil)
+	r.OTLPPinned = true
+	r.Consent = func(string, hookrun.Consent) bool { return true }
+	if res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, ServerKeyAuthURL: routedAuth, OTLPURL: srv.URL, ServerKeySignIn: true, Team: "p1"}, true, 0); res.Sent != 8 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
 	var payload struct {

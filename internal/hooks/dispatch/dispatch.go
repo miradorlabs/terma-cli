@@ -6,8 +6,10 @@ package dispatch
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
@@ -50,20 +52,19 @@ type Deps struct {
 	// Profile is the developer's setup as hooks read it locally.
 	Profile func() Profile
 	Spool   func() *spool.Spool
-	// Claimed runs once a hook has claimed its session, with the checkout it claimed and
-	// the policy in force: the relay, and that repository's commit hooks.
-	Claimed func(cwd string, policy config.Policy)
-	Flush   func()
+	// ClaimedRouted runs once routing sends or holds the checkout a hook placed its
+	// session in: the relay, and that repository's commit hooks.
+	ClaimedRouted func(cwd string, routing *hookrun.Routing)
+	Flush         func()
 	// AwaitPush starts a detached hookrun.AwaitPush for a recorded push.
 	AwaitPush func(path string)
 }
 
 // Profile is what a hook reads of the developer's setup.
 type Profile struct {
-	Team   string
 	Agents []string
-	// Policy is the collection policy, NoPolicy until one is validated.
-	Policy config.Policy
+	// Routing is the profile's routing state (non-nil and unusable when failing closed).
+	Routing *hookrun.Routing
 	// Account is the sign-in in place as auth.Account names it, which what the hook queues
 	// is bound to: its account key; "" signed out, or under a server key; or
 	// sendas.AccountUnreadable, when what the hook collects is lost (spool.LaneOf).
@@ -78,6 +79,12 @@ const maxPayload = 4 << 20
 // handlerTimeout bounds an event handler; a render hook keeps its own deadline.
 const handlerTimeout = 5 * time.Second
 
+// isReachEvent reports whether event is a pre-tool reach hook whose persistence
+// failure must exit non-zero so the hook fails closed.
+func isReachEvent(event string) bool {
+	return strings.HasSuffix(event, "-tool-reach") || event == "pre-tool-use" || strings.HasSuffix(event, "-pre-tool-use")
+}
+
 // Run handles the request and returns the status the process exits with.
 func Run(ctx context.Context, d Deps, r Request) int {
 	// Teardown retires the relay's token but leaves the commit hooks in repositories, and an
@@ -89,9 +96,12 @@ func Run(ctx context.Context, d Deps, r Request) int {
 	}
 	if render, ok := d.Agents.Render(r.Event); ok {
 		p := d.Profile()
+		if p.Routing == nil {
+			p.Routing = hookrun.NewRouting("", nil)
+		}
 		env := hookrun.Env{Now: time.Now(), Cwd: r.Cwd, Args: r.Args, Stdin: r.Stdin, Stdout: r.Stdout, Stderr: r.Stderr,
-			ConfigDir: d.ConfigDir, StateDir: d.StateDir, Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: p.Policy, Team: p.Team,
-			Account: p.Account, ServerKey: p.ServerKey}
+			ConfigDir: d.ConfigDir, StateDir: d.StateDir, Version: r.Version, Debug: r.Debug, Flush: d.Flush, Policy: config.NoPolicy("", ""),
+			Routing: p.Routing, Account: p.Account, ServerKey: p.ServerKey}
 		if !r.HooksOff {
 			env.Spool = bound(d.Spool(), p)
 		}
@@ -116,17 +126,19 @@ func Run(ctx context.Context, d Deps, r Request) int {
 		fmt.Fprintf(r.Stderr, "terma hook: unknown event %q (ignored)\n", r.Event)
 		return 0
 	}
-	run(ctx, d, r, e.Handler, e.Flush, agents.Tool(e.Agent))
-	return 0
+	return run(ctx, d, r, e.Handler, e.Flush, agents.Tool(e.Agent))
 }
 
-func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush bool, tool string) {
+func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush bool, tool string) int {
 	if r.HooksOff {
-		return
+		return 0
 	}
 	p := d.Profile()
+	if p.Routing == nil {
+		p.Routing = hookrun.NewRouting("", nil)
+	}
 	if r.Cwd == "" {
-		return
+		return 0
 	}
 	// Stdout is the hook's reply to the agent, which may feed it to the model. A bounded
 	// copy of the payload lets a hook that spooled nothing still claim its session.
@@ -149,26 +161,33 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 		Version:   r.Version,
 		Debug:     r.Debug,
 		Spool:     bound(d.Spool(), p),
-		Policy:    p.Policy,
-		Team:      p.Team,
+		Policy:    config.NoPolicy("", ""),
 		Agents:    p.Agents,
+		Routing:   p.Routing,
 		Account:   p.Account,
 		ServerKey: p.ServerKey,
 	}
 	ctx, cancel := context.WithTimeout(ctx, handlerTimeout)
 	defer cancel()
-	_ = handler(ctx, env)
+	_ = env.Routing.TakeWriteErr()
+	if err := handler(ctx, env); errors.Is(err, hookrun.ErrFailClosed) {
+		return 1
+	}
 	if !claimed && tool != "" {
 		if s, ok := d.Agents.PayloadSession(r.Event, payload.Bytes()); ok {
 			claimed, claimedIn = hookrun.ClaimFromPayload(ctx, env, s, tool), cmp.Or(s.Cwd, r.Cwd)
 		}
 	}
-	if claimed {
-		d.Claimed(claimedIn, p.Policy)
+	if isReachEvent(r.Event) && env.Routing.TakeWriteErr() != nil {
+		return 1
+	}
+	if claimed && d.ClaimedRouted != nil {
+		d.ClaimedRouted(claimedIn, p.Routing)
 	}
 	if flush && env.Spool != nil && !flushed {
 		d.Flush()
 	}
+	return 0
 }
 
 // boundedBuffer keeps the first max bytes, so an oversized payload cannot inflate it.

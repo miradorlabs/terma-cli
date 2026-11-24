@@ -3,6 +3,8 @@ package refresh
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -106,5 +108,142 @@ func TestAFailedRelayServiceRefreshIsRetried(t *testing.T) {
 	fixed.RelayService = func(context.Context) (string, bool, error) { return "/svc.plist", true, nil }
 	if up, err := fixed.AfterUpgrade(t.Context()); err != nil || !slices.Contains(up.Changed, "/svc.plist") {
 		t.Fatalf("the retry = %+v, %v", up, err)
+	}
+}
+
+// Machine refresh updates already-installed machine-wide hooks files to the current
+// build's hook set without creating files for agents that were never set up.
+func TestMachineRefreshUpdatesInstalledUserHooks(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	installedPath := filepath.Join(dir, "installed", "hooks.json")
+	if err := os.MkdirAll(filepath.Dir(installedPath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	stale := `{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user old-event || true"}]}]}}`
+	if err := os.WriteFile(installedPath, []byte(stale), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	absentPath := filepath.Join(dir, "absent", "hooks.json")
+	installed := agentstest.UserHooked{Agent: agentstest.Agent{ID: "installed"}, Path: installedPath}
+	absent := agentstest.UserHooked{Agent: agentstest.Agent{ID: "absent"}, Path: absentPath}
+	r := Refresher{
+		Version: "v7.0.0",
+		Agents:  agents.New(installed, absent).Support(installed, absent),
+	}
+	changed, err := r.Machine()
+	if err != nil {
+		t.Fatalf("Machine: %v", err)
+	}
+	if !slices.Equal(changed, []string{installedPath}) {
+		t.Fatalf("changed = %v, want [%s]", changed, installedPath)
+	}
+	got, err := os.ReadFile(installedPath)
+	if err != nil || !strings.Contains(string(got), "hook --user installed-stop") {
+		t.Fatalf("refreshed hooks file = %q, %v", got, err)
+	}
+	if _, err := os.Stat(absentPath); !os.IsNotExist(err) {
+		t.Fatalf("absent hooks file should not have been created: err=%v", err)
+	}
+}
+
+type trustingUserHooked struct {
+	agentstest.UserHooked
+	syncCalls int
+	syncFn    func(hooksFile string, command func(event string) string) (agents.TrustSync, error)
+}
+
+func (a *trustingUserHooked) SyncHookTrust(hooksFile string, command func(event string) string) (agents.TrustSync, error) {
+	a.syncCalls++
+	return a.syncFn(hooksFile, command)
+}
+
+// A SyncHookTrust failure fails the refresh so the release remains due, and a retry still
+// reconciles hook trust even when the hooks file plan is already empty.
+func TestMachineRefreshPropagatesHookTrustFailureAndRetriesWhenPlanEmpty(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	stateDir := t.TempDir()
+	hooksPath := filepath.Join(dir, "hooks.json")
+	stale := `{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"[ -x '/usr/local/bin/terma' ] && '/usr/local/bin/terma' hook --user old-event || true"}]}]}}`
+	if err := os.WriteFile(hooksPath, []byte(stale), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	failTrust := true
+	ag := &trustingUserHooked{
+		UserHooked: agentstest.UserHooked{Agent: agentstest.Agent{ID: "trusting"}, Path: hooksPath},
+		syncFn: func(string, func(string) string) (agents.TrustSync, error) {
+			if failTrust {
+				return agents.TrustSync{}, errors.New("config.toml locked")
+			}
+			return agents.TrustSync{Approved: 1}, nil
+		},
+	}
+	r := Refresher{
+		StateDir: stateDir,
+		Version:  "v8.0.0",
+		Agents:   agents.New(ag).Support(ag),
+	}
+	if _, err := r.Run(t.Context()); err == nil || !strings.Contains(err.Error(), "config.toml locked") {
+		t.Fatalf("first Run = %v, want trust failure", err)
+	}
+	if !selfupdate.NeedsRefresh(stateDir, "v8.0.0") {
+		t.Fatal("failed SyncHookTrust was recorded as refreshed")
+	}
+	// Retry: the hooks file is now up-to-date (plan.Empty()), yet SyncHookTrust must still run.
+	failTrust = false
+	changed, err := r.Run(t.Context())
+	if err != nil {
+		t.Fatalf("retry Run: %v", err)
+	}
+	if ag.syncCalls != 2 {
+		t.Fatalf("syncCalls = %d, want 2", ag.syncCalls)
+	}
+	if !slices.Equal(changed, []string{hooksPath}) {
+		t.Fatalf("retry changed = %v, want [%s]", changed, hooksPath)
+	}
+	if selfupdate.NeedsRefresh(stateDir, "v8.0.0") {
+		t.Fatal("successful retry was not recorded as refreshed")
+	}
+}
+
+// A refresh migrates what an earlier terma kept in the state directory once the relay's
+// step has run, reports what the migration wrote, and stays due while it fails; a relay
+// step that failed may have left an earlier build's relay running, so nothing is migrated
+// until a later refresh.
+func TestARefreshMigratesAfterTheRelayStepAndRetriesAFailure(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	var order []string
+	service := func(err error) func(context.Context) (string, bool, error) {
+		return func(context.Context) (string, bool, error) { order = append(order, "relay"); return "", false, err }
+	}
+	migrate := func(err error) func(context.Context) ([]string, error) {
+		return func(context.Context) ([]string, error) {
+			order = append(order, "migrate")
+			return []string{"/state/routing/default.json"}, err
+		}
+	}
+	r := Refresher{StateDir: dir, Version: "v3.1.0", Agents: agents.New(), RelayService: service(nil), Migrate: migrate(nil)}
+	changed, err := r.Run(t.Context())
+	if err != nil || !slices.Equal(changed, []string{"/state/routing/default.json"}) || !slices.Equal(order, []string{"relay", "migrate"}) {
+		t.Fatalf("Run = %v, %v in order %v; want the migrated file, after the relay step", changed, err, order)
+	}
+	if selfupdate.NeedsRefresh(dir, "v3.1.0") {
+		t.Fatal("a refresh that migrated is still due")
+	}
+
+	failed := Refresher{StateDir: t.TempDir(), Version: "v3.1.0", Agents: agents.New(), RelayService: service(nil), Migrate: migrate(errors.New("keychain locked"))}
+	if _, err := failed.Run(t.Context()); err == nil || !strings.Contains(err.Error(), "keychain locked") {
+		t.Fatalf("Run with a failed migration = %v", err)
+	}
+	if !selfupdate.NeedsRefresh(failed.StateDir, "v3.1.0") {
+		t.Fatal("a refresh whose migration failed is not retried")
+	}
+
+	order = nil
+	blocked := Refresher{StateDir: t.TempDir(), Version: "v3.1.0", Agents: agents.New(), RelayService: service(errors.New("a pre-routing relay is still running")), Migrate: migrate(nil)}
+	if changed, err := blocked.Run(t.Context()); err == nil || len(changed) != 0 || !slices.Equal(order, []string{"relay"}) {
+		t.Fatalf("Run with a failed relay step = %v, %v in order %v; want nothing migrated", changed, err, order)
 	}
 }

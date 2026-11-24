@@ -54,18 +54,13 @@ func (app *App) newSpoolAwaitPushCommand() *cobra.Command {
 	}
 }
 
-// pushEnv is what reporting a push needs: the spool, and a flush once it is spooled.
+// pushEnv is what reporting a push needs: the spool, routing state, and a flush once spooled.
 func (app *App) pushEnv() hookrun.Env {
-	env := hookrun.Env{StateDir: app.stateDir, ConfigDir: app.dir, Spool: app.openSpool(), Flush: spawnFlush,
-		Stderr: os.Stderr, Debug: os.Getenv("TERMA_DEBUG") != ""}
-	// One snapshot, as a hook's profile (hookProfile): a mixed one is unreadable, and lost.
-	lane, _ := readLaneAsOne(app.dir, func() string {
-		cfg, err := app.loadConfig()
-		if err != nil {
-			return sendas.AccountUnreadable
-		}
-		return app.profileLane(cfg)
-	})
+	_, lane, rt := app.routedSnapshot(app.loadConfig)
+	env := hookrun.Env{
+		StateDir: app.stateDir, ConfigDir: app.dir, Spool: app.openSpool(), Flush: spawnFlush,
+		Stderr: os.Stderr, Debug: os.Getenv("TERMA_DEBUG") != "", Routing: rt,
+	}
 	if lane == sendas.NoPersonLane {
 		env.ServerKey = true
 		if env.Spool != nil {
@@ -234,8 +229,6 @@ func (app *App) delivery() delivery.Router {
 		StateDir:     app.stateDir,
 		Version:      app.version,
 		OTLPPinned:   app.flags.otlpURL != "" || os.Getenv("TERMA_OTLP_URL") != "",
-		Policy:       app.policies().Current,
-		User:         app.accountUser,
 		EnrolledUser: app.enrolledUser,
 		Consent: func(tool string, c hookrun.Consent) bool {
 			a, ok := app.agents.ForTool(tool)
@@ -268,12 +261,6 @@ func (app *App) flushSpool(ctx context.Context, force bool, minInterval time.Dur
 	}
 	r := app.delivery()
 	r.SignIn = app.signInSource(cfg)
-	// A hook that found the policy stale started this flush to refresh it (hookrun refreshPolicy).
-	// Under multi-org routing, policies live in routing.State (refreshed by the relay daemon):
-	// single-team refresh would fetch the wrong team and write Profile.Team back to config.json.
-	if !delivery.RoutingActive(app.stateDir, cfg.ProfileName) && cfg.Policy.Stale(time.Now()) {
-		r.Policy = refreshOnce(ctx, cfg, cfg.Policy.Team(), r.Policy)
-	}
 	return r.Flush(ctx, s, cfg, force, minInterval), nil
 }
 
@@ -303,17 +290,3 @@ func (app *App) enrolledUser(profile string, team routing.Team, endpoint, accoun
 }
 
 var errTornDown = errors.New("terma is not set up on this machine; run `terma setup`")
-
-type policyFunc = func(context.Context, *config.Config, string) (config.Policy, error)
-
-// refreshOnce refreshes team's policy now, even with nothing queued for it (a hook outside
-// the list queues nothing), and answers delivery's lookups for team with that result.
-func refreshOnce(ctx context.Context, cfg *config.Config, team string, current policyFunc) policyFunc {
-	pol, err := current(ctx, cfg, team)
-	return func(ctx context.Context, cfg *config.Config, t string) (config.Policy, error) {
-		if t == team {
-			return pol, err
-		}
-		return current(ctx, cfg, t)
-	}
-}

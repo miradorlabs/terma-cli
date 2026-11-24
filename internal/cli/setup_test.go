@@ -701,8 +701,8 @@ func TestDesktopGrantCutoverKeepsInFlightWorkWithItsTeam(t *testing.T) {
 	gateway.policyBodies = map[string]string{
 		// The SHARED organization's team: one repository, no prompts, no tool content.
 		teamA: `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/acme/app"]},"git_hooks":false,"capture":{"exclude_prompts":true,"exclude_tool_content":true}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
-		// Personal's starts on Collect All: every session, all content.
-		personal: `{"policy":{"version":"1.1","terma":{"global":{},"git_hooks":false,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
+		// Second organization's team has a wider capture policy (prompts + tool content).
+		personal: `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/beta/side"]},"git_hooks":false,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
 	}
 	ingest := newRecordingIngest(t)
 	t.Setenv("TERMA_OTLP_URL", ingest.URL)

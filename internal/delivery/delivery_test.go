@@ -3,7 +3,6 @@ package delivery
 import (
 	"bytes"
 	"context"
-	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -21,7 +20,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -121,28 +122,32 @@ func TestQueuedEventsMeetTodaysPolicy(t *testing.T) {
 	}
 }
 
-// A project with no policy yet, or no key, keeps its events; one with neither problem
-// delivers, and every counter says why.
+// A project with an expired policy, or no key, keeps its events; an event with no destination
+// enrollment is dropped and counted as no_destination, and every counter says why.
 func TestAProjectWithoutAPolicyOrAKeyKeepsItsEvents(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
-	s, err := spool.Open(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	s.BindNoPerson()
-	for _, id := range []string{"unfetched", "keyless", ""} {
-		if err := s.Append(spool.Event{Repository: app, Name: semconv.TermaSessionStartEvent, Attrs: map[string]any{hookrun.AttrProjectID: id}}); err != nil {
+	m := newRoutedMachine(t)
+	expired := orgTeam("org-a", "expired", listed...)
+	expired.Policy.FetchedAt = time.Now().Add(-config.MaxPolicyAge - time.Minute)
+	keyless := orgTeam("org-b", "keyless", "github.com/acme/other")
+	enr := m.createState(config.DefaultProfile, sendas.NoPersonLane, []routing.Team{expired, keyless}, func(s *routing.State, _ map[string]string) error {
+		if err := s.Bind(app.Origin, "org-a", false); err != nil {
+			return err
+		}
+		return s.Bind("github.com/acme/other", "org-b", false)
+	})
+	m.spool.BindNoPerson()
+	for _, ev := range []spool.Event{
+		{Repository: app, Name: semconv.TermaSessionStartEvent, Profile: config.DefaultProfile, Enrollment: enr["expired"]},
+		{Repository: config.Repository{Origin: "github.com/acme/other"}, Name: semconv.TermaSessionStartEvent, Profile: config.DefaultProfile, Enrollment: enr["keyless"]},
+		{Repository: app, Name: semconv.TermaSessionStartEvent, Profile: config.DefaultProfile, Enrollment: ""},
+	} {
+		if err := m.spool.Append(ev); err != nil {
 			t.Fatal(err)
 		}
 	}
-	r := Router{ConfigDir: dir, Policy: func(_ context.Context, _ *config.Config, team string) (config.Policy, error) {
-		if team == "unfetched" {
-			return config.Policy{}, errors.New("not fetched yet")
-		}
-		return config.Policy{Mode: config.ModeRepo, Repositories: listed}, nil
-	}}
-	res := r.Flush(t.Context(), s, &config.Config{ServerKeySignIn: true}, true, 0)
+	r := m.router(nil)
+	res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, ServerKeyAuthURL: routedAuth, ServerKeySignIn: true}, true, 0)
 	if res.Sent != 0 || res.Held != 2 || res.Unroutable != 1 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
@@ -152,33 +157,34 @@ func TestAProjectWithoutAPolicyOrAKeyKeepsItsEvents(t *testing.T) {
 // force when it is sent: once tightened, without its content, the rest of it still sent.
 func TestContentSpooledUnderAnOlderPolicyLeavesWithoutIt(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	m := newRoutedMachine(t)
 	var bodies [][]byte
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		bodies = append(bodies, b)
 	}))
 	defer srv.Close()
-	if err := keystore.Set(dir, "p1", testKey, keystore.Hosts{}); err != nil {
+	if err := keystore.Set(m.config, "p1", testKey, keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
-	s, err := spool.Open(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	s.BindNoPerson()
+	tm := orgTeam("org-a", "p1", listed...)
+	tm.Policy.IncludePrompts, tm.Policy.IncludeToolContent = false, false
+	enr := m.createState(config.DefaultProfile, sendas.NoPersonLane, []routing.Team{tm}, func(s *routing.State, _ map[string]string) error {
+		return s.Bind(app.Origin, "org-a", false)
+	})
+	m.spool.BindNoPerson()
 	for _, e := range []spool.Event{
-		{Repository: app, Name: semconv.TermaSessionQuotaEvent, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1", semconv.TermaTurnIDKey: "turn-1", semconv.UserEmailKey: "private@example.com"}},
-		{Repository: app, Name: semconv.TermaToolCallEvent, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1", semconv.GenAIToolCallIDKey: "call-1", semconv.GenAIToolCallArgumentsKey: map[string]any{"cmd": "private arguments"}}},
-		{Repository: app, Name: semconv.TermaApprovalRequestedEvent, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1", semconv.TermaApprovalReasonKey: "private reason"}},
+		{Repository: app, Name: semconv.TermaSessionQuotaEvent, SessionID: "s1", Profile: config.DefaultProfile, Enrollment: enr["p1"], Attrs: map[string]any{hookrun.AttrProjectID: "p1", semconv.TermaTurnIDKey: "turn-1", semconv.UserEmailKey: "private@example.com"}},
+		{Repository: app, Name: semconv.TermaToolCallEvent, SessionID: "s1", Profile: config.DefaultProfile, Enrollment: enr["p1"], Attrs: map[string]any{hookrun.AttrProjectID: "p1", semconv.GenAIToolCallIDKey: "call-1", semconv.GenAIToolCallArgumentsKey: map[string]any{"cmd": "private arguments"}}},
+		{Repository: app, Name: semconv.TermaApprovalRequestedEvent, SessionID: "s1", Profile: config.DefaultProfile, Enrollment: enr["p1"], Attrs: map[string]any{hookrun.AttrProjectID: "p1", semconv.TermaApprovalReasonKey: "private reason"}},
 	} {
-		if err := s.Append(e); err != nil {
+		if err := m.spool.Append(e); err != nil {
 			t.Fatal(err)
 		}
 	}
-	tightened := config.Policy{Mode: config.ModeRepo, Repositories: listed, TeamID: "p1", FetchedAt: time.Now()}
-	r := Router{ConfigDir: dir, OTLPPinned: true, Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return tightened, nil }}
-	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
+	r := m.router(nil)
+	r.OTLPPinned = true
+	res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, ServerKeyAuthURL: routedAuth, OTLPURL: srv.URL, ServerKeySignIn: true, Team: "p1"}, true, 0)
 	if res.Sent != 3 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
@@ -351,29 +357,28 @@ func TestEveryHookEventKindIsClassified(t *testing.T) {
 // Events whose key the keychain will not give up now stay queued, and the flush says why.
 func TestALockedKeychainKeepsEventsQueued(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	m := newRoutedMachine(t)
 	sent := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { sent++ }))
 	defer srv.Close()
-	if err := keystore.Set(dir, "p1", testKey, keystore.Hosts{}); err != nil {
+	if err := keystore.Set(m.config, "p1", testKey, keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
-	secret.FailForTest(t, dir)
-	s, err := spool.Open(t.TempDir())
-	if err != nil {
+	enr := m.createState(config.DefaultProfile, sendas.NoPersonLane, []routing.Team{orgTeam("org-a", "p1", listed...)}, func(s *routing.State, _ map[string]string) error {
+		return s.Bind(app.Origin, "org-a", false)
+	})
+	secret.FailForTest(t, m.config)
+	m.spool.BindNoPerson()
+	if err := m.spool.Append(spool.Event{Repository: app, Name: semconv.TermaToolCallEvent, SessionID: "s1", Profile: config.DefaultProfile, Enrollment: enr["p1"]}); err != nil {
 		t.Fatal(err)
 	}
-	s.BindNoPerson()
-	if err := s.Append(spool.Event{Repository: app, Name: semconv.TermaToolCallEvent, SessionID: "s1", Attrs: map[string]any{hookrun.AttrProjectID: "p1"}}); err != nil {
-		t.Fatal(err)
-	}
-	pol := config.Policy{Mode: config.ModeRepo, Repositories: listed, TeamID: "p1", FetchedAt: time.Now()}
-	r := Router{ConfigDir: dir, OTLPPinned: true, Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return pol, nil }}
-	res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0)
+	r := m.router(nil)
+	r.OTLPPinned = true
+	res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, ServerKeyAuthURL: routedAuth, OTLPURL: srv.URL, ServerKeySignIn: true, Team: "p1"}, true, 0)
 	if sent != 0 || res.Sent != 0 || !secret.IsUnavailable(res.Err) {
 		t.Fatalf("Flush = %+v, sent %d; want nothing sent and the keychain named", res, sent)
 	}
-	if n, _, _ := s.Pending(); n != 1 {
+	if n, _, _ := m.spool.Pending(); n != 1 {
 		t.Fatalf("pending = %d, want the event kept", n)
 	}
 }
@@ -414,46 +419,52 @@ func TestSessionPairsLeaveUnderEveryPolicy(t *testing.T) {
 	}
 }
 
-// A hook event names the Mirador user the router's User names for its project and ingest, on
-// the resource as the relay names it, under any policy; one it names no one for carries none.
+// A hook event names the Mirador user the router's EnrolledUser names for its team and
+// ingest, on the resource as the relay names it, under any policy; one it names no one for
+// carries none.
 func TestHookEventsNameTheUser(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
+	m := newRoutedMachine(t)
 	var bodies []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		bodies = append(bodies, string(b))
 	}))
 	defer srv.Close()
-	for _, id := range []string{"p1", "p2"} {
-		if err := keystore.Set(dir, id, testKey, keystore.Hosts{}); err != nil {
+	other := config.Repository{Origin: "github.com/acme/other"}
+	t1, t2 := orgTeam("org-a", "p1", listed...), orgTeam("org-b", "p2", other.Origin)
+	t1.Policy.IncludePrompts, t1.Policy.IncludeToolContent = false, false
+	t2.Policy.IncludePrompts, t2.Policy.IncludeToolContent = false, false
+	enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{t1, t2}, func(s *routing.State, _ map[string]string) error {
+		if err := s.Bind(app.Origin, "org-a", false); err != nil {
+			return err
+		}
+		return s.Bind(other.Origin, "org-b", false)
+	})
+	m.spool.Bind(aliceLane)
+	for _, ev := range []spool.Event{
+		{Repository: app, Name: semconv.TermaSessionQuotaEvent, SessionID: "s-p1", Profile: config.DefaultProfile, Enrollment: enr["p1"]},
+		{Repository: other, Name: semconv.TermaSessionQuotaEvent, SessionID: "s-p2", Profile: config.DefaultProfile, Enrollment: enr["p2"]},
+	} {
+		if err := m.spool.Append(ev); err != nil {
 			t.Fatal(err)
 		}
 	}
-	s, err := spool.Open(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	s.BindNoPerson()
-	for _, id := range []string{"p1", "p2"} {
-		if err := s.Append(spool.Event{Repository: app, Name: semconv.TermaSessionQuotaEvent, SessionID: "s-" + id, Attrs: map[string]any{hookrun.AttrProjectID: id}}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	withheld := config.Policy{Mode: config.ModeRepo, Repositories: listed, FetchedAt: time.Now()}
 	var asked []string
-	r := Router{ConfigDir: dir, OTLPPinned: true,
-		Policy: func(context.Context, *config.Config, string) (config.Policy, error) { return withheld, nil },
-		User: func(_ *config.Config, projectID, endpoint, _ string) string {
-			asked = append(asked, projectID+"@"+endpoint)
-			if projectID == "p1" {
-				return "user-a"
-			}
-			return ""
-		}}
-	if res := r.Flush(t.Context(), s, &config.Config{OTLPURL: srv.URL, ServerKeySignIn: true}, true, 0); res.Sent != 2 || res.Err != nil {
+	r := m.router(&fakeSignIn{account: aliceLane, token: "token-a"})
+	r.OTLPPinned = true
+	r.maxConcurrency = 1
+	r.EnrolledUser = func(_ string, team routing.Team, endpoint, _ string) string {
+		asked = append(asked, team.TeamID+"@"+endpoint)
+		if team.TeamID == "p1" {
+			return "user-a"
+		}
+		return ""
+	}
+	if res := r.Flush(t.Context(), m.spool, &config.Config{ProfileName: config.DefaultProfile, AuthURL: routedAuth, OTLPURL: srv.URL}, true, 0); res.Sent != 2 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
+	slices.Sort(asked)
 	if want := []string{"p1@" + srv.URL, "p2@" + srv.URL}; !slices.Equal(asked, want) {
 		t.Errorf("asked who events name for %q, want %q", asked, want)
 	}

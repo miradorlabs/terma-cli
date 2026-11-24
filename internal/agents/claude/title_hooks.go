@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"context"
 	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
@@ -11,12 +12,16 @@ var claudeTitleStateDir = hookrun.AgentStateDir(name, "titles")
 
 // captureClaudeTitle spools the session's name when new or renamed. It restates the first
 // prompt, so it travels under titleConsented and, at delivery, the policy's prompt switch.
-func captureClaudeTitle(e hookrun.Env, r *hookrun.Repo, in *claudeHookInput) {
-	if in.TranscriptPath == "" || !titleConsented(e.Consent()) {
+func captureClaudeTitle(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *claudeHookInput) {
+	if in.TranscriptPath == "" || !titleConsented(e.Consent(r)) {
 		return
 	}
 	attrs := map[string]any{semconv.GenAIMainAgentNameKey: claudeTool, semconv.TermaEvidenceSourceKey: sourceClaudeTranscript}
 	hookrun.SpoolTitle(e, r, claudeTitleStateDir, in.SessionID, attrs, func() (string, bool, error) {
+		if e.Routing != nil {
+			turns := e.Turns(ctx)
+			return readRoutedTranscriptTitle(in.TranscriptPath, in.SessionID, func(cwd string) bool { return turns.Exclusive(r, cwd) })
+		}
 		return readTranscriptTitle(in.TranscriptPath, in.SessionID)
 	})
 }

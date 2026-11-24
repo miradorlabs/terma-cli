@@ -32,7 +32,8 @@ type reply struct {
 	TurnID  string
 	TraceID string
 	// At is when Codex recorded the message, not when the hook read it.
-	At time.Time
+	At  time.Time
+	Cwd string
 }
 
 // replyCursor holds no transcript text: an offset, an anchor that detects a rewritten
@@ -46,8 +47,11 @@ type replyCursor struct {
 	Skipping bool   `json:"skipping,omitempty"`
 	turnState
 	// Withheld is whether any turn was not collected, which keeps the thread's name, restating
-	// its first prompt, home.
-	Withheld bool `json:"withheld,omitempty"`
+	// its first prompt, home. TitleDest/TitleMixed ensure a multi-destination thread never
+	// attaches its title to another team's enrollment.
+	Withheld   bool   `json:"withheld,omitempty"`
+	TitleDest  string `json:"title_dest,omitempty"`
+	TitleMixed bool   `json:"title_mixed,omitempty"`
 }
 
 // codexReplyBatch bounds one read; a hook reads batch after batch inside its budget, and
@@ -76,7 +80,7 @@ func readRolloutReplies(ctx context.Context, sessionID, transcript string, curso
 	identity := fundingHash(rolloutFileIdentity(st) + string(first))
 	if cursor.Identity != identity || cursor.Offset < 0 || cursor.Offset > st.Size() ||
 		(cursor.Offset > 0 && cursor.Anchor != cursorAnchor(f, cursor.Offset)) {
-		cursor = replyCursor{Identity: identity, Withheld: cursor.Withheld}
+		cursor = replyCursor{Identity: identity, Withheld: cursor.Withheld, TitleDest: cursor.TitleDest, TitleMixed: cursor.TitleMixed}
 	}
 	if cursor.recheck(admits) {
 		cursor.Withheld = true
@@ -196,7 +200,7 @@ func codexReplyFrom(line []byte, cursor *replyCursor, sessionID string, maxText 
 	}
 	reply := reply{
 		ID: rec.Payload.ID, Text: full,
-		TurnID: cursor.TurnID, TraceID: cursor.TraceID, At: rec.Timestamp,
+		TurnID: cursor.TurnID, TraceID: cursor.TraceID, At: rec.Timestamp, Cwd: cursor.Cwd,
 	}
 	if !hookrun.EvidenceLabel.MatchString(reply.ID) {
 		reply.ID = fundingHash(sessionID + cursor.Identity + fmt.Sprint(cursor.Offset))

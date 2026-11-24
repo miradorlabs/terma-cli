@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
@@ -37,7 +38,7 @@ func (Agent) UnconfigureRelay(ctx context.Context, _ string) (agents.RelayResult
 	}
 	// Removing the files stops it either way; disabling keeps Hermes from looking for it.
 	disabled := disablePlugin(ctx)
-	result, err := relayexport.RemoveOwn(dir)
+	result, err := relayexport.RemoveOwn(dir, filepath.Join(dir, "__init__.py"))
 	if err == nil && disabled != nil {
 		result.Notes = append(result.Notes, fmt.Sprintf("Hermes: removed the plugin (%s) but could not disable it: %v.", dir, disabled))
 	}

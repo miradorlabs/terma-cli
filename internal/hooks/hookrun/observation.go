@@ -54,7 +54,7 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	}
 	attrs[AttrProjectID] = r.ProjectID
 	raw, _ := json.Marshal(attrs)
-	hash := EvidenceID(string(raw))
+	hash := EvidenceID(string(raw) + r.routeSalt())
 	dir := filepath.Join(e.StateDir, o.StateDir)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return
@@ -147,7 +147,8 @@ func (e Env) CaptureObservation(ctx context.Context, r *Repo, o Observation) {
 	// later, maybe once someone else has signed in, and must still leave only under the
 	// lane that collected it.
 	lane := e.lane()
-	state.Pending = &spool.Event{Time: e.Time(), Name: semconv.TermaSessionObservationEvent, SessionID: o.SessionID, Repository: r.Repository, Attrs: attrs, Account: lane.Account, NoPerson: lane.NoPerson}
+	pending := e.Routed(r, spool.Event{Time: e.Time(), Name: semconv.TermaSessionObservationEvent, SessionID: o.SessionID, Repository: r.Repository, Attrs: attrs, Account: lane.Account, NoPerson: lane.NoPerson})
+	state.Pending = &pending
 	if err = write(); err != nil {
 		e.Logf("%s checkpoint: %v", o.Tool, err)
 		return

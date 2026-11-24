@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
 )
 
 // OMP exports its own telemetry, so terma's extension is hooks only: it hands sessions,
@@ -18,7 +18,11 @@ import (
 //go:embed terma-omp.ts
 var extensionTemplate string
 
-const extensionConfigMarker = "const CONFIG: TermaConfig | null = null /* terma:config */"
+const (
+	extensionConfigPrefix = "const CONFIG: TermaConfig | null = "
+	extensionConfigSuffix = " /* terma:config */"
+	extensionConfigMarker = extensionConfigPrefix + "null" + extensionConfigSuffix
+)
 
 type extensionConfig struct {
 	Version     int      `json:"version"`
@@ -38,7 +42,7 @@ func renderExtension(hookCommand []string, relay string) (string, error) {
 	if !strings.Contains(extensionTemplate, extensionConfigMarker) {
 		return "", errors.New("omp extension template has no configuration line")
 	}
-	return strings.Replace(extensionTemplate, extensionConfigMarker, "const CONFIG: TermaConfig | null = "+string(data)+" /* terma:config */", 1), nil
+	return strings.Replace(extensionTemplate, extensionConfigMarker, extensionConfigPrefix+string(data)+extensionConfigSuffix, 1), nil
 }
 
 // writeExtension renders the extension to path, private to this user like the rest of
@@ -48,10 +52,22 @@ func writeExtension(path string, hookCommand []string, relay string) (string, er
 	if err != nil {
 		return "", err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return "", err
+	return path, relayexport.WriteOwn(path, []byte(text), 0o600)
+}
+
+func parseExtensionConfig(data []byte) (cfg extensionConfig, head, tail string, ok bool) {
+	var rest, literal string
+	if head, rest, ok = strings.Cut(string(data), extensionConfigPrefix); !ok {
+		return extensionConfig{}, "", "", false
 	}
-	return path, config.WriteFileAtomic(path, []byte(text), 0o600)
+	if literal, tail, ok = strings.Cut(rest, extensionConfigSuffix); !ok {
+		return extensionConfig{}, "", "", false
+	}
+	// A configuration that is no rendered one (the template's null) leaves the extension inert.
+	if json.Unmarshal([]byte(literal), &cfg) != nil || cfg.Version != 1 || cfg.Relay == "" || len(cfg.HookCommand) == 0 || strings.TrimSpace(cfg.HookCommand[0]) == "" {
+		return extensionConfig{}, "", "", false
+	}
+	return cfg, head, tail, true
 }
 
 // extensionCurrent reports whether path holds the extension this terma renders, with a
@@ -61,15 +77,22 @@ func extensionCurrent(path, addr string) bool {
 	if err != nil {
 		return false
 	}
-	head, rest, ok := strings.Cut(string(data), "const CONFIG: TermaConfig | null = ")
-	if !ok {
-		return false
+	cfg, head, tail, ok := parseExtensionConfig(data)
+	return ok && cfg.Relay == "http://"+addr && head+extensionConfigMarker+tail == extensionTemplate
+}
+
+// refreshExtension re-splices an installed OMP extension's configuration into this build's template.
+func refreshExtension() (string, bool, error) {
+	dir, err := ompAgentDir()
+	if err != nil {
+		return "", false, err
 	}
-	literal, tail, ok := strings.Cut(rest, " /* terma:config */")
-	var cfg extensionConfig
-	// A configuration that is no rendered one (the template's null) leaves the extension inert.
-	if !ok || json.Unmarshal([]byte(literal), &cfg) != nil || cfg.Version != 1 || cfg.Relay != "http://"+addr || len(cfg.HookCommand) == 0 || strings.TrimSpace(cfg.HookCommand[0]) == "" {
-		return false
-	}
-	return head+extensionConfigMarker+tail == extensionTemplate
+	return relayexport.RefreshTemplate(filepath.Join(dir, extensionPath), func(data []byte) ([]byte, bool, error) {
+		cfg, _, _, ok := parseExtensionConfig(data)
+		if !ok {
+			return nil, false, nil
+		}
+		text, err := renderExtension(cfg.HookCommand, cfg.Relay)
+		return []byte(text), err == nil, err
+	})
 }

@@ -13,9 +13,11 @@ type Consent struct {
 	Global bool
 }
 
-// Consent is the consent this hook runs under.
-func (e Env) Consent() Consent {
-	return Consent{Agents: e.Agents, Global: e.Policy.Global()}
+// Consent is the consent this hook runs under for what it records in r: global when the
+// policy r's records leave under (PolicyFor) collects every session, as delivery asks of
+// the team's policy when they leave.
+func (e Env) Consent(r *Repo) Consent {
+	return Consent{Agents: e.Agents, Global: e.PolicyFor(r).Global()}
 }
 
 // ConsentFor is the consent the developer's setup gives now, under the config directory

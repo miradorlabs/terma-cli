@@ -39,7 +39,8 @@ func captureCodexDesktopActivity(ctx context.Context, e hookrun.Env, r *hookrun.
 	}
 	ctx, cancel := context.WithTimeout(ctx, codexCaptureTimeout)
 	defer cancel()
-	next, status, err := readDesktopActivity(ctx, codexRolloutID(in), in.TranscriptPath, cursor, turnAdmission(ctx, e), func(a desktopActivity) error {
+	turns := e.Turns(ctx)
+	next, status, err := readDesktopActivity(ctx, codexRolloutID(in), in.TranscriptPath, cursor, turns.Admits, func(a desktopActivity) error {
 		attrs := hookrun.EvidenceAttrs(codexTool, sourceCodexRollout, "desktop")
 		attrs[semconv.TermaCaptureSurfaceKey] = semconv.TermaCaptureSurfaceDesktop
 		hookrun.BoundedAttr(attrs, semconv.TermaTurnIDKey, a.TurnID)
@@ -78,7 +79,7 @@ func captureCodexDesktopActivity(ctx context.Context, e hookrun.Env, r *hookrun.
 		if r.ProjectID != "" {
 			attrs[hookrun.AttrProjectID] = r.ProjectID
 		}
-		return e.Spool.Append(ev)
+		return e.Spool.Append(turns.Routed(r, a.Cwd, ev))
 	})
 	if err != nil {
 		e.Logf("desktop activity (%s): %v", status, err)

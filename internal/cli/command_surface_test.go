@@ -15,14 +15,14 @@ import (
 // primaryCommands is terma's whole surface (MIR-80): what `terma --help` lists, and the
 // only commands a message may tell someone to run. Each is safe to run again.
 var primaryCommands = []string{
-	"doctor", "setup", "switch", "teardown", "update",
+	"doctor", "setup", "teams", "teardown", "update",
 }
 
 // advancedCommands are hidden: other programs run them (auth, hook, launch, relay, spool,
-// version), Terma's engineers do (config, nate), or the e2e suites still do (status; MIR-80
-// removes it once those move to the primary commands).
+// version), Terma's engineers and the desktop do (config, nate, route), or the e2e suites
+// still do (status; MIR-80 removes it once those move to the primary commands).
 var advancedCommands = []string{
-	"auth", "config", "hook", "launch", "nate", "relay", "spool", "status", "version",
+	"auth", "config", "hook", "launch", "nate", "relay", "route", "spool", "status", "version",
 }
 
 func commandNamed(root *cobra.Command, name string) *cobra.Command {

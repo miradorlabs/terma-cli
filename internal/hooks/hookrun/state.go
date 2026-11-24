@@ -101,7 +101,7 @@ func pruneData(path string, before time.Time) {
 }
 
 // StateDirs are the hook state directories the runtime itself keeps, beside each agent's.
-var StateDirs = []string{fundingStateDir}
+var StateDirs = []string{fundingStateDir, turnStateDir}
 
 // Sweep ages out the hook state directories dirs, named under the state directory dir,
 // and every private workspace store: the relay runs it, so state no hook revisits still goes.

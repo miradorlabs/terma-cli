@@ -18,6 +18,7 @@ var claudeHooks = []struct {
 	// Edits build the manifest; the Agent tool's response (Task in older builds) is the only place a
 	// subagent's model is named.
 	{"PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|Agent|Task", "post-tool-use"},
+	{"PreToolUse", "Read|Grep|Glob|NotebookRead|LS|Bash", "pre-tool-use"},
 	{"Stop", "", "stop"},
 	{"StopFailure", "", "stop-failure"},
 	// The one hook before a turn exports anything, so the relay is up and the session claimed first.
@@ -48,6 +49,24 @@ func planClaude(root, path string, command func(event string) string, install bo
 		own = append(own, entry)
 	}
 	return hookmgr.MergeEventHooks(root, hookmgr.HooksFile{Path: path}, own, install)
+}
+
+// refreshUserHooks rewrites terma's machine-wide entries in settings.json to this build's.
+func refreshUserHooks(path string) (bool, error) {
+	data, err := hookmgr.ReadFile(path)
+	if err != nil || data == nil {
+		return false, err
+	}
+	termas := hookmgr.TermaPaths(data)
+	if len(termas) != 1 {
+		return false, nil
+	}
+	dir := filepath.Dir(path)
+	plan, err := planClaude(dir, filepath.Base(path), hookmgr.UserHookCommand(termas[0]), true)
+	if err != nil || plan.Empty() {
+		return false, err
+	}
+	return true, hookmgr.ApplyThroughLinks(dir, plan)
 }
 
 func managedSettings(command func(event string) string) ([]byte, error) {

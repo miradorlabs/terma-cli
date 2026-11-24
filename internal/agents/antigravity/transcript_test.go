@@ -152,13 +152,18 @@ func (g *transcriptRig) policy() config.Policy {
 	return p
 }
 
-func (g *transcriptRig) env(cwd, extra string) hookrun.Env {
+// payload is a hook's payload for the rig's conversation, as agy working in cwd sends it.
+func (g *transcriptRig) payload(cwd, extra string) string {
 	payload := `{"conversationId":"` + g.id + `","modelName":"gemini-3.8-flash-low","cwd":"` + cwd + `","transcriptPath":"` + g.transcript + `",` + extra + `}`
 	if len(g.workspaces) > 0 {
 		paths, _ := json.Marshal(g.workspaces)
 		payload = strings.TrimSuffix(payload, "}") + `,"workspacePaths":` + string(paths) + `}`
 	}
-	return hookrun.Env{StateDir: g.stateDir, Now: time.Now(), Cwd: cwd, Policy: g.policy(), Agents: g.agents, Stdin: strings.NewReader(payload), Stdout: &bytes.Buffer{}, Spool: g.sp, Version: "test"}
+	return payload
+}
+
+func (g *transcriptRig) env(cwd, extra string) hookrun.Env {
+	return hookrun.Env{StateDir: g.stateDir, Now: time.Now(), Cwd: cwd, Policy: g.policy(), Agents: g.agents, Stdin: strings.NewReader(g.payload(cwd, extra)), Stdout: &bytes.Buffer{}, Spool: g.sp, Version: "test"}
 }
 
 // hookAt runs h as a hook whose agent works in cwd.

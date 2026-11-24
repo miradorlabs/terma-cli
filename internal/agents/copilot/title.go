@@ -1,6 +1,7 @@
 package copilot
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -26,20 +27,25 @@ var copilotTitleStateDir = hookrun.AgentStateDir(name, "titles")
 // captureTitle spools the session's name when new or renamed. The runtime names a session
 // after its first prompt until someone renames it, so the name travels under titleConsented
 // and, at delivery, the policy's prompt switch. Its telemetry carries no name.
-func captureTitle(e hookrun.Env, r *hookrun.Repo, sessionID string) {
-	if !titleConsented(e.Consent()) {
+func captureTitle(ctx context.Context, e hookrun.Env, r *hookrun.Repo, sessionID string) {
+	if !titleConsented(e.Consent(r)) {
 		return
+	}
+	var matches func(string) bool
+	if e.Routing != nil {
+		turns := e.Turns(ctx)
+		matches = func(cwd string) bool { return turns.Exclusive(r, cwd) }
 	}
 	attrs := map[string]any{semconv.GenAIMainAgentNameKey: name, semconv.TermaEvidenceSourceKey: sourceCopilotWorkspace}
 	hookrun.SpoolTitle(e, r, copilotTitleStateDir, sessionID, attrs, func() (string, bool, error) {
-		return readSessionName(sessionID)
+		return readSessionName(sessionID, matches)
 	})
 }
 
 // readSessionName is the name the runtime keeps for sessionID in
 // session-state/<id>/workspace.yaml: its first prompt, or the name someone gave it. found is
 // false before the runtime has written one, and for a file that names another session.
-func readSessionName(sessionID string) (title string, found bool, err error) {
+func readSessionName(sessionID string, matches func(string) bool) (title string, found bool, err error) {
 	home, err := copilotHome()
 	if err != nil {
 		return "", false, err
@@ -61,12 +67,13 @@ func readSessionName(sessionID string) (title string, found bool, err error) {
 	}
 	var w struct {
 		ID   string `yaml:"id"`
+		Cwd  string `yaml:"cwd"`
 		Name string `yaml:"name"`
 	}
 	if err := yaml.Unmarshal(b, &w); err != nil {
 		return "", false, err
 	}
-	if w.ID != "" && w.ID != sessionID {
+	if (w.ID != "" && w.ID != sessionID) || (matches != nil && !matches(w.Cwd)) {
 		return "", false, nil
 	}
 	title = strings.TrimSpace(w.Name)

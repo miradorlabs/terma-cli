@@ -126,16 +126,11 @@ func (m *routedMachine) pending() int {
 	return n
 }
 
-// router panics if Policy is ever called in routed mode.
 func (m *routedMachine) router(signIn SignIn) Router {
 	return Router{
 		ConfigDir: m.config,
 		StateDir:  m.state,
 		SignIn:    signIn,
-		Policy: func(context.Context, *config.Config, string) (config.Policy, error) {
-			m.t.Fatal("routed delivery must never call single-team Policy")
-			return config.Policy{}, nil
-		},
 	}
 }
 
@@ -1250,23 +1245,25 @@ func TestRoutedCrossProfileUsesEventProfileEndpoint(t *testing.T) {
 	}
 }
 
-// Fail closed in pre-activation byProject: if routing state is deleted, an event carrying
-// routed Profile metadata (even with empty Enrollment) must NOT fall through to legacy
-// attrs.project_id delivery.
+// Without routing state, delivery still runs in routed mode: a destination-less event
+// (even carrying legacy attrs.project_id) is dropped and counted as no_destination, and
+// an enrolled event holds fail-closed as Unrouted (zero fallback to attrs.project_id).
 func TestPreActivationFailsClosedOnProfileOnlyRoutedEvent(t *testing.T) {
 	t.Parallel()
 	m := newRoutedMachine(t)
 	ev := routedEvent(aliceLane, config.DefaultProfile, "", "github.com/acme/app", semconv.TermaToolCallEvent)
 	ev.Attrs[hookrun.AttrProjectID] = "legacy-team"
-	m.queueRaw(ev)
+	enrolled := routedEvent(aliceLane, config.DefaultProfile, "enr-missing", "github.com/acme/app", semconv.TermaToolCallEvent)
+	enrolled.Attrs[hookrun.AttrProjectID] = "legacy-team"
+	m.queueRaw(ev, enrolled)
 
 	srv, sent := recordingIngest(t, http.StatusOK)
 	r := m.router(&fakeSignIn{account: aliceLane, token: "tok"})
 	res := r.Flush(t.Context(), m.spool, &config.Config{
 		OTLPURL: srv.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth,
 	}, true, 0)
-	if res.Routed || res.Sent != 0 || res.Unrouted != 1 || res.Held != 1 || len(sent()) != 0 {
-		t.Fatalf("profile-only routed event must fail closed without routing state: res=%+v sent=%d", res, len(sent()))
+	if !res.Routed || res.Sent != 0 || res.Unroutable != 1 || res.Unrouted != 1 || res.Held != 1 || len(sent()) != 0 {
+		t.Fatalf("missing routing state must fail closed: res=%+v sent=%d", res, len(sent()))
 	}
 }
 

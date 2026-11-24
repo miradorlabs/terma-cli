@@ -70,15 +70,15 @@ func TestEventNamesAreStable(t *testing.T) {
 		"cursor-after-agent-response", "cursor-before-submit-prompt", "cursor-file-edit", "cursor-post-tool-use",
 		"cursor-post-tool-use-failure", "cursor-pre-compact", "cursor-session-end", "cursor-session-start",
 		"cursor-stop", "cursor-subagent-stop",
-		"dsh-file-edit", "dsh-prompt", "dsh-session-end", "dsh-session-start",
+		"dsh-file-edit", "dsh-prompt", "dsh-session-end", "dsh-session-start", "dsh-tool-reach",
 		"gemini-after-tool", "gemini-prompt", "gemini-session-end", "gemini-session-start",
 		"grok-post-tool-use", "grok-session-end", "grok-session-start", "grok-stop", "grok-subagent-start",
 		"grok-user-prompt-submit",
-		"hermes-file-edit", "hermes-prompt", "hermes-session-end", "hermes-session-start",
-		"omp-file-edit", "omp-prompt", "omp-session-end", "omp-session-start", "omp-title",
-		"opencode-file-edit", "opencode-session-end", "opencode-session-start",
-		"pi-file-edit", "pi-prompt", "pi-session-end", "pi-session-start",
-		"post-tool-use", "session-end", "session-start", "stop", "stop-failure", "subagent-start", "subagent-stop",
+		"hermes-file-edit", "hermes-prompt", "hermes-session-end", "hermes-session-start", "hermes-tool-reach",
+		"omp-file-edit", "omp-prompt", "omp-session-end", "omp-session-start", "omp-title", "omp-tool-reach",
+		"opencode-file-edit", "opencode-session-end", "opencode-session-start", "opencode-tool-reach",
+		"pi-file-edit", "pi-prompt", "pi-session-end", "pi-session-start", "pi-tool-reach",
+		"post-tool-use", "pre-tool-use", "session-end", "session-start", "stop", "stop-failure", "subagent-start", "subagent-stop",
 		"user-prompt-submit",
 	}
 	got := slices.Sorted(maps.Keys(reg.Handlers()))
@@ -90,7 +90,9 @@ func TestEventNamesAreStable(t *testing.T) {
 			t.Errorf("%s should flush the spool", event)
 		}
 	}
-	if reg.FlushesAfter("post-tool-use") || reg.FlushesAfter("antigravity-post-tool-use") || reg.FlushesAfter("copilot-post-tool-use") {
+	if reg.FlushesAfter("post-tool-use") || reg.FlushesAfter("antigravity-post-tool-use") || reg.FlushesAfter("copilot-post-tool-use") ||
+		reg.FlushesAfter("omp-tool-reach") || reg.FlushesAfter("pi-tool-reach") || reg.FlushesAfter("opencode-tool-reach") ||
+		reg.FlushesAfter("dsh-tool-reach") || reg.FlushesAfter("hermes-tool-reach") {
 		t.Error("a per-tool-call hook must not start a flush")
 	}
 }

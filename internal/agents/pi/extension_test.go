@@ -28,6 +28,10 @@ await handlers.before_agent_start({ prompt: "do it" }, ctx)
 handlers.tool_call({ toolCallId: "c1" })
 handlers.tool_result({ toolName: "write", toolCallId: "c1", input: { path: "hello.txt", content: "hello" } }, ctx)
 handlers.tool_result({ toolName: "read", toolCallId: "c2", input: { path: "notes.txt" } }, ctx)
+handlers.tool_call({ toolName: "grep", toolCallId: "c3", input: { path: "/other", glob: "*.go" } }, ctx)
+handlers.tool_result({ toolName: "grep", toolCallId: "c3", input: { path: "/other", glob: "*.go" } }, ctx)
+handlers.tool_call({ toolName: "bash", toolCallId: "c4", input: { command: "cat ../other/a.go", cwd: "/other" } }, ctx)
+handlers.tool_result({ toolName: "bash", toolCallId: "c4", input: { command: "cat ../other/a.go", cwd: "/other" } }, ctx)
 await handlers.message_end({ message: { role: "assistant", model: "m", usage: { input: 1, output: 1 }, content: [] } }, ctx)
 await handlers.session_shutdown({}, ctx)
 `
@@ -81,7 +85,7 @@ func TestExtensionUnderNode(t *testing.T) {
 				byEvent[c.Event] = append(byEvent[c.Event], c.Payload)
 			}
 		}
-		if len(files) >= 4 || time.Now().After(deadline) {
+		if len(files) >= 7 || time.Now().After(deadline) {
 			break
 		}
 	}
@@ -89,6 +93,9 @@ func TestExtensionUnderNode(t *testing.T) {
 		if len(byEvent[e]) != 1 {
 			t.Errorf("%s calls = %v", e, byEvent[e])
 		}
+	}
+	if len(byEvent["pi-tool-reach"]) != 3 {
+		t.Errorf("pi-tool-reach calls = %d (%v); want 3 (read, grep, bash; deduped)", len(byEvent["pi-tool-reach"]), byEvent["pi-tool-reach"])
 	}
 	if edits := byEvent["pi-file-edit"]; len(edits) == 1 && (edits[0]["file"] != "hello.txt" || edits[0]["files"] != nil) {
 		t.Errorf("edit payload = %v, want file hello.txt", edits[0])

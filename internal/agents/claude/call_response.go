@@ -69,7 +69,7 @@ type callResponseState struct {
 // fails, a subagent stops, or the session ends. Only labels and counts leave the machine, under
 // the title's consent.
 func captureClaudeCallResponses(e hookrun.Env, r *hookrun.Repo, sessionID, transcript string) {
-	if transcript == "" || e.Spool == nil || !session.ValidID(sessionID) || !titleConsented(e.Consent()) {
+	if transcript == "" || e.Spool == nil || !session.ValidID(sessionID) || !titleConsented(e.Consent(r)) {
 		return
 	}
 	dir := filepath.Join(e.StateDir, claudeCallResponseStateDir)

@@ -38,6 +38,7 @@ func userPromptSubmit(ctx context.Context, env hookrun.Env) error {
 	if !uuidShape.MatchString(in.PromptID) {
 		return nil
 	}
+	env.StartTurn(in.SessionID)
 	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
 	if !ok {
 		return nil
@@ -46,7 +47,7 @@ func userPromptSubmit(ctx context.Context, env hookrun.Env) error {
 	if in.child() && hookrun.ShortLabel(in.SubagentType) {
 		attrs[semconv.GenAIAgentNameKey] = in.SubagentType
 	}
-	if prompts, _ := env.Policy.Content(); prompts && (Agent{}).ContentConsented(env.Consent()) {
+	if prompts, _ := env.PolicyFor(r).Content(); prompts && (Agent{}).ContentConsented(env.Consent(r)) {
 		text := hookrun.TruncateBytes(in.Prompt, promptMaxBytes)
 		attrs[semconv.TermaMessageTextKey] = text
 		attrs[semconv.TermaMessageTruncatedKey] = len(text) < len(in.Prompt)

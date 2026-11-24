@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -61,13 +62,13 @@ func newHarness(t *testing.T) *harness {
 		t.Fatal(err)
 	}
 	h.deps = Deps{
-		ConfigDir: t.TempDir(),
-		StateDir:  t.TempDir(),
-		Agents:    agents.New(fake{ran: &h.ran}),
-		Profile:   func() Profile { return Profile{Policy: config.Policy{Mode: config.ModeRepo}} },
-		Spool:     func() *spool.Spool { return s },
-		Claimed:   func(string, config.Policy) { h.claims++ },
-		Flush:     func() { h.flushes++ },
+		ConfigDir:     t.TempDir(),
+		StateDir:      t.TempDir(),
+		Agents:        agents.New(fake{ran: &h.ran}),
+		Profile:       func() Profile { return Profile{} },
+		Spool:         func() *spool.Spool { return s },
+		ClaimedRouted: func(string, *hookrun.Routing) { h.claims++ },
+		Flush:         func() { h.flushes++ },
 	}
 	hookruntest.RelayOn(t, h.deps.StateDir)
 	return h
@@ -162,14 +163,23 @@ func TestRunGitHooksNeedNoRegistry(t *testing.T) {
 	}
 }
 
-// A hook where the team does not collect marks its session but claims nothing, so it
+// A hook where no routed team collects marks its session but claims nothing, so it
 // starts no relay.
 func TestRunMarksWithoutClaiming(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	h.deps.Agents = agents.New(reading{fake{ran: &h.ran}})
+	st := routing.State{
+		Profile: "default",
+		Account: hookruntest.Account,
+		Teams: []routing.Team{{
+			EnrollmentID: "enr-1", OrganizationID: "org-a", AuthURL: "https://auth.example", TeamID: "t1", Epoch: 1,
+			Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/work"}, TeamID: "t1", FetchedAt: time.Now()},
+		}},
+		Bindings: map[string]routing.Binding{"github.com/acme/work": {Organization: "org-a"}},
+	}
 	h.deps.Profile = func() Profile {
-		return Profile{Team: "t1", Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/work"}, TeamID: "t1", FetchedAt: time.Now()}}
+		return Profile{Account: hookruntest.Account, Routing: hookrun.NewRouting("default", &st)}
 	}
 	r := request("fake-edit")
 	r.Cwd, _ = filepath.EvalSymlinks(t.TempDir())
@@ -183,31 +193,24 @@ func TestRunMarksWithoutClaiming(t *testing.T) {
 	}
 }
 
-// A hook outside the list under a policy no relay is refreshing starts the flush that
-// refreshes it, once even for an event a flush follows, and still starts no relay.
-func TestRunRefreshesAStalePolicy(t *testing.T) {
+// Without routing.State, hooks fail closed and never fall back to legacy Profile.Team/Policy.
+func TestRunWithoutRoutingStateFailsClosed(t *testing.T) {
 	t.Parallel()
+	root := hookruntest.InitRepo(t)
 	h := newHarness(t)
 	h.deps.Agents = agents.New(reading{fake{ran: &h.ran}})
 	h.deps.Profile = func() Profile {
-		return Profile{Team: "t1", Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/work"}, TeamID: "t1", FetchedAt: time.Now().Add(-time.Hour)}}
+		return Profile{Account: hookruntest.Account}
 	}
 	r := request("fake-edit")
-	r.Cwd, _ = filepath.EvalSymlinks(t.TempDir())
-	r.Stdin = strings.NewReader(`{"session_id":"s1","cwd":"` + hookruntest.InJSON(r.Cwd) + `"}`)
+	r.Cwd = root
+	r.Stdin = strings.NewReader(`{"session_id":"s1","cwd":"` + hookruntest.InJSON(root) + `"}`)
 	Run(context.Background(), h.deps, r)
-	if h.flushes != 1 || h.claims != 0 {
-		t.Fatalf("flushes %d, relay starts %d; want 1, 0", h.flushes, h.claims)
+	if h.claims != 0 || h.flushes != 0 {
+		t.Fatalf("missing routing state claimed (%d) or flushed (%d)", h.claims, h.flushes)
 	}
-	stop := request("fake-stop")
-	stop.Cwd = r.Cwd
-	stop.Stdin = strings.NewReader(`{"session_id":"s2","cwd":"` + hookruntest.InJSON(r.Cwd) + `"}`)
-	h.deps.Profile = func() Profile {
-		return Profile{Team: "t2", Policy: config.Policy{Mode: config.ModeRepo, TeamID: "t2", FetchedAt: time.Now().Add(-time.Hour)}}
-	}
-	Run(context.Background(), h.deps, stop)
-	if h.flushes != 2 {
-		t.Fatalf("a flush-after event in a stale repository started %d flushes, want 1", h.flushes-1)
+	if c, ok := claim.Read(h.deps.StateDir, "s1", time.Now()); ok && c.ProjectID != "" {
+		t.Fatalf("missing routing state fell back to legacy team claim: %+v", c)
 	}
 }
 
@@ -229,13 +232,23 @@ func TestRunHandsOnTheClaimedCheckout(t *testing.T) {
 	root := hookruntest.InitRepo(t)
 	h := newHarness(t)
 	var claimedIn string
-	var policy config.Policy
-	h.deps.Claimed = func(cwd string, p config.Policy) { claimedIn, policy = cwd, p }
+	var gotRT *hookrun.Routing
+	h.deps.ClaimedRouted = func(cwd string, rt *hookrun.Routing) { claimedIn, gotRT = cwd, rt }
 	h.deps.Agents = agents.New(reading{fake{ran: &h.ran}})
+	p := hookruntest.Admitting(root)
+	p.TeamID, p.FetchedAt = hookruntest.Team, time.Now()
+	st := routing.State{
+		Profile: "default",
+		Account: hookruntest.Account,
+		Teams: []routing.Team{{
+			EnrollmentID: "enr-1", OrganizationID: "org-a", AuthURL: "https://auth.example", TeamID: hookruntest.Team, Epoch: 1,
+			Policy: p,
+		}},
+		Bindings: map[string]routing.Binding{p.Repositories[0]: {Organization: "org-a"}},
+	}
+	rt := hookrun.NewRouting("default", &st)
 	h.deps.Profile = func() Profile {
-		p := hookruntest.Admitting(root)
-		p.TeamID, p.FetchedAt = hookruntest.Team, time.Now()
-		return Profile{Team: hookruntest.Team, Account: hookruntest.Account, Policy: p}
+		return Profile{Account: hookruntest.Account, Routing: rt}
 	}
 	r := request("fake-edit")
 	r.Cwd = t.TempDir()
@@ -244,9 +257,8 @@ func TestRunHandsOnTheClaimedCheckout(t *testing.T) {
 	if claimedIn != root {
 		t.Fatalf("claimed in %q, want the payload's %q", claimedIn, root)
 	}
-	// The policy goes with it: what a repository gets installed depends on it.
-	if policy.TeamID != hookruntest.Team {
-		t.Fatalf("policy = %+v, want the profile's", policy)
+	if gotRT != rt {
+		t.Fatalf("routing = %+v, want %+v", gotRT, rt)
 	}
 }
 
@@ -289,7 +301,7 @@ func TestAHooksSpoolIsBoundToItsProfilesLane(t *testing.T) {
 			}
 			d := Deps{ConfigDir: t.TempDir(), StateDir: t.TempDir(), Agents: agents.New(appender{}),
 				Profile: func() Profile { return tc.profile }, Spool: func() *spool.Spool { return s },
-				Claimed: func(string, config.Policy) {}, Flush: func() {}}
+				Flush: func() {}}
 			hookruntest.RelayOn(t, d.StateDir)
 			Run(context.Background(), d, request("appender-edit"))
 			evs, err := s.Peek(10)
@@ -331,6 +343,20 @@ func marked(k string) string {
 	return ""
 }
 
+func routedProfileFor(root string) Profile {
+	origin := "github.com/acme/" + filepath.Base(root)
+	st := routing.State{
+		Profile: "default",
+		Account: hookruntest.Account,
+		Teams: []routing.Team{{
+			EnrollmentID: "enr-1", OrganizationID: "org-a", AuthURL: "https://auth.example", TeamID: hookruntest.Team, Epoch: 1,
+			Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{origin}, TeamID: hookruntest.Team, FetchedAt: time.Now()},
+		}},
+		Bindings: map[string]routing.Binding{origin: {Organization: "org-a"}},
+	}
+	return Profile{Account: hookruntest.Account, Routing: hookrun.NewRouting("default", &st)}
+}
+
 // A hook process another harness started stands down: no handler, claim, flush or reply,
 // with hooks on or off. A render hook still renders, and stderr says why only with Debug.
 func TestRunStandsDownInAnotherHarness(t *testing.T) {
@@ -338,11 +364,7 @@ func TestRunStandsDownInAnotherHarness(t *testing.T) {
 	h := newHarness(t)
 	h.deps.Agents = agents.New(reading{fake{ran: &h.ran}}).Starters(otherHarness{})
 	root := hookruntest.InitRepo(t)
-	h.deps.Profile = func() Profile {
-		p := hookruntest.Admitting(root)
-		p.TeamID, p.FetchedAt = hookruntest.Team, time.Now()
-		return Profile{Team: hookruntest.Team, Account: hookruntest.Account, Policy: p}
-	}
+	h.deps.Profile = func() Profile { return routedProfileFor(root) }
 	for _, off := range []bool{false, true} {
 		for _, event := range []string{"fake-edit", "fake-stop"} {
 			r := request(event)
@@ -387,11 +409,7 @@ func TestRunWithoutTheMarkRuns(t *testing.T) {
 	h := newHarness(t)
 	h.deps.Agents = agents.New(reading{fake{ran: &h.ran}}).Starters(otherHarness{})
 	root := hookruntest.InitRepo(t)
-	h.deps.Profile = func() Profile {
-		p := hookruntest.Admitting(root)
-		p.TeamID, p.FetchedAt = hookruntest.Team, time.Now()
-		return Profile{Team: hookruntest.Team, Account: hookruntest.Account, Policy: p}
-	}
+	h.deps.Profile = func() Profile { return routedProfileFor(root) }
 	unmarked := func(string) string { return "" }
 	for _, event := range []string{"fake-edit", "fake-stop"} {
 		r := request(event)
@@ -399,7 +417,7 @@ func TestRunWithoutTheMarkRuns(t *testing.T) {
 		r.Stdin = strings.NewReader(`{"session_id":"s1","cwd":"` + hookruntest.InJSON(root) + `"}`)
 		Run(context.Background(), h.deps, r)
 	}
-	if c, ok := claim.Read(h.deps.StateDir, "s1", time.Now()); !ok || c.ProjectID == "" || h.claims != 2 || h.flushes != 1 {
+	if c, ok := claim.Read(h.deps.StateDir, "s1", time.Now()); !ok || c.Kind != claim.KindRepository || h.claims != 2 || h.flushes != 1 {
 		t.Fatalf("claim %+v, %v; %d claims, %d flushes", c, ok, h.claims, h.flushes)
 	}
 	h.deps.Agents = agents.New(fake{ran: &h.ran}).Starters(otherHarness{})

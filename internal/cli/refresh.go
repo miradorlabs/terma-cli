@@ -12,7 +12,7 @@ import (
 )
 
 func (app *App) refresher() refresh.Refresher {
-	return refresh.Refresher{StateDir: app.stateDir, Agents: app.agents, Version: app.version, RelayService: app.refreshRelayService}
+	return refresh.Refresher{StateDir: app.stateDir, Agents: app.agents, Version: app.version, RelayService: app.refreshRelayService, Migrate: app.migrateServerKeyRouting}
 }
 
 // refreshRelayService rewrites a relay service an earlier terma (or another binary) wrote,
@@ -24,6 +24,9 @@ func (app *App) refreshRelayService(ctx context.Context) (path string, changed b
 		path, changed, err = daemon.RefreshService(ctx, app.stateDir)
 	}
 	daemon.Supersede(app.stateDir, app.version)
+	if gerr := daemon.EnsureRoutingRelay(app.stateDir, app.version); gerr != nil && err == nil {
+		err = gerr
+	}
 	return path, changed, err
 }
 

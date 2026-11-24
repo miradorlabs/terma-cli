@@ -17,11 +17,12 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/dispatch"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -43,6 +44,7 @@ type grokHook struct {
 var grokPayloadFor = map[string]string{
 	"session-start":      "session_start",
 	"user-prompt-submit": "user_prompt_submit",
+	"pre-tool-use":       "post_tool_use",
 	"post-tool-use":      "post_tool_use",
 	"subagent-start":     "subagent_start",
 	"subagent-stop":      "subagent_stop",
@@ -108,18 +110,28 @@ func runGrokHooks(t *testing.T, grok bool, owners ...string) *grokRun {
 	root, stateDir, sp := hookruntest.Project(t)
 	hookruntest.RelayOn(t, stateDir)
 	run := &grokRun{root: root, stateDir: stateDir, sp: sp}
+	origin := "github.com/acme/" + filepath.Base(root)
+	p := hookruntest.Admitting(root)
+	p.TeamID, p.FetchedAt = hookruntest.Team, time.Now()
+	st := routing.State{
+		Profile: "default",
+		Account: hookruntest.Account,
+		Teams: []routing.Team{{
+			EnrollmentID: "enr-1", OrganizationID: "org-a", AuthURL: "https://auth.example", TeamID: hookruntest.Team, Epoch: 1,
+			Policy: p,
+		}},
+		Bindings: map[string]routing.Binding{origin: {Organization: "org-a"}},
+	}
 	deps := dispatch.Deps{
 		ConfigDir: t.TempDir(),
 		StateDir:  stateDir,
 		Agents:    reg,
 		Profile: func() dispatch.Profile {
-			p := hookruntest.Admitting(root)
-			p.TeamID, p.FetchedAt = hookruntest.Team, time.Now()
-			return dispatch.Profile{Team: hookruntest.Team, Account: hookruntest.Account, Policy: p}
+			return dispatch.Profile{Account: hookruntest.Account, Routing: hookrun.NewRouting("default", &st)}
 		},
-		Spool:   func() *spool.Spool { return sp },
-		Claimed: func(string, config.Policy) { run.claims++ },
-		Flush:   func() { run.flushes++ },
+		Spool:         func() *spool.Spool { return sp },
+		ClaimedRouted: func(string, *hookrun.Routing) { run.claims++ },
+		Flush:         func() { run.flushes++ },
 	}
 	var events []string
 	for _, owner := range owners {
@@ -211,7 +223,7 @@ func TestGrokHooksStandDown(t *testing.T) {
 				t.Errorf("no %s for %s as Claude Code in %s", name, main, hookruntest.Names(events))
 			}
 		}
-		if c, ok := claim.Read(run.stateDir, main, time.Now()); !ok || c.ProjectID == "" {
+		if c, ok := claim.Read(run.stateDir, main, time.Now()); !ok || c.Kind != claim.KindRepository {
 			t.Errorf("claim %+v, %v", c, ok)
 		}
 		if run.claims == 0 {
@@ -236,7 +248,7 @@ func TestGrokHooksStandDown(t *testing.T) {
 				t.Errorf("no %s for %s as grok in %s", name, main, hookruntest.Names(events))
 			}
 		}
-		if c, ok := claim.Read(run.stateDir, main, time.Now()); !ok || c.ProjectID == "" || c.Tool != "grok" {
+		if c, ok := claim.Read(run.stateDir, main, time.Now()); !ok || c.Kind != claim.KindRepository || c.Tool != "grok" {
 			t.Errorf("claim %+v, %v", c, ok)
 		}
 		if run.claims == 0 || run.flushes == 0 {

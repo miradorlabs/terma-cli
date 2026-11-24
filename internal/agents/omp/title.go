@@ -35,11 +35,11 @@ func title(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	sessionName := strings.TrimSpace(in.Title)
-	if sessionName == "" || !titleConsented(env.Consent()) {
+	if sessionName == "" {
 		return nil
 	}
 	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
-	if !ok {
+	if !ok || !titleConsented(env.Consent(r)) {
 		return nil
 	}
 	attrs := map[string]any{semconv.GenAIMainAgentNameKey: name, semconv.TermaEvidenceSourceKey: sourceOmpSession}

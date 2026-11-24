@@ -17,9 +17,11 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/dispatch"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -143,6 +145,7 @@ func replay(t *testing.T, fixture string, o replayOpts) *replayRun {
 		}
 		stores = append(stores, session.Open(dir))
 	}
+	origin := "github.com/acme/" + filepath.Base(root)
 	deps := dispatch.Deps{
 		ConfigDir: t.TempDir(),
 		StateDir:  stateDir,
@@ -153,11 +156,20 @@ func replay(t *testing.T, fixture string, o replayOpts) *replayRun {
 			if o.policy != nil {
 				p = o.policy(p)
 			}
-			return dispatch.Profile{Team: hookruntest.Team, Agents: o.agents, Account: hookruntest.Account, Policy: p}
+			st := routing.State{
+				Profile: "default",
+				Account: hookruntest.Account,
+				Teams: []routing.Team{{
+					EnrollmentID: "enr-1", OrganizationID: "org-a", AuthURL: "https://auth.example", TeamID: hookruntest.Team, Epoch: 1,
+					Policy: p,
+				}},
+				Bindings: map[string]routing.Binding{origin: {Organization: "org-a"}},
+			}
+			return dispatch.Profile{Agents: o.agents, Account: hookruntest.Account, Routing: hookrun.NewRouting("default", &st)}
 		},
-		Spool:   func() *spool.Spool { return sp },
-		Claimed: func(string, config.Policy) {},
-		Flush:   func() {},
+		Spool:         func() *spool.Spool { return sp },
+		ClaimedRouted: func(string, *hookrun.Routing) {},
+		Flush:         func() {},
 	}
 	for _, h := range run.hooks {
 		payload := captureRepo.ReplaceAllString(string(h.Payload), hookruntest.InJSON(root))
@@ -223,7 +235,7 @@ func TestCapturedHooksClaimEverySession(t *testing.T) {
 			}
 			for _, id := range all {
 				c, ok := claim.Read(run.stateDir, id, time.Now())
-				if !ok || c.ProjectID != hookruntest.Team || c.Tool != "grok" {
+				if !ok || c.Kind != claim.KindRepository || c.Tool != "grok" {
 					t.Errorf("session %s: claim %+v, %v", id, c, ok)
 				}
 				if c.Parent != parents[id] {

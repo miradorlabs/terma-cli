@@ -287,6 +287,21 @@ func TestAReusedGrantListsTheOrganizationsOnce(t *testing.T) {
 	}
 }
 
+func selected(t *testing.T) (org, team string, signIns int) {
+	t.Helper()
+	file, err := config.LoadFile(testApp.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := file.Profiles[config.DefaultProfile]; p != nil {
+		org, team = p.OrganizationID, p.Team
+	}
+	if _, err := auth.LoadIdentity(testApp.dir, config.DefaultProfile); err == nil {
+		signIns = 1
+	}
+	return org, team, signIns
+}
+
 // An id spelled in uppercase is the same user: Terma's ids are lowercase, so the desktop's
 // identity is read without regard to case and the stored sign-in is still reused.
 func TestDesktopGrantReadsIdsWithoutRegardToCase(t *testing.T) {

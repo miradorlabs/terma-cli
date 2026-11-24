@@ -14,6 +14,11 @@ func (r *Relay) Run(ctx context.Context) {
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	// The janitor weighs files by modification time, so it keeps the wall clock, never Options.Now.
+	if r.teams() && r.outbox.dir != "" {
+		r.lossMu.Lock()
+		_, _ = PurgeOldOutbox(r.outbox.dir, time.Now())
+		r.lossMu.Unlock()
+	}
 	r.janitor(time.Now())
 	r.recoverOutbox()
 	lastJanitor := time.Now()

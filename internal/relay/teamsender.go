@@ -170,7 +170,7 @@ func (s *sender) nextBatch(limit int) ([]entry, time.Duration) {
 		return nil, keylessRetry
 	}
 	rc := s.r.opts.Router.Recheck(s.team.enrollment, s.team.account)
-	s.gen = rc.Generation()
+	s.stateID, s.gen = rc.StateID(), rc.Generation()
 	if discarded, waited := s.checkTeamWaits(rc); discarded || waited {
 		s.setKeyless(waited)
 		if waited {
@@ -263,7 +263,7 @@ func (s *sender) postBatch(ctx context.Context, pol Policy, batch []entry, body 
 			discarded = discarded || v == Discard
 			waited = waited || v == Wait
 		}
-		if genChanged := rc.Generation() != s.gen; discarded || genChanged {
+		if genChanged := rc.Generation() != s.gen || rc.StateID() != s.stateID; discarded || genChanged {
 			if genChanged {
 				s.r.invalidateTeamPolicy(s.team.enrollment)
 			}

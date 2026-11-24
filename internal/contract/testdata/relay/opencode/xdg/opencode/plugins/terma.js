@@ -313,25 +313,52 @@ class Exporter {
 
 // --- attribution hooks --------------------------------------------------------------
 
-// hookRunner hands session and file events to `terma hook <event>`, fire and forget.
-// A terma binary that is not on PATH is noticed once and then left alone: the
-// telemetry export does not depend on it, and a spawn error per event would be noise.
+// hookRunner hands session and file events to `terma hook <event>` in FIFO order so
+// session-start always finishes before tool-reach. A timed-out child is terminated and the
+// queue only advances once child exit is confirmed. Returns true iff the hook exited 0.
+const HOOK_TIMEOUT_MS = 2000, HOOK_KILL_GRACE_MS = 250, MAX_HOOK_QUEUE = 64
+
 function hookRunner(cfg) {
   const argv = Array.isArray(cfg.hookCommand) && cfg.hookCommand.length > 0 ? cfg.hookCommand : ["terma", "hook"]
-  let missing = false
+  let missing = false, queue = Promise.resolve(), pending = 0
+  const runOnce = (event, payload) => {
+    if (missing) return { result: Promise.resolve(false), exit: Promise.resolve() }
+    let resolveExit
+    const exit = new Promise((r) => { resolveExit = r })
+    const result = new Promise((resolve) => {
+      let settled = false, exited = false, child = null, killTimer
+      const finish = (ok) => { if (!settled) { settled = true; clearTimeout(timer); clearTimeout(killTimer); resolve(ok) } }
+      const markExited = () => { if (!exited) { exited = true; clearTimeout(timer); clearTimeout(killTimer); resolveExit() } }
+      const sendKill = (sig) => { try { child.kill(sig) } catch (err) { if (err && err.code === "ESRCH") markExited() } }
+      const timer = setTimeout(() => {
+        if (!child) { markExited(); return finish(false) }
+        sendKill("SIGTERM")
+        killTimer = setTimeout(() => { sendKill("SIGKILL"); if (typeof child.unref === "function") child.unref(); finish(false) }, HOOK_KILL_GRACE_MS)
+        if (typeof killTimer.unref === "function") killTimer.unref()
+      }, HOOK_TIMEOUT_MS)
+      if (typeof timer.unref === "function") timer.unref()
+      try {
+        child = spawn(argv[0], [...argv.slice(1), event], { stdio: ["pipe", "ignore", "ignore"] })
+        child.on("error", (err) => { if (err && err.code === "ENOENT") missing = true; if (!child?.pid || err?.code === "ESRCH") markExited(); finish(false) })
+        child.on("close", (code) => { markExited(); finish(code === 0) })
+        child.stdin.on("error", () => {})
+        child.stdin.end(JSON.stringify(payload))
+      } catch { markExited(); finish(false) }
+    })
+    return { result, exit }
+  }
   return function run(event, payload) {
-    if (missing) return
-    try {
-      const child = spawn(argv[0], [...argv.slice(1), event], { stdio: ["pipe", "ignore", "ignore"] })
-      child.on("error", (err) => {
-        if (err && err.code === "ENOENT") missing = true
-      })
-      child.stdin.on("error", () => {})
-      child.stdin.end(JSON.stringify(payload))
-      if (typeof child.unref === "function") child.unref()
-    } catch {
-      // Attribution is best effort.
-    }
+    if (missing || pending >= MAX_HOOK_QUEUE) return Promise.resolve(false)
+    pending++
+    const slot = queue.then(() => runOnce(event, payload))
+    queue = slot.then((s) => s.exit, () => undefined).finally(() => { pending-- })
+    return new Promise((resolve) => {
+      let done = false
+      const settle = (ok) => { if (!done) { done = true; clearTimeout(wait); resolve(ok) } }
+      const wait = setTimeout(() => settle(false), HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS + 500)
+      if (typeof wait.unref === "function") wait.unref()
+      slot.then((s) => s.result, () => false).then(settle, () => settle(false))
+    })
   }
 }
 
@@ -347,8 +374,9 @@ export const TermaPlugin = async ({ directory, worktree }) => {
 
   // Per-process bookkeeping, bounded so a long session cannot grow it without limit.
   const seenMessages = new Set() // assistant messages already exported
+  const tainted = new Set() // sessions whose reach hook failed (fail closed)
   const texts = new Map() // messageID -> latest assistant text (only when prompts are on)
-  const tools = new Map() // callID -> { sessionID, start }
+  const tools = new Map() // callID -> { sessionID, start, reachKey, reachPromise }
   let lastSession = "" // the session the most recent activity belonged to
   const remember = (set, key) => {
     set.add(key)
@@ -368,8 +396,28 @@ export const TermaPlugin = async ({ directory, worktree }) => {
   function parentOf(sessionID) {
     return sessionID ? parents.get(sessionID) : undefined
   }
+  function taint(sessionID) {
+    let cur = sessionID
+    for (let i = 0; i < 16 && cur; i++) {
+      remember(tainted, cur)
+      const p = parents.get(cur)
+      if (!p || p === cur) break
+      cur = p
+    }
+  }
+  function isTainted(sessionID) {
+    let cur = sessionID
+    for (let i = 0; i < 16 && cur; i++) {
+      if (tainted.has(cur)) return true
+      const p = parents.get(cur)
+      if (!p || p === cur) break
+      cur = p
+    }
+    return false
+  }
 
   function record(sessionID, name, body, extra = {}, severity = 9, time = Date.now()) {
+    if (isTainted(sessionID)) return
     exporter.record({
       timeUnixNano: nanos(time),
       severityNumber: severity,
@@ -385,6 +433,7 @@ export const TermaPlugin = async ({ directory, worktree }) => {
     if (seenMessages.has(info.id)) return
     remember(seenMessages, info.id)
     const sid = sessionOf(info.sessionID)
+    if (isTainted(sid)) return
     const tokens = info.tokens ?? {}
     const cache = tokens.cache ?? {}
     const attributes = {
@@ -419,6 +468,38 @@ export const TermaPlugin = async ({ directory, worktree }) => {
       attributes: attrs(attributes),
       status,
     })
+  }
+
+  // toolReach describes what a read, search, glob, list or shell tool call can reach.
+  function toolReach(tool, args) {
+    if (!args || typeof args !== "object") return null
+    const out = {}
+    const path = typeof args.filePath === "string" && args.filePath ? args.filePath : typeof args.path === "string" && args.path ? args.path : ""
+    switch (tool) {
+      case "read":
+        if (path) out.paths = [path]
+        break
+      case "grep":
+        out.paths = [path || "."]
+        if (typeof args.include === "string" && args.include) out.globs = [args.include]
+        break
+      case "glob":
+        out.paths = [path || "."]
+        if (typeof args.pattern === "string" && args.pattern) out.globs = [args.pattern]
+        break
+      case "list":
+        if (path) out.lists = [path]
+        break
+      case "bash": {
+        if (typeof args.command === "string" && args.command) out.command = args.command
+        const dir = typeof args.workdir === "string" && args.workdir ? args.workdir : typeof args.cwd === "string" && args.cwd ? args.cwd : ""
+        if (dir) out.dir = dir
+        break
+      }
+      default:
+        return null
+    }
+    return Object.keys(out).length > 0 ? out : null
   }
 
   return {
@@ -460,7 +541,7 @@ export const TermaPlugin = async ({ directory, worktree }) => {
             break
           }
           case "file.edited":
-            if (p.file) hook("opencode-file-edit", { session_id: lastSession, cwd: worktree || directory, file: p.file })
+            if (p.file && !isTainted(lastSession)) hook("opencode-file-edit", { session_id: lastSession, cwd: worktree || directory, file: p.file, parent_session_id: parentOf(lastSession) })
             break
           case "message.updated":
             modelCall(p.info)
@@ -510,11 +591,27 @@ export const TermaPlugin = async ({ directory, worktree }) => {
       } catch {}
     },
 
-    "tool.execute.before": async (input) => {
+    "tool.execute.before": async (input, output) => {
       try {
         if (!input?.callID) return
-        tools.set(input.callID, { sessionID: sessionOf(input.sessionID), start: Date.now() })
+        const sid = sessionOf(input.sessionID)
+        const reach = toolReach(input.tool, output?.args ?? input.args)
+        const reachKey = reach && sid ? JSON.stringify(reach) : ""
+        const reachPromise = reach && sid
+          ? hook("opencode-tool-reach", {
+              session_id: sid,
+              cwd: worktree || directory,
+              tool: input.tool,
+              parent_session_id: parentOf(sid),
+              ...reach,
+            }).then((ok) => {
+              if (!ok) taint(sid)
+              return ok
+            })
+          : null
+        tools.set(input.callID, { sessionID: sid, start: Date.now(), reachKey, reachPromise })
         if (tools.size > 1024) tools.delete(tools.keys().next().value)
+        if (reachPromise) await reachPromise
       } catch {}
     },
 
@@ -524,9 +621,30 @@ export const TermaPlugin = async ({ directory, worktree }) => {
         const started = tools.get(input.callID)
         tools.delete(input.callID)
         const sid = sessionOf(input.sessionID || started?.sessionID)
+        const args = input.args ?? {}
+        if (started?.reachPromise && !(await started.reachPromise)) {
+          taint(sid)
+          return
+        }
+        if (sid) {
+          const reach = toolReach(input.tool, args)
+          if (reach && JSON.stringify(reach) !== started?.reachKey) {
+            const ok = await hook("opencode-tool-reach", {
+              session_id: sid,
+              cwd: worktree || directory,
+              tool: input.tool,
+              parent_session_id: parentOf(sid),
+              ...reach,
+            })
+            if (!ok) {
+              taint(sid)
+              return
+            }
+          }
+          if (isTainted(sid)) return
+        }
         const end = Date.now()
         const start = started?.start ?? end
-        const args = input.args ?? {}
         const attributes = {
           "gen_ai.operation.name": "execute_tool",
           "gen_ai.tool.name": input.tool,

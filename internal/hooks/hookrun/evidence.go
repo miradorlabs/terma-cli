@@ -18,6 +18,7 @@ type FundingEvidence struct {
 	Status     string
 	SourceTime time.Time
 	Attrs      map[string]any
+	Cwd        string `json:"-"`
 }
 
 // EvidenceFileLimit bounds an evidence file terma reads.

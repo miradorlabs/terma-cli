@@ -18,7 +18,11 @@ import (
 //go:embed plugin/terma.mjs
 var dshPluginTemplate string
 
-const dshConfigMarker = "const CONFIG = null /* terma:config */"
+const (
+	dshConfigPrefix = "const CONFIG = "
+	dshConfigSuffix = " /* terma:config */"
+	dshConfigMarker = dshConfigPrefix + "null" + dshConfigSuffix
+)
 
 type pluginConfig struct {
 	Version            int               `json:"version"`
@@ -53,7 +57,28 @@ func renderPlugin(cfg pluginConfig) (string, error) {
 	if !strings.Contains(dshPluginTemplate, dshConfigMarker) {
 		return "", errors.New("dsh plugin template has no configuration line")
 	}
-	return strings.Replace(dshPluginTemplate, dshConfigMarker, "const CONFIG = "+string(data)+" /* terma:config */", 1), nil
+	return strings.Replace(dshPluginTemplate, dshConfigMarker, dshConfigPrefix+string(data)+dshConfigSuffix, 1), nil
+}
+
+// refreshPlugin re-splices an installed DSH plugin's configuration into this build's template.
+func refreshPlugin() (string, bool, error) {
+	dir, err := home()
+	if err != nil {
+		return "", false, err
+	}
+	return relayexport.RefreshTemplate(filepath.Join(dir, "plugins", "terma-relay.mjs"), func(data []byte) ([]byte, bool, error) {
+		_, rest, ok := strings.Cut(string(data), dshConfigPrefix)
+		if !ok {
+			return nil, false, nil
+		}
+		literal, _, ok := strings.Cut(rest, dshConfigSuffix)
+		var cfg pluginConfig
+		if !ok || json.Unmarshal([]byte(literal), &cfg) != nil || cfg.Version != 1 || cfg.Endpoint == "" {
+			return nil, false, nil
+		}
+		text, err := renderPlugin(cfg)
+		return []byte(text), err == nil, err
+	})
 }
 
 // writePlugin writes terma's plugin and appends its insert to dsh's home patch, a YAML
@@ -68,26 +93,29 @@ func writePlugin(cfg pluginConfig) (string, error) {
 		return "", err
 	}
 	path := filepath.Join(home, "plugins", "terma-relay.mjs")
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return "", err
-	}
-	// The plugin holds the relay's local token: private to this user.
-	if err := config.WriteFileAtomic(path, []byte(text), 0o600); err != nil {
-		return "", err
-	}
 	patch := filepath.Join(home, "cordis.patch.yml")
-	existing, err := os.ReadFile(patch)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return "", err
-	}
-	if strings.Contains(string(existing), path) {
-		return path, nil
-	}
-	out := string(existing)
-	if out != "" && !strings.HasSuffix(out, "\n") {
-		out += "\n"
-	}
-	return path, config.WriteFileAtomic(patch, []byte(out+insertEntry(path)), 0o600)
+	err = relayexport.WithTemplateLock(path, func() error {
+		// The plugin holds the relay's local token: private to this user.
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			return err
+		}
+		if err := config.WriteFileAtomic(path, []byte(text), 0o600); err != nil {
+			return err
+		}
+		existing, err := os.ReadFile(patch)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		if strings.Contains(string(existing), path) {
+			return nil
+		}
+		out := string(existing)
+		if out != "" && !strings.HasSuffix(out, "\n") {
+			out += "\n"
+		}
+		return config.WriteFileAtomic(patch, []byte(out+insertEntry(path)), 0o600)
+	})
+	return path, err
 }
 
 // removePlugin takes terma's insert out of dsh's home patch, then deletes the plugin.
@@ -98,25 +126,46 @@ func removePlugin() ([]string, error) {
 	}
 	path := filepath.Join(home, "plugins", "terma-relay.mjs")
 	patch := filepath.Join(home, "cordis.patch.yml")
-	var changed []string
-	existing, err := os.ReadFile(patch)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return nil, err
+	_, pathErr := os.Lstat(path)
+	_, patchErr := os.Lstat(patch)
+	if errors.Is(pathErr, os.ErrNotExist) && errors.Is(patchErr, os.ErrNotExist) {
+		return nil, nil
 	}
-	if out := strings.Replace(string(existing), insertEntry(path), "", 1); out != string(existing) {
-		// Only terma's entry was there: an empty patch is not a YAML list.
-		if strings.TrimSpace(out) == "" {
-			err = os.Remove(patch)
-		} else {
-			err = config.WriteFileAtomic(patch, []byte(out), 0o600)
+	var changed []string
+	err = relayexport.WithTemplateLock(path, func() error {
+		existing, err := os.ReadFile(patch)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		if out := strings.Replace(string(existing), insertEntry(path), "", 1); out != string(existing) {
+			// Only terma's entry was there: an empty patch is not a YAML list.
+			if strings.TrimSpace(out) == "" {
+				err = os.Remove(patch)
+			} else {
+				err = config.WriteFileAtomic(patch, []byte(out), 0o600)
+			}
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+			changed = append(changed, patch)
+		}
+		data, err := os.ReadFile(path)
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
 		}
 		if err != nil {
-			return nil, err
+			return err
 		}
-		changed = append(changed, patch)
-	}
-	removed, err := relayexport.RemoveOwn(path)
-	return append(changed, removed.Paths...), err
+		if !strings.HasPrefix(string(data), "// Terma ") {
+			return nil
+		}
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		changed = append(changed, path)
+		return nil
+	})
+	return changed, err
 }
 
 // insertEntry is the patch operation that loads terma's plugin at path.

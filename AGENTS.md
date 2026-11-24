@@ -32,10 +32,12 @@ internal/cli/           the command line; `terma --help` lists only the primary 
 internal/agents/        one package per coding agent; builtin/ is the only list of them
 internal/hooks/         `terma hook <event>`: dispatch, runtime (hookrun), hook-file writers (hookmgr)
 internal/relay/         the local relay daemon
+internal/routing/       multi-org routing table (`routing.State` CAS, bindings, `routing.Router`)
+internal/runs/          per-session run ledger and cross-org Mixed cutoff
 internal/spool/         the local queue hooks append to
 internal/delivery/      sends the spool to each project, from a detached flush
 internal/session/       session manifests and commit attribution
-internal/doctor/        `terma doctor` checks
+internal/doctor/        `terma doctor` checks (teams, routing state, Mixed runs, outbox/spool losses)
 internal/setup/         `terma setup`; internal/globalmode/ writes the machine-wide hooks
 internal/repohooks/     the commit hooks a claimed session installs in a repository's own
                         .git/hooks, chained to whatever was there
@@ -51,8 +53,8 @@ npm/, install.sh        distribution
 ## How it fits together
 
 **Hooks.** `terma setup` writes each agent's user-level hooks. The git hooks are
-installed per repository, on demand: the first agent session claimed in a repository the
-policy collects, with the policy's `git_hooks` on, writes `prepare-commit-msg`,
+installed per repository, on demand: the first agent session claimed in a repository a
+selected team collects, with that team policy's `git_hooks` on, writes `prepare-commit-msg`,
 `post-commit` and `pre-push` into that repository's own `.git/hooks` — the common git directory's, so a
 linked worktree shares the one install; hooks already there are left as they are. Nothing
 in terma ever takes them out, the policy switched off and teardown included: once terma is
@@ -60,17 +62,25 @@ gone they only run the hook each one displaced. git runs one file per hook name,
 there is moved to `<name>.pre-terma` and terma's script runs it first, unchanged and
 keeping its veto; a repository that sets its own `core.hooksPath` is skipped, and `terma
 doctor` says so. Nothing is written into a repository's working tree or committed files:
-`.git/hooks` is neither, and git never tracks it. Every hook runs `terma hook <event>`, which first resolves
-the working copy's `origin` as `host/path` (`gitx.RepositoryFS`) and asks the team
-policy's repository list (`config.Policy.Admits`); in repository mode, in a repository the list does not
-name, or outside git, it writes no manifest, spool line, trailer or claim for a project,
-only a placement with no project that marks the session not collected (`claim.Mark`), and
-under a policy no relay has refreshed for minutes it also starts a refresh. Each
-session is claimed for the developer's own team from setup. A harness may run the entries
-in another agent's hooks file (the grok agent's grok runs Claude Code's and Cursor's), so an
-agent marks the hook processes it starts (`agents.HookStarter`), and `terma hook` stands down in a process a
-harness other than the event's owner started: no claim, no spool line, no reply. The git
-hooks are not subject to it.
+`.git/hooks` is neither, and git never tracks it. Every hook runs `terma hook <event>`, which resolves
+the working copy's `origin` as `host/path` (`gitx.RepositoryFS`) and routes against the
+profile's account-stamped `routing.State` (`routing.Router.Route`). Missing, unreadable, or
+wrong-account routing state fails closed (zero fallback to `Profile.Team`). Unmatched
+locations write no manifest, spool line, trailer, or team claim — only a not-collected
+placement (`claim.Mark`). Read/shell reach hooks (and Extension agents' `<prefix>-tool-reach`)
+call `runs.MarkMixed` when a session crosses organizations; from `MixedAt` onward all
+conversation and telemetry content is dropped, while metadata-only `runs.Locational` events
+(commits, pushes, file touches) still route by their own checkout. A folder outside git that
+is no one's workspace crosses into no organization, Personal included: the filesystem's
+root, a device or kernel filesystem (`2>/dev/null`), the operating system's own folders and
+the machine's scratch space (`/tmp`, `$TMPDIR`), unless it is in the developer's home
+(`nobodys` in `internal/hooks/hookrun/reach.go`). A reach hook that fails never blocks or
+fails the agent's tool: an Extension agent's plugin taints the session, hands nothing more
+of it over and asks terma to mark its run Mixed. A harness may run the entries in another
+agent's hooks file (the grok agent's grok runs Claude Code's and Cursor's), so an agent
+marks the hook processes it starts (`agents.HookStarter`), and `terma hook` stands down in
+a process a harness other than the event's owner started: no claim, no spool line, no reply.
+The git hooks are not subject to it.
 
 **Commits.** The agent hooks announce the session and record the files it edits in a
 session manifest. At commit time, `prepare-commit-msg` matches the staged files against
@@ -95,56 +105,61 @@ index them, and hold them only where there is no keychain or `--insecure-storage
 older terma's per-organization `credentials.json` sessions are revoked and deleted at the
 next sign-in, and the team keys it minted are deleted from this machine (a user token
 cannot revoke them; an admin can, in the web app).
-The state directory (`config.StateDir`) holds what terma writes as it runs: `relay/`,
-`spool/`, `policies/`, `agents/<agent>/` (each agent's hook state), `funding/`,
+The state directory (`config.StateDir`) holds what terma writes as it runs: `routing/`
+(per-profile `routing/<profile>.json` storing account-stamped team enrollments, cached
+policies, and owner/repo bindings updated via account- and generation-checked CAS
+`routing.Update`/`routing.Replace`; only `terma setup` writes a profile's first one, but
+for a server-key profile an earlier terma set up, whose stored team, key and policy the
+refresh after an update, or a relay of this build as it starts, turns into its one-team
+`no_person` state, once: `internal/cli/serverkey_migrate.go`), `runs/` (per-session run
+ledgers and Mixed cutoffs),
+`relay/` (including `outbox-v2/.teams/@<account>/<enrollment>/<tool>/`), `spool/`,
+`policies/`, `agents/<agent>/` (each agent's hook state), `funding/`,
 `workspaces/` (session stores for work begun outside git) and `update/`; a repository's
 session store is `.git/terma/`, which also keeps what a git hook in an agent's sandbox could
-not write to the state directory, until a hook outside the sandbox moves it there. Names
-are lowercase with dashes; `.json`, `.log` and `.lock` say what a file holds, a single
-plain value has no extension, a folder of per-key files is plural, a name never repeats
-its folder's, and state that belongs to one agent sits under its name. `App.Execute` resolves both directories once and passes them down;
-nothing below it reads them from the environment (`internal/boundary`).
+not write to the state directory, until a hook outside the sandbox moves it there (a
+sandboxed hook without `routing.State` parks with an empty destination and unpark drops and
+counts `no_destination`). Names are lowercase with dashes; `.json`, `.log` and `.lock` say
+what a file holds, a single plain value has no extension, a folder of per-key files is plural,
+a name never repeats its folder's, and state that belongs to one agent sits under its name.
+`App.Execute` resolves both directories once and passes them down; nothing below it reads
+them from the environment (`internal/boundary`).
 
-**Telemetry.** Claude Code and Codex ignore exporter settings in repository config, and
-desktop apps and IDE extensions read only user-level settings. But a user-level exporter
-sends everything, personal work included, under one key. So every agent's user-level
-exporter points at a relay that terma runs on `127.0.0.1`. An agent whose command reads
-its exporter from its environment alone (`agents.Launched`: the Copilot CLI) has no
-settings file to point: setup defines a shell function (`shellrc.InstallLauncher`) that
-starts it through `terma launch <agent>`, which adds the exporter to that one process's
-environment, and the real command as it was once terma is gone. A hook in a collected repository
-claims its session for the developer's team, naming the repository. The relay forwards
-only claimed sessions, only from the processes the claim names, and only while the policy
-still lists the claim's repository. It sends them with the person's sign-in, a user token,
-naming the team in `X-Mirador-Project` (a profile set up with a server key sends with that
-key instead), and applies the team's collection policy: agents export all content to it, and the policy alone decides what
-leaves (`config.Policy.Content`). The claim also names the checkout the hook ran in, which
-the relay stamps on the session's records (`stampCheckout`): its origin, branch and whether
-it is a linked worktree under any policy (`vcs.*`, `terma.repository.worktree.linked`), and
-its working tree, the directory in it and the worktree's name with tool content only
-(`terma.repository.root`, `terma.working_directory`, `terma.repository.worktree.name`). On the
-parts of an agent that writes the home directory as `~` in its exported paths, and on no
-other (`shape.CaptureRules.HomeRelativeScopes`: grok's), it also stamps that directory with
-tool content (`terma.home_directory`, `Options.HomeDir`). A subagent's
-claim names the session that opened it where the agent's own telemetry does not (OMP's and
-grok's, `hookrun.Env.StartSubagent`), which the relay stamps as `terma.session.parent.id`
-(`stampParent`). grok's `PostToolUse` hook also sends the call that launched a subagent
-(`terma.subagent.call`) and, when the parent waits on or kills a background one, how it
-ended (`terma.subagent.end`). Hook events never pass the relay, so delivery applies
-the same rules when it sends them. Antigravity has no export, so its hooks send its content
-too: the prompt and the reply from the transcript, a tool call's arguments from `PostToolUse`
-and each tool's result as `terma.tool.result`. Which of it may go is ruled in
-`internal/agents/antigravity/content_paths.go` and `turn.go`. grok's export often loses the prompt,
-so its prompt hook sends it as the same event (`terma.user.message`), which leaves under any
-policy, so it counts, with its text only while the policy collects prompts and the agent still
-has the developer's consent (`delivery.promptContent`). A session marked not collected is dropped on arrival;
-everything else unclaimed is held briefly and dropped: nothing unclaimed leaves the
-machine. The exception is a policy in global mode, which collects every session on the
-machine: it admits every repository, a hook outside git claims its session for the
-policy's default project, and the relay sends what no claim places there too, except a
-session an agent's hooks claim every one of (`shape.SessionKey.Claimed`): it waits for its
-claim, so a hidden side thread no hook claims stays here. What is held stays in memory,
-never on disk, and a stopping relay drops it.
+**Telemetry & multi-org routing.** Claude Code and Codex ignore exporter settings in
+repository config, and desktop apps and IDE extensions read only user-level settings. So
+every agent's user-level exporter points at a relay that terma runs on `127.0.0.1` (writing
+`daemon.RunInfo` with `Routing: true` so hooks refuse pre-routing relays). An agent whose
+command reads its exporter from its environment alone (`agents.Launched`: the Copilot CLI)
+is launched via `terma launch <agent>` (`shellrc.InstallLauncher`). A hook claims its session
+for the routed enrollment, naming the repository and checkout (`stampCheckout`,
+`stampParent`), and on parts of an agent that writes the home directory as `~` in exported
+paths (`shape.CaptureRules.HomeRelativeScopes`: grok's) also stamps that directory with
+tool content (`terma.home_directory`, `Options.HomeDir`). A subagent's claim names the
+session that opened it where the agent's own telemetry does not (OMP's and grok's,
+`hookrun.Env.StartSubagent`), and grok's `PostToolUse` hook sends the call that launched a
+subagent (`terma.subagent.call`) and, when the parent waits on or kills a background one,
+how it ended (`terma.subagent.end`). The relay forwards only claimed sessions from claimed
+PIDs, pinned once routed: unclaimed records wait briefly in `unknownHold`, while
+pending/blocked records stay destination-pinned in `pinnedHold` (re-checked only, never
+re-routed), and spans/logs/metrics straddling `MixedAt` drop. It sends each team's backlog
+with the person's single user token and `X-Mirador-Project: <team_id>` (a server-key profile
+uses its `keys.json` server key under `Account: "no_person"` with no `X-Mirador-Project`),
+applying that team's `config.Policy.Content`. On ingest `403 ORG_NOT_ACCESSIBLE`, the relay
+triggers a coalesced refresh nudge and refuses all enrollments of that org via epoch-fenced
+CAS (`routing.ApplyOrgAccessLost`) without retiring the user token, leaving other
+organizations and Personal uninterrupted. Spool delivery applies the same lane,
+`routing.State`, Mixed, and content rules. Antigravity has no export, so its hooks send its
+content too: the prompt and the reply from the transcript, a tool call's arguments from
+`PostToolUse` and each tool's result as `terma.tool.result`
+(`internal/agents/antigravity/content_paths.go` and `turn.go`), under the content switches
+of the team routing sends the hook's checkout to (`hookrun.Env.PolicyFor`) and only for
+workspaces routing sends to that same team (`hookrun.Env.RoutesWith`). grok's export often
+loses the prompt, so its prompt hook sends it as `terma.user.message` under the routed
+team's policy (`PolicyFor`) and consent (`Consent`). Use `terma teams` to manage ticked
+teams and bindings, `terma route explain` to trace `routing.Router.Route` for a path, and
+`terma doctor` to inspect routing state, per-enrollment health (including `OrgAccessLost`,
+pending bindings, and single `terma setup` remediation for `SignInNeeded`), Mixed runs, and
+combined outbox/spool losses.
 
 ### Lanes, ownership, and loss accounting
 
@@ -214,6 +229,6 @@ never on disk, and a stopping relay drops it.
   developer's shell startup files is outside it, even where a dotfiles repository keeps
   those files (`TERMA_NO_MODIFY_PATH` opts out), and so is the function setup defines
   there for an agent it starts through `terma launch` (`TERMA_SHELL_LAUNCHERS=0` opts
-  out): like a hook entry it only calls terma, and holds no endpoint or token. What a developer collects is the
-  team policy's repository list, read through `config.Policy.Admits` alone.
+  out): like a hook entry it only calls terma, and holds no endpoint or token. What a developer collects is decided
+  by `routing.Router.Route` over the profile's `routing.State` and each selected team's collection policy.
 - Help text never mentions the hidden `dev` and `local` environments.

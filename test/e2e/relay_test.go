@@ -410,7 +410,7 @@ func TestRelayNegativeControls(t *testing.T) {
 				}
 				sb.WorkDir = dir
 				run(t, sb)
-				expectNothing(t, sb, "not_collected")
+				expectNothing(t, sb, "no_team")
 				if c := sb.RelayStats(); sum(c, "dropped.unclaimed_expired") != 0 {
 					t.Errorf("a marked session's records were held to expiry: %v", c)
 				}

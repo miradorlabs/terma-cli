@@ -27,6 +27,7 @@ import atexit
 import hashlib
 import json
 import os
+import queue
 import secrets
 import subprocess
 import threading
@@ -80,6 +81,7 @@ SCOPE = {"name": "terma-hermes", "version": "1"}
 _lock = threading.Lock()
 _spans = []
 _logs = []
+_tainted = set()
 _wake = threading.Event()
 
 
@@ -116,6 +118,8 @@ def _sender():
 
 def _span(session, name, start, end, attrs, error=False):
     with _lock:
+        if session and session in _tainted:
+            return
         _spans.append({
             "traceId": _trace_id(session),
             "spanId": secrets.token_hex(8),
@@ -131,6 +135,8 @@ def _span(session, name, start, end, attrs, error=False):
 def _log(session, event, body, attrs):
     t = _nanos(time.time())
     with _lock:
+        if session and session in _tainted:
+            return
         _logs.append({
             "timeUnixNano": t,
             "observedTimeUnixNano": t,
@@ -156,28 +162,79 @@ def _cwd():
         return os.getcwd()
 
 
-def _reap(proc):
-    try:
-        proc.wait(timeout=30)
-    except Exception:
-        pass
+_hook_queue = queue.Queue(maxsize=128)
+_hook_worker_lock = threading.Lock()
+_hook_worker_started = False
 
 
-def _terma_hook(event, payload):
-    """Hands an event to `terma hook`, detached from the agent's thread. The hook runs
-    as this process's child, which is what lets its claim name this process."""
+def _reap_proc(proc):
+    while proc.poll() is None:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        try:
+            proc.wait(timeout=0.5)
+            return
+        except (ChildProcessError, ProcessLookupError):
+            return
+        except subprocess.TimeoutExpired:
+            pass
+        except Exception:
+            time.sleep(0.05)
+
+
+def _hook_worker():
+    while True:
+        event, payload, done, result = _hook_queue.get()
+        ok = False
+        proc = None
+        try:
+            proc = subprocess.Popen(
+                [*CONFIG["hookCommand"], event],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            try:
+                proc.communicate(json.dumps(payload).encode(), timeout=2.0)
+                ok = proc.returncode == 0
+            except Exception:
+                ok = False
+        except Exception:
+            ok = False
+        result[0] = ok
+        done.set()
+        try:
+            if proc is not None and proc.poll() is None:
+                _reap_proc(proc)
+        finally:
+            _hook_queue.task_done()
+
+
+def _ensure_hook_worker():
+    global _hook_worker_started
+    if _hook_worker_started:
+        return
+    with _hook_worker_lock:
+        if not _hook_worker_started:
+            threading.Thread(target=_hook_worker, name="terma-hook", daemon=True).start()
+            _hook_worker_started = True
+
+
+def _terma_hook(event, payload, wait=False):
+    """Hands an event to `terma hook` in FIFO order so session-start always finishes before
+    tool-reach. When wait=True, blocks up to 2s and returns True only if the hook exited 0."""
     try:
-        proc = subprocess.Popen(
-            [*CONFIG["hookCommand"], event],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        proc.stdin.write(json.dumps(payload).encode())
-        proc.stdin.close()
-        threading.Thread(target=_reap, args=(proc,), daemon=True).start()
+        _ensure_hook_worker()
+        done = threading.Event()
+        result = [False]
+        _hook_queue.put_nowait((event, payload, done, result))
+        if not wait:
+            return True
+        return done.wait(timeout=2.0) and result[0]
     except Exception:
-        pass
+        return False
 
 
 # --- hooks ------------------------------------------------------------------------------
@@ -219,8 +276,13 @@ def _cost(model, usage, provider, base_url):
 
 
 def _on_session_start(session_id="", model="", **_):
-    if session_id:
-        _terma_hook("hermes-session-start", {"session_id": session_id, "cwd": _cwd(), "model": model})
+    if not session_id:
+        return
+    with _lock:
+        tainted = session_id in _tainted
+    if _terma_hook("hermes-session-start", {"session_id": session_id, "cwd": _cwd(), "model": model}, wait=tainted) and tainted:
+        with _lock:
+            _tainted.discard(session_id)
 
 
 def _on_pre_llm_call(session_id="", user_message="", model="", turn_id="", **_):
@@ -271,9 +333,58 @@ def _on_post_api_request(session_id="", model="", response_model="", provider=""
     }, error=finish_reason == "error")
 
 
+def _tool_reach(tool_name, args):
+    if not isinstance(args, dict):
+        return None
+    name = str(tool_name or "").lower()
+    out = {}
+
+    def first(*keys):
+        for k in keys:
+            v = args.get(k)
+            if isinstance(v, str) and v:
+                return v
+        return ""
+
+    path = first("path", "file_path", "dir_path")
+    if name in ("read_file", "read"):
+        if path:
+            out["paths"] = [path]
+    elif name in ("search_files", "grep"):
+        out["paths"] = [path or "."]
+        g = first("file_glob", "glob", "include")
+        if not g and name == "search_files" and args.get("target") == "files":
+            g = first("pattern")
+        if g:
+            out["globs"] = [g]
+    elif name in ("glob", "find_files"):
+        out["paths"] = [path or "."]
+        g = first("pattern", "glob")
+        if g:
+            out["globs"] = [g]
+    elif name in ("list_directory", "list_files", "ls"):
+        if path:
+            out["lists"] = [path]
+    elif name in ("terminal", "bash", "shell"):
+        cmd = first("command", "cmd")
+        if cmd:
+            out["command"] = cmd
+        d = first("workdir", "cwd")
+        if d:
+            out["dir"] = d
+    else:
+        return None
+    return out or None
+
+
 def _on_post_tool_call(session_id="", tool_name="", args=None, result=None, tool_call_id="", duration_ms=None,
                        status="", turn_id="", **_):
     if not session_id:
+        return
+    reach = _tool_reach(tool_name, args)
+    if reach and not _terma_hook("hermes-tool-reach", {"session_id": session_id, "cwd": _cwd(), "tool": tool_name, **reach}, wait=True):
+        with _lock:
+            _tainted.add(session_id)
         return
     end = time.time()
     start = end - (duration_ms or 0) / 1000.0
@@ -298,7 +409,7 @@ def _on_session_end(**_):
 
 def _on_session_finalize(session_id="", **_):
     if session_id:
-        _terma_hook("hermes-session-end", {"session_id": session_id, "cwd": _cwd()})
+        _terma_hook("hermes-session-end", {"session_id": session_id, "cwd": _cwd()}, wait=True)
     _flush()
 
 

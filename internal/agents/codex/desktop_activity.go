@@ -18,6 +18,7 @@ type desktopActivity struct {
 	DurationMs                                        int64
 	HasDuration                                       bool
 	At, StartedAt                                     time.Time
+	Cwd                                               string
 }
 
 // desktopCursor stores only position and turn metadata, never content.
@@ -156,7 +157,7 @@ func codexDesktopActivityFrom(line []byte, cursor *desktopCursor, sessionID stri
 		}
 		return desktopActivity{}, false
 	}
-	a := desktopActivity{TurnID: cursor.TurnID, TraceID: cursor.TraceID, Model: cursor.Model, At: rec.Timestamp}
+	a := desktopActivity{TurnID: cursor.TurnID, TraceID: cursor.TraceID, Model: cursor.Model, At: rec.Timestamp, Cwd: cursor.Cwd}
 	switch {
 	case rec.Type == "event_msg" && rec.Payload.Type == "item_completed" && rec.Payload.Item.Type == "Extension":
 		a.Kind, a.ID = "tool", rec.Payload.Item.ID

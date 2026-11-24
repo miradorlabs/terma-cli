@@ -19,7 +19,9 @@ const TitleMaxBytes = 256
 // titleState keeps an unchanged name from being sent at every turn's end: a hash of the name
 // last spooled, never the name, which can restate the first prompt.
 type titleState struct {
-	Hash string `json:"hash"`
+	Hash  string `json:"hash"`
+	Route string `json:"route,omitempty"`
+	Mixed bool   `json:"mixed,omitempty"`
 }
 
 // SpoolTitle spools a session's name as terma.session.title when it differs from the one last
@@ -46,6 +48,15 @@ func SpoolTitle(e Env, r *Repo, stateDir, sessionID string, attrs map[string]any
 	if readErr == nil && json.Unmarshal(b, &last) != nil {
 		last = titleState{}
 	}
+	if e.Routing != nil && (last.Mixed || (last.Route != "" && last.Route != r.RouteKey())) {
+		if !last.Mixed {
+			last.Mixed = true
+			if b, err := json.Marshal(last); err == nil {
+				_ = WriteState(path, b)
+			}
+		}
+		return
+	}
 	title, found, err := read()
 	if err != nil {
 		e.Logf("title: %v", err)
@@ -58,11 +69,15 @@ func SpoolTitle(e Env, r *Repo, stateDir, sessionID string, attrs map[string]any
 	}
 	out := maps.Clone(attrs)
 	out[semconv.TermaSessionTitleKey], out[AttrProjectID] = title, r.ProjectID
-	if err := e.Spool.Append(spool.Event{Time: e.Time(), Name: semconv.TermaSessionTitleEvent, SessionID: sessionID, Repository: r.Repository, Global: e.Policy.Global(), Attrs: out}); err != nil {
+	if err := e.Spool.Append(e.Routed(r, spool.Event{Time: e.Time(), Name: semconv.TermaSessionTitleEvent, SessionID: sessionID, Repository: r.Repository, Global: e.Policy.Global(), Attrs: out})); err != nil {
 		e.Logf("title: %v", err)
 		return
 	}
-	if b, err := json.Marshal(titleState{Hash: hash}); err == nil {
+	next := titleState{Hash: hash}
+	if e.Routing != nil {
+		next.Route = r.RouteKey()
+	}
+	if b, err := json.Marshal(next); err == nil {
 		if err := WriteState(path, b); err != nil {
 			e.Logf("title state: %v", err)
 		}

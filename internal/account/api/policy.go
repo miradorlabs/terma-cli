@@ -15,6 +15,16 @@ import (
 // this machine, with the developer's login or the team's own server key;
 // TERMA_POLICY_STUB is an offline test override.
 func (c *Client) CollectionPolicy(ctx context.Context) (config.Policy, error) {
+	return c.collectionPolicy(ctx, c.projectID)
+}
+
+// TeamPolicy asks the account service for teamID's collection policy on c's shared
+// credential so concurrent callers serialize token refreshes through one client.
+func (c *Client) TeamPolicy(ctx context.Context, teamID string) (config.Policy, error) {
+	return c.collectionPolicy(ctx, teamID)
+}
+
+func (c *Client) collectionPolicy(ctx context.Context, projectID string) (config.Policy, error) {
 	if err := ctx.Err(); err != nil {
 		return config.Policy{}, err
 	}
@@ -33,10 +43,10 @@ func (c *Client) CollectionPolicy(ctx context.Context) (config.Policy, error) {
 	// A server key is bound to its team and names none; a login names the team it reads.
 	query := url.Values{}
 	if c.apiKey == "" {
-		if c.projectID == "" {
+		if projectID == "" {
 			return config.Policy{}, fmt.Errorf("collection policy requires a team ID")
 		}
-		query.Set("project_id", c.projectID)
+		query.Set("project_id", projectID)
 	}
 	if err := c.AuthGet(ctx, "/v1/policy", query, &response); err != nil {
 		return config.Policy{}, err

@@ -471,9 +471,12 @@ func TestTeamsActiveMixedAndResolve(t *testing.T) {
 		},
 	})
 
-	// Missing routing file -> Active() is false (pre-cutover fallback).
-	if teams.Active() {
-		t.Fatal("Active() = true without routing file")
+	// Missing routing file -> Active() is true (cutover fails closed, zero fallback).
+	if !teams.Active() {
+		t.Fatal("Active() = false without routing file; must fail closed")
+	}
+	if got := teams.Route(relay.Record{Account: alice}); got.Outcome != relay.Hold || got.Why != relay.WhyNoState {
+		t.Fatalf("Route on missing file = %+v, want Hold(WhyNoState)", got)
 	}
 
 	// Corrupt routing file -> Active() is true (fails closed, no fallback), Route holds with WhyNoState.

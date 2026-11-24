@@ -34,9 +34,11 @@ the one that owns this copy of terma, not whichever one is first on PATH.
 After the new version is in place, update also refreshes what earlier versions wrote on
 this machine — the agents' status line wrap and plugins, and the relay's service —
 keeping every choice you made at setup. It works from what is on disk: it signs in to
-nothing and adds no file, but one: an agent's folder that an app such as T3 Code made after
-setup gets terma's hook when another folder of that agent has it switched on. Already on
-the latest release, update runs just that refresh, so it is safe to run again.
+nothing and adds no file, but two: an agent's folder that an app such as T3 Code made after
+setup gets terma's hook when another folder of that agent has it switched on, and a machine
+set up with a server key (TERMA_API_KEY) before terma routed by team gets the routing state
+its stored team, key and policy name. Already on the latest release, update runs just that
+refresh, so it is safe to run again.
 
 terma checks for a newer release and installs it by itself, a patch at once and a new minor
 or major version after it has been out for 24 hours. The local relay checks every few minutes

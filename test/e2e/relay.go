@@ -72,7 +72,24 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 		if err := os.WriteFile(filepath.Join(sb.TermaConfig, "keys.json"), keys, 0o600); err != nil {
 			t.Fatal(err)
 		}
-		sb.editProfile("default", func(p map[string]any) { p["server_key_sign_in"] = true })
+		sb.editProfile("default", func(p map[string]any) {
+			p["server_key_sign_in"] = true
+			p["server_key_auth_url"] = acct.srv.URL
+			delete(p, "account")
+		})
+		statePath := filepath.Join(sb.TermaConfig, "routing", "default.json")
+		if raw, err := os.ReadFile(statePath); err == nil {
+			var st map[string]any
+			if err := json.Unmarshal(raw, &st); err != nil {
+				t.Fatal(err)
+			}
+			st["account"] = "no_person"
+			if out, err := json.Marshal(st); err != nil {
+				t.Fatal(err)
+			} else {
+				sb.writeAbs(statePath, string(out))
+			}
+		}
 	}
 	// The relay withholds a claimed session of an agent the developer did not choose, and
 	// setup records only the agents it offers (the rest are Coming Soon): the profile

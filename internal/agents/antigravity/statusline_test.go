@@ -11,10 +11,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
+	"github.com/miradorlabs/terma-cli/internal/spool"
 	"github.com/tailscale/hujson"
 )
 
@@ -529,5 +532,47 @@ func TestAntigravityStatusLineKeepsACommentBeforeTheClosingBrace(t *testing.T) {
 				t.Fatalf("after teardown:\n%s", b)
 			}
 		})
+	}
+}
+
+// On a routed machine the quota is stamped with the team routing sends the checkout to, as
+// the account event beside it is: one that names no destination is dropped at delivery
+// (no_destination). The snapshot is keyed on that route, so a redraw that changed nothing
+// queues nothing, and the same snapshot routed to another team is new to that team.
+func TestAntigravityStatusLineRoutesQuotaAndKeysItOnTheRoute(t *testing.T) {
+	root, stateDir, sp := hookruntest.Project(t)
+	sp.Bind(routedAccount)
+	payload := statusLinePayload(t, root)
+	now := time.Date(2026, 11, 20, 18, 0, 0, 0, time.UTC)
+	draw := func(st routing.State, at time.Duration) []spool.Event {
+		t.Helper()
+		env := hookrun.Env{StateDir: stateDir, Now: now.Add(at), Cwd: root, Policy: config.NoPolicy("", ""), Routing: hookrun.NewRouting("default", &st),
+			Account: routedAccount, Stdin: strings.NewReader(payload), Stdout: &bytes.Buffer{}, Spool: sp}
+		if code := antigravityStatusLine(context.Background(), env, "", ""); code != 0 {
+			t.Fatalf("code %d", code)
+		}
+		return hookruntest.Named(hookruntest.Spooled(t, sp), semconv.TermaSessionQuotaEvent)
+	}
+	teamA, teamB := routedTeam(t, root, "orgA", "team-a", true, true), routedTeam(t, root, "orgB", "team-b", true, true)
+	for _, st := range []*routing.State{&teamA, &teamB} {
+		st.Teams[0].Policy.FetchedAt = now
+	}
+
+	quota := draw(teamA, 0)
+	if len(quota) != 1 {
+		t.Fatalf("%d quota events, want 1", len(quota))
+	}
+	if q := quota[0]; q.Enrollment != teamA.Teams[0].EnrollmentID || q.Profile != "default" || q.Account != routedAccount || q.Global {
+		t.Fatalf("quota routed to profile %q enrollment %q as %q (global %v), want team A's enrollment %q", q.Profile, q.Enrollment, q.Account, q.Global, teamA.Teams[0].EnrollmentID)
+	}
+	if _, legacy := quota[0].Attrs[hookrun.AttrProjectID]; legacy {
+		t.Errorf("a routed quota names a project of its own: %v", quota[0].Attrs)
+	}
+	if again := draw(teamA, time.Second); len(again) != 0 {
+		t.Fatalf("an unchanged redraw on the same route queued %d quota events", len(again))
+	}
+	moved := draw(teamB, 2*time.Second)
+	if len(moved) != 1 || moved[0].Enrollment != teamB.Teams[0].EnrollmentID {
+		t.Fatalf("the same snapshot routed to another team: %+v, want one event for enrollment %q", moved, teamB.Teams[0].EnrollmentID)
 	}
 }

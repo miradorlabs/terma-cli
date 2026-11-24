@@ -34,10 +34,17 @@ const rotatedKey = "ter_srv_fedcba9876543210"
 // its team and permissions, and it reads that team's policy and nothing else.
 func (f *fakeAuth) serveServerKey(w http.ResponseWriter, r *http.Request, key string) {
 	team := f.serverKeys[key]
+	orgID := orgA().ID
+	for _, p := range projectsIn(orgB().ID) {
+		if p.ID == team {
+			orgID = orgB().ID
+			break
+		}
+	}
 	switch {
 	case r.URL.Path == "/v1/whoami":
 		f.whoamis.Add(1)
-		id := map[string]any{"organization_id": orgA().ID, "project_id": team, "auth_type": "server_key"}
+		id := map[string]any{"organization_id": orgID, "project_id": team, "auth_type": "server_key"}
 		perms, listed := f.keyPermissions[key]
 		if !listed {
 			perms = map[string]bool{"read": false, "write": false, "ingest": true}
@@ -52,6 +59,9 @@ func (f *fakeAuth) serveServerKey(w http.ResponseWriter, r *http.Request, key st
 		fmt.Fprint(w, `{"error":{"code":"INVALID_ARGUMENT","message":"a server key reads its own team's policy: omit project_id"}}`)
 	case r.URL.Path == "/v1/policy":
 		f.keyPolicies.Add(1)
+		if f.onPolicy != nil && f.onPolicy(w, r) {
+			return
+		}
 		fmt.Fprint(w, cmp.Or(f.policyBody, `{"policy":null}`))
 	default:
 		w.WriteHeader(http.StatusForbidden)

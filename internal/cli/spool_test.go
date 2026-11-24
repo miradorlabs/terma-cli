@@ -13,10 +13,11 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
-	"github.com/miradorlabs/terma-cli/internal/account/keystore"
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -56,19 +57,57 @@ func appendEvent(t *testing.T, s *spool.Spool, projectID string, at time.Time) {
 	}
 	if projectID != "" {
 		e.Attrs = map[string]any{hookrun.AttrProjectID: projectID}
+		if profile, tm, ok := findEnrolledTeam(projectID); ok {
+			e.Profile, e.Enrollment = profile, tm.EnrollmentID
+			if len(tm.Policy.Repositories) > 0 {
+				e.Repository = config.Repository{Origin: tm.Policy.Repositories[0]}
+			} else if tm.Personal {
+				e.Repository = config.Repository{Origin: "github.com/personal/side"}
+			}
+		}
 	}
 	if err := s.Append(e); err != nil {
 		t.Fatal(err)
 	}
 }
 
-// An event with no team id is counted as unroutable, apart from one that aged out.
+func findEnrolledTeam(projectID string) (string, routing.Team, bool) {
+	check := func(profile string) (routing.Team, bool) {
+		st, found, err := routing.Load(testApp.stateDir, profile)
+		if err != nil || !found {
+			return routing.Team{}, false
+		}
+		for _, tm := range st.Teams {
+			if tm.TeamID == projectID {
+				return tm, true
+			}
+		}
+		return routing.Team{}, false
+	}
+	if tm, ok := check(config.DefaultProfile); ok {
+		return config.DefaultProfile, tm, true
+	}
+	if file, err := config.LoadFile(testApp.dir); err == nil {
+		for name := range file.Profiles {
+			if name == "" || name == config.DefaultProfile {
+				continue
+			}
+			if tm, ok := check(name); ok {
+				return name, tm, true
+			}
+		}
+	}
+	return "", routing.Team{}, false
+}
+
+// An event with no destination enrollment is counted as unroutable, apart from one that aged out.
 func TestFlushSpoolSeparatesUnroutableFromExpired(t *testing.T) {
 	useConfigDir(t, t.TempDir())
 	acceptingOTLP(t)
+	acct := signInHereAs(t, "u-spool")
 	s := spoolForTest(t)
 	appendEvent(t, s, "", time.Now())
-	if err := s.Append(spool.Event{Name: "terma.commit", Time: time.Now().Add(-2 * spool.MaxAge), Repository: appRepo, Account: "aaaaaaaaaaaaaaaa",
+	if err := s.Append(spool.Event{Name: "terma.commit", Time: time.Now().Add(-2 * spool.MaxAge), Repository: appRepo, Account: acct,
 		Attrs: map[string]any{hookrun.AttrProjectID: spoolTestProject}}); err != nil {
 		t.Fatal(err)
 	}
@@ -142,9 +181,7 @@ func TestSpoolFlushThrottleIsNotAnError(t *testing.T) {
 	useConfigDir(t, t.TempDir())
 	acceptingOTLP(t)
 	serverKeyProfile(t)
-	if err := keystore.Set(testApp.dir, spoolTestProject, "ter_srv_test", keystore.Hosts{}); err != nil {
-		t.Fatal(err)
-	}
+	routeProject(t, spoolTestProject, "ter_srv_test", "")
 	s := spoolForTest(t)
 	appendEvent(t, s, spoolTestProject, time.Now())
 
@@ -173,9 +210,7 @@ func TestSpoolFlushDeliversUnderTheProjectKey(t *testing.T) {
 	t.Cleanup(srv.Close)
 	t.Setenv("TERMA_OTLP_URL", srv.URL)
 	serverKeyProfile(t)
-	if err := keystore.Set(testApp.dir, spoolTestProject, "ter_srv_test", keystore.Hosts{}); err != nil {
-		t.Fatal(err)
-	}
+	routeProject(t, spoolTestProject, "ter_srv_test", "")
 	s := spoolForTest(t)
 	appendEvent(t, s, spoolTestProject, time.Now())
 	appendEvent(t, s, spoolTestProject, time.Now())

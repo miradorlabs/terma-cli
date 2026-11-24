@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -64,7 +65,7 @@ func TestCodexPromptHookStillClaims(t *testing.T) {
 	root := collectedRepo(t)
 	sid := "thread-prompt"
 	runHook(t, "codex-user-prompt-submit", `{"session_id":"`+sid+`","turn_id":"turn-1","prompt":"hi","cwd":"`+root+`"}`)
-	if got, ok := claim.Read(testApp.stateDir, sid, time.Now()); !ok || got.ProjectID != "team" {
+	if got, ok := claim.Read(testApp.stateDir, sid, time.Now()); !ok || got.Kind != claim.KindRepository || got.Profile != config.DefaultProfile || got.Account == "" {
 		t.Errorf("the prompt hook claimed nothing: %+v %v", got, ok)
 	}
 }

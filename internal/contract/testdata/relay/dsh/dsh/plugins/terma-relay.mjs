@@ -102,7 +102,10 @@ function schedule() {
   if (!timer) timer = setTimeout(() => void flush(), 1000)
 }
 
+const tainted = new Set()
+
 function span(session, name, start, end, a, error = false) {
+  if (session && tainted.has(session)) return
   spans.push({
     traceId: traceId(session), spanId: hex(8), name, kind: 3,
     startTimeUnixNano: nanos(start), endTimeUnixNano: nanos(end),
@@ -113,6 +116,7 @@ function span(session, name, start, end, a, error = false) {
 }
 
 function record(session, event, body, a) {
+  if (session && tainted.has(session)) return
   const t = nanos(Date.now())
   logs.push({
     timeUnixNano: t, observedTimeUnixNano: t, severityNumber: 9, severityText: "INFO",
@@ -136,15 +140,52 @@ function usageAttrs(u) {
 
 // --- terma hook ------------------------------------------------------------------------
 
-// termaHook hands an event to `terma hook dsh-*`, as this process's child — which is
-// what lets its claim name this process. Best-effort; it never delays the agent.
+// termaHook hands an event to `terma hook dsh-*` in FIFO order, as this process's child —
+// which lets its claim name this process and ensures session-start finishes before tool-reach.
+// A timed-out child is terminated and the queue only advances once child exit is confirmed.
+const HOOK_TIMEOUT_MS = 2000, HOOK_KILL_GRACE_MS = 250, MAX_HOOK_QUEUE = 64
+let hookQueue = Promise.resolve()
+let hookPending = 0
+
+function spawnHook(event, payload) {
+  let resolveExit
+  const exit = new Promise((r) => { resolveExit = r })
+  const result = new Promise((resolve) => {
+    let settled = false, exited = false, child = null, killTimer
+    const finish = (ok) => { if (!settled) { settled = true; clearTimeout(timer); clearTimeout(killTimer); resolve(ok) } }
+    const markExited = () => { if (!exited) { exited = true; clearTimeout(timer); clearTimeout(killTimer); resolveExit() } }
+    const sendKill = (sig) => { try { child.kill(sig) } catch (err) { if (err && err.code === "ESRCH") markExited() } }
+    const timer = setTimeout(() => {
+      if (!child) { markExited(); return finish(false) }
+      sendKill("SIGTERM")
+      killTimer = setTimeout(() => { sendKill("SIGKILL"); if (typeof child.unref === "function") child.unref(); finish(false) }, HOOK_KILL_GRACE_MS)
+      if (typeof killTimer.unref === "function") killTimer.unref()
+    }, HOOK_TIMEOUT_MS)
+    if (typeof timer.unref === "function") timer.unref()
+    try {
+      const [cmd, ...args] = CONFIG.hookCommand
+      child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"] })
+      child.on("error", (err) => { if (!child?.pid || err?.code === "ESRCH") markExited(); finish(false) })
+      child.on("close", (code) => { markExited(); finish(code === 0) })
+      child.stdin.on("error", () => {})
+      child.stdin.end(JSON.stringify(payload))
+    } catch { markExited(); finish(false) }
+  })
+  return { result, exit }
+}
+
 function termaHook(event, payload) {
-  try {
-    const [cmd, ...args] = CONFIG.hookCommand
-    const child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"] })
-    child.on("error", () => {})
-    child.stdin.end(JSON.stringify(payload))
-  } catch {}
+  if (hookPending >= MAX_HOOK_QUEUE) return Promise.resolve(false)
+  hookPending++
+  const slot = hookQueue.then(() => spawnHook(event, payload))
+  hookQueue = slot.then((s) => s.exit, () => undefined).finally(() => { hookPending-- })
+  return new Promise((resolve) => {
+    let done = false
+    const settle = (ok) => { if (!done) { done = true; clearTimeout(wait); resolve(ok) } }
+    const wait = setTimeout(() => settle(false), HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS + 500)
+    if (typeof wait.unref === "function") wait.unref()
+    slot.then((s) => s.result, () => false).then(settle, () => settle(false))
+  })
 }
 
 // --- the plugin -------------------------------------------------------------------------
@@ -153,7 +194,7 @@ const EDIT_TOOLS = new Set(["write", "edit", "multi_edit"])
 
 const cwds = new Map() // session → workspace
 const stepStart = new Map() // session → when its model step began
-const calls = new Map() // callId → { name, args, start }
+const calls = new Map() // callId → { name, args, start, reachDone }
 const ended = new Set()
 
 function sessionOf(session, event) {
@@ -176,6 +217,59 @@ function args(raw) {
   }
 }
 
+// toolReach describes what a read, search, glob, list or shell tool call can reach.
+function toolReach(tool, raw) {
+  const a = args(raw)
+  const out = {}
+  const str = (...keys) => {
+    for (const k of keys) if (typeof a[k] === "string" && a[k]) return a[k]
+    return ""
+  }
+  const path = str("file_path", "path", "dir_path", "filePath")
+  switch (String(tool || "").toLowerCase()) {
+    case "read":
+    case "read_file":
+    case "view_file":
+      if (path) out.paths = [path]
+      break
+    case "grep":
+    case "grep_search":
+    case "search": {
+      out.paths = [path || "."]
+      const g = str("glob", "include")
+      if (g) out.globs = [g]
+      break
+    }
+    case "glob":
+    case "find":
+    case "find_files": {
+      out.paths = [path || "."]
+      const g = str("pattern", "glob")
+      if (g) out.globs = [g]
+      break
+    }
+    case "ls":
+    case "list":
+    case "list_dir":
+    case "list_files":
+      if (path) out.lists = [path]
+      break
+    case "bash":
+    case "shell":
+    case "exec":
+    case "run_command": {
+      const cmd = str("command", "cmd")
+      if (cmd) out.command = cmd
+      const dir = str("cwd", "workdir")
+      if (dir) out.dir = dir
+      break
+    }
+    default:
+      return null
+  }
+  return Object.keys(out).length > 0 ? out : null
+}
+
 export function apply(ctx) {
   if (!CONFIG) return
 
@@ -188,7 +282,7 @@ export function apply(ctx) {
     termaHook("dsh-session-start", { session_id: s, cwd })
   })
 
-  ctx.on("session/event", (session, event) => {
+  ctx.on("session/event", async (session, event) => {
     const s = sessionOf(session, event)
     if (!s || !event) return
     const d = event.data || {}
@@ -222,15 +316,34 @@ export function apply(ctx) {
         if (reply) record(s, "dsh.assistant_response", CONFIG.includePrompts ? truncate(reply, MAX_TEXT) : "", { response_length: reply.length })
         break
       }
-      case "tool/call":
-        if (d.callId) calls.set(d.callId, { name: String(d.name || ""), args: d.arguments, start: at })
+      case "tool/call": {
+        const name = String(d.name || "")
+        const reach = toolReach(name, d.arguments)
+        const reachDone = reach
+          ? termaHook("dsh-tool-reach", { session_id: s, cwd, tool: name, ...reach }).then((ok) => {
+              if (!ok) tainted.add(s)
+              return ok
+            })
+          : null
+        if (d.callId) calls.set(d.callId, { name, args: d.arguments, start: at, reachDone })
+        if (reachDone) await reachDone
         break
+      }
       case "tool/result": {
         const id = d.message && d.message.source && d.message.source.callId
         const call = calls.get(id)
         if (!call) break
         calls.delete(id)
-        span(s, "execute_tool " + call.name, call.start, at, {
+        let end = at
+        if (call.reachDone) {
+          if (!(await call.reachDone)) {
+            tainted.add(s)
+            break
+          }
+          end = Math.max(at, Date.now())
+        }
+        if (tainted.has(s)) break
+        span(s, "execute_tool " + call.name, call.start, end, {
           "gen_ai.operation.name": "execute_tool",
           "gen_ai.tool.name": call.name,
           "gen_ai.tool.call.id": id,

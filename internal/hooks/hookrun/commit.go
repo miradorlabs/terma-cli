@@ -32,6 +32,9 @@ func PrepareCommitMsg(ctx context.Context, env Env) error {
 	if err != nil || r.GitDir == "" {
 		return nil
 	}
+	if env.Routing != nil && !env.Routing.stampsCommits(r.dest.d) {
+		return nil
+	}
 	env.Cwd = "" // git runs its hooks at the checkout's root, not where the agent works: keep its directory
 	manifests, err := r.Store.Manifests()
 	if err != nil {
@@ -103,7 +106,10 @@ const MaxCommitFileStats = 50
 // their manifests; an unstamped commit gets a count-only event.
 func PostCommit(ctx context.Context, env Env) error {
 	r, err := env.Repo(ctx)
-	if err != nil || r.GitDir == "" {
+	if err != nil {
+		r = env.sandboxedGitRepo(ctx)
+	}
+	if r == nil || r.GitDir == "" {
 		return nil
 	}
 	env.Cwd = "" // git runs its hooks at the checkout's root, not where the agent works: keep its directory

@@ -20,7 +20,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
@@ -68,23 +67,39 @@ func TestPolicyRefreshFiltersAlreadyQueuedReplies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg.ProjectID = "team"
-	if err := testApp.policies().Refresh(t.Context(), cfg); err != nil {
+	account := auth.AccountKey(srv.URL, "u-1")
+	target := routing.Team{OrganizationID: cfg.OrganizationID, AuthURL: cfg.AuthURL, TeamID: "team"}
+	pol1, err := testApp.policies().FetchTeam(t.Context(), cfg, account, target)
+	if err != nil {
 		t.Fatal(err)
 	}
+	target.Policy = pol1
+	st, err := routing.Create(testApp.stateDir, cfg.ProfileName, account, func(s *routing.State) error {
+		if _, err := s.Select(target); err != nil {
+			return err
+		}
+		return s.Bind(appRepo.Origin, cfg.OrganizationID, false)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	enrID := st.Teams[0].EnrollmentID
 	s := spoolForTest(t)
 	for _, name := range []string{semconv.TermaAssistantMessageEvent, semconv.TermaSessionTitleEvent, "terma.commit"} {
 		attrs := map[string]any{hookrun.AttrProjectID: "team"}
 		if name != "terma.commit" {
 			attrs["text"] = "PRIVATE_CONTENT"
 		}
-		account := auth.AccountKey(srv.URL, "u-1")
-		if err := s.Append(spool.Event{Time: time.Now(), Name: name, Repository: appRepo, Account: account, Attrs: attrs}); err != nil {
+		if err := s.Append(spool.Event{Time: time.Now(), Name: name, Repository: appRepo, Account: account, Profile: cfg.ProfileName, Enrollment: enrID, Attrs: attrs}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	revision.Store(2)
-	if err := testApp.policies().Refresh(t.Context(), cfg); err != nil {
+	ref, _ := testApp.policies().RefreshTeam(t.Context(), cfg, account, st.Teams[0])
+	if _, err := routing.Update(testApp.stateDir, cfg.ProfileName, st.Expect(), func(s *routing.State) error {
+		_, err := s.ApplyRefresh(ref)
+		return err
+	}); err != nil {
 		t.Fatal(err)
 	}
 	res, err := testApp.flushSpool(t.Context(), true, 0)
@@ -397,84 +412,6 @@ func TestPolicyRefreshOtherTeamKeepsSelectedCoverage(t *testing.T) {
 	}
 }
 
-// With no relay refreshing it, the flush a hook starts fetches a stale policy, so a
-// repository the team has since listed is admitted; a fresh one costs no request, and a
-// failing fetch is tried once per flush, not again for the team's queued events.
-func TestFlushRefreshesAStalePolicy(t *testing.T) {
-	useConfigDir(t, t.TempDir())
-	hookruntest.RelayOn(t, testApp.stateDir)
-	t.Setenv("TERMA_POLICY_STUB", "")
-	var revision, fetches atomic.Int64
-	var down atomic.Bool
-	revision.Store(1)
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/policy" {
-			t.Errorf("unexpected request %s", r.URL.Path)
-			return
-		}
-		fetches.Add(1)
-		if down.Load() {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			return
-		}
-		repos := `[]`
-		if revision.Load() > 1 {
-			repos = `["github.com/acme/app"]`
-		}
-		fmt.Fprintf(w, `{"policy":{"version":"1.0","terma":{"per_repository":{"repositories":%s},"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":%d,"updated_at":"2026-09-30T12:27:05Z"}`, repos, revision.Load())
-	}))
-	defer srv.Close()
-	t.Setenv("TERMA_AUTH_URL", srv.URL)
-	t.Setenv("TERMA_API_URL", srv.URL)
-	seedPolicyLogin(t, srv.URL)
-	cfg, err := testApp.loadConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	cfg.ProjectID = "team"
-	if err := testApp.policies().Refresh(t.Context(), cfg); err != nil {
-		t.Fatal(err)
-	}
-	age := func() {
-		t.Helper()
-		after, err := testApp.loadConfig()
-		if err != nil {
-			t.Fatal(err)
-		}
-		stale := after.Policy
-		stale.FetchedAt = time.Now().Add(-10 * time.Minute)
-		selectPolicy(t, stale)
-	}
-	age()
-	revision.Store(2)
-	for range 2 {
-		if _, err := testApp.flushSpool(t.Context(), false, 0); err != nil {
-			t.Fatal(err)
-		}
-	}
-	after, err := testApp.loadConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if after.Policy.Revision != 2 || !after.Policy.Admits(appRepo) || after.Policy.Stale(time.Now()) {
-		t.Fatalf("policy after the flush: %+v", after.Policy)
-	}
-	if got := fetches.Load(); got != 2 {
-		t.Fatalf("%d policy fetches, want setup's and one refresh", got)
-	}
-	down.Store(true)
-	age()
-	if err := spoolForTest(t).Append(spool.Event{Time: time.Now(), Name: "terma.commit", Repository: appRepo, Attrs: map[string]any{hookrun.AttrProjectID: "team"}}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := testApp.flushSpool(t.Context(), false, 0); err != nil {
-		t.Fatal(err)
-	}
-	if got := fetches.Load(); got != 3 {
-		t.Fatalf("a failing refresh was tried %d times in one flush, want 1", got-2)
-	}
-}
-
 // The hooks, the relay, delivery and doctor read the team's stored policy, so one that no
 // refresh has reached for over a week has expired for every one of them.
 func TestEveryReaderSeesTheStoredPolicy(t *testing.T) {
@@ -490,7 +427,11 @@ func TestEveryReaderSeesTheStoredPolicy(t *testing.T) {
 	if err := routing.StorePolicy(cfg, &pol); err != nil {
 		t.Fatal(err)
 	}
-	if err := config.UpdateProfile(testApp.dir, cfg.ProfileName, func(p *config.Profile) { p.Harnesses = []string{"codex"} }); err != nil {
+	if err := config.UpdateProfile(testApp.dir, cfg.ProfileName, func(p *config.Profile) {
+		p.Harnesses = []string{"codex"}
+		p.ServerKeySignIn = true
+		p.ServerKeyAuthURL = cfg.AuthURL
+	}); err != nil {
 		t.Fatal(err)
 	}
 	pol.FetchedAt = time.Now().Add(-config.MaxPolicyAge - time.Hour)
@@ -499,10 +440,29 @@ func TestEveryReaderSeesTheStoredPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !testApp.hookProfile().Policy.Expired(time.Now()) || !testApp.hookPolicy().CollectsNothing {
-		t.Fatal("the hooks see a policy that has not expired")
+	hp := testApp.hookProfile()
+	if !hp.Routing.Usable() {
+		t.Fatal("the hooks lost usable routing state")
 	}
-	if got, err := testApp.relayDeps().Resolver(cfg)(claim.Claim{ProjectID: "team", Tool: "codex", Repository: appRepo}); err == nil && (got.IncludePrompts || len(got.Signals) > 0) {
+	st, found, err := routing.Load(testApp.stateDir, cfg.ProfileName)
+	if err != nil || !found {
+		t.Fatalf("routing state load: found=%v err=%v", found, err)
+	}
+	if got := routing.NewRouter(st).Route(routing.Location{Kind: routing.Repository, Repository: appRepo.Origin}, time.Now()); got.Outcome != routing.Hold || got.Blocked != routing.Expired {
+		t.Fatalf("the hooks routed expired team as %+v, want hold/expired", got)
+	}
+	rec := relay.Record{
+		Placed: true,
+		Placement: claim.Claim{
+			Profile:    cfg.ProfileName,
+			Account:    st.Account,
+			Tool:       "codex",
+			Repository: appRepo,
+		},
+		Account: st.Account,
+		At:      time.Now(),
+	}
+	if got := testApp.relayDeps().Teams(cfg).Route(rec); got.Outcome == relay.Send {
 		t.Fatalf("the relay granted %+v", got)
 	}
 	stored, err := testApp.loadConfig()

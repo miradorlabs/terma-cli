@@ -23,20 +23,28 @@ git -C "$repo" config user.name bench
 git -C "$repo" remote add origin git@github.com:acme/repo.git
 git -C "$repo" commit -q --allow-empty -m init
 git -C "$repo" worktree add -q "$tmp/wt"
+: > "$repo/NOTES.md"; : > "$tmp/wt/NOTES.md"
 
 # What a claimed session leaves, offline: a validated policy listing the repository (which
 # admits its worktree too) with git_hooks on, and the hooks the installer writes into the
 # repository, from the same code.
 export TERMA_POLICY_STUB='{"mode":"repo","repositories":["github.com/acme/repo"],"git_hooks":true}'
 now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-printf '{"active_profile":"default","profiles":{"default":{"team":"proj_bench"}}}' > "$TERMA_CONFIG_DIR/config.json"
+printf '{"active_profile":"default","profiles":{"default":{"team":"proj_bench","server_key_sign_in":true}}}' > "$TERMA_CONFIG_DIR/config.json"
 mkdir -p "$TERMA_STATE_DIR/policies"
 printf '{"mode":"repo","repositories":["github.com/acme/repo"],"git_hooks":true,"include_prompts":true,"include_tool_content":true,"revision":1,"updated_at":"%s","team_id":"proj_bench","fetched_at":"%s"}' "$now" "$now" > "$TERMA_STATE_DIR/policies/proj_bench.json"
-(cd "$ROOT" && go run ./scripts/benchhooks "$BIN" "$repo")
+(cd "$ROOT" && go run ./scripts/benchhooks -routed "$BIN" "$repo")
 # One install in the common git directory serves the checkout and its worktree.
 hook="$repo/.git/hooks/prepare-commit-msg"
 
 ms() { perl -MTime::HiRes=time -e 'printf "%d", time*1000'; }
+tool_hook() {
+  ptimes="" i=0
+  while [ $i -lt 7 ]; do start=$(ms); printf '%s' "$3" 2>/dev/null | terma hook --user "$1"; end=$(ms); ptimes="$ptimes $((end - start))"; i=$((i + 1)); done
+  pm=$(echo "$ptimes" | tr ' ' '\n' | grep -v '^$' | sort -n | sed -n 4p)
+  echo "$1, $2: median ${pm}ms over 7 runs (${ptimes# }) — budget ${BUDGET_MS}ms"
+  [ "$pm" -le "$BUDGET_MS" ] || { echo "$1, $2: over budget" >&2; exit 1; }
+}
 
 # bench <checkout> <label>: an agent session with a manifest, so the timed path includes
 # the staged-files intersection (the expensive branch), not the early exit.
@@ -63,7 +71,10 @@ bench() {
   median=$(echo "$times" | tr ' ' '\n' | grep -v '^$' | sort -n | sed -n 4p)
   echo "prepare-commit-msg, $2: median ${median}ms over 7 runs (${times# }) — budget ${BUDGET_MS}ms"
   [ "$median" -le "$BUDGET_MS" ] || { echo "$2: over budget" >&2; exit 1; }
+  tool_hook pre-tool-use "Read, $2" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"%s/NOTES.md"},"cwd":"%s"}' "$sid" "$3" "$1")"
+  tool_hook pre-tool-use "Bash, $2" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"cd %s && cat NOTES.md src/a.go | grep -c bench > /dev/null; ls -la %s/src"},"cwd":"%s"}' "$sid" "$3" "$1" "$1")"
+  tool_hook pre-tool-use "Grep, $2" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Grep","tool_input":{"pattern":"TODO","path":"%s"},"cwd":"%s"}' "$sid" "$1" "$1")"
 }
 
-bench "$repo" checkout
-bench "$tmp/wt" worktree
+bench "$repo" checkout "$tmp/wt"
+bench "$tmp/wt" worktree "$repo"

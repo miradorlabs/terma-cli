@@ -23,6 +23,7 @@ type Router interface {
 
 // Rechecker re-evaluates destination-pinned parts under a single routing state snapshot.
 type Rechecker interface {
+	StateID() string
 	Generation() int64
 	TeamWaits() (Rechecked, bool)
 	Entry(q Queued) Rechecked

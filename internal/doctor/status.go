@@ -68,14 +68,46 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 			add("Account", "%s in %s%s, credentials %s", cmp.Or(cred.Email, "signed in"), cmp.Or(cfg.OrganizationName, cred.OrganizationID), cred.Origin(), cred.Storage())
 		}
 	}
-	rep.Rows = append(rep.Rows, machineRows(cfg)...)
+	rep.Rows = append(rep.Rows, machineRows(cfg, env.Routing != nil)...)
+	now := time.Now()
+	if env.Routing != nil {
+		rep.Rows = append(rep.Rows, TeamRows(*env.Routing, now)...)
+	}
 
 	root, gitDir, reg := env.Root, env.GitDir, env.Agents
 	projectID := cmp.Or(cfg.ProjectID, cfg.Policy.TeamID)
 	admission := Check{Status: Pass}
 	hooks := Check{Status: Skip}
 	pol := cfg.Policy.InForce(cfg.OrganizationID, cfg.AuthURL)
-	if env.RepoErr != nil {
+	if env.Routing != nil {
+		c, team := RoutedRepository(*env.Routing, gitDir, env.RepoErr, now)
+		admission = c
+		if env.RepoErr != nil {
+			add("Repository", "not inside a git repository")
+		} else {
+			add("Repository", "%s", admission.Detail)
+			if gitDir == "" {
+				add("Hooks", "Git hooks skipped (not a Git repository)")
+			} else {
+				hooks = CommitHooksCheck(judgeCommitHooks(gitDir, team != nil && team.Policy.GitHooks, team != nil))
+				hooks.Key = KeyHooks
+				add("Hooks", "%s", hooks.Detail)
+			}
+			if admission.Status == Pass {
+				work, err := workRows(env.StateDir, root, gitDir)
+				if err != nil {
+					return LocalReport{}, err
+				}
+				rep.Rows = append(rep.Rows, work...)
+			}
+		}
+		if team != nil {
+			pol = team.Policy
+		} else {
+			pol = config.Policy{}
+		}
+		projectID = routedProjectID(*env.Routing, team, now)
+	} else if env.RepoErr != nil {
 		add("Repository", "not inside a git repository")
 	} else {
 		admission.Detail = "every session, in global mode: " + GlobalDestination(cfg)
@@ -86,7 +118,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 		if gitDir == "" {
 			add("Hooks", "Git hooks skipped (not a Git repository)")
 		} else {
-			hooks = CommitHooksCheck(JudgeCommitHooks(gitDir, pol, time.Now()))
+			hooks = CommitHooksCheck(JudgeCommitHooks(gitDir, pol, now))
 			hooks.Key = KeyHooks
 			add("Hooks", "%s", hooks.Detail)
 		}
@@ -160,6 +192,18 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 	if !authOK {
 		rep.Checks = append(rep.Checks, Check{Status: Fail, Fix: p.signInFix()})
 	}
+	if env.Routing != nil {
+		if tc := TeamsCheck(*env.Routing, now); tc.Status != Pass {
+			tc.Key = KeyTeams
+			rep.Checks = append(rep.Checks, tc)
+		}
+	}
+	if rl := relayFacts(p); rl.lostRecently() {
+		oc := OutboxCheck(rl)
+		oc.Key = KeyOutbox
+		add("Records lost", "%s", oc.Detail)
+		rep.Checks = append(rep.Checks, oc)
+	}
 	if c, ok := AgentHooksCheck(ctx, reg, cfg.Harnesses, env.HookExecutable); ok && c.Status != Pass {
 		add("Agent hooks", "%s", c.Detail)
 		rep.Checks = append(rep.Checks, c)
@@ -185,7 +229,10 @@ func Context(env Env) []Row {
 		return nil
 	}
 	rows := append([]Row{{"Config", output.TildePath(env.ConfigDir)}, {"State", output.TildePath(env.StateDir)}},
-		machineRows(env.Config)...)
+		machineRows(env.Config, env.Routing != nil)...)
+	if env.Routing != nil {
+		rows = append(rows, TeamRows(*env.Routing, time.Now())...)
+	}
 	rows = append(rows, env.Updates...)
 	if env.RepoErr != nil {
 		return rows
@@ -200,13 +247,15 @@ func Context(env Env) []Row {
 const captureOff = "the collection policy has not been refreshed for over a week"
 
 // machineRows are what this machine collects and where it reports.
-func machineRows(cfg *config.Config) []Row {
+func machineRows(cfg *config.Config, routed bool) []Row {
 	var rows []Row
-	switch {
-	case cfg.Policy.Validated() && cfg.Policy.Expired(time.Now()):
-		rows = append(rows, Row{"Capture", "off: " + captureOff + " — run `terma setup`"})
-	case cfg.Policy.Validated():
-		rows = append(rows, Row{"Collecting", PolicySummary(cfg.Policy)})
+	if !routed {
+		switch {
+		case cfg.Policy.Validated() && cfg.Policy.Expired(time.Now()):
+			rows = append(rows, Row{"Capture", "off: " + captureOff + " — run `terma setup`"})
+		case cfg.Policy.Validated():
+			rows = append(rows, Row{"Collecting", PolicySummary(cfg.Policy)})
+		}
 	}
 	// Name the backend whenever it is not production, by environment or by host overrides.
 	switch {

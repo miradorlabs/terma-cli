@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -27,7 +28,7 @@ func TestHookStandsDownInAProcessGrokStarted(t *testing.T) {
 	}
 	t.Setenv("GROK_HOOK_EVENT", "")
 	runHook(t, "session-start", payload)
-	if c, ok := claim.Read(testApp.stateDir, "grok-session", time.Now()); !ok || c.ProjectID != "team" {
+	if c, ok := claim.Read(testApp.stateDir, "grok-session", time.Now()); !ok || c.Kind != claim.KindRepository || c.Profile != config.DefaultProfile || c.Account == "" {
 		t.Errorf("without grok's mark the session was not claimed: %+v %v", c, ok)
 	}
 }

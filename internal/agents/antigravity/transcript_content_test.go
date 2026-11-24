@@ -169,10 +169,10 @@ func TestAntigravityContentConsentIsChosenOrGlobal(t *testing.T) {
 	g.agents = nil
 	env := g.env(g.root, "")
 	env.Policy.Mode = "global"
-	if !contentConsented(env.Consent()) {
+	if !contentConsented(env.Consent(nil)) {
 		t.Fatal("global mode is not consent")
 	}
-	if contentConsented(g.env(g.root, "").Consent()) {
+	if contentConsented(g.env(g.root, "").Consent(nil)) {
 		t.Fatal("no agent chosen is consent")
 	}
 }

@@ -3,6 +3,7 @@ package hookrun
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"path/filepath"
 	"slices"
 
@@ -67,11 +68,14 @@ func (e Env) park(r *Repo, name string, v any) bool {
 	return true
 }
 
+// LostNoDestination counts parked or pre-cutover records dropped because they carry no
+// routed enrollment destination (Council 12e).
+const LostNoDestination = "no_destination"
+
 // unpark hands on what sandboxed hooks parked in r's git directory: pushes to AwaitPush,
 // the counts of what they lost to the spool's, and events to the spool, in one append, then
-// a flush. A parked event keeps the lane it was parked in, whoever is signed in now: it
-// leaves only under its own person's sign-in, or a server key; one parked with no lane is
-// dropped (spool.Spool.AppendAsCollected).
+// a flush. When Routing is active, any parked event carrying no Enrollment is dropped and
+// counted as no_destination instead of being filled in with a default team.
 func (e Env) unpark(r *Repo) {
 	if r.GitDir == "" {
 		return
@@ -87,16 +91,24 @@ func (e Env) unpark(r *Repo) {
 	moved := false
 	err := parking.Unpark(parkedEvents, func(lines []byte) error {
 		var events []spool.Event
+		noDest := 0
 		for line := range bytes.Lines(lines) {
 			var ev spool.Event
-			if json.Unmarshal(line, &ev) == nil {
+			if json.Unmarshal(line, &ev) != nil {
+				continue
+			}
+			if e.Routing != nil && ev.Enrollment == "" && ev.HoldKey == "" {
+				noDest++
+			} else {
 				events = append(events, ev)
 			}
 		}
-		moved = len(events) > 0
-		// Appended in one write: a part appended alone would be appended again, as the
-		// parked file stays, when the rest fails.
-		return e.Spool.AppendAsCollected(events...)
+		if moved = len(events) > 0; moved {
+			if err := e.Spool.AppendAsCollected(events...); err != nil {
+				return err
+			}
+		}
+		return e.countUnparkNoDest(r, moved, noDest)
 	})
 	if err != nil {
 		e.Logf("unpark events: %v", err)
@@ -105,6 +117,20 @@ func (e Env) unpark(r *Repo) {
 	if moved && e.Flush != nil {
 		e.Flush()
 	}
+}
+
+func (e Env) countUnparkNoDest(r *Repo, kept bool, n int) error {
+	if n == 0 {
+		return nil
+	}
+	if kept {
+		e.CountLost(r, LostNoDestination, n)
+		return nil
+	}
+	if e.Spool == nil {
+		return errors.New("no spool for no_destination loss count")
+	}
+	return e.Spool.CountLost(LostNoDestination, n)
 }
 
 // emitRecord is EmitFor for a git hook's record of sessions, a commit's, whose manifests
@@ -119,9 +145,11 @@ func (e Env) emitRecord(r *Repo, ev spool.Event, accounts []string) bool {
 		e.CountLost(r, sendas.LostAmbiguousPush, 1)
 		return true
 	}
-	ev = e.stamp(r, ev)
+	ev = e.stampFor(r, ev, true, false)
 	ev.Account, ev.NoPerson = lane.Account, lane.NoPerson
-	e.claimForRelay(r, ev, true)
+	if e.Routing == nil {
+		e.claimForRelay(r, ev, true)
+	}
 	return e.emitOrPark(r, ev)
 }
 
@@ -198,8 +226,12 @@ func (e Env) lost(r *Repo, n int) bool {
 // (spool.Spool.Appendable), never by whether the count went through: a hook whose spool takes
 // a write read its sign-in where it could, so the record is lost, however its count fares.
 // Signed out is signed out anywhere.
+func (e Env) inSandbox() bool {
+	return e.Spool == nil || !e.Spool.Appendable()
+}
+
 func (e Env) lostOutside(r *Repo, n int) bool {
-	if e.lane().Lost == sendas.LostUnreadable && (e.Spool == nil || !e.Spool.Appendable()) {
+	if e.lane().Lost == sendas.LostUnreadable && e.inSandbox() {
 		return false
 	}
 	return e.lost(r, n)

@@ -11,6 +11,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/account/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
+	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/setup"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
@@ -20,9 +23,10 @@ const serverKeyAuth = "server_key"
 
 // useServerKey has s sign in with the team server key in TERMA_API_KEY rather than as a
 // person: the auth host names the key's organization and team, and once the key has
-// fetched the team's policy it is kept as the team's key and the profile records them, so
-// nothing but setup needs TERMA_API_KEY again. Nothing is minted and no login is written;
-// one already on file only moves to where secrets are now kept.
+// fetched the team's policy it is kept as the team's key, the profile records them, and a
+// 1-team routing.State (Account: no_person) is committed via CAS, so nothing but setup
+// needs TERMA_API_KEY again. Nothing is minted and no login is written; one already on
+// file only moves to where secrets are now kept.
 // org is --org and insecure --insecure-storage; a setup that fails before the key is kept
 // leaves the keystore, the secret storage and the profile's sign-in as they were.
 func (app *App) useServerKey(s *setup.Steps, ui *setupUI, org orgRef, team *string, insecure bool) {
@@ -45,21 +49,66 @@ func (app *App) useServerKey(s *setup.Steps, ui *setupUI, org orgRef, team *stri
 		}
 		return cfg, nil
 	}
-	s.SelectTeam = func(_ context.Context, cfg *config.Config) error {
-		cfg.ProjectID, *team = cfg.Team, cfg.Team
-		return nil
-	}
-	s.FetchPolicy = func(ctx context.Context, cfg *config.Config) (config.Policy, error) {
-		pol, err := app.policies().FetchWithKey(ctx, cfg, cfg.APIKey)
-		// The sign-in is kept here, once the key has proved it reads the policy and before
-		// setup stores that policy, so a failed fetch writes nothing.
-		if err == nil {
-			err = app.keepServerKey(cfg, insecure)
+	s.SetupTeams = func(ctx context.Context, cfg *config.Config) (config.Policy, error) {
+		if err := app.gateRoutingActivation(); err != nil {
+			return config.Policy{}, err
 		}
+		baseline := app.loadSetupBaseline(cfg.ProfileName, sendas.NoPersonLane)
+		cfg.ProjectID, *team = cfg.Team, cfg.Team
+		pol, err := app.policies().FetchWithKey(ctx, cfg, cfg.APIKey)
 		if err != nil {
 			return config.Policy{}, err
 		}
-		return pol, nil
+		if pol.Global() {
+			pol.Mode, pol.Repositories = config.ModeRepo, nil
+		}
+		target := routing.Team{
+			OrganizationID: cfg.OrganizationID,
+			AuthURL:        cfg.AuthURL,
+			TeamID:         cfg.Team,
+			Personal:       false,
+			Policy:         pol,
+		}
+		// Only reuse existing bindings when updating the same server-key team in place;
+		// switching to a different server-key team replaces routing.State with blank
+		// bindings, so all bindings for the new team must be computed fresh.
+		var existingBindings map[string]routing.Binding
+		if baseline.sameAccount && sameSingleTeam(baseline.state, target) {
+			existingBindings = baseline.state.Bindings
+		}
+		bindings, err := decideSetupBindings(target, cmp.Or(cfg.OrganizationName, cfg.OrganizationID), existingBindings, false)
+		if err != nil {
+			return config.Policy{}, err
+		}
+		var committed routing.State
+		var switched bool
+		err = daemon.WithRoutingRelayGate(app.stateDir, app.version, func() error {
+			if err := app.checkSetupBaseline(cfg.ProfileName, sendas.NoPersonLane, baseline, true); err != nil {
+				return err
+			}
+			// Keep the key only once it has proved it reads the policy, the routing state
+			// still matches baseline, and no pre-routing relay blocks activation.
+			if err := app.keepServerKey(cfg, insecure); err != nil {
+				return err
+			}
+			var cerr error
+			committed, switched, cerr = app.commitRoutingStateLocked(cfg.ProfileName, sendas.NoPersonLane, baseline, target, nil, bindings, true)
+			return cerr
+		})
+		if err != nil {
+			return config.Policy{}, err
+		}
+		primary := committedPrimary(committed, target)
+		if err := app.persistCommittedPolicies(committed); err != nil {
+			return config.Policy{}, err
+		}
+		if switched || cfg.Policy.OrganizationID != primary.OrganizationID || cfg.Policy.AuthURL != primary.AuthURL || cfg.Policy.TeamID != primary.TeamID {
+			if dir, derr := daemon.Dir(app.stateDir); derr == nil {
+				daemon.Stop(dir)
+			}
+		}
+		ui.policyFetched(*team, primary.Policy)
+		return primary.Policy, nil
 	}
 	s.SpoolKey = func(_ context.Context, cfg *config.Config) {
 		ui.OK("Hook events", "delivered with the server key "+keystore.Mask(cfg.APIKey))
