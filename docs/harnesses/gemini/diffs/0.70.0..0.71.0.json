@@ -3,7 +3,7 @@
   "harness": "gemini",
   "from": "0.70.0",
   "to": "0.71.0",
-  "generated_at": "2026-11-24T20:20:08.975404456Z",
+  "generated_at": "2026-11-24T23:02:10.147159457Z",
   "source": {
     "compare": "https://github.com/google-gemini/gemini-cli/compare/v0.70.0...v0.71.0"
   },
@@ -12,223 +12,19 @@
     "text": "## What's Changed\n* Changelog for v0.70.0-preview.0 by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/30361\n* chore(release): bump version to 0.71.0-nightly.20261118.g615d6bc8c by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/30366\n* Changelog for v0.69.0 by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/30365\n* fix(core,cli): parse PowerShell commands asynchronously to prevent UI spinner freeze by @tadipavan in https://github.com/google-gemini/gemini-cli/pull/30334\n* chore(gcp): push development worker to private artifact registry by @DavidAPierce in https://github.com/google-gemini/gemini-cli/pull/30319\n\n\n**Full Changelog**: https://github.com/google-gemini/gemini-cli/compare/v0.70.0...v0.71.0"
   },
   "summary": {
-    "changes": 8,
+    "changes": 1,
     "categories": {
-      "network": 7,
       "storage": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
       "informational": 1,
-      "notable": 7
+      "notable": 0
     },
-    "undocumented": 8
+    "undocumented": 1
   },
   "changes": [
-    {
-      "id": "network.telemetry.POST play.googleapis.com/log.events.api_request",
-      "category": "network",
-      "op": "removed",
-      "path": [
-        "network",
-        "telemetry",
-        "POST play.googleapis.com/log",
-        "events",
-        "api_request"
-      ],
-      "title": "Vendor telemetry event no longer sent: api_request",
-      "impact": "notable",
-      "before": {
-        "count": 2,
-        "fields": [
-          "application",
-          "client_install_id",
-          "console_type",
-          "event_metadata",
-          "event_name"
-        ]
-      },
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "network.telemetry.POST play.googleapis.com/log.events.api_response",
-      "category": "network",
-      "op": "removed",
-      "path": [
-        "network",
-        "telemetry",
-        "POST play.googleapis.com/log",
-        "events",
-        "api_response"
-      ],
-      "title": "Vendor telemetry event no longer sent: api_response",
-      "impact": "notable",
-      "before": {
-        "count": 2,
-        "fields": [
-          "application",
-          "client_install_id",
-          "console_type",
-          "event_metadata",
-          "event_name"
-        ]
-      },
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "network.telemetry.POST play.googleapis.com/log.events.hook_call",
-      "category": "network",
-      "op": "removed",
-      "path": [
-        "network",
-        "telemetry",
-        "POST play.googleapis.com/log",
-        "events",
-        "hook_call"
-      ],
-      "title": "Vendor telemetry event no longer sent: hook_call",
-      "impact": "notable",
-      "before": {
-        "count": 2,
-        "fields": [
-          "application",
-          "client_install_id",
-          "console_type",
-          "event_metadata",
-          "event_name"
-        ]
-      },
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "network.telemetry.POST play.googleapis.com/log.events.model_routing",
-      "category": "network",
-      "op": "removed",
-      "path": [
-        "network",
-        "telemetry",
-        "POST play.googleapis.com/log",
-        "events",
-        "model_routing"
-      ],
-      "title": "Vendor telemetry event no longer sent: model_routing",
-      "impact": "notable",
-      "before": {
-        "count": 1,
-        "fields": [
-          "application",
-          "client_install_id",
-          "console_type",
-          "event_metadata",
-          "event_name"
-        ]
-      },
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "network.telemetry.POST play.googleapis.com/log.events.new_prompt",
-      "category": "network",
-      "op": "removed",
-      "path": [
-        "network",
-        "telemetry",
-        "POST play.googleapis.com/log",
-        "events",
-        "new_prompt"
-      ],
-      "title": "Vendor telemetry event no longer sent: new_prompt",
-      "impact": "notable",
-      "before": {
-        "count": 1,
-        "fields": [
-          "application",
-          "client_install_id",
-          "console_type",
-          "event_metadata",
-          "event_name"
-        ]
-      },
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "network.telemetry.POST play.googleapis.com/log.events.start_session",
-      "category": "network",
-      "op": "removed",
-      "path": [
-        "network",
-        "telemetry",
-        "POST play.googleapis.com/log",
-        "events",
-        "start_session"
-      ],
-      "title": "Vendor telemetry event no longer sent: start_session",
-      "impact": "notable",
-      "before": {
-        "count": 1,
-        "fields": [
-          "application",
-          "client_install_id",
-          "console_type",
-          "event_metadata",
-          "event_name"
-        ]
-      },
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
-    {
-      "id": "network.telemetry.POST play.googleapis.com/log.events.startup_stats",
-      "category": "network",
-      "op": "removed",
-      "path": [
-        "network",
-        "telemetry",
-        "POST play.googleapis.com/log",
-        "events",
-        "startup_stats"
-      ],
-      "title": "Vendor telemetry event no longer sent: startup_stats",
-      "impact": "notable",
-      "before": {
-        "count": 1,
-        "fields": [
-          "application",
-          "client_install_id",
-          "console_type",
-          "event_metadata",
-          "event_name"
-        ]
-      },
-      "after": null,
-      "text_diff": null,
-      "terma": null,
-      "source": null,
-      "documented": false
-    },
     {
       "id": "storage.transcript.path",
       "category": "storage",

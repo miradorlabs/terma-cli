@@ -3,7 +3,7 @@
   "harness": "gemini",
   "from": "0.71.0",
   "to": "0.71.1",
-  "generated_at": "2026-11-24T20:20:08.975404456Z",
+  "generated_at": "2026-11-24T23:02:10.147159457Z",
   "source": {
     "compare": "https://github.com/google-gemini/gemini-cli/compare/v0.71.0...v0.71.1"
   },
@@ -12,54 +12,20 @@
     "text": "## What's Changed\n* fix(patch): cherry-pick aafdfdf to release/v0.71.0-pr-30420 to patch version v0.71.0 and create version 0.71.1 by @gemini-cli-robot in https://github.com/google-gemini/gemini-cli/pull/30429\n\n\n**Full Changelog**: https://github.com/google-gemini/gemini-cli/compare/v0.71.0...v0.71.1"
   },
   "summary": {
-    "changes": 3,
+    "changes": 2,
     "categories": {
       "binary": 1,
-      "hooks": 1,
       "storage": 1
     },
     "impact": {
       "breaking": 0,
       "degrading": 0,
-      "informational": 3,
+      "informational": 2,
       "notable": 0
     },
-    "undocumented": 3
+    "undocumented": 2
   },
   "changes": [
-    {
-      "id": "hooks.events.AfterAgent.matcher",
-      "category": "hooks",
-      "op": "changed",
-      "path": [
-        "hooks",
-        "events",
-        "AfterAgent",
-        "matcher"
-      ],
-      "title": "AfterAgent hook takes a matcher: true → false",
-      "impact": "informational",
-      "before": true,
-      "after": false,
-      "text_diff": null,
-      "terma": null,
-      "source": {
-        "refs": [
-          {
-            "path": "packages/cli/src/commands/hooks/migrate.ts",
-            "line": 26,
-            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.71.1/packages/cli/src/commands/hooks/migrate.ts#L26"
-          },
-          {
-            "path": "packages/cli/src/commands/hooks/migrate.ts",
-            "line": 27,
-            "url": "https://github.com/google-gemini/gemini-cli/blob/v0.71.1/packages/cli/src/commands/hooks/migrate.ts#L27"
-          }
-        ],
-        "gone": false
-      },
-      "documented": false
-    },
     {
       "id": "storage.transcript.path",
       "category": "storage",
@@ -72,7 +38,7 @@
       "title": "On-disk transcript path changed",
       "impact": "informational",
       "before": "<home>/.gemini<tmp><time>693ff3.jsonl",
-      "after": "<home>/.gemini<tmp><time>aca227d.jsonl",
+      "after": "<home>/.gemini<tmp><time>efe2a8.jsonl",
       "text_diff": null,
       "terma": null,
       "source": null,

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-24T22:27:23.849040294Z",
+  "generated_at": "2026-11-24T23:02:10.147159457Z",
   "versions": [
     {
       "harness": "claude",
@@ -143,34 +143,32 @@
       "name": "Gemini CLI",
       "version": "0.71.1",
       "released_at": "2026-11-24T03:57:09.158Z",
-      "captured_at": "2026-11-24T16:48:07.081917625Z",
+      "captured_at": "2026-11-24T23:02:10.147159457Z",
       "platforms": [
         "darwin/arm64"
       ],
       "support": "supported",
       "previous": "0.71.0",
-      "changes": 3,
+      "changes": 2,
       "categories": {
         "binary": 1,
-        "hooks": 1,
         "storage": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 3,
+        "informational": 2,
         "notable": 0
       },
-      "undocumented": 3,
+      "undocumented": 2,
       "highlights": [
-        "AfterAgent hook takes a matcher: true → false",
         "On-disk transcript path changed",
         "Binary size: 98,574,960 → 121,875,875 bytes (98.6 MB → 121.9 MB)"
       ],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-24T16:48:07.081917625Z",
-      "attempts": 3
+      "attempted_at": "2026-11-24T23:02:10.147159457Z",
+      "attempts": 4
     },
     {
       "harness": "gemini",
@@ -183,22 +181,19 @@
       ],
       "support": "supported",
       "previous": "0.70.0",
-      "changes": 8,
+      "changes": 1,
       "categories": {
-        "network": 7,
         "storage": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
         "informational": 1,
-        "notable": 7
+        "notable": 0
       },
-      "undocumented": 8,
+      "undocumented": 1,
       "highlights": [
-        "Vendor telemetry event no longer sent: api_request",
-        "Vendor telemetry event no longer sent: api_response",
-        "Vendor telemetry event no longer sent: hook_call"
+        "On-disk transcript path changed"
       ],
       "signing": null,
       "partial": true,
