@@ -1,7 +1,33 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-24T20:20:08.975404456Z",
+  "generated_at": "2026-11-24T21:18:42.115934938Z",
   "versions": [
+    {
+      "harness": "codex-desktop",
+      "name": "Codex app",
+      "version": "26.1120.50957",
+      "released_at": "2026-11-24T20:55:02Z",
+      "captured_at": "2026-11-24T21:18:42.115934938Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "untested",
+      "previous": "26.1120.41243",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": null,
+      "highlights": [],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-24T21:18:42.115934938Z",
+      "attempts": 1
+    },
     {
       "harness": "copilot",
       "name": "GitHub Copilot CLI",
@@ -6190,35 +6216,6 @@
       },
       "undocumented": 0,
       "highlights": [],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.225",
-      "released_at": "2026-08-07T23:08:56.171Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.224",
-      "changes": 2,
-      "categories": {
-        "config": 2
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 2,
-        "notable": 0
-      },
-      "undocumented": 2,
-      "highlights": [
-        "New environment variable: CLAUDE_REMOTE_TOOLS_BRIDGE_URL",
-        "New environment variable: CLAUDE_WORKSHOP_PROGRESS"
-      ],
       "signing": "valid"
     }
   ]

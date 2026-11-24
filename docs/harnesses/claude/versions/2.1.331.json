@@ -22628,6 +22628,10 @@
         "description": "Set to `1` to turn off the head start that can run your shell startup files while Claude writes the session's first Bash command, before that command's permission prompt. Requires Claude Code v2.1.327 or later",
         "read": true
       },
+      "CLAUDE_CODE_DISABLE_SHIP": {
+        "description": "Set to `1` to turn off `/ship` and `/steward`. Requires Claude Code v2.1.331 or later",
+        "read": true
+      },
       "CLAUDE_CODE_DISABLE_STRUCTURED_OUTPUTS": {
         "description": "Set to `1` to stop Claude Code from sending the structured-output `output_config.format` field and the `anthropic-beta` value that pairs with it, for an LLM gateway whose upstream rejects them. This leaves on the other pre-release capabilities that `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS` turns off. Requires Claude Code v2.1.288 or later",
         "read": true
@@ -23729,7 +23733,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-24T20:20:08.975404456Z",
+    "fetched_at": "2026-11-24T21:18:42.115934938Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -26146,7 +26150,6 @@
       "CLAUDE_CODE_DISABLE_RESPONSE_COMPRESSION",
       "CLAUDE_CODE_DISABLE_RESUME_LOAD_GOODBYE_SKIP",
       "CLAUDE_CODE_DISABLE_SELF_NAMED_CERT_DROP",
-      "CLAUDE_CODE_DISABLE_SHIP",
       "CLAUDE_CODE_DISABLE_STARTUP_WORK_GATE",
       "CLAUDE_CODE_DISABLE_STOP_OF_HELD_MESSAGES",
       "CLAUDE_CODE_DISABLE_SUBAGENT_HANDBACK",
