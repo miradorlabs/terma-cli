@@ -34,7 +34,7 @@ func upgradedServerKeyMachine(t *testing.T) (f *fakeAuth, ingest *recordingInges
 	ingest = newRecordingIngest(t)
 	t.Setenv("TERMA_OTLP_URL", ingest.URL)
 	t.Setenv("TERMA_API_KEY", key)
-	if out, err := runTerma(t, "setup", "-y", "--relay-service", "off"); err != nil {
+	if out, err := runTerma(t, "setup", "-y", "--harness", "claude", "--relay-service", "off"); err != nil {
 		t.Fatalf("server-key setup: %v\n%s", err, out)
 	}
 	t.Setenv("TERMA_API_KEY", "")
