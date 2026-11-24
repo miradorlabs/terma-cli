@@ -336,7 +336,7 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 
 	// Persisted `go env -w` file makes unset GOPATH/GOMODCACHE fail closed; GOENV=off or explicit env still resolves.
 	goEnvFile := filepath.Join(parent, "goenv")
-	if err := os.WriteFile(goEnvFile, []byte("GOPATH=/other\nGOMODCACHE=/other/mod\n"), 0o600); err != nil {
+	if err := os.WriteFile(goEnvFile, []byte("GOPATH="+filepath.Join(parent, "other")+"\nGOMODCACHE="+filepath.Join(parent, "other", "mod")+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	envWithGoEnv := func(extra map[string]string) func(string) (string, bool) {
@@ -1181,7 +1181,10 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 		}
 	}
 
-	dir := t.TempDir()
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// 2. hasRemoteLink / fileHasLine / hasGoEnv check ".." segments before cleaning so /safe/jump/../env with remote jump fails closed.
 	if !os.IsPathSeparator('\\') {
@@ -3299,5 +3302,44 @@ func TestPR175ReviewRegressions(t *testing.T) {
 	scReftable := newScan(reftableRepo, baseEnv, work{deadline: time.Now().Add(time.Minute)})
 	if got, ok := scReftable.safeLocate(reftableRepo); ok {
 		t.Errorf("safeLocate(reftable without refs) = (%q, true), want false", got)
+	}
+
+	// 7. Empty and special-prefix (%(prefix)/, :() Git include paths fail closed in safeLocate.
+	for _, body := range []string{
+		"[include]\n\tpath = \"\"\n",
+		"[include]\n\tpath =\n",
+		"[include]\n\tpath = %(prefix)/etc/gitconfig\n",
+		"[include]\n\tpath = :(optional)extra.cfg\n",
+	} {
+		if err := os.WriteFile(filepath.Join(incRepo, ".git", "config"), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		scEmptyInc := newScan(incRepo, baseEnv, work{deadline: time.Now().Add(time.Minute)})
+		if got, ok := scEmptyInc.safeLocate(incRepo); ok {
+			t.Errorf("safeLocate(%q) = (%q, true), want false", body, got)
+		}
+	}
+
+	// 8. Relative GOMODCACHE/GOPATH in GOENV or env fails closed even when modeling the other go env key.
+	for _, body := range []string{"GOMODCACHE=relative\n", "GOPATH=relative\n"} {
+		relGoEnv := filepath.Join(parent, "goenv-rel")
+		if err := os.WriteFile(relGoEnv, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		scRelGE := newScan(parent, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, "GOENV": relGoEnv}), work{deadline: time.Now().Add(time.Minute)})
+		if got, ok := gopath(scRelGE, nil); ok {
+			t.Errorf("GOENV %q: gopath = %q, want false", body, got)
+		}
+		if got, ok := modcache(scRelGE, nil); ok {
+			t.Errorf("GOENV %q: modcache = %q, want false", body, got)
+		}
+	}
+	scRelMCEnv := newScan(parent, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, "GOMODCACHE": "relative"}), work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := gopath(scRelMCEnv, nil); ok {
+		t.Errorf("env GOMODCACHE=relative: gopath = %q, want false", got)
+	}
+	scRelGPEnv := newScan(parent, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, "GOPATH": "relative", "GOMODCACHE": filepath.Join(parent, "mod")}), work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := modcache(scRelGPEnv, nil); ok {
+		t.Errorf("env GOPATH=relative: modcache = %q, want false", got)
 	}
 }

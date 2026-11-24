@@ -80,7 +80,7 @@ func (sc *scan) pwdBare(a []*syntax.Word) (string, bool) {
 func (sc *scan) envVal(k string) string { v, _ := sc.lookup(k); return v }
 func (sc *scan) envSet(k string) bool   { _, ok := sc.lookup(k); return ok }
 func (sc *scan) hasGoEnv(key string) bool {
-	if slices.ContainsFunc([]string{"GOFLAGS", "GOTOOLCHAIN", "GOEXPERIMENT", "GOFIPS140"}, func(k string) bool { return sc.isUnresolvedVar(k) || sc.envVal(k) != "" }) || sc.isUnresolvedVar("GO111MODULE") || !slices.Contains([]string{"", "on", "off", "auto"}, sc.envVal("GO111MODULE")) || sc.isUnresolvedVar("GOWORK") || sc.envVal("GOWORK") != "" && sc.envVal("GOWORK") != "off" {
+	if slices.ContainsFunc([]string{"GOFLAGS", "GOTOOLCHAIN", "GOEXPERIMENT", "GOFIPS140"}, func(k string) bool { return sc.isUnresolvedVar(k) || sc.envVal(k) != "" }) || sc.isUnresolvedVar("GO111MODULE") || !slices.Contains([]string{"", "on", "off", "auto"}, sc.envVal("GO111MODULE")) || sc.isUnresolvedVar("GOWORK") || sc.envVal("GOWORK") != "" && sc.envVal("GOWORK") != "off" || sc.isUnresolvedVar("GOMODCACHE") || sc.envVal("GOMODCACHE") != "" && !filepath.IsAbs(sc.envVal("GOMODCACHE")) || sc.isUnresolvedVar("GOPATH") || sc.envVal("GOPATH") != "" && slices.ContainsFunc(filepath.SplitList(sc.envVal("GOPATH")), func(e string) bool { return !filepath.IsAbs(e) }) {
 		return true
 	}
 	p, bad := sc.envVal("GOENV"), sc.isUnresolvedVar("GOENV")
@@ -95,8 +95,8 @@ func (sc *scan) hasGoEnv(key string) bool {
 	}
 	return bad || p != "" && p != "off" && (!filepath.IsAbs(p) || sc.fileHasLine(p, func(l string) bool {
 		t := strings.TrimSpace(l)
-		k, _, ok := strings.Cut(t, "=")
-		return t != "" && t[0] != '#' && (!ok || k == key || !slices.Contains([]string{"GOPATH", "GOMODCACHE", "GOPROXY", "GOPRIVATE", "GONOPROXY", "GONOSUMDB"}, k))
+		k, v, ok := strings.Cut(t, "=")
+		return t != "" && t[0] != '#' && (!ok || k == key || !slices.Contains([]string{"GOPATH", "GOMODCACHE", "GOPROXY", "GOPRIVATE", "GONOPROXY", "GONOSUMDB"}, k) || k == "GOMODCACHE" && v != "" && !filepath.IsAbs(v) || k == "GOPATH" && v != "" && slices.ContainsFunc(filepath.SplitList(v), func(e string) bool { return !filepath.IsAbs(e) }))
 	}))
 }
 func gopath(sc *scan, args []*syntax.Word) (string, bool) {
@@ -314,7 +314,7 @@ func (sc *scan) badGitConfig(p, gitDir, worktree string, depth int) bool {
 			return true
 		} else if (curSec == "include" || curSec == "includeif") && k == "path" {
 			inc, ok := sc.resolvePath(val, filepath.Dir(p), false)
-			return !hasEq || cont || strings.HasPrefix(val, "~") && !strings.HasPrefix(val, "~/") || val != "" && (!ok || sc.badGitConfig(inc, gitDir, worktree, depth+1))
+			return !hasEq || cont || val == "" || strings.HasPrefix(val, "~") && !strings.HasPrefix(val, "~/") || strings.HasPrefix(val, "%(") || strings.HasPrefix(val, ":(") || !ok || sc.badGitConfig(inc, gitDir, worktree, depth+1)
 		} else if curSec == "core" && k == "worktree" {
 			if rw, ok := sc.resolveJoined(gitDir, val, false); hasEq && !cont && val != "" && worktree != "" && ok {
 				r, _, _, found := sc.walkPath(rw, true)
