@@ -185,8 +185,7 @@ func antigravityEditedPaths(in *antigravityHookInput) []string {
 }
 
 // postToolUse records every tool step as a `terma.tool.call`, since agy has no other
-// export, the file an edit changed and the skill a read loaded; `toolCall.args` is opened
-// only for those paths.
+// export, and the file an edit changed; `toolCall.args` is opened only for that path.
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	defer antigravityAck(env)
 	in, ok := antigravityInput(env)
@@ -202,16 +201,8 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	id := in.id()
 	turn := antigravityTurnID(env, r, id)
 	call, called := antigravityToolCallAttrs(in, turn)
-	// A skill's use rides on the read that loaded it; its definition goes once per conversation.
-	skill, used := antigravityUsedSkill(env, r, in)
 	if called {
-		if used {
-			nameSkill(call, skill)
-		}
 		env.EmitFor(r, spool.Event{Name: semconv.TermaToolCallEvent, SessionID: id, Attrs: call})
-	}
-	if used {
-		hookrun.SpoolSkills(env, r, antigravitySkillStateDir, id, antigravitySkillAttrs(), []hookrun.Skill{skill})
 	}
 	captureAntigravityCalls(ctx, env, r, in)
 

@@ -65,7 +65,18 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 		if n == nil {
 			top := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
-			dir = leaveScope(top.node, top.dir, dir)
+			switch t := top.node.(type) {
+			case *syntax.Subshell, *syntax.CmdSubst, *syntax.ProcSubst:
+				dir = top.dir // a cd inside ends with it
+			case *syntax.BinaryCmd:
+				if t.Op == syntax.Pipe || t.Op == syntax.PipeAll {
+					dir = top.dir // so does one in a pipeline, each part a subshell
+				}
+			case *syntax.IfClause, *syntax.CaseClause, *syntax.WhileClause, *syntax.ForClause:
+				if dir != top.dir {
+					dir = "" // a cd in a branch or loop may not have run
+				}
+			}
 			return true
 		}
 		switch n := n.(type) {
@@ -86,7 +97,16 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 			}
 		case *syntax.CallExpr:
 			words := wordsOf(n)
-			dir = cdTo(words, dir)
+			if len(words) > 0 && words[0].text == "cd" {
+				switch {
+				case len(words) == 2 && words[1].literal && filepath.IsAbs(words[1].text):
+					dir = filepath.Clean(words[1].text)
+				case len(words) == 2 && words[1].literal && dir != "":
+					dir = filepath.Join(dir, words[1].text)
+				default:
+					dir = "" // somewhere the shell decides; relative targets after it are unknown
+				}
+			}
 			if len(words) > 0 && filepath.Base(words[0].text) == "mkdir" {
 				args := make([]string, len(words))
 				for i, w := range words {
@@ -109,39 +129,6 @@ func shellWrites(command, cwd string) (paths []string, commits []int) {
 		return true
 	})
 	return out, commits
-}
-
-// cdTo is the directory the shell is in after running words in dir: a cd moves it, to ""
-// when where cannot be told, so relative paths after it are unknown.
-func cdTo(words []word, dir string) string {
-	if len(words) == 0 || words[0].text != "cd" {
-		return dir
-	}
-	switch {
-	case len(words) == 2 && words[1].literal && filepath.IsAbs(words[1].text):
-		return filepath.Clean(words[1].text)
-	case len(words) == 2 && words[1].literal && dir != "":
-		return filepath.Join(dir, words[1].text)
-	default:
-		return "" // somewhere the shell decides
-	}
-}
-
-// leaveScope is the directory the shell is in, now dir, once node ends, which began in begun.
-func leaveScope(node syntax.Node, begun, dir string) string {
-	switch t := node.(type) {
-	case *syntax.Subshell, *syntax.CmdSubst, *syntax.ProcSubst:
-		return begun // a cd inside ends with it
-	case *syntax.BinaryCmd:
-		if t.Op == syntax.Pipe || t.Op == syntax.PipeAll {
-			return begun // so does one in a pipeline, each part a subshell
-		}
-	case *syntax.IfClause, *syntax.CaseClause, *syntax.WhileClause, *syntax.ForClause:
-		if dir != begun {
-			return "" // a cd in a branch or loop may not have run
-		}
-	}
-	return dir
 }
 
 // patches returns the patch text an apply_patch statement is given.
