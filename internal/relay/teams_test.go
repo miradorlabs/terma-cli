@@ -1155,6 +1155,58 @@ func TestReviewEdgeCases(t *testing.T) {
 			t.Fatal("expected teamDiscoverErr=false after janitor retry succeeded")
 		}
 	})
+
+	t.Run("sessionless_record_from_wholly_uncollected_process_dropped_not_personal", func(t *testing.T) {
+		t.Parallel()
+		now := t0.Add(time.Minute)
+		var routeCalls atomic.Int32
+		router := &stubRouter{
+			active: true, unknownPers: true,
+			routeFn: func(rec Record) Routed {
+				routeCalls.Add(1)
+				return Routed{Outcome: Send, Queued: Queued{Enrollment: "enr_personal", Project: "proj_personal", Account: rec.Account, Kind: "unknown"}}
+			},
+		}
+		r := New(Options{
+			Dir: t.TempDir(), Router: router, SignIn: &testSignIn{account: accountA},
+			Now:          func() time.Time { return now },
+			ProcessAlive: func(int) bool { return true },
+			Lookup: func(session string, _ time.Time) (claim.Claim, bool) {
+				if session == "s_nc1" || session == "s_nc2" {
+					return claim.Claim{PIDs: []int{5151}, Tool: "claude-code"}, true
+				}
+				return claim.Claim{}, false
+			},
+		})
+		r.learnProcess(5151, "s_nc1")
+		r.learnProcess(5151, "s_nc2")
+		p := &part{signal: Logs, msg: oneSessionLog("", "anon"), records: 1, pid: 5151, session: procKey(5151), account: accountA, arrived: now, at: now, endAt: now}
+		r.route(p)
+		if routeCalls.Load() != 0 {
+			t.Fatalf("Router.Route called %d times for wholly uncollected process, want 0", routeCalls.Load())
+		}
+		if got := r.Stats().Snapshot().Counters["dropped.not_collected.logs"]; got != 1 {
+			t.Fatalf("dropped.not_collected.logs = %d, want 1", got)
+		}
+	})
+
+	t.Run("routed_placement_without_project_id_not_treated_as_uncollected", func(t *testing.T) {
+		t.Parallel()
+		now := t0.Add(time.Minute)
+		r := New(Options{
+			Dir: t.TempDir(), Now: func() time.Time { return now },
+			Lookup: func(session string, _ time.Time) (claim.Claim, bool) {
+				if session == "s_repo" {
+					return claim.Claim{Kind: claim.KindRepository, PIDs: []int{5252}, Tool: "claude-code"}, true
+				}
+				return claim.Claim{}, false
+			},
+		})
+		r.learnProcess(5252, "s_repo")
+		if r.collectsNone(5252, now) {
+			t.Fatal("collectsNone returned true for routed placement with non-empty Kind")
+		}
+	})
 }
 
 func oneSessionLog(session, body string) *logspb.LogsData {

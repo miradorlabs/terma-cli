@@ -54,12 +54,8 @@ func splitBeforeMixed(p *part, mixedAt time.Time) (before, atOrAfter *part) {
 	}
 	return parts[0], parts[1]
 }
-func logIV(x *logspb.LogRecord) timeInterval {
-	return makeInterval(x.GetTimeUnixNano(), x.GetObservedTimeUnixNano())
-}
-func spanIV(x *tracepb.Span) timeInterval {
-	return makeInterval(x.GetStartTimeUnixNano(), x.GetEndTimeUnixNano())
-}
+func logIV(x *logspb.LogRecord) timeInterval { return makeInterval(x.GetTimeUnixNano(), x.GetObservedTimeUnixNano()) }
+func spanIV(x *tracepb.Span) timeInterval { return makeInterval(x.GetStartTimeUnixNano(), x.GetEndTimeUnixNano()) }
 func partitionPart(p *part, keyOf func(timeInterval) string) []*part {
 	groups, out := map[string]*part{}, []*part(nil)
 	get := func(k string) *part {

@@ -131,6 +131,9 @@ func (r *Relay) sessionOf(key string, pid int) (session, held string) {
 	return session, cmp.Or(held, whyNoTrace)
 }
 func (r *Relay) decideTeams(key string, p *part) verdict {
+	if ppid, ok := procOf(key); ok && r.collectsNone(ppid, p.at) && (p.endAt.IsZero() || p.endAt.Equal(p.at) || r.collectsNone(ppid, p.endAt)) {
+		return verdict{why: whyNotCollected, final: true}
+	}
 	session, held := r.sessionOf(key, p.pid)
 	rec, how := Record{Session: session, At: p.at, EndAt: p.endAt, Account: p.account, Narrow: p.narrow, Claimed: p.claimed}, attribution{}
 	if rec.Session != "" {

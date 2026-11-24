@@ -99,7 +99,7 @@ func (r *Relay) collectsNone(pid int, at time.Time) bool {
 		if !ok {
 			return false
 		}
-		if c, ok = c.At(pid, at); !ok || c.ProjectID != "" {
+		if c, ok = c.At(pid, at); !ok || c.ProjectID != "" || c.Kind != "" {
 			return false
 		}
 	}
