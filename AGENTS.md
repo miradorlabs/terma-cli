@@ -70,7 +70,13 @@ locations write no manifest, spool line, trailer, or team claim — only a not-c
 placement (`claim.Mark`). Read/shell reach hooks (and Extension agents' `<prefix>-tool-reach`)
 call `runs.MarkMixed` when a session crosses organizations; from `MixedAt` onward all
 conversation and telemetry content is dropped, while metadata-only `runs.Locational` events
-(commits, pushes, file touches) still route by their own checkout.
+(commits, pushes, file touches) still route by their own checkout. A folder outside git that
+is no one's workspace crosses into no organization, Personal included: the filesystem's
+root, a device or kernel filesystem (`2>/dev/null`), the operating system's own folders and
+the machine's scratch space (`/tmp`, `$TMPDIR`), unless it is in the developer's home
+(`nobodys` in `internal/hooks/hookrun/reach.go`). A reach hook that fails never blocks or
+fails the agent's tool: an Extension agent's plugin taints the session, hands nothing more
+of it over and asks terma to mark its run Mixed.
 
 **Commits.** The agent hooks announce the session and record the files it edits in a
 session manifest. At commit time, `prepare-commit-msg` matches the staged files against
@@ -98,7 +104,11 @@ cannot revoke them; an admin can, in the web app).
 The state directory (`config.StateDir`) holds what terma writes as it runs: `routing/`
 (per-profile `routing/<profile>.json` storing account-stamped team enrollments, cached
 policies, and owner/repo bindings updated via account- and generation-checked CAS
-`routing.Update`/`routing.Replace`), `runs/` (per-session run ledgers and Mixed cutoffs),
+`routing.Update`/`routing.Replace`; only `terma setup` writes a profile's first one, but
+for a server-key profile an earlier terma set up, whose stored team, key and policy the
+refresh after an update, or a relay of this build as it starts, turns into its one-team
+`no_person` state, once: `internal/cli/serverkey_migrate.go`), `runs/` (per-session run
+ledgers and Mixed cutoffs),
 `relay/` (including `outbox-v2/.teams/@<account>/<enrollment>/<tool>/`), `spool/`,
 `policies/`, `agents/<agent>/` (each agent's hook state), `funding/`,
 `workspaces/` (session stores for work begun outside git) and `update/`; a repository's
@@ -131,7 +141,9 @@ and Personal uninterrupted. Spool delivery applies the same lane, `routing.State
 and content rules. Antigravity has no export, so its hooks send its content too: the prompt
 and the reply from the transcript, a tool call's arguments from `PostToolUse` and each
 tool's result as `terma.tool.result` (`internal/agents/antigravity/content_paths.go` and
-`turn.go`). Use `terma teams` to manage ticked teams and bindings, `terma route
+`turn.go`), under the content switches of the team routing sends the hook's checkout to
+(`hookrun.Env.PolicyFor`) and only for workspaces routing sends to that same team
+(`hookrun.Env.RoutesWith`). Use `terma teams` to manage ticked teams and bindings, `terma route
 explain` to trace `routing.Router.Route` for a path, and `terma doctor` to inspect routing
 state, per-enrollment health (including `OrgAccessLost`, pending bindings, and single
 `terma setup` remediation for `SignInNeeded`), Mixed runs, and combined outbox/spool losses.

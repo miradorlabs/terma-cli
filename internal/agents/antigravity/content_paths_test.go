@@ -10,6 +10,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 )
 
@@ -66,12 +67,12 @@ func TestAntigravityPathOwner(t *testing.T) {
 		{"relative with no cwd", "", "file.txt", ownerUnresolved},
 		{"a missing path that climbs from the cwd", g.collected, "missing" + string(filepath.Separator) + ".." + string(filepath.Separator) + "file.txt", ownerUnresolved},
 	} {
-		if got := newAntigravityPaths(g.pol).owner(tc.cwd, tc.path); got != tc.want {
+		if got := newAntigravityPaths(hookrun.Env{Policy: g.pol}, nil).owner(tc.cwd, tc.path); got != tc.want {
 			t.Errorf("%s: owner %d, want %d", tc.name, got, tc.want)
 		}
 	}
 	// Global mode collects every checkout.
-	if got := newAntigravityPaths(config.Policy{Mode: config.ModeGlobal}).owner("", filepath.Join(g.excluded, "file.txt")); got != ownerCollected {
+	if got := newAntigravityPaths(hookrun.Env{Policy: config.Policy{Mode: config.ModeGlobal}}, nil).owner("", filepath.Join(g.excluded, "file.txt")); got != ownerCollected {
 		t.Errorf("global mode: owner %d", got)
 	}
 }
@@ -122,13 +123,13 @@ func TestAntigravityJudgesAgysOwnFileAndFolderTools(t *testing.T) {
 		for _, key := range tool.keys {
 			for _, r := range rows {
 				args := argsJSON(t, map[string]any{key: r.path, "Other": 1})
-				if got := newAntigravityPaths(r.pol).refuses(g.collected, name, args); got != r.want {
+				if got := newAntigravityPaths(hookrun.Env{Policy: r.pol}, nil).refuses(g.collected, name, args); got != r.want {
 					t.Errorf("%s %s, %s: refused %v, want %v", name, key, r.name, got, r.want)
 				}
 			}
 		}
 		for _, raw := range []string{"", `"made-up"`, `1`, `["made-up"]`, `null`, `{}`, `{"` + tool.keys[0] + `":1}`} {
-			if !newAntigravityPaths(g.pol).refuses(g.collected, name, json.RawMessage(raw)) {
+			if !newAntigravityPaths(hookrun.Env{Policy: g.pol}, nil).refuses(g.collected, name, json.RawMessage(raw)) {
 				t.Errorf("%s with arguments %q: shown", name, raw)
 			}
 		}
@@ -137,10 +138,10 @@ func TestAntigravityJudgesAgysOwnFileAndFolderTools(t *testing.T) {
 	defer func(was bool) { antigravityShowsFilesInNoRepository = was }(antigravityShowsFilesInNoRepository)
 	antigravityShowsFilesInNoRepository = false
 	file := func(path string) json.RawMessage { return argsJSON(t, map[string]any{"Path": path}) }
-	if !newAntigravityPaths(g.pol).refuses(g.collected, "read_file", file(filepath.Join(g.none, "file.txt"))) {
+	if !newAntigravityPaths(hookrun.Env{Policy: g.pol}, nil).refuses(g.collected, "read_file", file(filepath.Join(g.none, "file.txt"))) {
 		t.Error("a file in no repository was shown with the answer withholding it")
 	}
-	if newAntigravityPaths(g.pol).refuses(g.collected, "read_file", file(filepath.Join(g.collected, "file.txt"))) {
+	if newAntigravityPaths(hookrun.Env{Policy: g.pol}, nil).refuses(g.collected, "read_file", file(filepath.Join(g.collected, "file.txt"))) {
 		t.Error("withholding files in no repository refused a collected one")
 	}
 }
@@ -155,7 +156,7 @@ func TestAntigravityOtherToolsAreNotJudgedAsClaudeCodesAndCodexsAreNot(t *testin
 		if err := json.Unmarshal([]byte(c), &call); err != nil {
 			t.Fatal(err)
 		}
-		if newAntigravityPaths(g.pol).refuses(g.collected, call.Name, call.Args) {
+		if newAntigravityPaths(hookrun.Env{Policy: g.pol}, nil).refuses(g.collected, call.Name, call.Args) {
 			t.Errorf("%s: refused", c)
 		}
 	}
@@ -190,7 +191,7 @@ func argsJSON(t *testing.T, v any) json.RawMessage {
 func TestAntigravityCallsRefused(t *testing.T) {
 	g := newPathRig(t)
 	refuses := func(name string, args json.RawMessage) bool {
-		return newAntigravityPaths(g.pol).refuses(g.collected, name, args)
+		return newAntigravityPaths(hookrun.Env{Policy: g.pol}, nil).refuses(g.collected, name, args)
 	}
 	calls := func(raw ...string) []antigravityToolCall {
 		var out []antigravityToolCall
@@ -227,7 +228,7 @@ func TestAntigravityCallsRefused(t *testing.T) {
 func TestAntigravityWorkspacesMustAllBeCollected(t *testing.T) {
 	g := newPathRig(t)
 	collected := func(pol config.Policy, cwd string, workspaces ...string) bool {
-		return newAntigravityPaths(pol).workspacesCollected(cwd, &antigravityHookInput{WorkspacePaths: workspaces})
+		return newAntigravityPaths(hookrun.Env{Policy: pol}, nil).workspacesCollected(cwd, &antigravityHookInput{WorkspacePaths: workspaces})
 	}
 	for _, tc := range []struct {
 		name       string
@@ -288,20 +289,20 @@ func TestAntigravityPathOwnerFailsClosed(t *testing.T) {
 		{"the home folder", "~"},
 		{"another user's home folder", "~someone/file.txt"},
 	} {
-		if got := newAntigravityPaths(g.pol).owner(g.collected, tc.path); got != ownerUnresolved {
+		if got := newAntigravityPaths(hookrun.Env{Policy: g.pol}, nil).owner(g.collected, tc.path); got != ownerUnresolved {
 			t.Errorf("%s: owner %d", tc.name, got)
 		}
 	}
 
 	t.Setenv("GIT_DIR", filepath.Join(g.collected, ".git"))
-	if got := newAntigravityPaths(g.pol).owner("", filepath.Join(g.excluded, "file.txt")); got != ownerUnresolved {
+	if got := newAntigravityPaths(hookrun.Env{Policy: g.pol}, nil).owner("", filepath.Join(g.excluded, "file.txt")); got != ownerUnresolved {
 		t.Errorf("with GIT_DIR set: owner %d", got)
 	}
-	if !newAntigravityPaths(g.pol).refuses(g.collected, "read_file", argsJSON(t, map[string]any{"Path": filepath.Join(g.collected, "file.txt")})) {
+	if !newAntigravityPaths(hookrun.Env{Policy: g.pol}, nil).refuses(g.collected, "read_file", argsJSON(t, map[string]any{"Path": filepath.Join(g.collected, "file.txt")})) {
 		t.Error("with GIT_DIR set, a read was shown")
 	}
 	for _, pol := range []config.Policy{g.pol, {Mode: config.ModeGlobal}} {
-		if newAntigravityPaths(pol).workspacesCollected(g.collected, &antigravityHookInput{}) {
+		if newAntigravityPaths(hookrun.Env{Policy: pol}, nil).workspacesCollected(g.collected, &antigravityHookInput{}) {
 			t.Errorf("with GIT_DIR set, mode %q collected the workspace", pol.Mode)
 		}
 	}

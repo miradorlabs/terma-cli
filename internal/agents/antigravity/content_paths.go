@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
@@ -59,11 +58,12 @@ func contentConsented(c hookrun.Consent) bool {
 // switch, the developer's consent, and every workspace in a checkout the policy collects.
 type antigravityContent struct{ prompts, tools bool }
 
-// antigravityContentFor is the content the hook in e (its Cwd where it ran) may attach, its
-// workspaces placed by paths.
-func antigravityContentFor(e hookrun.Env, in *antigravityHookInput, paths *antigravityPaths) antigravityContent {
-	prompts, tools := e.Policy.Content()
-	if !prompts && !tools || !contentConsented(e.Consent()) || !paths.workspacesCollected(e.Cwd, in) {
+// antigravityContentFor is the content the hook in e (its Cwd where it ran) may attach to
+// what it records in r, its workspaces placed by paths: the switches are those of the policy
+// r's records leave under, the routed team's once routing is active (hookrun.Env.PolicyFor).
+func antigravityContentFor(e hookrun.Env, r *hookrun.Repo, in *antigravityHookInput, paths *antigravityPaths) antigravityContent {
+	prompts, tools := e.PolicyFor(r).Content()
+	if !prompts && !tools || !contentConsented(e.Consent(r)) || !paths.workspacesCollected(e.Cwd, in) {
 		return antigravityContent{}
 	}
 	return antigravityContent{prompts: prompts, tools: tools}
@@ -83,17 +83,25 @@ const (
 	ownerExcluded
 )
 
-// antigravityPaths judges paths for one hook under its policy, and remembers the owner of each
-// resolved folder it has placed, for the life of the hook.
+// antigravityPaths judges paths for one hook, and remembers the owner of each resolved folder
+// it has placed, for the life of the hook. A checkout is collected when its records leave
+// with those of the hook's own checkout r (hookrun.Env.RoutesWith): the policy admits it
+// before routing, and with it routing sends both to the same team.
 type antigravityPaths struct {
-	pol    config.Policy
+	e      hookrun.Env
+	r      *hookrun.Repo
 	owners map[string]antigravityOwner
 }
 
-// newAntigravityPaths judges paths under pol, with nothing placed yet.
-func newAntigravityPaths(pol config.Policy) *antigravityPaths {
-	return &antigravityPaths{pol: pol, owners: map[string]antigravityOwner{}}
+// newAntigravityPaths judges paths for the hook in e, whose checkout is r, with nothing
+// placed yet.
+func newAntigravityPaths(e hookrun.Env, r *hookrun.Repo) *antigravityPaths {
+	return &antigravityPaths{e: e, r: r, owners: map[string]antigravityOwner{}}
 }
+
+// global reports whether a folder outside git is collected with the hook's own checkout:
+// global mode before routing, and with it a team that takes both.
+func (p *antigravityPaths) global() bool { return p.e.RoutesWith(p.r, "", "") }
 
 // owner places path, absolute or relative to cwd: the checkout that holds its resolved folder
 // (gitx.ResolveFolderFS, gitx.PlaceFolderFS), judged by the policy. A path that starts with "~"
@@ -122,7 +130,7 @@ func (p *antigravityPaths) owner(cwd, path string) antigravityOwner {
 		owner = ownerNone
 	case gitx.InCheckout:
 		owner = ownerExcluded
-		if origin, _ := gitx.OriginFS(gitDir); p.pol.Admits(config.Repository{Origin: origin}) {
+		if origin, _ := gitx.OriginFS(gitDir); p.e.RoutesWith(p.r, gitDir, origin) {
 			owner = ownerCollected
 		}
 	}
@@ -154,7 +162,7 @@ func (p *antigravityPaths) workspacesCollected(cwd string, in *antigravityHookIn
 		switch p.owner("", w) {
 		case ownerCollected:
 		case ownerNone:
-			if !p.pol.Global() {
+			if !p.global() {
 				return false
 			}
 		default:
@@ -202,7 +210,7 @@ func (p *antigravityPaths) refuses(cwd, name string, raw json.RawMessage) bool {
 		switch p.owner(cwd, path) {
 		case ownerCollected:
 		case ownerNone:
-			if tool.folder && !p.pol.Global() || !tool.folder && !antigravityShowsFilesInNoRepository {
+			if tool.folder && !p.global() || !tool.folder && !antigravityShowsFilesInNoRepository {
 				return true
 			}
 		default:

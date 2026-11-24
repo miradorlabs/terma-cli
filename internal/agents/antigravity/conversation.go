@@ -79,7 +79,7 @@ func (o *antigravityOwnCall) time(next func() time.Time) time.Time {
 // antigravityCallLockWait for another of its hooks, and loads its calls state. Without a
 // transcript of agy's shape, a spool or a safe id, it holds nothing.
 func openAntigravityConversation(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *antigravityHookInput) *antigravityConversation {
-	c := &antigravityConversation{e: e, r: r, in: in, call: antigravityOwnCall{step: -1}, paths: newAntigravityPaths(e.Policy)}
+	c := &antigravityConversation{e: e, r: r, in: in, call: antigravityOwnCall{step: -1}, paths: newAntigravityPaths(e, r)}
 	transcript := antigravityTranscript(in)
 	id := in.id()
 	if transcript == "" || e.Spool == nil || !session.ValidID(id) {
@@ -145,7 +145,7 @@ func (c *antigravityConversation) callTime() time.Time { return c.call.time(c.no
 // contentFor is the content this hook may attach, worked out once.
 func (c *antigravityConversation) contentFor() antigravityContent {
 	if c.content == nil {
-		content := antigravityContentFor(c.e, c.in, c.paths)
+		content := antigravityContentFor(c.e, c.r, c.in, c.paths)
 		c.content = &content
 	}
 	return *c.content

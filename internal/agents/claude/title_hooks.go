@@ -13,7 +13,7 @@ var claudeTitleStateDir = hookrun.AgentStateDir(name, "titles")
 // captureClaudeTitle spools the session's name when new or renamed. It restates the first
 // prompt, so it travels under titleConsented and, at delivery, the policy's prompt switch.
 func captureClaudeTitle(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *claudeHookInput) {
-	if in.TranscriptPath == "" || !titleConsented(e.Consent()) {
+	if in.TranscriptPath == "" || !titleConsented(e.Consent(r)) {
 		return
 	}
 	attrs := map[string]any{semconv.GenAIMainAgentNameKey: claudeTool, semconv.TermaEvidenceSourceKey: sourceClaudeTranscript}

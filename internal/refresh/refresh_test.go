@@ -206,3 +206,44 @@ func TestMachineRefreshPropagatesHookTrustFailureAndRetriesWhenPlanEmpty(t *test
 		t.Fatal("successful retry was not recorded as refreshed")
 	}
 }
+
+// A refresh migrates what an earlier terma kept in the state directory once the relay's
+// step has run, reports what the migration wrote, and stays due while it fails; a relay
+// step that failed may have left an earlier build's relay running, so nothing is migrated
+// until a later refresh.
+func TestARefreshMigratesAfterTheRelayStepAndRetriesAFailure(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	var order []string
+	service := func(err error) func(context.Context) (string, bool, error) {
+		return func(context.Context) (string, bool, error) { order = append(order, "relay"); return "", false, err }
+	}
+	migrate := func(err error) func(context.Context) ([]string, error) {
+		return func(context.Context) ([]string, error) {
+			order = append(order, "migrate")
+			return []string{"/state/routing/default.json"}, err
+		}
+	}
+	r := Refresher{StateDir: dir, Version: "v3.1.0", Agents: agents.New(), RelayService: service(nil), Migrate: migrate(nil)}
+	changed, err := r.Run(t.Context())
+	if err != nil || !slices.Equal(changed, []string{"/state/routing/default.json"}) || !slices.Equal(order, []string{"relay", "migrate"}) {
+		t.Fatalf("Run = %v, %v in order %v; want the migrated file, after the relay step", changed, err, order)
+	}
+	if selfupdate.NeedsRefresh(dir, "v3.1.0") {
+		t.Fatal("a refresh that migrated is still due")
+	}
+
+	failed := Refresher{StateDir: t.TempDir(), Version: "v3.1.0", Agents: agents.New(), RelayService: service(nil), Migrate: migrate(errors.New("keychain locked"))}
+	if _, err := failed.Run(t.Context()); err == nil || !strings.Contains(err.Error(), "keychain locked") {
+		t.Fatalf("Run with a failed migration = %v", err)
+	}
+	if !selfupdate.NeedsRefresh(failed.StateDir, "v3.1.0") {
+		t.Fatal("a refresh whose migration failed is not retried")
+	}
+
+	order = nil
+	blocked := Refresher{StateDir: t.TempDir(), Version: "v3.1.0", Agents: agents.New(), RelayService: service(errors.New("a pre-routing relay is still running")), Migrate: migrate(nil)}
+	if changed, err := blocked.Run(t.Context()); err == nil || len(changed) != 0 || !slices.Equal(order, []string{"relay"}) {
+		t.Fatalf("Run with a failed relay step = %v, %v in order %v; want nothing migrated", changed, err, order)
+	}
+}

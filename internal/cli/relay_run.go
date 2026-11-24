@@ -15,6 +15,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -53,8 +54,20 @@ func (app *App) newRelayRunCommand() *cobra.Command {
 			engine.UpdateAuto = func() string { return app.updateAuto(install) }
 			res, err := daemon.Run(ctx, daemon.Config{
 				StateDir: app.stateDir, Addr: addr, Idle: idle, Service: asService, Follow: follow, Launch: launch, Environment: cfg.Environment, Version: app.version, Log: log,
-				Engine:  engine,
-				OnRelay: onRelay,
+				Engine: engine,
+				// This relay holds the relay's lock by now, so none of an earlier build runs: a
+				// server-key profile set up before team routing gets its routing state before
+				// this relay, maybe the first of this build to run here, routes by it.
+				OnRelay: func(r *relay.Relay) {
+					wrote, err := app.writeServerKeyRouting(app.serverKeyProfilesToMigrate())
+					for _, path := range wrote {
+						log.Printf("wrote %s: the routing state of a server-key profile set up before team routing", path)
+					}
+					if err != nil {
+						log.Printf("a server-key profile's routing state could not be written (%v): run `terma setup` with TERMA_API_KEY set", err)
+					}
+					onRelay(r)
+				},
 				Workers: []func(context.Context){teamWorker, app.sweepHookState},
 				Updater: app.relayUpdater(install),
 				Listening: func(at net.Addr, hold time.Duration) {

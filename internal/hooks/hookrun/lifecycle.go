@@ -264,11 +264,17 @@ func (e Env) checkouts(r *Repo, paths []string) []touched {
 // checkoutOf is the checkout holding dir, judged from the filesystem alone: r when dir is in
 // r or no checkout can be read there (an inherited GIT_DIR names r's), another one only if
 // the team policy admits it, else nil. When Routing is active every other checkout is
-// returned with its routing destination so touches of uncollected repos are classified too.
+// returned with its routing destination so touches of uncollected repos are classified too,
+// and so is a folder outside git, as the place personal may collect, unless it is no one's
+// workspace (nobodys): a device or scratch space is reached and edited by every team's
+// sessions, so it places nothing, crosses into no organization and reports no touch.
 func (e Env) checkoutOf(r *Repo, dir string) *Repo {
 	root, gitDir, ok := gitx.LocateFS(dir)
 	if !ok {
 		if e.Routing != nil && (r == nil || r.GitDir != "") {
+			if nobodys(dir) {
+				return nil
+			}
 			return &Repo{Root: dir, dest: e.Routing.route(routing.Location{Kind: routing.OutsideGit}, e.Time())}
 		}
 		return r

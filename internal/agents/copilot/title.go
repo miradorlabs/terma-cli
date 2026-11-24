@@ -28,7 +28,7 @@ var copilotTitleStateDir = hookrun.AgentStateDir(name, "titles")
 // after its first prompt until someone renames it, so the name travels under titleConsented
 // and, at delivery, the policy's prompt switch. Its telemetry carries no name.
 func captureTitle(ctx context.Context, e hookrun.Env, r *hookrun.Repo, sessionID string) {
-	if !titleConsented(e.Consent()) {
+	if !titleConsented(e.Consent(r)) {
 		return
 	}
 	var matches func(string) bool

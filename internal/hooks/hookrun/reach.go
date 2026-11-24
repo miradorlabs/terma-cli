@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"mvdan.cc/sh/v3/pattern"
@@ -77,6 +78,47 @@ func (e Env) reached(r *Repo, paths []string) (out []touched) {
 		}
 	}
 	return out
+}
+
+// deviceRoots are the device and kernel filesystems, which are no one's workspace.
+var deviceRoots = []string{"/dev", "/proc", "/sys"}
+
+// machineRoots are the folders that are the machine's own, each as named and as its links
+// resolve: the operating system's configuration and programs, and the scratch space
+// (/tmp is /private/tmp on macOS, and $TMPDIR a folder of /var/folders there).
+var machineRoots = sync.OnceValue(func() (roots []string) {
+	for _, root := range []string{"/etc", "/bin", "/sbin", "/usr", "/lib", "/lib64", "/System", "/Library", "/tmp", "/var/tmp", os.TempDir()} {
+		if root = filepath.Clean(root); filepath.IsAbs(root) && root != filepath.Dir(root) {
+			roots = appendUnique(roots, root, resolved(root))
+		}
+	}
+	return roots
+})
+
+// nobodys reports whether dir, a folder in no git checkout, is no one's workspace, so that
+// reaching it crosses into no organization, personal included (checkoutOf): the
+// filesystem's root folder itself, a device or kernel filesystem (2>/dev/null,
+// /proc/cpuinfo), the operating system's own folders (/etc/hosts, /usr/bin), or the
+// machine's scratch space (ls /tmp, a mktemp file), which every tool and every team's
+// session on the machine shares. Any other folder outside git may hold the developer's own
+// work, and stays theirs: so does a folder of their home wherever the home is, and a git
+// checkout kept in scratch space is still its origin's, never asked about here.
+func nobodys(dir string) bool {
+	if dir == filepath.Dir(dir) || slices.ContainsFunc(deviceRoots, func(root string) bool { return under(dir, root) }) {
+		return true
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != filepath.Dir(home) && (under(dir, home) || under(dir, resolved(home))) {
+		return false
+	}
+	return slices.ContainsFunc(machineRoots(), func(root string) bool { return under(dir, root) })
+}
+
+// under reports whether dir is root or a folder below it.
+func under(dir, root string) bool {
+	if root == "" || len(dir) < len(root) || dir[:len(root)] != root && (filepath.Separator != '\\' || !strings.EqualFold(dir[:len(root)], root)) {
+		return false
+	}
+	return len(dir) == len(root) || os.IsPathSeparator(dir[len(root)])
 }
 
 const aloneMark = "\x00alone\x00"

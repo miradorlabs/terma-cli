@@ -1,7 +1,8 @@
 // Package refresh rewrites, with this build's templates, the home-directory files an
 // earlier terma wrote: from disk alone, never creating a file, signing in, or changing a
 // choice, which `terma setup` would; but an agent's home that a client made after setup gets
-// terma's hook when another home of that agent already has it switched on.
+// terma's hook when another home of that agent already has it switched on, and what an
+// earlier terma kept in the state directory is brought to what this build reads (Migrate).
 package refresh
 
 import (
@@ -24,22 +25,36 @@ type Refresher struct {
 	// RelayService rewrites the relay's service when it is not what this build would
 	// install, returning its path and whether it did; nil leaves the service alone.
 	RelayService func(ctx context.Context) (path string, changed bool, err error)
+	// Migrate brings what an earlier terma kept in the state directory to what this build
+	// reads, from disk alone, returning the files it wrote; nil migrates nothing.
+	Migrate func(ctx context.Context) (wrote []string, err error)
 }
 
 // machine refreshes the agents' home-directory files, then the relay's service, which an
-// earlier build may have written to run a command this one lacks.
+// earlier build may have written to run a command this one lacks, then, once no relay of an
+// earlier build is in the way, the state an earlier build kept.
 func (r Refresher) machine(ctx context.Context) ([]string, error) {
 	changed, err := r.Machine()
-	if r.RelayService == nil {
-		return changed, err
+	var serviceErr error
+	if r.RelayService != nil {
+		var path string
+		var ok bool
+		if path, ok, serviceErr = r.RelayService(ctx); serviceErr != nil {
+			err = errors.Join(err, fmt.Errorf("relay service: %w", serviceErr))
+		} else if ok {
+			changed = append(changed, path)
+		}
 	}
-	path, ok, serviceErr := r.RelayService(ctx)
-	if serviceErr != nil {
-		serviceErr = fmt.Errorf("relay service: %w", serviceErr)
-	} else if ok {
-		changed = append(changed, path)
+	// A relay step that failed may have left an earlier build's relay running: the next
+	// refresh migrates, once it is gone.
+	if r.Migrate != nil && serviceErr == nil {
+		wrote, migrateErr := r.Migrate(ctx)
+		changed = append(changed, wrote...)
+		if migrateErr != nil {
+			err = errors.Join(err, fmt.Errorf("state of an earlier version: %w", migrateErr))
+		}
 	}
-	return changed, errors.Join(err, serviceErr)
+	return changed, err
 }
 
 // Machine rewrites each agent's home-directory files, carrying on past a failure.

@@ -297,9 +297,16 @@ export default async function (omp: any) {
         t?.unref?.()
       }),
     ])
+  // A session whose reach hook failed is tainted: this extension hands nothing more of it
+  // over, and asks terma to fence its run (mark it Mixed) so the relay drops what OMP exports
+  // of it. A tool is never blocked or failed for it: with terma gone, signed out or not yet
+  // set up, nothing claims the session and the relay forwards none of it anyway.
   const tainted = new Set<string>()
   const fenced = new Map<string, { gen: number; parent: string; pGen: number }>()
   const fencing = new Map<string, Promise<boolean>>()
+  // unfenced are the runs whose fence failed once: a later tool call tries again without
+  // waiting for it, so a terma that cannot answer delays the agent once, not at every call.
+  const unfenced = new Set<string>()
   const runGen = new Map<string, number>()
   const isTainted = (s: string, parent = "") => !!(s && tainted.has(s)) || !!(parent && tainted.has(parent))
   const isFenced = (s: string, parent = "") => {
@@ -316,10 +323,11 @@ export default async function (omp: any) {
     if (isFenced(s, parent)) return Promise.resolve(true)
     const key = parent || s
     const active = fencing.get(key)
-    if (active) return active
+    if (active) return unfenced.has(key) ? Promise.resolve(false) : active
     // Fail-closed fence: await lifecycle drain (bounded) and flip the run to Mixed via
-    // an unresolvable shell reach before tool execution continues. If fencing also fails,
-    // tool_call blocks execution so OMP's native OTLP export cannot leak under a stale claim.
+    // an unresolvable shell reach, which the first tool call it is needed for waits for,
+    // within the hook's bounds. If fencing fails too the tool still runs: the session stays
+    // tainted, and every later tool call tries the fence again, in the background.
     const p = (async () => {
       const drained = await awaitWithin(lifecycle.then(() => true, () => true), HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS, false)
       if (!drained) return false
@@ -339,7 +347,13 @@ export default async function (omp: any) {
       return ok
     })().finally(() => { if (fencing.get(key) === p) fencing.delete(key) })
     fencing.set(key, p)
-    return p
+    const waited = unfenced.has(key) ? Promise.resolve(false) : p
+    void p.then((ok) => {
+      if ((runGen.get(s) ?? 0) !== gen) return
+      if (ok) unfenced.delete(key)
+      else unfenced.add(key)
+    })
+    return waited
   }
   const reached = new Map<string, Promise<boolean>>()
   const emitReach = (event: any, ctx: any): Promise<boolean> | null => {
@@ -368,6 +382,7 @@ export default async function (omp: any) {
       runGen.set(session, (runGen.get(session) ?? 0) + 1)
       fenced.delete(session)
       fencing.delete(session)
+      unfenced.delete(session)
       if (!parent) tainted.delete(session)
     }
     return queuedHook("omp-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason, parent_session_id: parent || undefined }).then(() => undefined)
@@ -404,6 +419,9 @@ export default async function (omp: any) {
     sendTitle(ctx)
   })
 
+  // The reach is judged, or the run fenced, before the tool runs where terma answers in
+  // time. The handler returns nothing whatever came of it, which lets the tool run: a hook
+  // never fails the agent, and a failed one only stops what terma collects of the session.
   omp.on("tool_call", async (event: any, ctx: any) => {
     const pendingReach = emitReach(event, ctx)
     if (!pendingReach) return
@@ -411,9 +429,7 @@ export default async function (omp: any) {
       reached.set(event.toolCallId, pendingReach)
       if (reached.size > 1024) reached.delete(reached.keys().next().value!)
     }
-    if (!(await pendingReach)) {
-      return { block: true, reason: "terma reach fence failed" }
-    }
+    await pendingReach.catch(() => false)
   })
 
   omp.on("tool_result", async (event: any, ctx: any) => {

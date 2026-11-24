@@ -163,6 +163,41 @@ func holdKey(d routing.Decision) string {
 	return ""
 }
 
+// PolicyFor is the collection policy r's records leave under: Env.Policy before routing,
+// and with it the last validated policy of the team routing sends or holds r for (delivery
+// applies that team's policy again as each record leaves), or none where it drops r.
+func (e Env) PolicyFor(r *Repo) config.Policy {
+	if e.Routing == nil {
+		return e.Policy
+	}
+	if r != nil && r.dest.collected() && e.Routing.Usable() {
+		if t, ok := e.Routing.state.Team(r.dest.d.EnrollmentID); ok {
+			return t.Policy
+		}
+	}
+	return config.NoPolicy("", "")
+}
+
+// RoutesWith reports whether the records of another place leave with r's: the checkout
+// whose git directory is gitDir, with that origin, or a folder outside git when gitDir is
+// "". Before routing the policy says so (it admits the checkout, or global mode collects
+// outside git); with it, routing sends or holds both for the same team, under the same
+// pending binding if any, so a repository the developer bound elsewhere, refused or left
+// undecided never shares r's content, whatever r's team lists.
+func (e Env) RoutesWith(r *Repo, gitDir, origin string) bool {
+	if e.Routing == nil {
+		if gitDir == "" {
+			return e.Policy.Global()
+		}
+		return e.Policy.Admits(config.Repository{Origin: origin})
+	}
+	if r == nil || !r.dest.collected() {
+		return false
+	}
+	d := e.Routing.route(locationOf(gitDir, origin), e.Time())
+	return d.collected() && d.d.EnrollmentID == r.dest.d.EnrollmentID && holdKey(d.d) == holdKey(r.dest.d)
+}
+
 // Routed stamps ev with r's routed destination and the session's current run when routed.
 func (e Env) Routed(r *Repo, ev spool.Event) spool.Event {
 	if e.Routing == nil || r == nil || r.dest == nil {

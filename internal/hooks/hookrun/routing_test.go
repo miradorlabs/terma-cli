@@ -401,7 +401,10 @@ func TestRoutedOutsideGitPersonalAndSymlinkEditMixed(t *testing.T) {
 	stateDir := t.TempDir()
 	repoA := namedRepo(t, "alpha", "git@github.com:orgA/alpha.git")
 	repoB := namedRepo(t, "beta", "git@github.com:orgB/beta.git")
+	// A folder of the developer's home: a temp folder that is not is no one's (nobodys).
 	outsideDir := t.TempDir()
+	t.Setenv("HOME", outsideDir)
+	t.Setenv("USERPROFILE", outsideDir)
 	personalFile := filepath.Join(outsideDir, "diary.txt")
 	if err := os.WriteFile(personalFile, []byte("private\n"), 0o644); err != nil {
 		t.Fatal(err)
