@@ -72,15 +72,14 @@ func (app *App) runTeamsChecklist(cmd *cobra.Command, cfg *config.Config, st rou
 		run = prompt.Run
 	}
 	result, err := run(form)
-	if errors.Is(err, prompt.ErrCancelled) {
-		return teamsView{}, errCancelled
-	}
 	if err != nil {
+		if errors.Is(err, prompt.ErrCancelled) {
+			return teamsView{}, errCancelled
+		}
 		return teamsView{}, err
 	}
-	ff := checklistDiff(v, slots, result, f)
-	if !ff.changes() {
-		return v, nil
+	if ff := checklistDiff(v, slots, result, f); ff.changes() {
+		return app.applyTeamsWithView(cmd, cfg, st, v, true, ff)
 	}
-	return app.applyTeamsWithView(cmd, cfg, st, v, true, ff)
+	return v, nil
 }

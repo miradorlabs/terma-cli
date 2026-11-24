@@ -18,20 +18,15 @@ import (
 )
 
 type teamsChange struct {
-	ops      []bindingOp
-	untick   []routing.Team
-	released map[string]bool
-	ticks    []*tick
-	changes  []string
-	warnings []string
+	ops               []bindingOp
+	untick            []routing.Team
+	released          map[string]bool
+	ticks             []*tick
+	changes, warnings []string
 }
 
-// applyTeams makes f's changes against st as one CAS routing-state write
+// applyTeamsWithView makes f's changes against st as one CAS routing-state write
 // (st.ExpectConsent): bindings, then unticks/releases, then ticks. No keys are minted.
-func (app *App) applyTeams(cmd *cobra.Command, cfg *config.Config, st routing.State, f teamsFlags) (teamsView, error) {
-	return app.applyTeamsWithView(cmd, cfg, st, teamsView{}, false, f)
-}
-
 func (app *App) applyTeamsWithView(cmd *cobra.Command, cfg *config.Config, st routing.State, v teamsView, listed bool, f teamsFlags) (teamsView, error) {
 	ctx := cmd.Context()
 	names := loadTeamNames(app.stateDir, cfg.ProfileName)
@@ -91,11 +86,8 @@ func (app *App) applyTeamsWithView(cmd *cobra.Command, cfg *config.Config, st ro
 			if err != nil {
 				return teamsView{}, err
 			}
-			if err := decideBindings(planned, tk, tickAsker{cmd: cmd, ask: ask, assumeYes: f.assumeYes}); err != nil {
+			if err := decideBindings(&planned, tk, tickAsker{cmd: cmd, ask: ask, assumeYes: f.assumeYes, names: names}); err != nil {
 				return teamsView{}, err
-			}
-			for _, op := range tk.ops {
-				_ = op.apply(&planned)
 			}
 			ch.ticks = append(ch.ticks, tk)
 		}
@@ -109,7 +101,7 @@ func (app *App) applyTeamsWithView(cmd *cobra.Command, cfg *config.Config, st ro
 	}
 
 	for _, tk := range ch.ticks {
-		if committed, ok := next.Team(tk.enrollmentID); ok {
+		if committed, ok := next.Team(tk.enrollment); ok {
 			_ = routing.StoreTeamPolicy(app.stateDir, committed)
 		}
 		ch.changes = append(ch.changes, "ticked "+orgTeamLabel(tk.orgName, tk.teamName))
@@ -169,7 +161,7 @@ func (ch *teamsChange) write(s *routing.State, now time.Time) error {
 		if err != nil {
 			return err
 		}
-		tk.enrollmentID = id
+		tk.enrollment = id
 	}
 	return nil
 }
@@ -275,11 +267,7 @@ func unselectedTeam(v teamsView, ref string) (orgRow, teamRow, error) {
 			all = append(all, candidate{org: o, team: t})
 		}
 	}
-	k := matchKind[candidate]{
-		noun: "team",
-		id:   func(c candidate) string { return c.team.ID },
-		name: func(c candidate) string { return c.team.Name },
-	}
+	k := matchKind[candidate]{noun: "team", id: func(c candidate) string { return c.team.ID }, name: func(c candidate) string { return c.team.Name }}
 	idx, err := matchUniqueRef(k, all, ref, func(c candidate) string {
 		return fmt.Sprintf("%s (%s)", orgTeamLabel(orgTitle(c.org), cmp.Or(c.team.Name, c.team.ID)), c.team.ID)
 	})

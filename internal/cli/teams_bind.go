@@ -38,7 +38,7 @@ func resolveBindingFlags(cmd *cobra.Command, planned *routing.State, f teamsFlag
 				}
 				op.override = true
 			}
-		} else if err := keepRepositoryDecisions(cmd, planned, key, org, orgName, false, *names, ask, ch); err != nil {
+		} else if err := keepRepositoryDecisions(cmd, planned, key, org, orgName, false, *names, ask, &ch.ops, &ch.changes, &ch.warnings); err != nil {
 			return err
 		}
 		if err := op.apply(planned); err != nil {
@@ -52,7 +52,7 @@ func resolveBindingFlags(cmd *cobra.Command, planned *routing.State, f teamsFlag
 			return err
 		}
 		if routing.Owner(key) == "" {
-			if err := keepRepositoryDecisions(cmd, planned, key, "", "", true, *names, ask, ch); err != nil {
+			if err := keepRepositoryDecisions(cmd, planned, key, "", "", true, *names, ask, &ch.ops, &ch.changes, &ch.warnings); err != nil {
 				return err
 			}
 		}
@@ -124,7 +124,7 @@ func confirmConflict(cmd *cobra.Command, question string, ask, assumeYes bool) e
 	return errCancelled
 }
 
-func keepRepositoryDecisions(cmd *cobra.Command, planned *routing.State, owner, org, orgName string, refuse bool, names teamNames, ask bool, ch *teamsChange) error {
+func keepRepositoryDecisions(cmd *cobra.Command, planned *routing.State, owner, org, orgName string, refuse bool, names teamNames, ask bool, ops *[]bindingOp, changes, warnings *[]string) error {
 	ownerAction := "bound to " + cmp.Or(orgName, org)
 	if refuse {
 		ownerAction = "refused to every organization"
@@ -142,14 +142,17 @@ func keepRepositoryDecisions(cmd *cobra.Command, planned *routing.State, owner, 
 			}
 		}
 		if keep {
-			ch.warnings = append(ch.warnings, "kept "+k+" "+bindingWords(b, names)+", under "+owner)
+			*warnings = append(*warnings, "kept "+k+" "+bindingWords(b, names)+", under "+owner)
 			continue
 		}
 		op := bindingOp{key: k}
 		if err := op.apply(planned); err != nil {
 			return err
 		}
-		ch.ops, ch.changes = append(ch.ops, op), append(ch.changes, describeOp(op, ""))
+		*ops = append(*ops, op)
+		if changes != nil {
+			*changes = append(*changes, describeOp(op, ""))
+		}
 	}
 	return nil
 }

@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/miradorlabs/terma-cli/internal/account/keystore"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/routing"
@@ -884,6 +886,51 @@ func TestTeamsSignInNeededMessageAndInvalidStateFailure(t *testing.T) {
 		}
 		if st.Bindings["github.com/acme"].Organization != orgA().ID || st.Bindings["github.com/acme/api"].Organization != orgB().ID {
 			t.Fatalf("bindings = %+v", st.Bindings)
+		}
+	})
+
+	t.Run("interactive whole-owner selection reconciles existing child repository bindings", func(t *testing.T) {
+		for _, keepChild := range []bool{true, false} {
+			name, answer := "unbind", "n\n"
+			if keepChild {
+				name, answer = "keep", "y\n"
+			}
+			t.Run(name, func(t *testing.T) {
+				routedMachine(t, "alice", func(_ *fakeAuth, s *routing.State) error {
+					return s.Bind("github.com/acme/other", orgB().ID, false)
+				})
+				prevAsk, prevPick := testApp.canAsk, tickPick
+				t.Cleanup(func() { testApp.canAsk, tickPick = prevAsk, prevPick })
+				testApp.canAsk = func() bool { return true }
+				tickPick = func(*cobra.Command, string, []pickRow, func(string) (int, error)) (int, error) { return 1, nil }
+				cmd := testApp.NewRootCommand()
+				var out strings.Builder
+				cmd.SetIn(strings.NewReader(answer))
+				cmd.SetOut(&out)
+				cmd.SetErr(&out)
+				cmd.SetArgs([]string{"teams", "--select", "Acme API"})
+				if err := cmd.Execute(); err != nil {
+					t.Fatalf("teams --select: %v\n%s", err, out.String())
+				}
+				st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if st.Bindings["github.com/acme"].Organization != orgA().ID {
+					t.Fatalf("owner binding = %+v, want %s", st.Bindings["github.com/acme"], orgA().ID)
+				}
+				child, hasChild := st.Bindings["github.com/acme/other"]
+				if keepChild {
+					if !hasChild || child.Organization != orgB().ID {
+						t.Fatalf("kept child = (%+v, %v), want %s", child, hasChild, orgB().ID)
+					}
+					if !strings.Contains(out.String(), "kept github.com/acme/other") {
+						t.Fatalf("output missing kept warning:\n%s", out.String())
+					}
+				} else if hasChild {
+					t.Fatalf("child binding = %+v, want unbound under whole owner", child)
+				}
+			})
 		}
 	})
 }

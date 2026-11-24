@@ -15,19 +15,15 @@ import (
 )
 
 type tick struct {
-	team         routing.Team
-	orgName      string
-	teamName     string
-	ops          []bindingOp
-	notes        []string
-	enrollmentID string
+	team                          routing.Team
+	orgName, teamName, enrollment string
+	ops                           []bindingOp
+	notes                         []string
 }
 
 type bindingOp struct {
-	key      string
-	org      string
-	refuse   bool
-	override bool
+	key, org         string
+	refuse, override bool
 }
 
 func (op bindingOp) apply(s *routing.State) error {
@@ -64,20 +60,22 @@ func prepareTick(ctx context.Context, client *api.Client, authURL string, o orgR
 	return tk, nil
 }
 
+var tickPick = pick
+
 type tickAsker struct {
-	cmd       *cobra.Command
-	ask       bool
-	assumeYes bool
+	cmd            *cobra.Command
+	ask, assumeYes bool
+	names          teamNames
 }
 
 // decideBindings resolves the undecided bindings tk's policy needs: prompts interactively,
 // takes defaults under --yes, or leaves them pending.
-func decideBindings(st routing.State, tk *tick, a tickAsker) error {
+func decideBindings(planned *routing.State, tk *tick, a tickAsker) error {
 	t := tk.team
 	if t.Personal || t.Policy.Global() {
 		return nil
 	}
-	var need []routing.Entry
+	var need, skipped []routing.Entry
 	exactOnly := true
 	for _, raw := range t.Policy.Repositories {
 		e, ok := routing.ParseEntry(raw, t.Policy.Wildcards)
@@ -85,29 +83,49 @@ func decideBindings(st routing.State, tk *tick, a tickAsker) error {
 			continue
 		}
 		exactOnly = exactOnly && !e.Wildcard()
-		switch who, decided := decisionFor(st, e); {
+		switch who, decided := decisionFor(*planned, e); {
 		case decided && who == t.OrganizationID:
 		case decided:
-			tk.notes = append(tk.notes, raw+" is skipped: "+who)
+			skipped = append(skipped, e)
 		default:
 			need = append(need, e)
 		}
 	}
-	if len(need) == 0 {
-		return nil
-	}
-	if exactOnly {
-		return decideOwners(tk, need, a)
-	}
-	for _, e := range need {
-		op, err := askBinding(a, tk, e.Key(), "needed by "+e.Raw)
-		if err != nil {
+	if len(need) > 0 && exactOnly {
+		if err := decideOwners(planned, tk, need, a); err != nil {
 			return err
 		}
-		if op != nil {
-			tk.ops = append(tk.ops, *op)
+	} else {
+		for _, e := range need {
+			op, err := askBinding(a, tk, e.Key(), "needed by "+e.Raw)
+			if err != nil {
+				return err
+			}
+			if op != nil {
+				if err := addTickOp(planned, tk, a, *op); err != nil {
+					return err
+				}
+			}
 		}
 	}
+	for _, e := range skipped {
+		if who, decided := decisionFor(*planned, e); decided && who != t.OrganizationID {
+			tk.notes = append(tk.notes, e.Raw+" is skipped: "+who)
+		}
+	}
+	return nil
+}
+
+func addTickOp(planned *routing.State, tk *tick, a tickAsker, op bindingOp) error {
+	if routing.Owner(op.key) == "" {
+		if err := keepRepositoryDecisions(a.cmd, planned, op.key, op.org, tk.orgName, op.refuse, a.names, a.ask, &tk.ops, nil, &tk.notes); err != nil {
+			return err
+		}
+	}
+	if err := op.apply(planned); err != nil {
+		return err
+	}
+	tk.ops = append(tk.ops, op)
 	return nil
 }
 
@@ -127,7 +145,7 @@ func decisionFor(st routing.State, e routing.Entry) (string, bool) {
 	return "", false
 }
 
-func decideOwners(tk *tick, need []routing.Entry, a tickAsker) error {
+func decideOwners(planned *routing.State, tk *tick, need []routing.Entry, a tickAsker) error {
 	var owners []string
 	byOwner := map[string][]string{}
 	for _, e := range need {
@@ -138,9 +156,9 @@ func decideOwners(tk *tick, need []routing.Entry, a tickAsker) error {
 		byOwner[o] = append(byOwner[o], e.Key())
 	}
 	for _, owner := range owners {
-		repos, whole := byOwner[owner], false
+		keys := byOwner[owner]
 		if a.ask {
-			i, err := pick(a.cmd, fmt.Sprintf("%s lists %d of %s's repositories. Bind to %s:", tk.teamName, len(repos), owner, cmp.Or(tk.orgName, tk.team.OrganizationID)), []pickRow{
+			i, err := tickPick(a.cmd, fmt.Sprintf("%s lists %d of %s's repositories. Bind to %s:", tk.teamName, len(keys), owner, cmp.Or(tk.orgName, tk.team.OrganizationID)), []pickRow{
 				{Label: "just the listed repositories", Note: "the owner's other repositories stay free: personal may collect them", Default: true},
 				{Label: "the whole owner " + owner, Note: "every repository under it belongs to " + cmp.Or(tk.orgName, "the organization")},
 				{Label: "decide later", Note: "what they match is held until you decide"},
@@ -151,16 +169,16 @@ func decideOwners(tk *tick, need []routing.Entry, a tickAsker) error {
 			if i == 2 {
 				continue
 			}
-			whole = i == 1
+			if i == 1 {
+				keys = []string{owner}
+			}
 		} else if !a.assumeYes {
 			continue
 		}
-		if whole {
-			tk.ops = append(tk.ops, bindingOp{key: owner, org: tk.team.OrganizationID})
-			continue
-		}
-		for _, r := range repos {
-			tk.ops = append(tk.ops, bindingOp{key: r, org: tk.team.OrganizationID})
+		for _, k := range keys {
+			if err := addTickOp(planned, tk, a, bindingOp{key: k, org: tk.team.OrganizationID}); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -174,7 +192,7 @@ func askBinding(a tickAsker, tk *tick, key, why string) (*bindingOp, error) {
 		return nil, nil
 	}
 	org := cmp.Or(tk.orgName, tk.team.OrganizationID)
-	i, err := pick(a.cmd, fmt.Sprintf("%s (%s):", key, why), []pickRow{
+	i, err := tickPick(a.cmd, fmt.Sprintf("%s (%s):", key, why), []pickRow{
 		{Label: "bind it to " + org, Note: "only " + org + " collects it; personal never does", Default: true},
 		{Label: "refuse it", Note: "no organization collects it; personal may"},
 		{Label: "decide later", Note: "what it matches is held until you decide"},

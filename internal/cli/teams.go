@@ -82,7 +82,7 @@ func (app *App) runTeams(cmd *cobra.Command, f teamsFlags) error {
 	var v teamsView
 	switch {
 	case f.changes():
-		v, err = app.applyTeams(cmd, cfg, st, f)
+		v, err = app.applyTeamsWithView(cmd, cfg, st, teamsView{}, false, f)
 	case !f.json && app.canAsk():
 		v, err = app.teamsChecklist(cmd, cfg, st, f)
 	default:
