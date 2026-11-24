@@ -352,12 +352,22 @@ func TestReachNewIsBounded(t *testing.T) {
 	if took := time.Since(start); took > 500*time.Millisecond {
 		t.Fatalf("oversized slashed word took %v", took)
 	}
-	// Moderately deep nonexistent path spends lookup budget per parent step.
+	// Deep nonexistent path stops immediately at the first missing component, while an existing
+	// deep directory tree charges the stat budget per traversed component.
 	deep := strings.Repeat("a/", 50) + "leaf"
 	sc2 := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
 	sc2.candidate(deep, plain)
-	if sc2.lookups < 50 {
-		t.Fatalf("deep reachNew spent only %d lookups, want >= 50", sc2.lookups)
+	if sc2.stats == 0 || sc2.stats > 30 {
+		t.Fatalf("deep nonexistent path spent %d stats, want fast prefix stop in (0, 30]", sc2.stats)
+	}
+	deepDir := filepath.Join(dir, strings.Repeat("d/", 40))
+	if err := os.MkdirAll(deepDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	sc3 := newScan(dir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	sc3.candidate(strings.Repeat("d/", 40)+"leaf", plain)
+	if sc3.stats < 40 {
+		t.Fatalf("deep existing path spent only %d stats, want >= 40", sc3.stats)
 	}
 }
 
@@ -1472,6 +1482,115 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 	gotUnset, err := scUnset.fields(parseFirstArg(t, `echo ${UNSET:-/safe}/file`))
 	if err != nil || len(gotUnset) != 1 || gotUnset[0] != "/safe/file" {
 		t.Fatalf("unset :- default = (%q, %v), want ([\"/safe/file\"], nil)", gotUnset, err)
+	}
+
+	// 19. Bundled short flags containing -c (e.g. bash -ce, sh -xc) mask the command payload.
+	for _, cmd := range []string{
+		`bash -ce '{curl,--user,alice:SECRET}'`,
+		`sh -xc 'curl -u alice:SECRET https://example.com'`,
+		`zsh -cu 'echo SECRET'`,
+	} {
+		if got := firstWords(cmd); strings.Contains(got, "SECRET") {
+			t.Fatalf("firstWords(%q) = %q, leaked bundled -c payload", cmd, got)
+		}
+	}
+
+	// 20. Named-user tilde expansion (~someone/path) fails closed without calling os/user.Lookup.
+	for _, expr := range []string{
+		`echo ~nonexistent_user_xyz_mir708/repo/file`,
+		`echo ${UNSET:-~nonexistent_user_xyz_mir708/repo/file}`,
+	} {
+		scTilde := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+		if got, err := scTilde.fields(parseFirstArg(t, expr)); err == nil {
+			t.Fatalf("%s expanded to %q, want errOpaque without user lookup", expr, got)
+		}
+	}
+
+	// 21. Unresolved IFS, indirect arithmetic $((N)) -> unresolved DIR, and unresolved HOME fail closed.
+	scUnresIFS := newScan(dir, func(k string) (string, bool) {
+		if k == "A" {
+			return "x y", true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	scUnresIFS.vars["IFS"] = nil
+	if got, err := scUnresIFS.fields(parseFirstArg(t, `echo $A`)); err == nil {
+		t.Fatalf("unresolved IFS expanded $A to %q, want errOpaque", got)
+	}
+	scArithInd := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	scArithInd.vars["N"] = &ref
+	scArithInd.vars["DIR"] = nil
+	if got, err := scArithInd.fields(parseFirstArg(t, `echo $((N))`)); err == nil {
+		t.Fatalf("indirect arith $((N)) with unresolved DIR expanded to %q, want errOpaque", got)
+	}
+	scHomeUnres := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	scHomeUnres.vars["HOME"] = nil
+	if got, err := scHomeUnres.fields(parseFirstArg(t, `echo ~/file`)); err == nil {
+		t.Fatalf("unresolved HOME expanded ~/file to %q, want errOpaque", got)
+	}
+
+	// 22. After cd sub, create-capable relative operand still places sub/nested-repo even when cwd/nested-repo/file exists.
+	baseDir := filepath.Join(dir, "create-cd")
+	subDir := filepath.Join(baseDir, "sub")
+	cwdNested := filepath.Join(baseDir, "nested-repo")
+	subNested := filepath.Join(subDir, "nested-repo")
+	for _, d := range []string{cwdNested, subNested} {
+		if err := os.MkdirAll(d, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(cwdNested, "file"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scCD := newScan(baseDir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	scCD.dir = subDir
+	scCD.candidate("nested-repo/file", creates)
+	if !slices.Contains(scCD.out, subNested) {
+		t.Fatalf("create target after cd missed %q: out=%q", subNested, scCD.out)
+	}
+
+	// 23. Concurrent parent directory <-> remote symlink swap race never follows remote share.
+	if filepath.Separator == '/' {
+		raceDir := filepath.Join(dir, "toctou-race")
+		realMid := filepath.Join(raceDir, "real-mid")
+		if err := os.MkdirAll(realMid, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(realMid, "leaf"), []byte("ok"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		mid := filepath.Join(raceDir, "mid")
+		remoteTmp := filepath.Join(raceDir, "remote-tmp")
+		stop := make(chan struct{})
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+					_ = os.Remove(mid)
+					_ = os.Symlink(realMid, mid)
+					_ = os.Remove(remoteTmp)
+					_ = os.Symlink("//evil.invalid/share", remoteTmp)
+					_ = os.Rename(remoteTmp, mid)
+				}
+			}
+		}()
+		for range 40 {
+			scRace := newScan(raceDir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+			scRace.candidate("mid/leaf", plain)
+			for _, p := range scRace.out {
+				if strings.Contains(p, "evil.invalid") {
+					close(stop)
+					<-done
+					t.Fatalf("TOCTOU race followed remote symlink: out=%q", scRace.out)
+				}
+			}
+		}
+		close(stop)
+		<-done
 	}
 }
 

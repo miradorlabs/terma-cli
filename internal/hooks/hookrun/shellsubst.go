@@ -170,17 +170,17 @@ func dirname(_ *scan, p string) (string, bool) {
 	return vol + ".", true
 }
 func (sc *scan) real(p string) (string, bool) {
-	if q, ok := sc.path(p, sc.dir); p == "" || !ok || sc.hasRemoteLink(q) {
+	q, ok := sc.path(p, sc.dir)
+	if p == "" || !ok {
 		return "", false
-	} else if r, err := filepath.EvalSymlinks(q); err == nil {
-		return r, r != "" && !remote(r, sc.cwd)
-	} else if !errors.Is(err, fs.ErrNotExist) {
+	} else if r, _, _, found := sc.walkPath(q, true); found {
+		return r, true
+	} else if sc.unknown || filepath.Dir(q) == q {
 		return "", false
-	} else if _, err := os.Lstat(q); errors.Is(err, fs.ErrNotExist) && filepath.Dir(q) != q && !sc.hasRemoteLink(filepath.Dir(q)) {
-		if pr, err := filepath.EvalSymlinks(filepath.Dir(q)); err == nil && pr != "" && !remote(pr, sc.cwd) {
-			info, err := os.Stat(pr)
-			return filepath.Join(pr, filepath.Base(q)), err == nil && info.IsDir()
-		}
+	} else if _, _, _, exists := sc.walkPath(q, false); exists || sc.unknown {
+		return "", false
+	} else if pr, _, pInfo, pFound := sc.walkPath(filepath.Dir(q), true); pFound && pInfo.IsDir() {
+		return filepath.Join(pr, filepath.Base(q)), true
 	}
 	return "", false
 }
@@ -201,18 +201,18 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 		if gd != "" && (!ok1 || sc.hasRemoteLink(absGD)) || wt != "" && (!ok2 || sc.hasRemoteLink(absWT)) || gd == "" || wt == "" {
 			return "", false
 		}
-		info, err := os.Stat(absGD)
-		return absWT, err == nil && info.IsDir()
+		_, _, info, found := sc.walkPath(absGD, true)
+		return absWT, found && info.IsDir()
 	}
 	if start, ok := sc.real(dir); !ok {
 		return "", false
-	} else if startInfo, err := os.Stat(start); err == nil && startInfo.IsDir() {
+	} else if _, _, startInfo, found := sc.walkPath(start, true); found && startInfo.IsDir() {
 		for cur := start; sc.spendStat(1); cur = filepath.Dir(cur) {
-			if ci, err := os.Stat(cur); cur != start && (err != nil || !sameDevice(startInfo, ci)) {
+			if _, _, ci, ok := sc.walkPath(cur, true); cur != start && (!ok || !sameDevice(startInfo, ci)) {
 				break
 			}
 			dotGit := filepath.Join(cur, ".git")
-			if info, err := os.Lstat(dotGit); err == nil {
+			if _, _, info, ok := sc.walkPath(dotGit, false); ok {
 				if info.IsDir() {
 					return cur, !sc.hasWorktreeConfig(dotGit)
 				} else if info.Mode().IsRegular() {
@@ -267,9 +267,10 @@ func (sc *scan) locateGitdirFile(path, cur string) (string, bool) {
 		sc.unknown = sc.unknown || errors.Is(err, errOpaque)
 	} else if line, _, _ := strings.Cut(data, "\n"); strings.HasPrefix(strings.TrimSpace(line), "gitdir:") {
 		if target := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "gitdir:")); target != "" {
-			if resolved, ok := sc.resolveTarget(cur, target, 1); ok && !sc.hasRemoteLink(resolved) {
-				info, err := os.Stat(resolved)
-				return cur, err == nil && info.IsDir() && !sc.hasWorktreeConfig(resolved)
+			if resolved, ok := sc.resolveTarget(cur, target, 1); ok {
+				if r, _, info, found := sc.walkPath(resolved, true); found && info.IsDir() {
+					return cur, !sc.hasWorktreeConfig(r)
+				}
 			}
 		}
 	}
@@ -291,9 +292,9 @@ func (sc *scan) below(dir string, levels int) {
 			for _, e := range sc.readDir(d) {
 				sub := filepath.Join(d, e.Name())
 				if e.Type()&fs.ModeSymlink != 0 {
-					if _, bad := sc.resolveLink(sub, 0); bad {
+					if _, _, info, found := sc.walkPath(sub, true); sc.unknown {
 						return
-					} else if info, err := os.Stat(sub); err != nil || !info.IsDir() {
+					} else if !found || !info.IsDir() {
 						continue
 					}
 				} else if !e.IsDir() {
@@ -302,7 +303,7 @@ func (sc *scan) below(dir string, levels int) {
 				if depth == maxBelowDepth && sc.fail() || !sc.spend(1) {
 					return
 				}
-				if _, err := os.Lstat(filepath.Join(sub, ".git")); err == nil {
+				if _, _, _, ok := sc.walkPath(filepath.Join(sub, ".git"), false); ok {
 					sc.place(sub)
 				} else if !sc.holdsNone(sub) {
 					next = append(next, sub)
@@ -313,8 +314,8 @@ func (sc *scan) below(dir string, levels int) {
 	}
 }
 func (sc *scan) enclosingCheckout(root string) bool {
-	if home, ok := sc.lookup("HOME"); ok && home != "" && !sc.hasRemoteLink(home) {
-		if r, err := filepath.EvalSymlinks(home); err == nil && samePath(root, r) || err != nil && samePath(root, home) {
+	if home, ok := sc.lookup("HOME"); ok && home != "" {
+		if r, _, _, found := sc.walkPath(home, true); found && samePath(root, r) || !found && !sc.unknown && samePath(root, home) {
 			return true
 		}
 	}

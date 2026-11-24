@@ -70,7 +70,7 @@ func maskWords(command string, depth int) string {
 		}
 		lower, short := strings.ToLower(b), len(b) > 2 && b[0] == '-' && b[1] != '-'
 		secret = slices.Contains(secretOptions, b) || b == "eval" || b == "-a" && hasRedis ||
-			short && (slices.Contains(secretOptions, "-"+b[len(b)-1:]) || b[len(b)-1] == 'a' && hasRedis) ||
+			short && (strings.ContainsRune(b[1:], 'c') || slices.Contains(secretOptions, "-"+b[len(b)-1:]) || b[len(b)-1] == 'a' && hasRedis) ||
 			strings.HasPrefix(b, "-") && slices.ContainsFunc(secretNames, func(n string) bool { return strings.Contains(lower, n) })
 	}
 	s := strings.Map(func(r rune) rune {
