@@ -250,7 +250,10 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 		case "GOPATH":
 			return filepath.Join(parent, "go"), true
 		case "GOENV", "GOMODCACHE", "GOFLAGS", "GOTOOLCHAIN", "XDG_CONFIG_HOME", "AppData", "PATH",
-			"SHELLOPTS", "LD_PRELOAD", "LD_AUDIT", "LD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES", "DYLD_LIBRARY_PATH", "DYLD_FRAMEWORK_PATH":
+			"SHELLOPTS", "GCONV_PATH", "LOCPATH":
+			return "", false
+		}
+		if strings.HasPrefix(k, "LD_") || strings.HasPrefix(k, "DYLD_") {
 			return "", false
 		}
 		return os.LookupEnv(k)
@@ -2986,7 +2989,13 @@ func TestReachCoreReviewRegressions(t *testing.T) {
 	}
 
 	// 19. Dynamic-loader injection env vars fail closed for external substitutions (but not builtin pwd).
-	for _, k := range []string{"LD_PRELOAD", "LD_AUDIT", "LD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES", "DYLD_LIBRARY_PATH", "DYLD_FRAMEWORK_PATH"} {
+	for _, k := range []string{
+		"LD_PRELOAD", "LD_AUDIT", "LD_LIBRARY_PATH", "LD_ORIGIN_PATH", "GCONV_PATH", "LOCPATH",
+		"DYLD_INSERT_LIBRARIES", "DYLD_LIBRARY_PATH", "DYLD_FRAMEWORK_PATH",
+		"DYLD_VERSIONED_LIBRARY_PATH", "DYLD_VERSIONED_FRAMEWORK_PATH",
+		"DYLD_FALLBACK_LIBRARY_PATH", "DYLD_FALLBACK_FRAMEWORK_PATH",
+		"DYLD_ROOT_PATH", "DYLD_IMAGE_SUFFIX", "DYLD_SHARED_CACHE_DIR",
+	} {
 		scL := newScan(repo, makeEnv(map[string]string{"HOME": parent, "USERPROFILE": parent, k: "/tmp/hook.so"}), work{deadline: time.Now().Add(time.Minute)})
 		if got, err := evalSubst(scL, "dirname /a/b"); err == nil {
 			t.Errorf("%s set: substitute(dirname) = %q, want error", k, got)
