@@ -8,8 +8,6 @@ import (
 	"strings"
 
 	"mvdan.cc/sh/v3/syntax"
-
-	"github.com/miradorlabs/terma-cli/internal/gitx"
 )
 
 // outputs maps known command-substitution prefixes to static path evaluators.
@@ -59,12 +57,12 @@ func (sc *scan) substitute(w io.Writer, cs *syntax.CmdSubst) error {
 func where(sc *scan, args []*syntax.Word) (string, bool) {
 	return sc.dir, sc.dir != "" && len(args) == 0
 }
-
 func toplevel(sc *scan, args []*syntax.Word) (string, bool) {
-	root, _, ok := gitx.LocateFS(sc.dir)
-	return root, ok && len(args) == 0
+	if len(args) != 0 {
+		return "", false
+	}
+	return sc.safeLocate(sc.dir)
 }
-
 func gopath(sc *scan, args []*syntax.Word) (string, bool) {
 	if v, ok := sc.lookup("GOPATH"); ok && v != "" {
 		return v, len(args) == 0
@@ -72,19 +70,16 @@ func gopath(sc *scan, args []*syntax.Word) (string, bool) {
 	home, ok := sc.lookup("HOME")
 	return filepath.Join(home, "go"), ok && len(args) == 0
 }
-
 func modcache(sc *scan, args []*syntax.Word) (string, bool) {
 	if v, ok := sc.lookup("GOMODCACHE"); ok && v != "" {
 		return v, len(args) == 0
 	}
 	gp, ok := gopath(sc, args)
-	list := filepath.SplitList(gp)
-	if !ok || len(list) == 0 || list[0] == "" {
-		return "", false
+	if list := filepath.SplitList(gp); ok && len(list) > 0 && list[0] != "" {
+		return filepath.Join(list[0], "pkg", "mod"), true
 	}
-	return filepath.Join(list[0], "pkg", "mod"), true
+	return "", false
 }
-
 func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 	name, tmp := "", false
 	for _, a := range args {
@@ -95,15 +90,14 @@ func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 		case l == "--tmpdir":
 			tmp = true
 		case strings.HasPrefix(l, "-") && !strings.HasPrefix(l, "--"):
-			for j := 1; j < len(l); j++ {
-				if l[j] == 'p' {
-					return "", false
-				}
-				tmp = tmp || l[j] == 't'
+			if strings.ContainsRune(l[1:], 'p') {
+				return "", false
 			}
-		case !strings.HasPrefix(l, "-") && pathLike(l):
-			return "", false
+			tmp = tmp || strings.ContainsRune(l[1:], 't')
 		case !strings.HasPrefix(l, "-"):
+			if pathLike(l) {
+				return "", false
+			}
 			name = l
 		}
 	}
@@ -116,7 +110,6 @@ func mktemp(sc *scan, args []*syntax.Word) (string, bool) {
 	}
 	return filepath.Join(dir, cmp.Or(name, "tmp.XXXXXXXXXX")), dir != ""
 }
-
 func ofOperand(f func(sc *scan, p string) string) func(*scan, []*syntax.Word) (string, bool) {
 	return func(sc *scan, args []*syntax.Word) (string, bool) {
 		if len(args) > 0 && args[0].Lit() == "--" {
@@ -125,21 +118,18 @@ func ofOperand(f func(sc *scan, p string) string) func(*scan, []*syntax.Word) (s
 		if len(args) != 1 {
 			return "", false
 		}
-		fields, err := sc.fields(args[0])
-		if err != nil || len(fields) != 1 {
-			return "", false
+		if fields, err := sc.fields(args[0]); err == nil && len(fields) == 1 {
+			return f(sc, fields[0]), true
 		}
-		return f(sc, fields[0]), true
+		return "", false
 	}
 }
-
 func dirname(_ *scan, p string) string {
 	if trimmed := strings.TrimRight(p, "/"); trimmed != "" || p == "" {
 		return filepath.Dir(trimmed)
 	}
 	return "/"
 }
-
 func (sc *scan) real(p string) string {
 	q, ok := sc.path(p, sc.dir)
 	if !ok || sc.hasRemoteLink(q) {

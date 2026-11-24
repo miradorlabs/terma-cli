@@ -66,8 +66,7 @@ func firstWords(command string) string {
 	return s
 }
 
-// shellFields are command's first n words as written, quotes kept, split at whitespace
-// outside them, honoring backslash escapes outside single quotes.
+// shellFields are command's first n words as written, quotes kept, split at whitespace outside quotes.
 func shellFields(command string, n int) []string {
 	var words []string
 	start, quote, escaped := -1, rune(0), false
@@ -103,7 +102,7 @@ func shellFields(command string, n int) []string {
 		}
 	}
 	if start >= 0 {
-		words = append(words, command[start:]) // an open quote's
+		words = append(words, command[start:])
 	}
 	return words
 }

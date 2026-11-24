@@ -9,17 +9,14 @@ import (
 const (
 	maxShellNesting = 4096
 	maxShellExpr    = 4096
+	separators      = " \t\n;&|()<>"
 )
 
-var (
-	compounds  = []string{"if", "for", "while", "until", "case", "select"}
-	separators = " \t\n;&|()<>"
-)
+var compounds = []string{"if", "for", "while", "until", "case", "select"}
 
 type heredoc struct {
-	delim     string
-	quoted    bool
-	stripTabs bool
+	delim             string
+	quoted, stripTabs bool
 }
 
 // parsable reports whether src is within maxShellNesting, maxShellExpr, and maxShellWords.
@@ -27,7 +24,6 @@ func parsable(src string) bool {
 	var open []byte // what closes each context open: ) } ] " `; h and q a body's (nothing)
 	var docs, bodies []heredoc
 	body, expr, exprDepth, letUntil, links, words, dollars := 0, -1, 0, -1, 0, 0, 0
-	// push opens n contexts c closes, at i, an expression's when isExpr.
 	push := func(c byte, n, i int, isExpr bool) {
 		if isExpr && expr < 0 {
 			expr, exprDepth = i, len(open)
@@ -36,7 +32,6 @@ func parsable(src string) bool {
 			open = append(open, closing(c))
 		}
 	}
-	// read starts reading bodies[0]'s body.
 	read := func() {
 		marker := byte('h')
 		if body = len(open); bodies[0].quoted {
@@ -56,8 +51,7 @@ func parsable(src string) bool {
 			next = src[i+1]
 		}
 		double := i+2 < len(src) && src[i+2] == next
-		code := top != '"' && top != 'h' && top != 'q'
-		if code && strings.IndexByte(separators, c) < 0 && strings.IndexByte(separators, prev) >= 0 {
+		if top != '"' && top != 'h' && top != 'q' && strings.IndexByte(separators, c) < 0 && strings.IndexByte(separators, prev) >= 0 {
 			words++
 		}
 		if c == '$' && top != 'q' {
@@ -72,8 +66,6 @@ func parsable(src string) bool {
 				bodies, docs = docs, nil
 				read()
 			}
-			// Each body that ends at the next line, its delimiter's, one after another; a
-			// context its substitutions left open stays open.
 			for len(bodies) > 0 && i < len(src) && delimiterLine(src[i+1:lineEnd(src, i+1)], bodies[0]) {
 				i = lineEnd(src, i+1)
 				open = slices.Delete(open, body, body+1)
@@ -93,11 +85,9 @@ func parsable(src string) bool {
 			push(next, n, i, n == 2 || next != '(')
 		case c == '`' && top == '`', c == '"' && top == '"':
 			open = open[:len(open)-1]
-		case c == '`':
+		case c == '`', c == '"' && top != 'h':
 			push(c, 1, i, false)
 		case top == '"' || top == 'h':
-		case c == '"':
-			push(c, 1, i, false)
 		case c == '\'':
 			j := i + 1
 			for ; j < len(src) && src[j] != '\''; j++ {
@@ -109,11 +99,7 @@ func parsable(src string) bool {
 				i = j
 			}
 		case c == '#' && strings.IndexByte(" \t\n;&|()", prev) >= 0:
-			if j := strings.IndexByte(src[i:], '\n'); j > 0 {
-				i += j - 1
-			} else {
-				i = len(src)
-			}
+			i = lineEnd(src, i) - 1
 		case c == '(' || c == '[' || c == '{': // (( [[ [ open expressions
 			n := 1
 			if c != '{' && next == c {
@@ -145,10 +131,9 @@ func parsable(src string) bool {
 				if end > maxShellExpr || end < 0 && len(src)-j > maxShellExpr {
 					return false
 				}
+				letUntil = j + end
 				if end < 0 {
 					letUntil = len(src)
-				} else {
-					letUntil = j + end
 				}
 			}
 			i = j - 1
@@ -163,14 +148,12 @@ func parsable(src string) bool {
 	}
 	return len(bodies) == 0 && len(docs) == 0
 }
-
 func closing(c byte) byte {
 	if i := strings.IndexByte("({[", c); i >= 0 {
 		return ")}]"[i]
 	}
 	return c
 }
-
 func heredocDelimiter(src string, i int) (heredoc, int) {
 	stripTabs := i < len(src) && src[i] == '-'
 	if stripTabs {
@@ -207,14 +190,12 @@ func heredocDelimiter(src string, i int) (heredoc, int) {
 	}
 	return heredoc{d.String(), quoted, stripTabs}, i - 1
 }
-
 func lineEnd(src string, i int) int {
 	if j := strings.IndexByte(src[i:], '\n'); j >= 0 {
 		return i + j
 	}
 	return len(src)
 }
-
 func delimiterLine(line string, h heredoc) bool {
 	if h.stripTabs {
 		line = strings.TrimLeft(line, "\t")
