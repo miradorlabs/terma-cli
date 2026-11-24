@@ -45,17 +45,11 @@ func captureClaudeSkills(ctx context.Context, e hookrun.Env, r *hookrun.Repo, se
 	if readErr == nil && json.Unmarshal(b, &cur) != nil {
 		cur = claudeSkillCursor{}
 	}
-	// Each use is judged by where the session ran when it was written, once per directory.
-	judged := map[string]bool{}
+	// Each use is judged by where the session ran when it was written and must match r's destination.
+	turns := e.Turns(ctx)
+	gitDir := os.Getenv("GIT_DIR") != ""
 	admits := func(cwd string) bool {
-		ok, seen := judged[cwd]
-		if !seen {
-			// With GIT_DIR set every directory reads as that one checkout, so only the
-			// hook's own is judged; what was written anywhere else stays here.
-			ok = cwd != "" && (os.Getenv("GIT_DIR") == "" || cwd == e.Cwd) && e.Admits(ctx, cwd)
-			judged[cwd] = ok
-		}
-		return ok
+		return cwd != "" && (!gitDir || cwd == e.Cwd) && turns.Admits(cwd) && turns.Matches(r, cwd)
 	}
 	uses, next, err := readClaudeSkillUses(transcript, cur, admits)
 	if err != nil {

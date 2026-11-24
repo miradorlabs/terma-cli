@@ -14,9 +14,11 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/runs"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -181,5 +183,95 @@ func TestClaudePreToolUseRegisteredAndRefreshedInUserHooks(t *testing.T) {
 	}
 	if !strings.Contains(string(b), "PreToolUse") || !strings.Contains(string(b), "pre-tool-use") {
 		t.Fatalf("refreshed settings.json missing PreToolUse hook:\n%s", b)
+	}
+}
+
+func TestClaudeRoutedSkillBacklogDoesNotLeakAcrossOrgs(t *testing.T) {
+	const acct = "1111111111111111"
+	stateDir := t.TempDir()
+	repoA := initOriginRepo(t, "alpha", "git@github.com:orgA/alpha.git")
+	repoB := initOriginRepo(t, "beta", "git@github.com:orgB/beta.git")
+	hookruntest.WriteFile(t, repoA, ".claude/skills/secret-a/SKILL.md", "---\nname: secret-a\ndescription: Org A only.\n---\n\nbody\n")
+	hookruntest.WriteFile(t, repoB, ".claude/skills/public-b/SKILL.md", "---\nname: public-b\ndescription: Org B ok.\n---\n\nbody\n")
+
+	now := time.Now().UTC()
+	enrollments := map[string]string{}
+	st, err := routing.Create(stateDir, "default", acct, func(s *routing.State) error {
+		for _, spec := range []struct {
+			org, team, repo string
+			collect         bool
+		}{
+			{"orgA", "teamA", "github.com/orgA/alpha", false},
+			{"orgB", "teamB", "github.com/orgB/beta", true},
+		} {
+			enr, err := s.Select(routing.Team{
+				OrganizationID: spec.org, AuthURL: "https://api.example.com", TeamID: spec.team,
+				Policy: config.Policy{
+					Mode: config.ModeRepo, Repositories: []string{spec.repo},
+					IncludePrompts: spec.collect, IncludeToolContent: spec.collect, Revision: 1,
+					FetchedAt: now, TeamID: spec.team, OrganizationID: spec.org, AuthURL: "https://api.example.com",
+				},
+			})
+			if err != nil {
+				return err
+			}
+			enrollments[spec.org] = enr
+			if err := s.Bind(spec.repo, spec.org, false); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp, err := spool.Open(filepath.Join(stateDir, spool.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp.Bind(acct)
+
+	cwdA, _ := json.Marshal(repoA)
+	cwdB, _ := json.Marshal(repoB)
+	baseDirA, _ := json.Marshal("Base directory for this skill: " + filepath.Join(repoA, ".claude", "skills", "secret-a") + "\n")
+	baseDirB, _ := json.Marshal("Base directory for this skill: " + filepath.Join(repoB, ".claude", "skills", "public-b") + "\n")
+	transcript := filepath.Join(t.TempDir(), "claude.jsonl")
+	lines := []string{
+		`{"type":"assistant","cwd":` + string(cwdA) + `,"message":{"content":[{"type":"tool_use","id":"toolu_a","name":"Skill","input":{"skill":"secret-a"}}]}}`,
+		`{"type":"user","isMeta":true,"cwd":` + string(cwdA) + `,"sourceToolUseID":"toolu_a","message":{"content":[{"type":"text","text":` + string(baseDirA) + `}]}}`,
+	}
+	if err := os.WriteFile(transcript, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	sid := "018f3a2c-cl02-7000-8000-000000000002"
+	env := hookrun.Env{StateDir: stateDir, Cwd: repoA, Spool: sp, Account: acct, Routing: hookrun.NewRouting("default", &st), Now: now}
+	rA, err := env.Repo(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Stop in restrictive orgA leaves the transcript skill cursor unadvanced.
+	captureClaudeSkills(ctx, env, rA, sid, transcript)
+
+	// Session resumes in permissive orgB and uses an orgB skill: orgA's unread skill must NOT be spooled to orgB.
+	lines = append(lines,
+		`{"type":"assistant","cwd":`+string(cwdB)+`,"message":{"content":[{"type":"tool_use","id":"toolu_b","name":"Skill","input":{"skill":"public-b"}}]}}`,
+		`{"type":"user","isMeta":true,"cwd":`+string(cwdB)+`,"sourceToolUseID":"toolu_b","message":{"content":[{"type":"text","text":`+string(baseDirB)+`}]}}`,
+	)
+	if err := os.WriteFile(transcript, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	env.Cwd = repoB
+	env.Routing = hookrun.LoadRouting(stateDir, "default")
+	rB, err := env.Repo(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	captureClaudeSkills(ctx, env, rB, sid, transcript)
+
+	got := hookruntest.Named(hookruntest.Spooled(t, sp), semconv.TermaSkillDefinitionEvent)
+	if len(got) != 1 || got[0].Attrs[semconv.TermaSkillNameKey] != "public-b" || got[0].Enrollment != enrollments["orgB"] {
+		t.Fatalf("spooled skills = %+v; want only public-b for orgB (%q)", got, enrollments["orgB"])
 	}
 }
