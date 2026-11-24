@@ -231,7 +231,7 @@ func New(opts Options) *Relay {
 		lastSeen: opts.Now(), sendCtx: sendCtx, cancelSend: cancel, stopping: make(chan struct{}),
 		unreadableRetry: unreadableRetry,
 	}
-	r.initTeams()
+	r.pinnedHold, r.teamSenders, r.teamRecovered, r.mixedSeen, r.nudging = map[string][]heldPart{}, map[teamRoute]*sender{}, map[teamRoute]bool{}, map[string]time.Time{}, map[string]bool{}
 	r.seedLane()
 	return r
 }

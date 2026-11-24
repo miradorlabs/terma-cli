@@ -54,8 +54,6 @@ func splitBeforeMixed(p *part, mixedAt time.Time) (before, atOrAfter *part) {
 	}
 	return parts[0], parts[1]
 }
-func logIV(x *logspb.LogRecord) timeInterval { return makeInterval(x.GetTimeUnixNano(), x.GetObservedTimeUnixNano()) }
-func spanIV(x *tracepb.Span) timeInterval { return makeInterval(x.GetStartTimeUnixNano(), x.GetEndTimeUnixNano()) }
 func partitionPart(p *part, keyOf func(timeInterval) string) []*part {
 	groups, out := map[string]*part{}, []*part(nil)
 	get := func(k string) *part {
@@ -71,7 +69,9 @@ func partitionPart(p *part, keyOf func(timeInterval) string) []*part {
 	case *logspb.LogsData:
 		for _, rl := range m.GetResourceLogs() {
 			for _, sl := range rl.GetScopeLogs() {
-				for _, g := range groupBy(sl.GetLogRecords(), logIV, keyOf) {
+				for _, g := range groupBy(sl.GetLogRecords(), func(x *logspb.LogRecord) timeInterval {
+					return makeInterval(x.GetTimeUnixNano(), x.GetObservedTimeUnixNano())
+				}, keyOf) {
 					pc := get(g.k)
 					pc.msg.(*logspb.LogsData).ResourceLogs = append(pc.msg.(*logspb.LogsData).ResourceLogs, &logspb.ResourceLogs{Resource: cloneResource(rl.GetResource()), SchemaUrl: rl.GetSchemaUrl(), ScopeLogs: []*logspb.ScopeLogs{{Scope: sl.GetScope(), SchemaUrl: sl.GetSchemaUrl(), LogRecords: g.v}}})
 					pc.records += len(g.v)
@@ -81,7 +81,9 @@ func partitionPart(p *part, keyOf func(timeInterval) string) []*part {
 	case *tracepb.TracesData:
 		for _, rs := range m.GetResourceSpans() {
 			for _, ss := range rs.GetScopeSpans() {
-				for _, g := range groupBy(ss.GetSpans(), spanIV, keyOf) {
+				for _, g := range groupBy(ss.GetSpans(), func(x *tracepb.Span) timeInterval {
+					return makeInterval(x.GetStartTimeUnixNano(), x.GetEndTimeUnixNano())
+				}, keyOf) {
 					pc := get(g.k)
 					pc.msg.(*tracepb.TracesData).ResourceSpans = append(pc.msg.(*tracepb.TracesData).ResourceSpans, &tracepb.ResourceSpans{Resource: cloneResource(rs.GetResource()), SchemaUrl: rs.GetSchemaUrl(), ScopeSpans: []*tracepb.ScopeSpans{{Scope: ss.GetScope(), SchemaUrl: ss.GetSchemaUrl(), Spans: g.v}}})
 					pc.records += len(g.v)

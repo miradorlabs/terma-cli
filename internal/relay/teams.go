@@ -107,10 +107,7 @@ func (rec Record) EffectiveEnd() time.Time { return nonZeroTime(rec.EndAt, rec.A
 // EffectiveEnd returns EndAt when non-zero, falling back to At.
 func (q Queued) EffectiveEnd() time.Time   { return nonZeroTime(q.EndAt, q.At) }
 func nonZeroTime(a, b time.Time) time.Time { return map[bool]time.Time{true: a, false: b}[!a.IsZero()] }
-func (r *Relay) initTeams() {
-	r.pinnedHold, r.teamSenders, r.teamRecovered, r.mixedSeen, r.nudging = map[string][]heldPart{}, map[teamRoute]*sender{}, map[teamRoute]bool{}, map[string]time.Time{}, map[string]bool{}
-}
-func (r *Relay) teams() bool { return r.opts.Router != nil && r.opts.Router.Active() }
+func (r *Relay) teams() bool               { return r.opts.Router != nil && r.opts.Router.Active() }
 func (r *Relay) takesUnplaced() bool {
 	if r.teams() {
 		return r.opts.Router.UnknownToPersonal()
@@ -144,7 +141,7 @@ func (r *Relay) decideTeams(key string, p *part) verdict {
 		if raw, ok := r.lookup(rec.Session); ok {
 			held = whyProcess
 			if c, ok := raw.At(p.pid, p.at); ok {
-				if endC, ok := raw.At(p.pid, p.endAt); !p.endAt.IsZero() && !p.endAt.Equal(p.at) && ok && endC.Kind == claim.KindMixed {
+				if endC, ok := raw.At(p.pid, p.endAt); !p.endAt.IsZero() && !p.endAt.Equal(p.at) && ok && (endC.Kind == claim.KindMixed || endC.Kind == "" && endC.ProjectID == "") {
 					c = endC
 				}
 				if c.Kind == "" && c.ProjectID == "" {

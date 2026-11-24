@@ -1207,6 +1207,52 @@ func TestReviewEdgeCases(t *testing.T) {
 			t.Fatal("collectsNone returned true for routed placement with non-empty Kind")
 		}
 	})
+
+	t.Run("interval_ending_in_not_collected_placement_is_dropped", func(t *testing.T) {
+		t.Parallel()
+		var routeCalls atomic.Int32
+		router := &stubRouter{
+			active: true,
+			routeFn: func(rec Record) Routed {
+				routeCalls.Add(1)
+				return Routed{Outcome: Send, Queued: Queued{Enrollment: "enr_repo", Project: "proj_repo", Account: rec.Account, Kind: "repository"}}
+			},
+		}
+		movedAt := t0.Add(10 * time.Second)
+		r := New(Options{
+			Dir: t.TempDir(), Router: router, SignIn: &testSignIn{account: accountA},
+			Now: func() time.Time { return t0.Add(time.Minute) },
+			Lookup: func(session string, _ time.Time) (claim.Claim, bool) {
+				if session != "s_end_nc" {
+					return claim.Claim{}, false
+				}
+				return claim.Claim{
+					Tool: "claude-code",
+					Placements: []claim.Placement{
+						{Since: t0, Kind: claim.KindRepository, PIDs: []int{6161}, Remote: "github.com/acme/repo"},
+						{Since: movedAt, PIDs: []int{6161}}, // explicit not-collected mark
+					},
+				}, true
+			},
+		})
+		spans := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{
+			Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("session.id", "s_end_nc")}},
+			ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{{
+				Name:              "straddle-nc",
+				StartTimeUnixNano: uint64(t0.Add(5 * time.Second).UnixNano()),
+				EndTimeUnixNano:   uint64(t0.Add(15 * time.Second).UnixNano()),
+			}}}},
+		}}}
+		p := &part{signal: Traces, msg: spans, records: 1, pid: 6161, session: "s_end_nc", account: accountA, arrived: t0.Add(time.Minute)}
+		p.at, p.endAt = intervalOf(p.msg)
+		r.route(p)
+		if routeCalls.Load() != 0 {
+			t.Fatalf("Router.Route called %d times for span ending in not-collected placement, want 0", routeCalls.Load())
+		}
+		if got := r.Stats().Snapshot().Counters["dropped.not_collected.traces"]; got != 1 {
+			t.Fatalf("dropped.not_collected.traces = %d, want 1", got)
+		}
+	})
 }
 
 func oneSessionLog(session, body string) *logspb.LogsData {
