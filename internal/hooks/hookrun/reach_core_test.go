@@ -36,6 +36,9 @@ func TestFirstWordsMasksSecretsAndCapsLength(t *testing.T) {
 		"cli --api-key supersecret run":                                                  "cli --api-key … run",
 		`cli "--password" hunter2 run`:                                                   `cli "--password" … run`,
 		"curl https://u:p@ss@example.com/a":                                              "curl https://…@example.com/a",
+		"curl https://alice:supersecret=foo@example.com":                                 "curl https://…@example.com",
+		"curl https://alice:supersecret=foo@example.com?q=1":                             "curl https://…@example.com?q=…",
+		"URL=https://alice:supersecret=foo@example.com echo hi":                          "URL=… echo hi",
 		"cli --token=supersecret":                                                        "cli --token=…",
 		"cli -pfoo run":                                                                  "cli -p… run",
 		"echo " + strings.Repeat("a", 80):                                                "echo " + strings.Repeat("a", 55) + " …",
@@ -239,11 +242,13 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 			return parent, true
 		case "GOPATH":
 			return filepath.Join(parent, "go"), true
+		case "GOENV", "GOMODCACHE", "XDG_CONFIG_HOME", "AppData":
+			return "", false
 		}
 		return os.LookupEnv(k)
 	}
 	sc := newScan(side, env, work{deadline: time.Now().Add(time.Minute)})
-	evalSubst := func(src string) (string, error) {
+	evalSubst := func(s *scan, src string) (string, error) {
 		f, err := syntax.NewParser().Parse(strings.NewReader("echo $("+src+")"), "")
 		if err != nil {
 			t.Fatalf("parse %q: %v", src, err)
@@ -251,7 +256,7 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 		ce := f.Stmts[0].Cmd.(*syntax.CallExpr)
 		cs := ce.Args[1].Parts[0].(*syntax.CmdSubst)
 		var buf bytes.Buffer
-		err = sc.substitute(&buf, cs)
+		err = s.substitute(&buf, cs)
 		return buf.String(), err
 	}
 	for src, want := range map[string]string{
@@ -260,27 +265,72 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 		"go env GOPATH":                 filepath.Join(parent, "go"),
 		"go env GOMODCACHE":             filepath.Join(parent, "go", "pkg", "mod"),
 		"dirname /a/b/c":                filepath.FromSlash("/a/b"),
+		"dirname link/../file":          filepath.FromSlash("link/.."),
+		"dirname /foo":                  string(filepath.Separator),
+		"dirname foo":                   ".",
 		"basename /a/b/c":               "c",
 		"realpath .":                    side,
 		"readlink -f .":                 side,
 		"pwd -P":                        side,
 		"dirname $(pwd)":                parent,
 	} {
-		got, err := evalSubst(src)
+		got, err := evalSubst(sc, src)
 		if err != nil || got != want {
 			t.Errorf("substitute(%q) = (%q, %v), want (%q, nil)", src, got, err, want)
 		}
 	}
-	if got, err := evalSubst("mktemp -d"); err != nil || !strings.HasPrefix(got, os.TempDir()) {
+	if got, err := evalSubst(sc, "mktemp -d"); err != nil || !strings.HasPrefix(got, os.TempDir()) {
 		t.Errorf("substitute(mktemp -d) = (%q, %v)", got, err)
 	}
-	if got, err := evalSubst("mktemp -dt foo.XXX"); err != nil || !strings.HasPrefix(got, os.TempDir()) {
+	if got, err := evalSubst(sc, "mktemp -dt foo.XXX"); err != nil || !strings.HasPrefix(got, os.TempDir()) {
 		t.Errorf("substitute(mktemp -dt) = (%q, %v)", got, err)
 	}
-	for _, opaque := range []string{"cat somefile", "mktemp -p /tmp", "mktemp -dp/tmp", "mktemp --tmpdir=/tmp", "mktemp sub/foo.XXX"} {
-		if _, err := evalSubst(opaque); err == nil {
+	for _, opaque := range []string{
+		"cat somefile", "mktemp -p /tmp", "mktemp -dp/tmp", "mktemp --tmpdir=/tmp",
+		"mktemp sub/foo.XXX", "realpath missing/parent", "readlink -f missing/parent",
+	} {
+		if _, err := evalSubst(sc, opaque); err == nil {
 			t.Errorf("substitute(%q) succeeded, want error", opaque)
 		}
+	}
+
+	// Persisted `go env -w` file makes unset GOPATH/GOMODCACHE fail closed; GOENV=off or explicit env still resolves.
+	goEnvFile := filepath.Join(parent, "goenv")
+	if err := os.WriteFile(goEnvFile, []byte("GOPATH=/other\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	envWithGoEnv := func(extra map[string]string) func(string) (string, bool) {
+		return func(k string) (string, bool) {
+			if v, ok := extra[k]; ok {
+				return v, true
+			}
+			if k == "HOME" {
+				return parent, true
+			}
+			return "", false
+		}
+	}
+	scGoEnv := newScan(side, envWithGoEnv(map[string]string{"GOENV": goEnvFile}), work{deadline: time.Now().Add(time.Minute)})
+	for _, cmd := range []string{"go env GOPATH", "go env GOMODCACHE"} {
+		if _, err := evalSubst(scGoEnv, cmd); err == nil {
+			t.Errorf("substitute(%q) with existing GOENV succeeded, want error", cmd)
+		}
+	}
+	scGoEnvExplicit := newScan(side, envWithGoEnv(map[string]string{"GOENV": goEnvFile, "GOPATH": filepath.Join(parent, "custom")}), work{deadline: time.Now().Add(time.Minute)})
+	if got, err := evalSubst(scGoEnvExplicit, "go env GOPATH"); err != nil || got != filepath.Join(parent, "custom") {
+		t.Errorf("explicit GOPATH with GOENV = (%q, %v), want custom", got, err)
+	}
+	if _, err := evalSubst(scGoEnvExplicit, "go env GOMODCACHE"); err == nil {
+		t.Error("unset GOMODCACHE with GOENV succeeded, want error")
+	}
+	scGoEnvOff := newScan(side, envWithGoEnv(map[string]string{"GOENV": "off"}), work{deadline: time.Now().Add(time.Minute)})
+	if got, err := evalSubst(scGoEnvOff, "go env GOPATH"); err != nil || got != filepath.Join(parent, "go") {
+		t.Errorf("GOENV=off go env GOPATH = (%q, %v), want default", got, err)
+	}
+	scUnresolvedGoEnv := newScan(side, envWithGoEnv(nil), work{deadline: time.Now().Add(time.Minute)})
+	scUnresolvedGoEnv.vars["GOENV"] = nil
+	if _, err := evalSubst(scUnresolvedGoEnv, "go env GOPATH"); err == nil {
+		t.Error("unresolved GOENV var succeeded, want error")
 	}
 }
 

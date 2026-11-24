@@ -10,11 +10,9 @@ import (
 
 // openDirNoBlock verifies dir is a directory before opening it on non-Unix platforms.
 func openDirNoBlock(dir string) (*os.File, error) {
-	info, err := os.Stat(dir)
-	if err != nil {
+	if info, err := os.Stat(dir); err != nil {
 		return nil, err
-	}
-	if !info.IsDir() {
+	} else if !info.IsDir() {
 		return nil, fs.ErrInvalid
 	}
 	return os.Open(dir)
