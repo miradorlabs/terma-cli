@@ -745,6 +745,44 @@ func TestScanBoundsAndSafety(t *testing.T) {
 			t.Fatalf("path(`foo\\../file`) = (%q, %v), want %q", got, ok, filepath.Join(bsDir, "file"))
 		}
 	}
+
+	// GIT_WORK_TREE set without GIT_DIR (or unresolved in script vars) fails closed in safeLocate.
+	wtOnlyRepo := filepath.Join(dir, "wt-only-repo")
+	if err := os.MkdirAll(filepath.Join(wtOnlyRepo, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	scWTOnly := newScan(wtOnlyRepo, func(k string) (string, bool) {
+		if k == "GIT_WORK_TREE" {
+			return customWT, true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	gitBuf.Reset()
+	if err := scWTOnly.substitute(&gitBuf, csGit); err == nil {
+		t.Fatalf("GIT_WORK_TREE without GIT_DIR resolved to %q, want errOpaque", gitBuf.String())
+	}
+	scUnresolvedGD := newScan(wtOnlyRepo, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
+	scUnresolvedGD.vars["GIT_DIR"] = nil
+	if got, ok := scUnresolvedGD.safeLocate(wtOnlyRepo); ok {
+		t.Fatalf("unresolved GIT_DIR resolved to %q, want false", got)
+	}
+
+	// Quoted or escaped secret flags and userinfo in firstWords are still masked.
+	for _, tc := range []struct {
+		cmd, leak string
+	}{
+		{`curl --us""er alice:supersecret https://example.com`, "supersecret"},
+		{`curl -""u alice:supersecret https://example.com`, "supersecret"},
+		{`curl \-u alice:supersecret https://example.com`, "supersecret"},
+		{`curl --he""ader="Authorization: Bearer topsecret" https://example.com`, "topsecret"},
+		{`curl -H"X-Api: key=topsecret" https://example.com`, "topsecret"},
+		{`curl https://alice:supersecret"@"example.com/x`, "supersecret"},
+		{`re""dis-cli -a topsecret ping`, "topsecret"},
+	} {
+		if got := firstWords(tc.cmd); strings.Contains(got, tc.leak) {
+			t.Errorf("firstWords(%q) = %q, leaked %q", tc.cmd, got, tc.leak)
+		}
+	}
 }
 
 func FuzzParsable(f *testing.F) {

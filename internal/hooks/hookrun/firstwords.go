@@ -24,28 +24,29 @@ func firstWords(command string) string {
 		}
 		command = command[:n]
 	}
-	words := shellFields(command, 5)
+	words, bare := shellFields(command, 5)
 	more := cut || len(words) > 4
-	words = words[:min(len(words), 4)]
+	words, bare = words[:min(len(words), 4)], bare[:min(len(bare), 4)]
 	secret, hasRedis := false, false
-	for i, w := range words {
-		bare := strings.Trim(w, `"'`)
-		hasRedis = hasRedis || strings.HasSuffix(bare, "redis-cli")
-		name, _, eq := strings.Cut(w, "=")
+	for i, b := range bare {
+		hasRedis = hasRedis || strings.HasSuffix(b, "redis-cli")
+		name, _, eq := strings.Cut(b, "=")
 		switch {
 		case secret:
 			words[i] = "…"
+		case len(b) > 2 && b[0] == '-' && b[1] != '-':
+			words[i] = b[:2] + "…"
 		case eq && name != "":
 			words[i] = name + "=…"
-		case len(bare) > 2 && bare[0] == '-' && bare[1] != '-':
-			words[i] = bare[:2] + "…"
+		case userinfo.MatchString(b):
+			words[i] = b
 		}
 		words[i] = userinfo.ReplaceAllString(words[i], "://…@")
-		lower := strings.ToLower(bare)
-		tail := len(bare) > 2 && bare[0] == '-' && bare[1] != '-' &&
-			(slices.Contains(secretOptions, "-"+bare[len(bare)-1:]) || bare[len(bare)-1] == 'a' && hasRedis)
-		secret = slices.Contains(secretOptions, bare) || bare == "-a" && hasRedis || tail ||
-			strings.HasPrefix(bare, "-") && slices.ContainsFunc(secretNames, func(n string) bool { return strings.Contains(lower, n) })
+		lower := strings.ToLower(b)
+		tail := len(b) > 2 && b[0] == '-' && b[1] != '-' &&
+			(slices.Contains(secretOptions, "-"+b[len(b)-1:]) || b[len(b)-1] == 'a' && hasRedis)
+		secret = slices.Contains(secretOptions, b) || b == "-a" && hasRedis || tail ||
+			strings.HasPrefix(b, "-") && slices.ContainsFunc(secretNames, func(n string) bool { return strings.Contains(lower, n) })
 	}
 	s := strings.Map(func(r rune) rune {
 		if r < 0x20 || r == 0x7f {
@@ -53,12 +54,8 @@ func firstWords(command string) string {
 		}
 		return r
 	}, strings.Join(words, " "))
-	runes := 0
-	for i := range s {
-		if runes++; runes > 60 {
-			s, more = s[:i], true
-			break
-		}
+	if r := []rune(s); len(r) > 60 {
+		s, more = string(r[:60]), true
 	}
 	if more {
 		s += " …"
@@ -66,16 +63,14 @@ func firstWords(command string) string {
 	return s
 }
 
-// shellFields are command's first n words as written, quotes kept, split at whitespace outside quotes.
-func shellFields(command string, n int) []string {
-	var words []string
+// shellFields returns command's first n words as written alongside their unquoted forms.
+func shellFields(command string, n int) (raw, bare []string) {
+	var buf strings.Builder
 	start, quote, escaped := -1, rune(0), false
 	for i, r := range command + " " {
 		if escaped {
 			escaped = false
-			if start < 0 {
-				start = i
-			}
+			buf.WriteRune(r)
 			continue
 		}
 		switch {
@@ -84,13 +79,18 @@ func shellFields(command string, n int) []string {
 		case quote != 0:
 			if r == quote {
 				quote = 0
+			} else {
+				buf.WriteRune(r)
 			}
 		case r == '\'' || r == '"':
 			quote = r
 		case !unicode.IsSpace(r):
+			buf.WriteRune(r)
 		case start >= 0:
-			if words = append(words, command[start:i]); len(words) == n {
-				return words
+			raw, bare = append(raw, command[start:i]), append(bare, buf.String())
+			buf.Reset()
+			if len(raw) == n {
+				return raw, bare
 			}
 			start = -1
 			continue
@@ -102,7 +102,7 @@ func shellFields(command string, n int) []string {
 		}
 	}
 	if start >= 0 {
-		words = append(words, command[start:])
+		raw, bare = append(raw, command[start:]), append(bare, buf.String())
 	}
-	return words
+	return raw, bare
 }
