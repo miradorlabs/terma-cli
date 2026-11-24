@@ -173,7 +173,8 @@ func isAssignment(w *syntax.Word) bool {
 	return eq && isName(name)
 }
 func programName(w *syntax.Word) string {
-	return pick(w.Lit() != "", strings.TrimSuffix(filepath.Base(w.Lit()), ".exe"), "")
+	lit := w.Lit()
+	return pick(lit != "" && !strings.ContainsAny(lit, `\{`), strings.TrimSuffix(filepath.Base(lit), ".exe"), "")
 }
 func scriptFlag(opt, letters string, anywhere bool) bool {
 	return len(opt) >= 2 && opt[0] == '-' && !strings.ContainsFunc(opt[1:], func(r rune) bool { return (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') }) && (anywhere && strings.ContainsAny(opt[1:], letters) || !anywhere && len(opt) <= 4 && strings.ContainsRune(letters, rune(opt[len(opt)-1])))

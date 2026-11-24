@@ -1028,7 +1028,7 @@ func TestShellPathsResolveCommandWordsListedLinksAndNamerefs(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(deep.side, "a", "b", "c", "d", "e", "f"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(blank.api, "a .."), nil, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(blank.api, "a ..'"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if got := blank.paths(`ls ../acme-api | xargs grep -r k`, blank.side); !slices.Contains(got, UnknownReach) {
