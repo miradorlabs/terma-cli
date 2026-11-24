@@ -169,9 +169,9 @@ func (sc *scan) real(p string) (string, bool) {
 
 // safeLocate finds the git worktree root for dir without statting remote targets or crossing mounts.
 func (sc *scan) safeLocate(dir string) (string, bool) {
-	if dir == "" || sc.hasRemoteLink(dir) ||
-		slices.ContainsFunc([]string{"GIT_DIR", "GIT_WORK_TREE", "GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM"}, sc.isUnresolvedVar) ||
-		slices.ContainsFunc([]string{"GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM"}, func(k string) bool { v, _ := sc.lookup(k); return v != "" }) {
+	gitEnv := []string{"GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_COMMON_DIR"}
+	if dir == "" || sc.hasRemoteLink(dir) || sc.isUnresolvedVar("GIT_DIR") || sc.isUnresolvedVar("GIT_WORK_TREE") ||
+		slices.ContainsFunc(gitEnv, func(k string) bool { v, _ := sc.lookup(k); return sc.isUnresolvedVar(k) || v != "" }) {
 		return "", false
 	}
 	gd, _ := sc.lookup("GIT_DIR")
@@ -211,8 +211,8 @@ func (sc *scan) hasWorktreeConfig(gitDir string) bool {
 	match := func(l string) bool {
 		t := strings.TrimSpace(strings.TrimPrefix(l, "\ufeff"))
 		_, after, bracket := strings.Cut(t, "]")
-		k, _, eq := strings.Cut(map[bool]string{true: after, false: t}[strings.HasPrefix(t, "[") && bracket], "=")
-		return strings.HasPrefix(strings.ToLower(t), "[include") || eq && strings.EqualFold(strings.TrimSpace(k), "worktree")
+		f := strings.FieldsFunc(map[bool]string{true: after, false: t}[strings.HasPrefix(t, "[") && bracket], func(r rune) bool { return r == '=' || r <= ' ' })
+		return strings.HasPrefix(strings.ToLower(t), "[include") || len(f) > 0 && strings.EqualFold(f[0], "worktree")
 	}
 	return sc.fileHasLine(filepath.Join(gitDir, "config"), match) || sc.fileHasLine(filepath.Join(gitDir, "config.worktree"), match)
 }

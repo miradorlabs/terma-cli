@@ -85,6 +85,7 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 	vol := filepath.VolumeName(p)
 	root, err := openRootDir(vol + string(filepath.Separator))
 	if err != nil {
+		sc.unknown = sc.unknown || !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, fs.ErrInvalid)
 		return "", "", nil, nil, false
 	}
 	stack, paths := []dirHandle{root}, []string{vol + string(filepath.Separator)}
@@ -156,7 +157,7 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 		f, ok = sc.openLeaf(cur, ".", fi, openMode)
 		return curPath, filepath.Dir(curPath), fi, f, ok
 	}
-	return curPath, filepath.Dir(curPath), nil, nil, false
+	return "", "", nil, nil, !sc.fail()
 }
 func (sc *scan) openLeaf(cur dirHandle, part string, fi fs.FileInfo, openMode uint8) (*os.File, bool) {
 	if openMode == 0 || openMode == 1 && !fi.Mode().IsRegular() || openMode == 2 && !fi.IsDir() {

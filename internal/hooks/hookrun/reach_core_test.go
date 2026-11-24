@@ -1814,6 +1814,31 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 	if !scGoEnv.hasGoEnv("GOPATH") {
 		t.Fatalf("hasGoEnv(GOPATH) = false with unresolved config-dir vars, want true")
 	}
+	// Whitespace-separated worktree config and GIT_CONFIG_COUNT env overrides prevent safeLocate from returning a guessed root.
+	wsRepo := filepath.Join(dir, "ws-worktree-repo")
+	if err := os.MkdirAll(filepath.Join(wsRepo, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wsRepo, ".git", "config"), []byte("[core]\n\tworktree /outside/checkout\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scWS := newScan(wsRepo, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scWS.safeLocate(wsRepo); ok {
+		t.Fatalf("safeLocate(whitespace worktree config) = (%q, true), want false", got)
+	}
+	cleanRepo := filepath.Join(dir, "cfg-count-repo")
+	if err := os.MkdirAll(filepath.Join(cleanRepo, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	scCfgCount := newScan(cleanRepo, func(k string) (string, bool) {
+		if k == "GIT_CONFIG_COUNT" {
+			return "1", true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	if got, ok := scCfgCount.safeLocate(cleanRepo); ok {
+		t.Fatalf("safeLocate(GIT_CONFIG_COUNT=1) = (%q, true), want false", got)
+	}
 }
 
 func FuzzParsable(f *testing.F) {
