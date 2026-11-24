@@ -144,9 +144,7 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	// After the session start, so on a conversation's first turn the start sorts before its
 	// prompt.
 	read := conv.read(ctx)
-	observed := conv.at(env)
-	conv.close()
-	observed.CaptureObservation(ctx, r, hookrun.Observation{
+	conv.at(env).CaptureObservation(ctx, r, hookrun.Observation{
 		Tool: antigravityTool, Source: sourceAntigravityHook, StateDir: antigravityObservationDir,
 		SessionID: id, Hook: "PreInvocation", TurnID: turn, Attrs: antigravityObservationAttrs(in, "PreInvocation", turn, read),
 	})
@@ -218,7 +216,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	if step, stepped := call[semconv.TermaStepIndexKey].(int64); stepped {
 		conv.callStep = step
 	}
-	refused := antigravityRefuses(env, in)
+	refused := in.ToolCall != nil && conv.refuses(in.ToolCall.Args)
 	conv.read(ctx)
 	// A skill's use rides on the read that loaded it; its definition goes once per conversation.
 	// Both are content of both kinds: they go only where the call's arguments and a prompt may.
@@ -256,7 +254,6 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env = conv.at(env)
-	conv.close()
 	// The step's terma.tool.call ids: this is what that call changed, not a second call.
 	ids := map[string]any{}
 	for _, k := range []string{semconv.GenAIToolCallIDKey, semconv.TermaStepIndexKey, semconv.TermaTurnIDKey} {
@@ -339,14 +336,12 @@ func antigravityObserve(ctx context.Context, env hookrun.Env, hook string) error
 	conv := openAntigravityConversation(ctx, env, r, in)
 	defer conv.close()
 	read := conv.read(ctx)
-	observed := conv.at(env)
-	conv.close()
 	if hook == "Stop" {
 		// Stop ends the turn it found and no other; a prompt or a wake after it starts with
 		// a PreInvocation at invocation 0, which records the turn again.
 		endAntigravityTurnBegun(env, in.id(), begun)
 	}
-	observed.CaptureObservation(ctx, r, hookrun.Observation{
+	conv.at(env).CaptureObservation(ctx, r, hookrun.Observation{
 		Tool: antigravityTool, Source: sourceAntigravityHook, StateDir: antigravityObservationDir,
 		SessionID: in.id(), Hook: hook, TurnID: turn, Attrs: antigravityObservationAttrs(in, hook, turn, read),
 	})

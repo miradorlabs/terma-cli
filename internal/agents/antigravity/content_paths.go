@@ -2,7 +2,6 @@ package antigravity
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,21 +13,18 @@ import (
 )
 
 // Which content a hook may attach, and the two rules for content of another repository
-// (design 3.3). Both ask one question of a path: which checkout owns it.
+// (design 3.3). Both ask one question of a path: which checkout owns it (gitx places it, the
+// policy judges the checkout).
 
 // antigravityShowsFilesInNoRepository is the answer for a file in no repository at all (a
 // skill file, a note in the home folder): shown, as Claude Code and Codex show such reads.
-// false refuses it as a file in a repository the policy does not collect. It decides the
-// file keys alone (antigravityFileKeys): a folder in no repository is always refused.
+// false refuses it as a file in a repository the policy does not collect. It decides every
+// path but a folder key's (antigravityFolderKeys), which has its own, stricter rule.
 var antigravityShowsFilesInNoRepository = true
 
-// antigravityWithholdsRepliesAfterRefusal withholds the replies of a turn after a tainted call
-// line (transcript_read.go), until that turn's record ends: the model can repeat what it
-// read. false sends them, as every other agent's are.
-var antigravityWithholdsRepliesAfterRefusal = false
-
-// antigravityFileKeys are the argument keys that name a file, for any tool: the edit tools'
-// (antigravityPathKeys) and view_file's.
+// antigravityFileKeys are the argument keys known to name a file, for any tool: the edit
+// tools' (antigravityPathKeys) and view_file's. A relative path is judged only under one of
+// them or antigravityFolderKeys.
 var antigravityFileKeys = append(slices.Clone(antigravityPathKeys), "AbsolutePath")
 
 // antigravityFolderKeys are the argument keys that name a folder a tool lists, searches or
@@ -46,48 +42,19 @@ func contentConsented(c hookrun.Consent) bool {
 // switch, the developer's consent, and every workspace in a checkout the policy collects.
 type antigravityContent struct{ prompts, tools bool }
 
-// antigravityContentFor is the content the hook in e (its Cwd where it ran) may attach.
-func antigravityContentFor(e hookrun.Env, in *antigravityHookInput) antigravityContent {
+// antigravityContentFor is the content the hook in e (its Cwd where it ran) may attach, its
+// workspaces placed by paths.
+func antigravityContentFor(e hookrun.Env, in *antigravityHookInput, paths *antigravityPaths) antigravityContent {
 	prompts, tools := e.Policy.Content()
-	if !prompts && !tools || !contentConsented(e.Consent()) || !antigravityWorkspacesCollected(e, in) {
+	if !prompts && !tools || !contentConsented(e.Consent()) || !paths.workspacesCollected(e.Cwd, in) {
 		return antigravityContent{}
 	}
 	return antigravityContent{prompts: prompts, tools: tools}
 }
 
-// antigravityWorkspacesCollected reports whether every one of the conversation's workspaces
-// (workspacePaths, the cwd when the list is empty) is in a checkout the policy collects,
-// judged by the owner of its resolved path, as a file is (antigravityPathOwner), so a
-// workspace that is a link into an excluded checkout is not collected. A workspace must be
-// an existing folder: one removed is not judged by the folder above it, which may be the
-// collected checkout an excluded clone was nested in. One outside git is
-// not, unless global mode collects it, as it collects a session outside git. agy reports a
-// conversation's first folder as cwd for good, and adds the folder it is resumed from to the
-// list, so a conversation resumed from another repository sends no content.
-func antigravityWorkspacesCollected(e hookrun.Env, in *antigravityHookInput) bool {
-	paths := in.WorkspacePaths
-	if len(paths) == 0 {
-		paths = []string{e.Cwd}
-	}
-	for _, p := range paths {
-		if p == "" || !filepath.IsAbs(p) {
-			return false
-		}
-		if info, err := os.Stat(p); err != nil || !info.IsDir() {
-			return false
-		}
-		switch antigravityPathOwner(e.Policy, "", p) {
-		case ownerCollected:
-		case ownerNone:
-			if !e.Policy.Global() {
-				return false
-			}
-		default:
-			return false
-		}
-	}
-	return true
-}
+// antigravityPathLimit is the longest argument value judged as a path when no key says it
+// names one.
+const antigravityPathLimit = 4096
 
 // antigravityOwner is which checkout owns a path.
 type antigravityOwner int
@@ -103,131 +70,170 @@ const (
 	ownerExcluded
 )
 
-// antigravityPathOwner places path, absolute or relative to cwd: its symlinks resolved (for a
-// file not there yet, its nearest existing folder's), then the nearest git checkout that
-// holds it, so a nested clone or a submodule is its own, judged by the policy.
-//
-// With GIT_DIR in the hook's environment, gitx.LocateFS pairs any folder with that git
-// directory, so no path's checkout can be told: every path is unresolved, and with every
-// workspace unresolved such a session sends no content at all. A path that starts with "~" is
-// unresolved too: agy may expand it to a home folder, terma does not.
-func antigravityPathOwner(pol config.Policy, cwd, path string) antigravityOwner {
-	if os.Getenv("GIT_DIR") != "" || strings.HasPrefix(path, "~") {
+// antigravityPaths judges paths for one hook under its policy, and remembers the owner of each
+// resolved folder it has placed: a call line with many paths in one folder, and the hook and
+// the transcript's reader judging the same arguments, place that folder once.
+type antigravityPaths struct {
+	pol    config.Policy
+	owners map[string]antigravityOwner
+	// placed counts the folders placed, the lookups the cache saved excluded.
+	placed int
+}
+
+// newAntigravityPaths judges paths under pol, with nothing placed yet.
+func newAntigravityPaths(pol config.Policy) *antigravityPaths {
+	return &antigravityPaths{pol: pol, owners: map[string]antigravityOwner{}}
+}
+
+// owner places path, absolute or relative to cwd: the checkout that holds its resolved folder
+// (gitx.ResolveFolderFS, gitx.PlaceFolderFS), judged by the policy. A path that starts with "~"
+// is unresolved: agy may expand it to a home folder, terma does not. With GIT_DIR in the
+// hook's environment every path is unresolved, and with every workspace unresolved such a
+// session sends no content at all.
+func (p *antigravityPaths) owner(cwd, path string) antigravityOwner {
+	if strings.HasPrefix(path, "~") {
 		return ownerUnresolved
 	}
 	if !filepath.IsAbs(path) {
 		if cwd == "" {
 			return ownerUnresolved
 		}
+		// Not filepath.Join, which would clean away a ".." the resolution refuses.
 		path = cwd + string(filepath.Separator) + path
 	}
-	resolved, ok := antigravityResolve(path)
+	dir, ok := gitx.ResolveFolderFS(path)
 	if !ok {
 		return ownerUnresolved
 	}
-	// A file's checkout is its folder's.
-	if info, err := os.Stat(resolved); err != nil {
-		return ownerUnresolved
-	} else if !info.IsDir() {
-		resolved = filepath.Dir(resolved)
+	if owner, ok := p.owners[dir]; ok {
+		return owner
 	}
-	for cur := resolved; ; cur = filepath.Dir(cur) {
-		_, err := os.Lstat(filepath.Join(cur, ".git"))
-		if err == nil {
-			root, gitDir, found := gitx.LocateFS(cur)
-			if !found || root != cur {
-				return ownerUnresolved
+	p.placed++
+	owner := ownerUnresolved
+	switch _, gitDir, place := gitx.PlaceFolderFS(dir); place {
+	case gitx.NoCheckout:
+		owner = ownerNone
+	case gitx.InCheckout:
+		owner = ownerExcluded
+		if origin, _ := gitx.OriginFS(gitDir); p.pol.Admits(config.Repository{Origin: origin}) {
+			owner = ownerCollected
+		}
+	}
+	p.owners[dir] = owner
+	return owner
+}
+
+// workspacesCollected reports whether every one of the conversation's workspaces
+// (workspacePaths, cwd when the list is empty) is in a checkout the policy collects, judged by
+// the owner of its resolved path, as a file is, so a workspace that is a link into an
+// excluded checkout is not collected. A workspace must be an existing folder: one removed is
+// not judged by the folder above it, which may be the collected checkout an excluded clone
+// was nested in. One outside git is not, unless global mode collects it, as it collects a
+// session outside git. agy reports a conversation's first folder as cwd for good, and adds
+// the folder it is resumed from to the list, so a conversation resumed from another
+// repository sends no content.
+func (p *antigravityPaths) workspacesCollected(cwd string, in *antigravityHookInput) bool {
+	workspaces := in.WorkspacePaths
+	if len(workspaces) == 0 {
+		workspaces = []string{cwd}
+	}
+	for _, w := range workspaces {
+		if w == "" || !filepath.IsAbs(w) {
+			return false
+		}
+		if info, err := os.Stat(w); err != nil || !info.IsDir() {
+			return false
+		}
+		switch p.owner("", w) {
+		case ownerCollected:
+		case ownerNone:
+			if !p.pol.Global() {
+				return false
 			}
-			origin, _ := gitx.OriginFS(gitDir)
-			if pol.Admits(config.Repository{Origin: origin}) {
-				return ownerCollected
-			}
-			return ownerExcluded
-		}
-		if !errors.Is(err, os.ErrNotExist) {
-			return ownerUnresolved
-		}
-		if filepath.Dir(cur) == cur {
-			return ownerNone
+		default:
+			return false
 		}
 	}
+	return true
 }
 
-// antigravityResolve is path with its symlinks resolved, or for a path that does not exist
-// yet, its nearest existing folder's resolved; false when neither can be had. A missing path
-// that climbs with ".." is not resolved: past a link, ".." names another folder than the
-// text does. Nor is a path through a dangling link, the path itself or a folder on the way:
-// where it leads is unknown, not its folder's.
-func antigravityResolve(path string) (string, bool) {
-	if resolved, err := filepath.EvalSymlinks(path); err == nil {
-		return resolved, true
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return "", false
-	}
-	if slices.Contains(strings.Split(filepath.ToSlash(path), "/"), "..") {
-		return "", false
-	}
-	for cur := filepath.Clean(path); ; cur = filepath.Dir(cur) {
-		resolved, err := filepath.EvalSymlinks(cur)
-		if err == nil {
-			return resolved, true
-		}
-		if !errors.Is(err, os.ErrNotExist) || filepath.Dir(cur) == cur {
-			return "", false
-		}
-		// Something there that does not resolve is a link to nothing (or cannot be read).
-		if _, err := os.Lstat(cur); !errors.Is(err, os.ErrNotExist) {
-			return "", false
-		}
-	}
-}
-
-// antigravityRefuses reports whether the content of the hook's own tool call is refused
-// (antigravityRefusesArgs), a relative path judged from the conversation's cwd.
-func antigravityRefuses(e hookrun.Env, in *antigravityHookInput) bool {
-	return in.ToolCall != nil && antigravityRefusesArgs(e, e.Cwd, in.ToolCall.Args)
-}
-
-// antigravityRefusesArgs reports whether a tool call's content is refused: its arguments name
-// a file or folder (antigravityFileKeys, antigravityFolderKeys, any tool) in a checkout the
-// policy does not collect, or one terma cannot place, a relative path joined to cwd. A folder
-// in no repository is refused, but in global mode; a file in no repository only when
-// antigravityShowsFilesInNoRepository is false. Arguments terma cannot read as an object name
-// no file it knows of: the hook attaches none of them, and the transcript's reader refuses
-// them itself (antigravityCallsRefused). The hook judges its own call's arguments by it, and
-// the reader every call a call line asks for, so both refuse the same calls.
-func antigravityRefusesArgs(e hookrun.Env, cwd string, raw json.RawMessage) bool {
+// refuses reports whether a tool call's content is refused, any tool: a value anywhere in its
+// arguments, nested objects and lists included, names a file or folder in a checkout the
+// policy does not collect, or one terma cannot place. Which values are judged:
+//
+//   - every one that looks like a path (antigravityLooksLikePath), under any key: what an MCP
+//     filesystem tool or a tool agy adds names a file with is not known in advance;
+//   - every one under a key known to name a path (antigravityFileKeys, antigravityFolderKeys),
+//     a relative one joined to cwd. Elsewhere a relative value is text, not judged.
+//
+// A folder of a folder key in no repository is refused, but in global mode; any other path in
+// no repository is refused only when antigravityShowsFilesInNoRepository is false. A value that
+// merely looks like a path in free text (an edit's Replacement of "/api/v1/users") resolves to
+// its nearest existing folder, which is in no repository, and is shown; a text that happens to
+// name a real excluded checkout is refused, which errs toward sending less.
+//
+// Arguments terma cannot read as an object name no file it knows of: the hook attaches none of
+// them, and the transcript's reader refuses them itself (antigravityCallsRefused). The hook
+// judges its own call's arguments by it, and the reader every call a call line asks for, so
+// both refuse the same calls.
+func (p *antigravityPaths) refuses(cwd string, raw json.RawMessage) bool {
 	if len(raw) == 0 {
 		return false
 	}
-	var args map[string]json.RawMessage
+	var args map[string]any
 	if json.Unmarshal(raw, &args) != nil {
 		return false
 	}
-	refused := func(key string, showsNone bool) bool {
-		var p string
-		if json.Unmarshal(args[key], &p) != nil || p == "" {
-			return false
+	return p.refusesValue(cwd, "", args)
+}
+
+// refusesValue reports whether v, the value under key, or any value within it is refused; the
+// items of a list are judged under the list's key.
+func (p *antigravityPaths) refusesValue(cwd, key string, v any) bool {
+	switch v := v.(type) {
+	case map[string]any:
+		for k, item := range v {
+			if p.refusesValue(cwd, k, item) {
+				return true
+			}
 		}
-		switch antigravityPathOwner(e.Policy, cwd, p) {
-		case ownerCollected:
-			return false
-		case ownerNone:
-			return !showsNone
+	case []any:
+		for _, item := range v {
+			if p.refusesValue(cwd, key, item) {
+				return true
+			}
 		}
-		return true
-	}
-	for _, key := range antigravityFileKeys {
-		if refused(key, antigravityShowsFilesInNoRepository) {
-			return true
-		}
-	}
-	// Global mode collects every repository on the machine and a session outside git, so a
-	// folder outside git holds nothing the policy excludes.
-	for _, key := range antigravityFolderKeys {
-		if refused(key, e.Policy.Global()) {
-			return true
-		}
+	case string:
+		return p.refusesPath(cwd, key, v)
 	}
 	return false
+}
+
+// refusesPath reports whether one string value under key is refused, by refuses's rules.
+func (p *antigravityPaths) refusesPath(cwd, key, value string) bool {
+	folder := slices.Contains(antigravityFolderKeys, key)
+	named := folder || slices.Contains(antigravityFileKeys, key)
+	if value == "" || !named && !antigravityLooksLikePath(value) {
+		return false
+	}
+	switch p.owner(cwd, value) {
+	case ownerCollected:
+		return false
+	case ownerNone:
+		// Global mode collects every repository on the machine and a session outside git, so
+		// a folder outside git holds nothing the policy excludes.
+		if folder {
+			return !p.pol.Global()
+		}
+		return !antigravityShowsFilesInNoRepository
+	}
+	return true
+}
+
+// antigravityLooksLikePath reports whether an argument value looks like a path whatever its
+// key: one line, at most antigravityPathLimit bytes, absolute, or the home folder or a path
+// in it ("~", "~/...").
+func antigravityLooksLikePath(s string) bool {
+	return len(s) <= antigravityPathLimit && !strings.Contains(s, "\n") &&
+		(filepath.IsAbs(s) || s == "~" || strings.HasPrefix(s, "~/"))
 }

@@ -139,7 +139,7 @@ func TestAntigravityRefusedReadSendsNeitherArgumentsNorResult(t *testing.T) {
 			if a, r := stepContent(got, "step-4"); !a || !r || len(got[semconv.TermaAssistantMessageEvent]) != 1 {
 				t.Errorf("the rest of the turn: arguments %v, result %v, replies %d", a, r, len(got[semconv.TermaAssistantMessageEvent]))
 			}
-			if s := g.readCallState(); s.Tainted || s.WithholdsFrom != nil {
+			if s := g.readCallState(); s.Tainted {
 				t.Errorf("a taint left after the turn: %+v", s)
 			}
 		})
@@ -157,48 +157,6 @@ func TestAntigravityFileInNoRepositoryFollowsTheAnswer(t *testing.T) {
 		g.readTurn(filepath.Join(none, "note.md"))
 		if args, result := stepContent(g.drain(), "step-2"); args != shows || result != shows {
 			t.Errorf("shows %v: arguments %v, result %v", shows, args, result)
-		}
-	}
-}
-
-// After a tainted batch the turn's replies go, unless the package's answer withholds them
-// until the turn's record ends; the next turn's go either way.
-func TestAntigravityRepliesAfterARefusalFollowTheAnswer(t *testing.T) {
-	file := excludedFile(t)
-	defer func(was bool) { antigravityWithholdsRepliesAfterRefusal = was }(antigravityWithholdsRepliesAfterRefusal)
-	for _, withholds := range []bool{false, true} {
-		antigravityWithholdsRepliesAfterRefusal = withholds
-		g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
-		g.readTurn(file)
-		g.write(8)
-		g.hook(preInvocation, begin("8"))
-		g.write(12)
-		g.hook(stop, stopped)
-		g.drain()
-		if g.spoke(6) == withholds || !g.spoke(11) {
-			t.Errorf("withholds %v: the refused turn's reply went %v, the next turn's %v", withholds, g.spoke(6), g.spoke(11))
-		}
-		if s := g.readCallState(); (s.WithholdsFrom != nil) != withholds {
-			t.Errorf("withholds %v: the state keeps %+v", withholds, s)
-		}
-
-		// A turn whose first call line cannot be read or placed: its reply follows the answer
-		// too, though the last step handled before it is the turn's prompt.
-		for name, first := range map[string]string{
-			"too long":   strings.Replace(replyLine(1), `"content":"<scrubbed>"`, `"content":"`+strings.Repeat("x", antigravityLineLimit)+`"`, 1),
-			"unreadable": `{"step_index":1,"type":"PLANNER_RESPONSE","tool_calls":[`,
-			"no step":    strings.Replace(callLine(1, readCall(filepath.Join(t.TempDir(), "made-up.txt"))), `"step_index":1,`, "", 1),
-		} {
-			g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
-			g.lines = []string{g.lines[0], first, resultLine(2), replyLine(3)}
-			g.write(1)
-			g.hook(preInvocation, begin("1"))
-			g.write(4)
-			g.hook(stop, stopped)
-			g.drain()
-			if g.spoke(3) == withholds {
-				t.Errorf("withholds %v, a first call line %s: the turn's reply went %v", withholds, name, g.spoke(3))
-			}
 		}
 	}
 }

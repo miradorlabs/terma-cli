@@ -2,7 +2,6 @@ package antigravity
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -75,7 +74,7 @@ func antigravityTranscriptPaths(in *antigravityHookInput) (transcript, appData s
 }
 
 // read reads the transcript past the last read and sends each line the rule in turn.go lets
-// this hook send (antigravitySend); it passes the rest. It reports whether it read the
+// this hook send, through send below; it passes the rest. It reports whether it read the
 // transcript, so the hook's observation says usage travels apart. Without the lock it reads
 // nothing.
 func (c *antigravityConversation) read(ctx context.Context) bool {
@@ -98,8 +97,7 @@ func (c *antigravityConversation) read(ctx context.Context) bool {
 		return true
 	}
 	// A call is refused by the rule its hook judges its own arguments by.
-	refuses := func(args json.RawMessage) bool { return antigravityRefusesArgs(e, e.Cwd, args) }
-	next, err := readAntigravitySteps(ctx, antigravityTranscript(c.in), c.state, prompt, refuses, func(s antigravityStep) bool {
+	next, err := readAntigravitySteps(ctx, antigravityTranscript(c.in), c.state, prompt, c.refuses, func(s antigravityStep) bool {
 		if first < 0 || (*s.StepIndex < first && !s.prompt) {
 			// Before this turn, or no turn of this hook's: passed for good. The one line before
 			// the turn that is its own is the prompt it began with.
@@ -150,7 +148,9 @@ func (c *antigravityConversation) send(s antigravityStep, turn string) bool {
 		if !e.EmitFor(r, ev) {
 			return false
 		}
-		if s.Content == "" || !c.contentFor().prompts || antigravityRepliesWithheld(s, turn) {
+		// A reply after a refused read goes, as every agent's does; withholding it would need
+		// the tainted call line's step kept in the state.
+		if s.Content == "" || !c.contentFor().prompts {
 			return true
 		}
 		reply := antigravityReplyEvent(id, s, turn)
@@ -179,10 +179,4 @@ func (c *antigravityConversation) send(s antigravityStep, turn string) bool {
 		return e.EmitFor(r, ev)
 	}
 	return true
-}
-
-// antigravityRepliesWithheld reports whether s's reply is withheld: the package's answer
-// withholds replies after a tainted call line, and that line is of turn, the one being read.
-func antigravityRepliesWithheld(s antigravityStep, turn string) bool {
-	return antigravityWithholdsRepliesAfterRefusal && s.withholdsFrom >= 0 && s.withholdsFrom >= antigravityTurnNumber(turn)
 }

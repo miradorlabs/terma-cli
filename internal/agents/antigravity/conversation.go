@@ -35,6 +35,8 @@ type antigravityConversation struct {
 	created bool
 
 	content *antigravityContent
+	// paths judges the paths the hook meets, each folder placed once.
+	paths *antigravityPaths
 	// callStep is the step of the call a PostToolUse spools, -1 for none; callAt is its time,
 	// stamped just before its result when the read meets that first.
 	callStep int64
@@ -45,7 +47,7 @@ type antigravityConversation struct {
 // antigravityCallLockWait for another of its hooks, and loads its calls state. Without a
 // transcript of agy's shape, a spool or a safe id, it holds nothing.
 func openAntigravityConversation(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *antigravityHookInput) *antigravityConversation {
-	c := &antigravityConversation{e: e, r: r, in: in, ctx: ctx, callStep: -1}
+	c := &antigravityConversation{e: e, r: r, in: in, ctx: ctx, callStep: -1, paths: newAntigravityPaths(e.Policy)}
 	transcript := antigravityTranscript(in)
 	id := in.id()
 	if transcript == "" || e.Spool == nil || !session.ValidID(id) {
@@ -118,18 +120,25 @@ func (c *antigravityConversation) callTime() time.Time {
 // contentFor is the content this hook may attach, worked out once.
 func (c *antigravityConversation) contentFor() antigravityContent {
 	if c.content == nil {
-		content := antigravityContentFor(c.e, c.in)
+		content := antigravityContentFor(c.e, c.in, c.paths)
 		c.content = &content
 	}
 	return *c.content
 }
 
-// close saves the state, when it changed or began, and lets the lock go.
+// refuses reports whether the content of a tool call with these arguments is refused
+// (antigravityPaths.refuses), a relative path judged from the conversation's cwd. The hook
+// judges its own call by it, and the transcript's reader every call a call line asks for.
+func (c *antigravityConversation) refuses(args json.RawMessage) bool {
+	return c.paths.refuses(c.e.Cwd, args)
+}
+
+// close saves the state, when it changed or began, and lets the lock go. A hook defers it
+// once, as it opens the conversation.
 func (c *antigravityConversation) close() {
 	if !c.held {
 		return
 	}
-	c.held = false
 	defer c.unlock()
 	// A state that began is saved even unchanged: a subagent's first hook runs before its
 	// transcript exists, and the next must not begin again past the subagent's first call.

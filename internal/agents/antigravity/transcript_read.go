@@ -13,7 +13,8 @@ import (
 )
 
 // Reading agy's transcript: how far a conversation's transcript was read, and the lines
-// past that point that a hook may send. Which of them it sends is antigravitySend's.
+// past that point that a hook may send. Which of them it sends is
+// (*antigravityConversation).send's.
 
 // antigravityCallState is how far a conversation's transcript was read.
 type antigravityCallState struct {
@@ -27,17 +28,13 @@ type antigravityCallState struct {
 	// follow it in order, one line each.
 	Results []string `json:"results,omitempty"`
 	// Tainted is that the last call line asked for a call whose content is refused
-	// (antigravityRefusesArgs), or could not be read: every result until the next call line
-	// is withheld.
+	// (antigravityPaths.refuses), or could not be read: every result until the next call line
+	// is withheld (antigravityBatch).
 	Tainted bool `json:"tainted,omitempty"`
 	// Before is the transcript's size when this state began: the lines that start before it
 	// are never sent and never counted, but for the turn's own prompt (readAntigravitySteps).
 	// 0 once a read has passed it, and for a state that began with no transcript.
 	Before int64 `json:"before,omitempty"`
-	// WithholdsFrom is the step of the last call line that was tainted, kept only while
-	// antigravityWithholdsRepliesAfterRefusal is on: the replies of its turn after it are
-	// withheld.
-	WithholdsFrom *int64 `json:"withholds_from,omitempty"`
 	// Clock is the last time stamped on an event of the conversation, in Unix milliseconds.
 	Clock int64 `json:"clock,omitempty"`
 }
@@ -64,9 +61,6 @@ type antigravityStep struct {
 	subagentResult bool
 	// withheld is set on a result of a tainted call line (antigravityCallState.Tainted).
 	withheld bool
-	// withholdsFrom is antigravityCallState.WithholdsFrom as it stood before the line, -1 for
-	// none.
-	withholdsFrom int64
 	// prompt is set on the USER_INPUT the turn being read began with.
 	prompt bool
 }
@@ -128,27 +122,9 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 			state.Before = 0
 		}
 	}
-	// pending are the calls of the last call line read while whether one is refused is not
-	// worked out yet: taint works it out only when a result of the batch is handed on, or the
-	// read stops, so a state that begins does not judge every path the transcript ever named.
-	var pending []antigravityToolCall
-	taint := func() bool {
-		if pending != nil {
-			state.Tainted = antigravityCallsRefused(pending, refuses)
-			pending = nil
-		}
-		return state.Tainted
-	}
-	// withholdReplies marks the replies after step withheld, when the package's answer does.
-	// A line that taints without a step of its own passes the step after the last handled:
-	// were it a turn's first call, the last handled is the turn's prompt, of the turn before.
-	withholdReplies := func(step int64) {
-		if antigravityWithholdsRepliesAfterRefusal {
-			state.WithholdsFrom = &step
-		}
-	}
+	batch := antigravityBatch{tainted: state.Tainted, refuses: refuses}
 	stop := func() antigravityCallState {
-		taint()
+		state.Tainted = batch.saved()
 		state.Tail = antigravityTail(f, state.Offset)
 		return state
 	}
@@ -171,8 +147,8 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 		}
 		if line == nil {
 			// Too long to read: the calls or results it held are unknown, so it taints.
-			state.Results, state.Tainted, pending = nil, true, nil
-			withholdReplies(state.Step + 1)
+			state.Results = nil
+			batch.unknown()
 			advance(n)
 			continue
 		}
@@ -184,8 +160,8 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 		var s antigravityStep
 		if json.Unmarshal(line, &s) != nil {
 			// Unreadable, as one too long is: it may be a call line whose calls are unknown.
-			state.Results, state.Tainted, pending = nil, true, nil
-			withholdReplies(state.Step + 1)
+			state.Results = nil
+			batch.unknown()
 			advance(n)
 			continue
 		}
@@ -193,8 +169,8 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 			if s.Type == "PLANNER_RESPONSE" {
 				// A call line with no step to place it: its calls are unknown, as an unreadable
 				// line's are, so it taints until the next call line.
-				state.Results, state.Tainted, pending = nil, true, nil
-				withholdReplies(state.Step + 1)
+				state.Results = nil
+				batch.unknown()
 			}
 			advance(n)
 			continue
@@ -203,16 +179,13 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 		// What the line moves on, kept only once it is read: a line emit refuses is read again.
 		// A prompt clears nothing: one that joins a running turn leaves its results pending,
 		// and after a cancelled turn the next call resets them.
-		results, calls := state.Results, []antigravityToolCall(nil)
+		results := state.Results
 		planner := s.Type == "PLANNER_RESPONSE"
 		switch {
 		case planner:
 			results = nil
 			for _, c := range s.ToolCalls {
 				results = append(results, c.Name)
-			}
-			if len(s.ToolCalls) > 0 {
-				calls = s.ToolCalls
 			}
 		case s.Type == "GENERIC":
 			if len(results) > 0 {
@@ -223,11 +196,7 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 		if step > state.Step && antigravityKept[s.Type] {
 			s.prompt = s.Type == "USER_INPUT" && prompt >= 0 && step == prompt
 			if state.Offset >= state.Before || s.prompt {
-				s.withheld = s.Type == "GENERIC" && taint()
-				s.withholdsFrom = -1
-				if state.WithholdsFrom != nil {
-					s.withholdsFrom = *state.WithholdsFrom
-				}
+				s.withheld = s.Type == "GENERIC" && batch.isTainted()
 				if !emit(s) {
 					return stop(), nil
 				}
@@ -236,14 +205,49 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 		}
 		state.Results = results
 		if planner {
-			state.Tainted, pending = false, calls
-			if antigravityWithholdsRepliesAfterRefusal && taint() {
-				withholdReplies(step)
-			}
+			batch.begin(s.ToolCalls)
 		}
 		advance(n)
 	}
 }
+
+// antigravityBatch is the taint of the batch being read: the results that follow the last
+// call line, withheld when it asked for a refused call or could not be read. Whether a call is
+// refused is worked out only when a result of the batch is handed on or the read stops, and
+// once, so a state that begins does not judge every path the transcript ever named.
+type antigravityBatch struct {
+	// tainted is the batch's taint once judged, or as the state was saved.
+	tainted bool
+	// pending are the calls of a call line not judged yet; nil once judged.
+	pending []antigravityToolCall
+	refuses func(json.RawMessage) bool
+}
+
+// begin is a call line asking for calls: a batch of its own, judged later. One that asks for
+// none is not tainted.
+func (b *antigravityBatch) begin(calls []antigravityToolCall) {
+	b.tainted, b.pending = false, nil
+	if len(calls) > 0 {
+		b.pending = calls
+	}
+}
+
+// unknown is a line that cannot be read, or a call line with no step to place it: it may have
+// asked for calls terma cannot see, so the batch is tainted until the next call line.
+func (b *antigravityBatch) unknown() { b.tainted, b.pending = true, nil }
+
+// isTainted reports whether the batch's results are withheld, judging its calls the first time.
+func (b *antigravityBatch) isTainted() bool {
+	if b.pending != nil {
+		b.tainted = antigravityCallsRefused(b.pending, b.refuses)
+		b.pending = nil
+	}
+	return b.tainted
+}
+
+// saved is the taint a read that stops keeps in the state (antigravityCallState.Tainted), for
+// the next hook's read to begin from.
+func (b *antigravityBatch) saved() bool { return b.isTainted() }
 
 // antigravityCallsRefused reports whether refuses refuses the arguments of any of calls, or
 // one has arguments the reader cannot judge: none at all, or not a JSON object. {} and null
