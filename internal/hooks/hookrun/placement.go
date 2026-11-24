@@ -262,7 +262,7 @@ func (rt *Routing) crossing(prev claim.Claim, havePrev bool, run string, locs []
 	for i, a := range classes {
 		for j := i + 1; j < len(classes); j++ {
 			b := classes[j]
-			if !a.ok || !b.ok || ((a.pending || b.pending) && a.repo != "" && a.repo == b.repo) || (!a.pending && !b.pending && a.id == b.id) {
+			if (!a.ok && !b.ok) || (a.ok && b.ok && (((a.pending || b.pending) && a.repo != "" && a.repo == b.repo) || (!a.pending && !b.pending && a.id == b.id))) {
 				continue
 			}
 			at := j

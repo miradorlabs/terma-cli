@@ -670,3 +670,57 @@ func TestUnparkMixedEventsAndPushesPreserveIdempotency(t *testing.T) {
 		t.Fatalf("no_destination after push retry = %d, want 2", lost)
 	}
 }
+
+func TestRoutedDroppedReachMarksMixed(t *testing.T) {
+	stateDir := t.TempDir()
+	repoA := namedRepo(t, "alpha", "git@github.com:orgA/alpha.git")
+	repoUnlisted := namedRepo(t, "personal", "git@github.com:someone/private.git")
+	fileUnlisted := filepath.Join(repoUnlisted, "secret.txt")
+	if err := os.WriteFile(fileUnlisted, []byte("secret\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	outsideDir := t.TempDir()
+	outsideFile := filepath.Join(outsideDir, "notes.txt")
+	if err := os.WriteFile(outsideFile, []byte("private\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Only orgA is selected; no personal team collects outside git or unlisted repos.
+	rt := routedState(t, stateDir, testAccountA, []routing.Team{
+		makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true),
+	}, map[string]string{"github.com/orgA/alpha": "orgA"})
+	env, _, _ := routedEnv(t, stateDir, repoA, testAccountA, rt)
+	ctx := context.Background()
+	rA, err := env.Repo(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Reading from an unlisted repository marks orgA's run Mixed.
+	sid1 := "018f3a2c-0009-7000-8000-000000000001"
+	env.StartRun(sid1)
+	env.Classify(ctx, rA, session.Session{ID: sid1, Tool: "claude_code"}, []string{fileUnlisted}, nil)
+	if c, ok := claim.Read(stateDir, sid1, env.Time()); !ok || c.Kind != claim.KindMixed {
+		t.Fatalf("claim after reading unlisted repo = %+v (ok=%v); want KindMixed", c, ok)
+	}
+
+	// 2. Reading from outside Git without a personal route marks orgA's run Mixed.
+	sid2 := "018f3a2c-0009-7000-8000-000000000002"
+	env.StartRun(sid2)
+	env.Classify(ctx, rA, session.Session{ID: sid2, Tool: "claude_code"}, []string{outsideFile}, nil)
+	if c, ok := claim.Read(stateDir, sid2, env.Time()); !ok || c.Kind != claim.KindMixed {
+		t.Fatalf("claim after reading outside git without personal route = %+v (ok=%v); want KindMixed", c, ok)
+	}
+
+	// 3. Reading inside orgA's own repository stays clean (not Mixed).
+	ownFile := filepath.Join(repoA, "ok.txt")
+	if err := os.WriteFile(ownFile, []byte("ok\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sid3 := "018f3a2c-0009-7000-8000-000000000003"
+	env.StartRun(sid3)
+	env.Announce(rA, env.NewSession(rA, sid3, "claude_code", ""), nil)
+	env.Classify(ctx, rA, session.Session{ID: sid3, Tool: "claude_code"}, []string{ownFile}, nil)
+	if c, ok := claim.Read(stateDir, sid3, env.Time()); !ok || c.Kind != claim.KindRepository {
+		t.Fatalf("claim after reading own repo = %+v (ok=%v); want KindRepository", c, ok)
+	}
+}
