@@ -240,14 +240,11 @@ func (v *teamsView) mergeState(st routing.State, names teamNames, now time.Time)
 		org := v.org(t.OrganizationID, names)
 		i := slices.IndexFunc(org.Teams, func(r teamRow) bool { return r.ID == t.TeamID })
 		if i < 0 {
-			org.Teams = append(org.Teams, teamRow{ID: t.TeamID, Name: names.Teams[t.TeamID]})
+			org.Teams = append(org.Teams, teamRow{ID: t.TeamID, Name: names.Teams[t.TeamID], Entries: t.Policy.Repositories, Collects: collectsSummary(t.Policy, t.Personal), GitHooks: t.Policy.GitHooks})
 			i = len(org.Teams) - 1
 		}
 		row := &org.Teams[i]
 		row.Selected, row.EnrollmentID, row.State, row.LastError = true, t.EnrollmentID, t.StateAt(now), t.LastError
-		if row.Unreadable == "" && row.Entries == nil {
-			row.Entries, row.Collects, row.GitHooks = t.Policy.Repositories, collectsSummary(t.Policy, t.Personal), t.Policy.GitHooks
-		}
 		if t.Personal && org.Type == "" {
 			org.Type = "personal"
 		}
@@ -260,15 +257,14 @@ func (v *teamsView) mergeState(st routing.State, names teamNames, now time.Time)
 	v.Pending = pendingBindings(st)
 	// Personal is always last.
 	slices.SortStableFunc(v.Organizations, func(a, b orgRow) int {
-		return cmp.Compare(boolInt(a.Type == "personal"), boolInt(b.Type == "personal"))
+		if (a.Type == "personal") == (b.Type == "personal") {
+			return 0
+		}
+		if a.Type == "personal" {
+			return 1
+		}
+		return -1
 	})
-}
-
-func boolInt(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
 }
 
 func (v *teamsView) org(id string, names teamNames) *orgRow {

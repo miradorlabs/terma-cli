@@ -159,10 +159,14 @@ func resolveOrg(ref string, names teamNames, list func() teamsView) (id, name st
 	v := list()
 	if orgID := strings.ToLower(parseOrgRef(ref).ID); orgID != "" {
 		if i := slices.IndexFunc(v.Organizations, func(o orgRow) bool { return strings.EqualFold(o.ID, orgID) }); i >= 0 {
-			if v.Organizations[i].Type == "personal" {
+			o := v.Organizations[i]
+			switch {
+			case o.Type == "personal":
 				return "", "", errPersonalBinding
+			case o.Inaccessible:
+				return "", "", fmt.Errorf("you no longer have access to %s, so it cannot be bound", orgTitle(o))
 			}
-			return v.Organizations[i].ID, cmp.Or(v.Organizations[i].Name, names.Orgs[v.Organizations[i].ID]), nil
+			return o.ID, cmp.Or(o.Name, names.Orgs[o.ID]), nil
 		}
 		if v.Unlisted == "" {
 			return "", "", fmt.Errorf("organization %q is not one of your organizations", ref)

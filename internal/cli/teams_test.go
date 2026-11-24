@@ -308,11 +308,35 @@ func TestTeamsAnnotatesOrgNotAccessibleWithoutFailingOthers(t *testing.T) {
 			if !strings.Contains(text, orgInaccessibleNote) || !strings.Contains(text, "Acme API") || !strings.Contains(text, "Personal") {
 				t.Errorf("unexpected text output:\n%s", text)
 			}
-			// Attempting to tick a team in the inaccessible org fails cleanly.
+			// Attempting to tick a team or bind to the inaccessible org (by name or UUID) fails cleanly.
 			if _, _, err := teamsJSON(t, "--select", betaCore); err == nil {
 				t.Error("selecting a team in an ORG_NOT_ACCESSIBLE org should fail")
 			}
+			if _, _, err := teamsJSON(t, "--bind", "github.com/beta/core="+orgB().ID); err == nil || !strings.Contains(err.Error(), "no longer have access") {
+				t.Errorf("binding to ORG_NOT_ACCESSIBLE org by UUID err = %v, want inaccessible rejection", err)
+			}
 		})
+	}
+}
+
+func TestTeamsPreservesFreshGlobalPolicyOverStaleState(t *testing.T) {
+	f, _ := routedMachine(t, "alice", func(f *fakeAuth, s *routing.State) error {
+		_, err := s.Select(stateTeam(f, orgA().ID, acmeAPI, false, "github.com/acme/api"))
+		return err
+	})
+	// Server policy switched from per-repository mode (git_hooks=true) to global mode (git_hooks=false).
+	f.policyBodies[acmeAPI] = `{"policy":{"version":"1.1","terma":{"capture":{"exclude_prompts":false,"exclude_tool_content":false},"git_hooks":false,"global":{}}},"revision":4,"updated_at":"2026-11-02T00:00:00Z"}`
+
+	v, out, err := teamsJSON(t)
+	if err != nil {
+		t.Fatalf("teams: %v\n%s", err, out)
+	}
+	_, row, ok := v.row(orgA().ID, acmeAPI)
+	if !ok {
+		t.Fatal("Acme API row missing")
+	}
+	if len(row.Entries) != 0 || row.GitHooks || row.Collects != "nothing until an admin chooses repositories" {
+		t.Fatalf("fresh global policy overwritten by stale state: %+v", row)
 	}
 }
 
