@@ -1592,6 +1592,42 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 		close(stop)
 		<-done
 	}
+
+	// 23. firstWords masks heredoc bodies and opaque option expansions (--us${EMPTY}er, $(echo --user)).
+	for _, cmd := range []string{
+		"cat << EOF\nSECRET\nEOF",
+		"cat <<EOF\nSECRET\nEOF",
+		"cat <<- 'EOF'\n\tSECRET\nEOF",
+		"cat 0<<EOF\nSECRET\nEOF",
+		`curl --us${EMPTY}er alice:SECRET https://example.com`,
+		`curl --us$EMPTY alice:SECRET https://example.com`,
+		`curl $(echo --user) alice:SECRET https://example.com`,
+		`curl ''$EMPTY alice:SECRET https://example.com`,
+	} {
+		if got := firstWords(cmd); strings.Contains(got, "SECRET") {
+			t.Fatalf("firstWords(%q) = %q, leaked SECRET", cmd, got)
+		}
+	}
+
+	// 24. readSmallFile and readDir open through the validated dirHandle, failing closed on remote symlinks and never panicking on root dirs.
+	if filepath.Separator == '/' {
+		remLink := filepath.Join(dir, "remote-link")
+		if err := os.Symlink("//evil.invalid/share", remLink); err != nil {
+			t.Fatal(err)
+		}
+		scRemFile := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+		if _, err := scRemFile.readSmallFile(remLink); !errors.Is(err, errOpaque) || !scRemFile.unknown {
+			t.Fatalf("readSmallFile(remote symlink) = err=%v unknown=%v, want errOpaque + unknown", err, scRemFile.unknown)
+		}
+		scRemDir := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+		if entries := scRemDir.readDir(remLink); len(entries) != 0 || !scRemDir.unknown {
+			t.Fatalf("readDir(remote symlink) = (%d, unknown=%v), want (0, true)", len(entries), scRemDir.unknown)
+		}
+		scRoot := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+		if _, err := scRoot.readSmallFile(string(filepath.Separator)); !errors.Is(err, errOpaque) {
+			t.Fatalf("readSmallFile(/) = %v, want errOpaque", err)
+		}
+	}
 }
 
 func FuzzParsable(f *testing.F) {

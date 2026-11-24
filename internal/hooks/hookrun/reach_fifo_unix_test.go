@@ -60,3 +60,58 @@ func TestReadDirAndBelowDoNotBlockOnFIFO(t *testing.T) {
 		t.Fatalf("FIFO scan took %v, exceeded bound", took)
 	}
 }
+
+// Swapping a traversed directory with a FIFO must never block walk, readSmallFile, or readDir.
+func TestWalkAndOpenNeverBlockOnDirToFIFOSwap(t *testing.T) {
+	t.Parallel()
+	dir, _ := filepath.EvalSymlinks(t.TempDir())
+	fifo := filepath.Join(dir, "fifo-src")
+	if err := syscall.Mkfifo(fifo, 0o600); err != nil {
+		t.Fatalf("mkfifo: %v", err)
+	}
+	sub := filepath.Join(dir, "real-sub")
+	if err := os.MkdirAll(sub, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sub, "leaf"), []byte("ok"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	slot := filepath.Join(dir, "slot")
+	tmp := filepath.Join(dir, "tmp-fifo")
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				_ = os.Remove(slot)
+				_ = os.Mkdir(slot, 0o700)
+				_ = os.Remove(tmp)
+				_ = syscall.Mkfifo(tmp, 0o600)
+				_ = os.Rename(tmp, slot)
+			}
+		}
+	}()
+	errCh := make(chan struct{}, 1)
+	go func() {
+		for range 40 {
+			sc := newScan(dir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(2 * time.Second)})
+			sc.candidate("slot/leaf", plain)
+			_ = sc.readDir(slot)
+			_, _ = sc.readSmallFile(fifo)
+		}
+		errCh <- struct{}{}
+	}()
+	select {
+	case <-errCh:
+	case <-time.After(3 * time.Second):
+		close(stop)
+		<-done
+		t.Fatal("dir-to-FIFO swap blocked walk/readDir/readSmallFile")
+	}
+	close(stop)
+	<-done
+}

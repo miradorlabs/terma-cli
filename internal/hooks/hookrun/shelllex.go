@@ -1,6 +1,7 @@
 package hookrun
 
 import (
+	"cmp"
 	"regexp"
 	"slices"
 	"strconv"
@@ -30,48 +31,50 @@ func maskWords(command string, depth int) string {
 	}
 	words, bare := shellFields(command, 5)
 	more, words, bare = more || len(words) > 4, words[:min(len(words), 4)], bare[:min(len(bare), 4)]
-	secret, redir, hasRedis := false, 0, false
+	secret, redir, heredoc, hasRedis, hasSubst := false, 0, false, false, false
 	for i, b := range bare {
-		hasRedis = hasRedis || strings.HasSuffix(b, "redis-cli")
-		hasSubst := strings.Contains(b, "$(") || strings.Contains(b, "`") || strings.Contains(b, "${") || strings.Contains(b, "$IFS")
-		if redir > 0 {
+		hasRedis, hasSubst = hasRedis || strings.HasSuffix(b, "redis-cli"), strings.ContainsAny(b, "`$")
+		if heredoc {
+			words[i] = "…"
+		} else if redir > 0 {
 			if redir == 2 || hasSubst || userinfo.MatchString(b) {
 				words[i] = "…"
 			}
-			redir = 0
-			continue
-		}
-		if r := strings.TrimLeft(words[i], "0123456789"); strings.HasPrefix(r, "<") || strings.HasPrefix(r, ">") {
+			heredoc, redir = redir == 3, 0
+		} else if r := strings.TrimLeft(words[i], "0123456789"); strings.HasPrefix(r, "<") || strings.HasPrefix(r, ">") {
 			if strings.HasPrefix(r, "<<<") && len(r) > 3 {
 				words[i] = "<<<…"
+			} else if strings.HasPrefix(r, "<<") && !strings.HasPrefix(r, "<<<") && r != "<<" && r != "<<-" {
+				if heredoc = true; hasSubst || userinfo.MatchString(b) {
+					words[i] = "…"
+				}
 			} else if hasSubst || strings.HasPrefix(r, "<(") || strings.HasPrefix(r, ">(") || userinfo.MatchString(b) {
 				words[i] = "…"
-			} else if r == "<<<" {
-				redir = 2
 			} else if strings.TrimLeft(r, "<>&-") == "" {
-				redir = 1
+				redir = cmp.Or(map[string]int{"<<": 3, "<<-": 3, "<<<": 2}[r], 1)
 			}
-			continue
-		}
-		masked := userinfo.ReplaceAllString(b, "${1}…@")
-		name, _, eq := strings.Cut(masked, "=")
-		if secret || hasSubst || depth >= 2 && strings.ContainsAny(b, " \t\n") {
-			words[i] = "…"
-		} else if len(b) > 2 && b[0] == '-' && b[1] != '-' {
-			words[i] = b[:2] + "…"
-		} else if eq && name != "" && !strings.ContainsAny(name, " \t\n") {
-			words[i] = name + "=…"
-		} else if strings.ContainsAny(b, " \t\n") {
-			if inner := maskWords(b, depth+1); inner != b {
-				words[i] = inner
+		} else {
+			masked := userinfo.ReplaceAllString(b, "${1}…@")
+			name, _, eq := strings.Cut(masked, "=")
+			short := len(b) > 2 && b[0] == '-' && b[1] != '-'
+			if secret || hasSubst || depth >= 2 && strings.ContainsAny(b, " \t\n") {
+				words[i] = "…"
+			} else if short {
+				words[i] = b[:2] + "…"
+			} else if eq && name != "" && !strings.ContainsAny(name, " \t\n") {
+				words[i] = name + "=…"
+			} else if strings.ContainsAny(b, " \t\n") {
+				if inner := maskWords(b, depth+1); inner != b {
+					words[i] = inner
+				}
+			} else if masked != b {
+				words[i] = masked
 			}
-		} else if masked != b {
-			words[i] = masked
+			lower := strings.ToLower(b)
+			secret = hasSubst || slices.Contains(secretOptions, b) || b == "eval" || b == "-a" && hasRedis ||
+				short && (strings.ContainsRune(b[1:], 'c') || slices.Contains(secretOptions, "-"+b[len(b)-1:]) || b[len(b)-1] == 'a' && hasRedis) ||
+				strings.HasPrefix(b, "-") && slices.ContainsFunc(secretNames, func(n string) bool { return strings.Contains(lower, n) })
 		}
-		lower, short := strings.ToLower(b), len(b) > 2 && b[0] == '-' && b[1] != '-'
-		secret = slices.Contains(secretOptions, b) || b == "eval" || b == "-a" && hasRedis ||
-			short && (strings.ContainsRune(b[1:], 'c') || slices.Contains(secretOptions, "-"+b[len(b)-1:]) || b[len(b)-1] == 'a' && hasRedis) ||
-			strings.HasPrefix(b, "-") && slices.ContainsFunc(secretNames, func(n string) bool { return strings.Contains(lower, n) })
 	}
 	s := strings.Map(func(r rune) rune {
 		if r < 0x20 || r == 0x7f {
@@ -127,7 +130,7 @@ func shellFields(command string, n int) (raw, bare []string) {
 				escaped = true
 			case quote != 0 && r == quote:
 				quote = 0
-			case quote != 0:
+			case quote != 0, cmdDepth > 0 && r != '(' && r != ')':
 				buf.WriteRune(r)
 			case r == '\'' || r == '"':
 				quote = r
@@ -141,8 +144,6 @@ func shellFields(command string, n int) (raw, bare []string) {
 				buf.WriteRune(r)
 			case r == ')' && cmdDepth > 0:
 				cmdDepth--
-				buf.WriteRune(r)
-			case cmdDepth > 0:
 				buf.WriteRune(r)
 			case backtick || !unicode.IsSpace(r) && (r != '<' && r != '>' || start < 0 || strings.Trim(buf.String(), "0123456789<>&") == ""):
 				buf.WriteRune(r)
@@ -223,21 +224,15 @@ func parsable(src string) bool {
 			open = append(open, c)
 		}
 	}
-	read := func() {
-		marker := byte('h')
-		if body = len(open); bodies[0].quoted {
-			marker = 'q'
-		}
-		open = append(open, marker)
-	}
-	byteAt := func(k int, def byte) byte {
-		if k >= 0 && k < len(src) {
-			return src[k]
-		}
-		return def
-	}
+	read := func() { body, open = len(open), append(open, map[bool]byte{true: 'q', false: 'h'}[bodies[0].quoted]) }
 	for i := 0; i < len(src); i++ {
-		c, top, prev, next := src[i], byte(0), byteAt(i-1, '\n'), byteAt(i+1, 0)
+		c, top, prev, next := src[i], byte(0), byte('\n'), byte(0)
+		if i > 0 {
+			prev = src[i-1]
+		}
+		if i+1 < len(src) {
+			next = src[i+1]
+		}
 		if len(open) > 0 {
 			top = open[len(open)-1]
 		}
@@ -248,7 +243,7 @@ func parsable(src string) bool {
 		if c == '$' && top != 'q' {
 			dollars++
 		}
-		if c == '\n' || c == ';' || c == '&' || c == '|' {
+		if strings.IndexByte("\n;&|", c) >= 0 {
 			letUntil = -1
 		}
 		switch {
@@ -274,10 +269,7 @@ func parsable(src string) bool {
 		case c == '\\':
 			i++
 		case c == '$' && (next == '(' || next == '{' || next == '['): // $( $(( ${ $[
-			n := 1
-			if next == '(' && double {
-				n = 2
-			}
+			n := map[bool]int{true: 2, false: 1}[next == '(' && double]
 			i += n
 			push(next, n, i, n == 2 || next != '(')
 		case c == '`' && top == '`', c == '"' && top == '"':
@@ -286,21 +278,15 @@ func parsable(src string) bool {
 			push(c, 1, i, false)
 		case top == '"' || top == 'h':
 		case c == '\'':
-			for j := i + 1; j < len(src); j++ {
-				if src[j] == '\'' {
-					i = j
-					break
-				} else if src[j] == '\\' && prev == '$' { // $'\''
-					j++
+			for i++; i < len(src) && src[i] != '\''; i++ {
+				if src[i] == '\\' && prev == '$' { // $'\''
+					i++
 				}
 			}
 		case c == '#' && strings.IndexByte(" \t\n;&|()", prev) >= 0:
 			i = lineEnd(src, i) - 1
 		case c == '(' || c == '[' || c == '{': // (( [[ [ open expressions
-			n := 1
-			if c != '{' && next == c {
-				n = 2
-			}
+			n := map[bool]int{true: 2, false: 1}[c != '{' && next == c]
 			i += n - 1
 			push(c, n, i, n == 2 || c == '[')
 		case c == top && len(open) > 0: // a NUL is no context's close
@@ -315,15 +301,14 @@ func parsable(src string) bool {
 			}
 		case 'a' <= c && c <= 'z' && strings.IndexByte(" \t\n;&|(){}`", prev) >= 0:
 			j := i
-			for j < len(src) && 'a' <= src[j] && src[j] <= 'z' {
-				j++
+			for ; j < len(src) && 'a' <= src[j] && src[j] <= 'z'; j++ {
 			}
 			if word := src[i:j]; slices.Contains(compounds, word) {
 				links++
 			} else if word == "let" { // its words are expressions
-				end := strings.IndexAny(src[j:], "\n;&|")
-				if end < 0 {
-					end = len(src) - j
+				end := lineEnd(src, j) - j
+				if k := strings.IndexAny(src[j:j+end], ";&|"); k >= 0 {
+					end = k
 				}
 				if letUntil = j + end; end > maxShellExpr {
 					return false
@@ -334,41 +319,36 @@ func parsable(src string) bool {
 		if expr >= 0 && len(open) <= exprDepth {
 			expr = -1
 		}
-		if len(open) > maxShellNesting || links > maxShellNesting || expr >= 0 && i-expr > maxShellExpr ||
-			words > maxShellWords || dollars > maxShellWords {
+		if len(open) > maxShellNesting || links > maxShellNesting || expr >= 0 && i-expr > maxShellExpr || words > maxShellWords || dollars > maxShellWords {
 			return false
 		}
 	}
 	return len(bodies) == 0 && len(docs) == 0
 }
 func heredocDelimiter(src string, i int) (heredoc, int) {
-	stripTabs := i < len(src) && src[i] == '-'
-	if stripTabs {
-		i++
+	stripTabs, quoted := false, false
+	if i < len(src) && src[i] == '-' {
+		stripTabs, i = true, i+1
 	}
 	i += len(src[i:]) - len(strings.TrimLeft(src[i:], " \t"))
 	var d strings.Builder
-	quoted := false
 	for quote := byte(0); i < len(src); i++ {
-		if c := src[i]; quote != 0 && c == '\n' {
+		switch c := src[i]; {
+		case quote != 0 && c == '\n', quote == 0 && c == '$' && i+1 < len(src) && src[i+1] == '\'':
 			return heredoc{}, -1
-		} else if quote == '"' && c == '\\' && i+1 < len(src) && strings.IndexByte("\"\\`$", src[i+1]) >= 0 {
+		case quote == '"' && c == '\\' && i+1 < len(src) && strings.IndexByte("\"\\`$", src[i+1]) >= 0:
 			i++
 			d.WriteByte(src[i])
-		} else if quote != 0 && c == quote {
+		case quote != 0 && c == quote:
 			quote = 0
-		} else if quote != 0 {
-			d.WriteByte(c)
-		} else if c == '$' && i+1 < len(src) && src[i+1] == '\'' {
-			return heredoc{}, -1
-		} else if c == '\'' || c == '"' {
+		case quote == 0 && (c == '\'' || c == '"'):
 			quote, quoted = c, true
-		} else if c == '\\' && i+1 < len(src) {
+		case quote == 0 && c == '\\' && i+1 < len(src):
 			i, quoted = i+1, true
 			d.WriteByte(src[i])
-		} else if strings.IndexByte(" \t\n;&|<>()", c) >= 0 {
+		case quote == 0 && strings.IndexByte(" \t\n;&|<>()", c) >= 0:
 			return heredoc{d.String(), quoted, stripTabs}, i - 1
-		} else {
+		default:
 			d.WriteByte(c)
 		}
 	}

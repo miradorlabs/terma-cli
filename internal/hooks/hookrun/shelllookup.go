@@ -19,11 +19,10 @@ func (sc *scan) candidate(t string, r role) {
 	if filepath.Separator == '/' && strings.HasPrefix(t, "///") && strings.TrimLeft(t, "/") != "" {
 		t = "/" + strings.TrimLeft(t, "/")
 	}
-	slashed := pathLike(t)
+	slashed, keyDir := pathLike(t), sc.dir
 	if t == "" || !slashed && r.needsSlash() || sc.away(t, r) {
 		return
 	}
-	keyDir := sc.dir
 	if t == "~" || strings.HasPrefix(t, "~/") {
 		home, _ := sc.lookup("HOME")
 		keyDir = "\x00" + home
@@ -44,11 +43,10 @@ func (sc *scan) candidate(t string, r role) {
 	}
 }
 func (sc *scan) resolve(t string, r role, slashed bool) (res cached) {
-	dirs := []string{sc.dir}
-	if sc.cwd != sc.dir {
-		dirs = append(dirs, sc.cwd)
-	}
-	for i, d := range dirs {
+	for i, d := range []string{sc.dir, sc.cwd} {
+		if i == 1 && d == sc.dir {
+			break
+		}
 		if p, info := sc.reach(t, d); p != "" {
 			if res.named = res.named || info != nil; info != nil && info.IsDir() {
 				if i == 0 {
@@ -58,7 +56,9 @@ func (sc *scan) resolve(t string, r role, slashed bool) (res cached) {
 			}
 		} else if r.mayCreate(slashed) {
 			if p, ok := sc.path(t, d); ok {
-				sc.placeParent(p)
+				if _, parent, _, found := sc.walkPath(p, true); !found && !sc.unknown && parent != "" {
+					sc.place(parent)
+				}
 			}
 		}
 	}
@@ -67,105 +67,114 @@ func (sc *scan) resolve(t string, r role, slashed bool) (res cached) {
 
 const maxSymlinkHops, maxPathComponents, maxPathBytes = 8, 128, 4096
 
-// walkPath traverses p component-by-component via directory-handle-relative os.Root operations,
-// preventing TOCTOU parent-symlink swaps to remote shares.
-func (sc *scan) walkPath(p string, followFinal bool) (resolved, parent string, info os.FileInfo, ok bool) {
-	if !filepath.IsAbs(p) {
-		if !filepath.IsAbs(sc.dir) {
-			return "", "", nil, false
-		}
+// walk traverses p component-by-component via dirHandle (openat O_DIRECTORY|O_NOFOLLOW|O_NONBLOCK on Unix,
+// os.Root on Windows), preventing TOCTOU symlink swaps and FIFO hangs. openMode: 0=stat, 1=openFile, 2=openDir.
+func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, parent string, info os.FileInfo, f *os.File, ok bool) {
+	if !filepath.IsAbs(p) && !filepath.IsAbs(sc.dir) {
+		return "", "", nil, nil, false
+	} else if !filepath.IsAbs(p) {
 		p = sc.dir + string(filepath.Separator) + p
 	}
 	if sc.unknown || remote(p, sc.cwd) || len(p) > maxPathBytes {
-		return "", "", nil, !sc.fail()
+		return "", "", nil, nil, !sc.fail()
 	}
 	vol := filepath.VolumeName(p)
-	root, err := os.OpenRoot(vol + string(filepath.Separator))
+	root, err := openRootDir(vol + string(filepath.Separator))
 	if err != nil {
-		return "", "", nil, false
+		return "", "", nil, nil, false
 	}
-	stack, paths := []*os.Root{root}, []string{vol + string(filepath.Separator)}
-	defer func() {
-		for _, r := range stack {
-			_ = r.Close()
+	stack, paths := []dirHandle{root}, []string{vol + string(filepath.Separator)}
+	closeAll := func() {
+		for _, h := range stack {
+			h.close()
 		}
-	}()
+	}
+	defer closeAll()
 	for parts, hops := strings.FieldsFunc(p[len(vol):], isSep), 0; len(parts) > 0; {
 		if len(parts)+len(stack) > maxPathComponents || !sc.spendStat(1) {
-			return "", "", nil, !sc.fail()
+			return "", "", nil, nil, !sc.fail()
 		}
 		part, cur, curPath := parts[0], stack[len(stack)-1], paths[len(paths)-1]
 		if parts = parts[1:]; part == "" || part == "." {
 			continue
 		} else if part == ".." {
 			if len(stack) > 1 {
-				_ = cur.Close()
+				cur.close()
 				stack, paths = stack[:len(stack)-1], paths[:len(paths)-1]
 			}
 			continue
 		}
-		fi, err := cur.Lstat(part)
+		fi, err := cur.lstat(part)
 		if err != nil {
-			return filepath.Join(append([]string{curPath, part}, parts...)...), curPath, nil, false
+			return filepath.Join(append([]string{curPath, part}, parts...)...), curPath, nil, nil, false
 		}
 		if fi.Mode()&fs.ModeSymlink != 0 {
 			if !followFinal && len(parts) == 0 {
-				return filepath.Join(curPath, part), curPath, fi, true
+				return filepath.Join(curPath, part), curPath, fi, nil, true
 			}
-			target, err := cur.Readlink(part)
+			target, err := cur.readlink(part)
 			if hops++; hops > maxSymlinkHops || err != nil || target == "" || remote(target, sc.cwd) || strings.HasPrefix(target, `\??\`) || filepath.VolumeName(target) != "" && !filepath.IsAbs(target) || len(curPath)+len(target) > maxPathBytes {
-				return "", "", nil, !sc.fail()
+				return "", "", nil, nil, !sc.fail()
 			}
 			tVol := filepath.VolumeName(target)
 			if filepath.IsAbs(target) || os.IsPathSeparator(target[0]) {
 				newVol := cmp.Or(tVol, filepath.VolumeName(curPath), filepath.VolumeName(sc.cwd)) + string(filepath.Separator)
-				nr, err := os.OpenRoot(newVol)
+				nr, err := openRootDir(newVol)
 				if err != nil {
-					return "", "", nil, !sc.fail()
+					return "", "", nil, nil, !sc.fail()
 				}
-				for _, r := range stack {
-					_ = r.Close()
-				}
-				stack, paths = []*os.Root{nr}, []string{newVol}
+				closeAll()
+				stack, paths = []dirHandle{nr}, []string{newVol}
 			}
 			parts = append(strings.FieldsFunc(target[len(tVol):], isSep), parts...)
 			continue
 		}
 		nextPath := filepath.Join(curPath, part)
 		if len(parts) == 0 {
-			return nextPath, curPath, fi, true
+			f, ok = sc.openLeaf(cur, part, fi, openMode)
+			return nextPath, curPath, fi, f, ok
 		} else if !fi.IsDir() {
-			return "", "", nil, false
-		} else if next, err := cur.OpenRoot(part); err != nil {
+			return "", "", nil, nil, false
+		} else if next, err := cur.openSubDir(part); err != nil {
 			if errors.Is(err, fs.ErrNotExist) || errors.Is(err, fs.ErrPermission) {
-				return "", curPath, nil, false
+				return "", curPath, nil, nil, false
 			}
-			return "", "", nil, !sc.fail()
+			return "", "", nil, nil, !sc.fail()
 		} else {
 			stack, paths = append(stack, next), append(paths, nextPath)
 		}
 	}
 	cur, curPath := stack[len(stack)-1], paths[len(paths)-1]
-	fi, err := cur.Lstat(".")
-	return curPath, filepath.Dir(curPath), fi, err == nil
-}
-func (sc *scan) hasRemoteLink(p string) bool {
-	if !sc.unknown {
-		_, _, _, _ = sc.walkPath(p, true)
+	if fi, err := cur.lstat("."); err == nil {
+		f, ok = sc.openLeaf(cur, ".", fi, openMode)
+		return curPath, filepath.Dir(curPath), fi, f, ok
 	}
-	return sc.unknown
+	return curPath, filepath.Dir(curPath), nil, nil, false
 }
+func (sc *scan) openLeaf(cur dirHandle, part string, fi fs.FileInfo, openMode uint8) (*os.File, bool) {
+	if openMode == 0 {
+		return nil, true
+	} else if openMode == 1 && !fi.Mode().IsRegular() || openMode == 2 && !fi.IsDir() {
+		return nil, false
+	}
+	f, err := cur.open(part, openMode == 2)
+	if err != nil {
+		sc.unknown = sc.unknown || !errors.Is(err, fs.ErrNotExist) && (openMode != 2 || !errors.Is(err, fs.ErrPermission))
+	}
+	return f, err == nil
+}
+func (sc *scan) walkPath(p string, followFinal bool) (string, string, os.FileInfo, bool) {
+	r, par, info, _, ok := sc.walk(p, followFinal, 0)
+	return r, par, info, ok
+}
+func (sc *scan) hasRemoteLink(p string) bool { _, _, _, _ = sc.walkPath(p, true); return sc.unknown }
 func (sc *scan) resolveTarget(base, raw string, _ int) (string, bool) {
 	if remote(raw, sc.cwd) || filepath.VolumeName(raw) != "" && !filepath.IsAbs(raw) {
 		return "", !sc.fail()
 	}
 	if !filepath.IsAbs(raw) && len(raw) > 0 && os.IsPathSeparator(raw[0]) {
 		raw = cmp.Or(filepath.VolumeName(base), filepath.VolumeName(sc.cwd)) + raw
-	}
-	if !filepath.IsAbs(raw) && base != "" {
-		if len(base)+len(raw)+1 > maxPathBytes {
-			return "", !sc.fail()
-		}
+	} else if !filepath.IsAbs(raw) && base != "" {
 		raw = strings.TrimRight(base, string(filepath.Separator)) + string(filepath.Separator) + raw
 	}
 	if len(raw) > maxPathBytes {
@@ -191,21 +200,12 @@ func (sc *scan) reach(w, dir string) (string, os.FileInfo) {
 		return res, info
 	}
 	if target, tParent, tInfo, tFound := sc.walkPath(p, true); tFound {
-		if tInfo.IsDir() {
-			sc.place(target)
-		} else {
-			sc.place(tParent)
-		}
+		sc.place(map[bool]string{true: target, false: tParent}[tInfo.IsDir()])
 		return res, tInfo
 	} else if !sc.unknown && tParent != "" {
 		sc.place(tParent)
 	}
 	return res, nil
-}
-func (sc *scan) placeParent(p string) {
-	if _, parent, _, found := sc.walkPath(p, true); !found && !sc.unknown && parent != "" {
-		sc.place(parent)
-	}
 }
 func (sc *scan) away(w string, r role) bool {
 	if !remote(w, sc.cwd) {
@@ -227,6 +227,9 @@ func (sc *scan) path(w, dir string) (string, bool) {
 	}
 	return sc.resolveTarget(dir, w, 0)
 }
+
+const alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
 func hasDotDot(p string) bool {
 	return p == ".." || strings.HasPrefix(p, "../") || strings.Contains(p, "/..") || os.IsPathSeparator('\\') && (strings.HasPrefix(p, `..\`) || strings.Contains(p, `\..`))
 }
@@ -238,15 +241,11 @@ func urlPath(w string) (string, bool) {
 		return "", true
 	} else if len(rest) > 2 && rest[0] == '/' && rest[2] == ':' {
 		return rest[1:], true
-	} else if strings.HasPrefix(rest, "/") {
-		return rest, true
 	}
-	return "//" + rest, true
+	return map[bool]string{true: rest, false: "//" + rest}[strings.HasPrefix(rest, "/")], true
 }
 func isScheme(s string) bool {
-	return len(s) > 1 && (s[0] >= 'a' && s[0] <= 'z' || s[0] >= 'A' && s[0] <= 'Z') && !strings.ContainsFunc(s, func(r rune) bool {
-		return (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && r != '+' && r != '-' && r != '.'
-	})
+	return len(s) > 1 && strings.IndexByte(alnum[:52], s[0]) >= 0 && strings.Trim(s, alnum+"+-.") == ""
 }
 
 // remote reports whether p starts with two separators (UNC/device path) outside cwd's share.
@@ -260,7 +259,7 @@ func share(p string) string {
 	}
 	host, rest := cutSep(p[2:])
 	name, _ := cutSep(rest)
-	if host == "" || name == "" || strings.Trim(host, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.$") != "" {
+	if host == "" || name == "" || strings.Trim(host, alnum+"-_.$") != "" {
 		return ""
 	}
 	return "//" + host + "/" + name
@@ -277,18 +276,11 @@ func shellValue(w string) string {
 		return v
 	} else if len(w) > 2 && w[0] == '-' && w[1] != '-' {
 		return w[2:]
-	} else if strings.HasPrefix(w, "-") {
-		return ""
 	}
-	return w
+	return map[bool]string{true: "", false: w}[strings.HasPrefix(w, "-")]
 }
 func isName(s string) bool {
-	for i, r := range s {
-		if r != '_' && (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (i == 0 || r < '0' || r > '9') {
-			return false
-		}
-	}
-	return s != ""
+	return s != "" && (s[0] < '0' || s[0] > '9') && strings.Trim(s, alnum+"_") == ""
 }
 func pathLike(w string) bool {
 	return strings.ContainsRune(w, '/') || strings.ContainsRune(w, filepath.Separator) || filepath.IsAbs(w)

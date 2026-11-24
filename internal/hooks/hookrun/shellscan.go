@@ -78,8 +78,7 @@ func (sc *scan) Get(name string) expand.Variable {
 	if strings.HasPrefix(name, "HOME ") || sc.isUnresolvedVar(name) {
 		sc.opaque = true
 		return expand.Variable{Set: true, Kind: expand.String}
-	}
-	if v, ok := sc.lookup(name); ok {
+	} else if v, ok := sc.lookup(name); ok {
 		return expand.Variable{Set: true, Kind: expand.String, Str: v}
 	}
 	return expand.Variable{}
@@ -187,11 +186,8 @@ func (sc *scan) ifs() string {
 	return " \t\n"
 }
 func (sc *scan) chargeFields(v string) bool {
-	if sc.isUnresolvedVar("IFS") {
-		return false
-	}
 	ifs := sc.ifs()
-	return ifs == "" || (len(ifs) <= 64 || !sc.fail()) && sc.budget(&sc.words, countFields(v, ifs, maxShellWords-sc.words), maxShellWords)
+	return !sc.isUnresolvedVar("IFS") && (ifs == "" || (len(ifs) <= 64 || !sc.fail()) && sc.budget(&sc.words, countFields(v, ifs, maxShellWords-sc.words), maxShellWords))
 }
 func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, inParam bool) int {
 	for i := 0; i < len(parts) && rem >= 0; i++ {
@@ -213,11 +209,12 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 				}
 			}
 		} else if inParam {
-			if p, ok := parts[i].(*syntax.DblQuoted); ok {
+			switch p := parts[i].(type) {
+			case *syntax.DblQuoted:
 				rem = sc.checkPartsFields(p.Parts, ifs, rem, true)
-			} else if p, ok := parts[i].(*syntax.Lit); ok {
+			case *syntax.Lit:
 				rem = sc.consumeFields(p.Value, ifs, rem)
-			} else if p, ok := parts[i].(*syntax.SglQuoted); ok {
+			case *syntax.SglQuoted:
 				rem = sc.consumeFields(p.Value, ifs, rem)
 			}
 		}
@@ -232,15 +229,9 @@ func (sc *scan) consumeFields(v, ifs string, rem int) int {
 	return rem - max(n-1, 0)
 }
 func countFields(v, ifs string, limit int) int {
-	var ascii [128]bool
-	for _, r := range ifs {
-		if r < 128 {
-			ascii[r] = true
-		}
-	}
 	n, inWord := 0, false
 	for _, r := range v {
-		sep := r < 128 && ascii[r] || r >= 128 && strings.ContainsRune(ifs, r)
+		sep := strings.ContainsRune(ifs, r)
 		if !inWord && (!sep || r != ' ' && r != '\t' && r != '\n') {
 			n++
 		}
@@ -253,9 +244,7 @@ func countFields(v, ifs string, limit int) int {
 func (sc *scan) fields(w *syntax.Word) ([]string, error) {
 	var out []string
 	for b, err := range sc.braces(w) {
-		if err != nil {
-			return nil, errOpaque
-		} else if ifs := sc.ifs(); len(ifs) > 64 && sc.fail() || !sc.charge(sc.size(b)) || ifs != "" && sc.checkPartsFields(b.Parts, ifs, maxShellWords-len(out), false) < 0 {
+		if ifs := sc.ifs(); err != nil || len(ifs) > 64 && sc.fail() || !sc.charge(sc.size(b)) || ifs != "" && sc.checkPartsFields(b.Parts, ifs, maxShellWords-len(out), false) < 0 {
 			return nil, errOpaque
 		}
 		prev := sc.opaque
