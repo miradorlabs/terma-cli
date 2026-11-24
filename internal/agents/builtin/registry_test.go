@@ -49,7 +49,7 @@ func TestRegistryIsConsistent(t *testing.T) {
 	if len(reg.Handlers()) != len(owners) {
 		t.Errorf("reg.Handlers() has %d entries, adapters declare %d", len(reg.Handlers()), len(owners))
 	}
-	for _, name := range []string{"claude", "cursor", "codex", "copilot", "opencode", "omp", "antigravity"} {
+	for _, name := range []string{"claude", "cursor", "codex", "copilot", "opencode", "omp", "antigravity", "grok"} {
 		if _, ok := reg.Lookup(name); !ok {
 			t.Errorf("reg.Lookup(%q) failed", name)
 		}
@@ -72,6 +72,8 @@ func TestEventNamesAreStable(t *testing.T) {
 		"cursor-stop", "cursor-subagent-stop",
 		"dsh-file-edit", "dsh-prompt", "dsh-session-end", "dsh-session-start", "dsh-tool-reach",
 		"gemini-after-tool", "gemini-prompt", "gemini-session-end", "gemini-session-start",
+		"grok-post-tool-use", "grok-session-end", "grok-session-start", "grok-stop", "grok-subagent-start",
+		"grok-user-prompt-submit",
 		"hermes-file-edit", "hermes-prompt", "hermes-session-end", "hermes-session-start", "hermes-tool-reach",
 		"omp-file-edit", "omp-prompt", "omp-session-end", "omp-session-start", "omp-title", "omp-tool-reach",
 		"opencode-file-edit", "opencode-session-end", "opencode-session-start", "opencode-tool-reach",
@@ -126,7 +128,7 @@ func TestHarnessesAnswerToTheirAgentsName(t *testing.T) {
 	for _, h := range reg.Harnesses() {
 		exporting = append(exporting, h.Name())
 	}
-	if !slices.Equal(exporting, []string{"claude", "codex", "opencode", "omp"}) {
+	if !slices.Equal(exporting, []string{"claude", "codex", "opencode", "omp", "grok"}) {
 		t.Errorf("harnesses %q", exporting)
 	}
 }
@@ -150,7 +152,8 @@ func TestEveryHarnessReportsStatusInASandbox(t *testing.T) {
 	}
 }
 
-// Every harness is a full agent in the support catalog.
+// Every harness is a full agent in the support catalog, except Grok Build's attribution:
+// only search_replace's result proves an edit, and a write's is not known yet.
 func TestSupportCatalogCoversEveryHarness(t *testing.T) {
 	t.Parallel()
 	for _, h := range reg.Harnesses() {
@@ -159,7 +162,11 @@ func TestSupportCatalogCoversEveryHarness(t *testing.T) {
 			t.Errorf("harness %q is not in the support catalog", h.Name())
 			continue
 		}
-		if a.Telemetry.Level != agents.SupportFull || a.Support != agents.SupportFull {
+		overall := agents.SupportFull
+		if h.Name() == "grok" {
+			overall = agents.SupportPartial
+		}
+		if a.Telemetry.Level != agents.SupportFull || a.Support != overall {
 			t.Errorf("%s exports telemetry but the catalog says telemetry %q, overall %q", h.Name(), a.Telemetry.Level, a.Support)
 		}
 	}
@@ -176,14 +183,17 @@ func TestEveryToolLabelIsASessionKey(t *testing.T) {
 	}
 }
 
-// Antigravity's hooks are checked with the POSIX command only, so Windows offers it as
-// Coming Soon; the agents supported everywhere stay supported there.
+// Antigravity's hooks are checked with the POSIX command only, and Grok Build's hooks and
+// export are verified on Linux alone, so Windows offers both as Coming Soon; the agents
+// supported everywhere stay supported there.
 func TestAntigravityIsComingSoonOnWindows(t *testing.T) {
 	t.Parallel()
 	for goos, want := range map[string]bool{"linux": true, "darwin": true, "windows": false} {
 		r := AgentsOn("", goos)
-		if got := r.IsSupported("antigravity"); got != want {
-			t.Errorf("%s: antigravity supported = %v, want %v", goos, got, want)
+		for _, name := range []string{"antigravity", "grok"} {
+			if got := r.IsSupported(name); got != want {
+				t.Errorf("%s: %s supported = %v, want %v", goos, name, got, want)
+			}
 		}
 		for _, name := range []string{"claude", "codex", "copilot"} {
 			if !r.IsSupported(name) {

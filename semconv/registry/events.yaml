@@ -48,6 +48,7 @@ attribute_groups:
           conditionally_required: When terma names the signed-in user for the team the part goes to.
       - ref: terma.repository.root
       - ref: terma.working_directory
+      - ref: terma.home_directory
       - ref: terma.repository.worktree.linked
       - ref: terma.repository.worktree.name
       - ref: vcs.repository.url.full
@@ -103,6 +104,8 @@ events:
         requirement_level: required
       - ref: gen_ai.request.model
       - ref: terma.session.parent.id
+      - ref: gen_ai.agent.name
+        note: The subagent's kind, on the start of a session an agent opened for a subagent.
       - ref: terma.agent.nickname
       - ref: terma.agent.path
       - ref: terma.capture.surface

@@ -32,6 +32,8 @@ func freeAddr(t *testing.T) string {
 func relaySandbox(t *testing.T) string {
 	t.Helper()
 	sandboxMachine(t)
+	// The agents the machine has installed would answer doctor's export check.
+	fakeClaudeOnPath(t)
 	useConfigDir(t, t.TempDir())
 	t.Setenv("CODEX_HOME", t.TempDir())
 	return claim.Dir(testApp.stateDir)

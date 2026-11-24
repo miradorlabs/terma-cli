@@ -328,3 +328,125 @@ func TestAHooksSpoolIsBoundToItsProfilesLane(t *testing.T) {
 		})
 	}
 }
+
+// otherHarness marks the hook processes it starts with OTHER_HOOK, as a harness that also
+// runs fake's hook entries does.
+type otherHarness struct{}
+
+func (otherHarness) StartedHook(getenv func(string) string) bool { return getenv("OTHER_HOOK") != "" }
+
+// marked reads OTHER_HOOK as set, and nothing else.
+func marked(k string) string {
+	if k == "OTHER_HOOK" {
+		return "1"
+	}
+	return ""
+}
+
+func routedProfileFor(root string) Profile {
+	origin := "github.com/acme/" + filepath.Base(root)
+	st := routing.State{
+		Profile: "default",
+		Account: hookruntest.Account,
+		Teams: []routing.Team{{
+			EnrollmentID: "enr-1", OrganizationID: "org-a", AuthURL: "https://auth.example", TeamID: hookruntest.Team, Epoch: 1,
+			Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{origin}, TeamID: hookruntest.Team, FetchedAt: time.Now()},
+		}},
+		Bindings: map[string]routing.Binding{origin: {Organization: "org-a"}},
+	}
+	return Profile{Account: hookruntest.Account, Routing: hookrun.NewRouting("default", &st)}
+}
+
+// A hook process another harness started stands down: no handler, claim, flush or reply,
+// with hooks on or off. A render hook still renders, and stderr says why only with Debug.
+func TestRunStandsDownInAnotherHarness(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	h.deps.Agents = agents.New(reading{fake{ran: &h.ran}}).Starters(otherHarness{})
+	root := hookruntest.InitRepo(t)
+	h.deps.Profile = func() Profile { return routedProfileFor(root) }
+	for _, off := range []bool{false, true} {
+		for _, event := range []string{"fake-edit", "fake-stop"} {
+			r := request(event)
+			r.Getenv, r.HooksOff, r.Cwd = marked, off, root
+			r.Stdin = strings.NewReader(`{"session_id":"s1","cwd":"` + hookruntest.InJSON(root) + `"}`)
+			if got := Run(context.Background(), h.deps, r); got != 0 {
+				t.Fatalf("%s: status %d", event, got)
+			}
+			if out, errs := r.Stdout.(*bytes.Buffer).String(), r.Stderr.(*bytes.Buffer).String(); out != "" || errs != "" {
+				t.Errorf("%s (hooks off %v): stdout %q, stderr %q", event, off, out, errs)
+			}
+		}
+	}
+	if len(h.ran) != 0 || h.flushes != 0 || h.claims != 0 {
+		t.Fatalf("ran %v, %d flushes, %d claims", h.ran, h.flushes, h.claims)
+	}
+	if _, ok := claim.Read(h.deps.StateDir, "s1", time.Now()); ok {
+		t.Fatal("a session another harness started was claimed or marked")
+	}
+	r := request("fake-edit")
+	r.Getenv, r.Debug = marked, true
+	Run(context.Background(), h.deps, r)
+	if errs := r.Stderr.(*bytes.Buffer).String(); strings.Count(errs, "\n") != 1 || !strings.Contains(errs, "fake-edit stands down") {
+		t.Errorf("with Debug, stderr %q", errs)
+	}
+	if r.Stdout.(*bytes.Buffer).Len() != 0 {
+		t.Errorf("with Debug, stdout %q", r.Stdout.(*bytes.Buffer).String())
+	}
+	line := request("fake-line")
+	line.Getenv = marked
+	if got := Run(context.Background(), h.deps, line); got != 7 {
+		t.Fatalf("render status %d, want 7", got)
+	}
+	if strings.Join(h.ran, ",") != "render spool=on" {
+		t.Fatalf("ran %v", h.ran)
+	}
+}
+
+// Without the mark the same events run as before, and claim their session.
+func TestRunWithoutTheMarkRuns(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	h.deps.Agents = agents.New(reading{fake{ran: &h.ran}}).Starters(otherHarness{})
+	root := hookruntest.InitRepo(t)
+	h.deps.Profile = func() Profile { return routedProfileFor(root) }
+	unmarked := func(string) string { return "" }
+	for _, event := range []string{"fake-edit", "fake-stop"} {
+		r := request(event)
+		r.Getenv, r.Cwd = unmarked, root
+		r.Stdin = strings.NewReader(`{"session_id":"s1","cwd":"` + hookruntest.InJSON(root) + `"}`)
+		Run(context.Background(), h.deps, r)
+	}
+	if c, ok := claim.Read(h.deps.StateDir, "s1", time.Now()); !ok || c.Kind != claim.KindRepository || h.claims != 2 || h.flushes != 1 {
+		t.Fatalf("claim %+v, %v; %d claims, %d flushes", c, ok, h.claims, h.flushes)
+	}
+	h.deps.Agents = agents.New(fake{ran: &h.ran}).Starters(otherHarness{})
+	off := request("fake-edit")
+	off.Getenv, off.HooksOff = unmarked, true
+	Run(context.Background(), h.deps, off)
+	if strings.Join(h.ran, ",") != "off" {
+		t.Fatalf("ran %v", h.ran)
+	}
+	if got := off.Stdout.(*bytes.Buffer).String(); got != "{}\n" {
+		t.Fatalf("hooks-off reply %q", got)
+	}
+}
+
+// A git hook runs in a process another harness started too, and still never reaches the
+// registry: a commit made from it is still stamped.
+func TestRunGitHooksIgnoreTheMark(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	h.deps.Agents = nil
+	for _, event := range []string{"prepare-commit-msg", "post-commit", "pre-push"} {
+		r := request(event)
+		r.Cwd, r.Getenv = t.TempDir(), marked
+		if got := Run(context.Background(), h.deps, r); got != 0 {
+			t.Fatalf("%s: status %d", event, got)
+		}
+	}
+	// post-commit's flush shows it ran.
+	if h.flushes != 1 {
+		t.Fatalf("%d flushes, want post-commit's 1", h.flushes)
+	}
+}

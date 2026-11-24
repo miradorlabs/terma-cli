@@ -4,7 +4,7 @@ This file provides guidance to coding agents (Claude Code, Codex and others) whe
 with code in this repository.
 
 `terma` is a Go CLI that connects coding agents (Claude Code, Codex, GitHub Copilot, OMP,
-Antigravity) to Terma and stamps the commits they produce with the agent session that
+Antigravity, Grok Build) to Terma and stamps the commits they produce with the agent session that
 wrote them.
 
 ## Commands
@@ -76,7 +76,11 @@ root, a device or kernel filesystem (`2>/dev/null`), the operating system's own 
 the machine's scratch space (`/tmp`, `$TMPDIR`), unless it is in the developer's home
 (`nobodys` in `internal/hooks/hookrun/reach.go`). A reach hook that fails never blocks or
 fails the agent's tool: an Extension agent's plugin taints the session, hands nothing more
-of it over and asks terma to mark its run Mixed.
+of it over and asks terma to mark its run Mixed. A harness may run the entries in another
+agent's hooks file (the grok agent's grok runs Claude Code's and Cursor's), so an agent
+marks the hook processes it starts (`agents.HookStarter`), and `terma hook` stands down in
+a process a harness other than the event's owner started: no claim, no spool line, no reply.
+The git hooks are not subject to it.
 
 **Commits.** The agent hooks announce the session and record the files it edits in a
 session manifest. At commit time, `prepare-commit-msg` matches the staged files against
@@ -128,25 +132,34 @@ every agent's user-level exporter points at a relay that terma runs on `127.0.0.
 command reads its exporter from its environment alone (`agents.Launched`: the Copilot CLI)
 is launched via `terma launch <agent>` (`shellrc.InstallLauncher`). A hook claims its session
 for the routed enrollment, naming the repository and checkout (`stampCheckout`,
-`stampParent`). The relay forwards only claimed sessions from claimed PIDs, pinned once
-routed: unclaimed records wait briefly in `unknownHold`, while pending/blocked records stay
-destination-pinned in `pinnedHold` (re-checked only, never re-routed), and spans/logs/metrics
-straddling `MixedAt` drop. It sends each team's backlog with the person's single user token
-and `X-Mirador-Project: <team_id>` (a server-key profile uses its `keys.json` server key
-under `Account: "no_person"` with no `X-Mirador-Project`), applying that team's
-`config.Policy.Content`. On ingest `403 ORG_NOT_ACCESSIBLE`, the relay triggers a coalesced
-refresh nudge and refuses all enrollments of that org via epoch-fenced CAS
-(`routing.ApplyOrgAccessLost`) without retiring the user token, leaving other organizations
-and Personal uninterrupted. Spool delivery applies the same lane, `routing.State`, Mixed,
-and content rules. Antigravity has no export, so its hooks send its content too: the prompt
-and the reply from the transcript, a tool call's arguments from `PostToolUse` and each
-tool's result as `terma.tool.result` (`internal/agents/antigravity/content_paths.go` and
-`turn.go`), under the content switches of the team routing sends the hook's checkout to
-(`hookrun.Env.PolicyFor`) and only for workspaces routing sends to that same team
-(`hookrun.Env.RoutesWith`). Use `terma teams` to manage ticked teams and bindings, `terma route
-explain` to trace `routing.Router.Route` for a path, and `terma doctor` to inspect routing
-state, per-enrollment health (including `OrgAccessLost`, pending bindings, and single
-`terma setup` remediation for `SignInNeeded`), Mixed runs, and combined outbox/spool losses.
+`stampParent`), and on parts of an agent that writes the home directory as `~` in exported
+paths (`shape.CaptureRules.HomeRelativeScopes`: grok's) also stamps that directory with
+tool content (`terma.home_directory`, `Options.HomeDir`). A subagent's claim names the
+session that opened it where the agent's own telemetry does not (OMP's and grok's,
+`hookrun.Env.StartSubagent`), and grok's `PostToolUse` hook sends the call that launched a
+subagent (`terma.subagent.call`) and, when the parent waits on or kills a background one,
+how it ended (`terma.subagent.end`). The relay forwards only claimed sessions from claimed
+PIDs, pinned once routed: unclaimed records wait briefly in `unknownHold`, while
+pending/blocked records stay destination-pinned in `pinnedHold` (re-checked only, never
+re-routed), and spans/logs/metrics straddling `MixedAt` drop. It sends each team's backlog
+with the person's single user token and `X-Mirador-Project: <team_id>` (a server-key profile
+uses its `keys.json` server key under `Account: "no_person"` with no `X-Mirador-Project`),
+applying that team's `config.Policy.Content`. On ingest `403 ORG_NOT_ACCESSIBLE`, the relay
+triggers a coalesced refresh nudge and refuses all enrollments of that org via epoch-fenced
+CAS (`routing.ApplyOrgAccessLost`) without retiring the user token, leaving other
+organizations and Personal uninterrupted. Spool delivery applies the same lane,
+`routing.State`, Mixed, and content rules. Antigravity has no export, so its hooks send its
+content too: the prompt and the reply from the transcript, a tool call's arguments from
+`PostToolUse` and each tool's result as `terma.tool.result`
+(`internal/agents/antigravity/content_paths.go` and `turn.go`), under the content switches
+of the team routing sends the hook's checkout to (`hookrun.Env.PolicyFor`) and only for
+workspaces routing sends to that same team (`hookrun.Env.RoutesWith`). grok's export often
+loses the prompt, so its prompt hook sends it as `terma.user.message` under the routed
+team's policy (`PolicyFor`) and consent (`Consent`). Use `terma teams` to manage ticked
+teams and bindings, `terma route explain` to trace `routing.Router.Route` for a path, and
+`terma doctor` to inspect routing state, per-enrollment health (including `OrgAccessLost`,
+pending bindings, and single `terma setup` remediation for `SignInNeeded`), Mixed runs, and
+combined outbox/spool losses.
 
 ### Lanes, ownership, and loss accounting
 

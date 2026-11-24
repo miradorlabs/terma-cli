@@ -8,7 +8,8 @@
 The `terma` cli connects coding agents to [Terma](https://terma.ai), then stamps the commits
 they produce so agent spend can be traced to shipped code. It supports **Claude Code**
 (CLI and Desktop), **Codex** (CLI and Desktop), **GitHub Copilot** (CLI and VS Code),
-**[OMP](https://github.com/can1357/oh-my-pi)** and **Antigravity** (the `agy` CLI 1.2.4 or later, on macOS and Linux).
+**[OMP](https://github.com/can1357/oh-my-pi)**, **Antigravity** (the `agy` CLI 1.2.4 or later, on macOS and Linux)
+and **Grok Build** (xAI's `grok` CLI 1.0.92 or later, in beta, on macOS and Linux).
 
 ## Get started
 
@@ -100,7 +101,7 @@ instead: see [Scripted and headless setup](#scripted-and-headless-setup).
 
 ```mermaid
 flowchart LR
-  agent["Claude Code / Codex / Copilot / OMP"] -- "telemetry" --> relay["terma relay<br/>(127.0.0.1)"]
+  agent["Claude Code / Codex / Copilot / OMP / Grok Build"] -- "telemetry" --> relay["terma relay<br/>(127.0.0.1)"]
   agent -- "hook events" --> hook["terma hook"]
   git["git commit"] -- "commit hooks" --> hook
   hook -- "routes & claims session<br/>for matching team" --> relay
@@ -262,7 +263,7 @@ terma setup --org acme --team platform --harness claude,codex,copilot,omp --yes
   account; with `--yes` and no `--team`, setup keeps your current selection (or picks the
   only available team on a fresh machine). Use `terma teams` to tick, untick, bind, or refuse
   teams at any time.
-- `--harness <agents>` records those agents (`claude`, `codex`, `copilot`, `omp`, and on macOS and Linux `antigravity`); with `--yes` or no
+- `--harness <agents>` records those agents (`claude`, `codex`, `copilot`, `omp`, and on macOS and Linux `antigravity` and `grok`); with `--yes` or no
   terminal and no `--harness`, setup records the agents recorded before and every
   supported agent installed on this machine.
 - `--yes` skips interactive prompts and accepts binding defaults for the selected team(s).
@@ -571,8 +572,52 @@ Setup switches terma's line back on, and says so, when it is set `"enabled": fal
 or only the `statusLine` entry when something else has changed the file since. `agy` runs a status line
 only in its interactive CLI: an `agy -p` session reports no plan or quota.
 
-On Windows, setup lists Antigravity as Coming Soon: `agy` runs its hooks with `cmd` there,
-and terma's hook command for it has been checked only on macOS and Linux.
+Grok Build (xAI's `grok` CLI, in beta) exports natively. Setup writes eight keys into
+`[telemetry]` in `~/.grok/config.toml` (`$GROK_HOME/config.toml`): the log stream on, sent to
+the relay over `http/protobuf`, and every content switch on, since the relay withholds what
+your team's policy does not collect. The relay's token leads the endpoint's path, so the file
+stays private to you (0600). Setup records what each key held; `terma teardown` puts back each
+key that still holds terma's value and names any you changed since. Setup writes no generic
+`otel_endpoint` and no metrics exporter: grok's metric points carry your email, so they never
+reach the relay. grok rewrites the file in its own form when it saves a setting, and drops
+its comments; terma compares the keys by value, so that rewrite does not undo setup.
+
+Setup also writes its own hooks file, `~/.grok/hooks/terma.json`, and leaves grok's other
+hooks files alone. Its hooks claim each session for your team, send each prompt, and report
+the files grok's `search_replace` tool edits, for commit attribution. For a subagent they name
+the session it was opened from and the call that launched it, and how a background one ended
+when its parent waits on it or kills it. grok's export can lose the prompt of a headless run,
+so the prompt comes from the hook: always counted, with its text only while you chose Grok
+Build at setup (or in global mode) and the team's policy collects prompts. grok also runs the
+entries in Claude Code's and Cursor's hooks files; terma's Claude Code and Cursor hooks do
+nothing inside grok, so a grok session is never recorded as theirs.
+
+Adding terma's hooks file gives grok a user hook. In a folder grok does not trust yet, its
+interactive mode then asks "Do you trust the contents of this directory?" before anything
+else, and answering No quits grok. Headless runs (`grok -p`) do not ask.
+
+terma needs grok 1.0.92 or later: setup refuses an earlier one and doctor fails it. Setup also
+refuses, before it writes anything, when your shell would take the export elsewhere, switch it
+off or break it: `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` set to anything but the relay,
+`OTEL_LOGS_EXPORTER` without `otlp`, `GROK_EXTERNAL_OTEL=0`, `OTEL_EXPORTER_OTLP_LOGS_PROTOCOL`
+other than `http/protobuf`, `OTEL_EXPORTER_OTLP_COMPRESSION=none`, or a metrics exporter
+(`OTEL_METRICS_EXPORTER`, or `otel_metrics_exporter` in grok's config) that would send to the
+relay. Unset it, then run setup again. An `OTEL_LOG_*` content switch turned off in your shell
+is only a warning. The generic `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_PROTOCOL`
+are fine: the keys setup writes win over them.
+
+Grok Build's known limits: a session grok runs in a sandbox (`--sandbox`, `GROK_SANDBOX` or
+`[sandbox] profile` in its config, set to anything but `off`) is not collected. Its hooks
+cannot write terma's state there, so nothing claims the session and the relay drops its
+telemetry. `terma doctor` warns when your shell or grok's config turns the sandbox on. A file
+grok's `write` tool creates, or one of its shell commands writes, is not attributed to its
+session. grok writes your home directory as `~` in the paths it exports, so the relay sends its
+own home directory beside them, with tool content only. Grok Build should work on macOS, but
+has been verified on Linux only.
+
+On Windows, setup lists Antigravity and Grok Build as Coming Soon: `agy` runs its hooks with
+`cmd` there, and terma's hook command for it has been checked only on macOS and Linux; grok's
+hooks and export have been verified on Linux only.
 
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`

@@ -17,14 +17,18 @@ var checkoutSafeKeys = []string{
 }
 
 // checkoutContentKeys name it by local path, and by the worktree's name, which an agent
-// harness often takes from the task: they leave only with the tool content that names paths.
+// harness often takes from the task, and name the home directory a path written from `~`
+// is under: they leave only with the tool content that names paths.
 var checkoutContentKeys = []string{
 	semconv.TermaRepositoryRootKey, semconv.TermaWorkingDirectoryKey, semconv.TermaRepositoryWorktreeNameKey,
+	semconv.TermaHomeDirectoryKey,
 }
 
-// stampCheckout names the checkout the part's session ran in, from the claim ran: the
-// relay's to name, never the agent's, so whatever the agent sent under these keys goes first.
-func stampCheckout(p *part, ran claim.Claim, toolContent bool) {
+// stampCheckout names the checkout the part's session ran in, from the claim ran, and, where
+// homeDir is set (a part of an agent that writes paths from `~`), the home directory of the
+// user the relay runs as: the relay's to name, never the agent's, so whatever the agent sent
+// under these keys goes first, on every part.
+func stampCheckout(p *part, ran claim.Claim, toolContent bool, homeDir string) {
 	for _, key := range checkoutSafeKeys {
 		unstamp(p, key)
 	}
@@ -57,6 +61,7 @@ func stampCheckout(p *part, ran claim.Claim, toolContent bool) {
 		semconv.TermaRepositoryRootKey:         ran.Root,
 		semconv.TermaWorkingDirectoryKey:       ran.Cwd,
 		semconv.TermaRepositoryWorktreeNameKey: ran.Worktree,
+		semconv.TermaHomeDirectoryKey:          homeDir,
 	} {
 		if value != "" {
 			stamp(p, key, value)

@@ -48,6 +48,7 @@ var harnesses = map[string]harnessMeta{
 		repo: "earendil-works/pi", language: "typescript", tag: "v%s", changelog: "https://github.com/earendil-works/pi/releases"},
 	"omp": {name: "OMP", vendor: "can1357", homepage: "https://github.com/can1357/oh-my-pi", npm: "@oh-my-pi/pi-coding-agent",
 		repo: "can1357/oh-my-pi", language: "typescript", tag: "v%s", changelog: "https://github.com/can1357/oh-my-pi/releases"},
+	"grok": {name: "Grok Build", vendor: "xAI", homepage: "https://www.npmjs.com/package/@xai-official/grok", npm: "@xai-official/grok"},
 	"hermes": {name: "Hermes Agent", vendor: "Nous Research", homepage: "https://github.com/NousResearch/hermes-agent",
 		repo: "NousResearch/hermes-agent", language: "python", tag: "v%s", changelog: "https://github.com/NousResearch/hermes-agent/releases"},
 	"dsh": {name: "DeepSeek Harness", vendor: "DeepSeek", homepage: "https://github.com/deepseek-ai/deepseek-harness", npm: "@deepseek-ai/dsh",

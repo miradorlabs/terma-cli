@@ -190,7 +190,7 @@ func (e Env) report(r *Repo, sess session.Session, toolName string, paths []stri
 		}
 		ev := spool.Event{Name: semconv.TermaFilesTouchedEvent, SessionID: sess.ID, Attrs: attrs}
 		if c.repo == r {
-			e.emitFor(r, ev, true, true)
+			e.emitFor(r, ev, true, true, true)
 		} else {
 			e.emit(e.stampFor(c.repo, ev, true, true))
 		}

@@ -39,7 +39,7 @@ func codexConflicts(f *tomlFile, e harness.Exporter) []harness.Conflict {
 		if !e.HasSignal(sk.signal) {
 			continue
 		}
-		shape := codexExporterOf(f.otel[sk.key])
+		shape := codexExporterOf(f.Table[sk.key])
 		key := otelTable + "." + sk.key
 		switch shape.Kind {
 		case "", codexExporterNone, codexExporterStatsig:
@@ -75,7 +75,7 @@ func codexConflicts(f *tomlFile, e harness.Exporter) []harness.Conflict {
 	}
 
 	// The user's analytics opt-out is not Terma's to flip; refuse the metrics signal instead.
-	if e.HasSignal(harness.SignalMetrics) && codexAnalyticsDisabled(f.doc) {
+	if e.HasSignal(harness.SignalMetrics) && codexAnalyticsDisabled(f.Doc) {
 		out = append(out, harness.Conflict{
 			Key:   codexAnalyticsTable + "." + codexAnalyticsEnabledKey,
 			Value: "false",

@@ -40,7 +40,7 @@ func ompRelay(t *testing.T, pol Policy) (*Relay, *upstream) {
 	f.claims[ompParent] = claim.Claim{ProjectID: "p1", Tool: "omp"}
 	f.claims[ompChild] = claim.Claim{ProjectID: "p1", Tool: "omp", Parent: ompParent}
 	pol.Endpoint, pol.Key = u.srv.URL, "key-p1"
-	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock, HomeDir: "/home/dev",
 		Resolve: func(claim.Claim) (Policy, error) { return pol, nil }})
 	runRelay(t, r)
 	srv := httptest.NewServer(r.Handler())
@@ -116,6 +116,17 @@ func TestRelayWithholdsOmpToolContent(t *testing.T) {
 	}
 	if !strings.Contains(sent, "CONTENT<omp.gen_ai.response.text>") {
 		t.Error("the reply did not leave though prompts are collected")
+	}
+}
+
+// The relay names its home directory only on the parts of an agent that writes paths from
+// `~` (shape.CaptureRules.HomeRelativeScopes): omp's carry none, tool content or not, so what
+// is stored for an agent that never needed it does not change.
+func TestRelayStampsNoHomeDirectoryOnOmp(t *testing.T) {
+	t.Parallel()
+	_, u := ompRelay(t, Policy{IncludePrompts: true, IncludeToolContent: true})
+	if sent := u.sent(); strings.Contains(sent, semconv.TermaHomeDirectoryKey) || !strings.Contains(sent, semconv.MiradorProjectIDKey) {
+		t.Errorf("omp's parts name the home directory, or carry no stamp at all")
 	}
 }
 

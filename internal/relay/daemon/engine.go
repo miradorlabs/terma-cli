@@ -88,7 +88,8 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 		Hold: s.Hold, Dir: filepath.Join(claim.Dir(stateDir), relay.OutboxDir), Version: d.Version,
 		Lookup:         func(sessionID string, now time.Time) (claim.Claim, bool) { return claim.Read(stateDir, sessionID, now) },
 		HeartbeatEvery: s.Heartbeat,
-		PeerPID:        procinfo.FindSender, ProcessAlive: procinfo.Alive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second}
+		PeerPID:        procinfo.FindSender, ProcessAlive: procinfo.Alive, ClaimCacheTTL: time.Second, PolicyCacheTTL: time.Second,
+		HomeDir: homeDir()}
 	if d.Bind != nil {
 		d.Bind(&opts, cfg)
 	}
@@ -96,6 +97,24 @@ func (d Deps) Engine(ctx context.Context, stateDir string, cfg *config.Config, s
 		opts.Logf = func(f string, a ...any) { fmt.Fprintf(logw, time.Now().Format("15:04:05.000 ")+f+"\n", a...) }
 	}
 	return opts
+}
+
+// homeDir is the home directory of the user the relay runs as, read once as it starts: $HOME,
+// as the agents it serves read it, symlink-resolved, absolute and with no trailing slash; ""
+// when it cannot be read, names no absolute path, or is the filesystem's root, which is all
+// slash.
+func homeDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	if resolved, err := filepath.EvalSymlinks(home); err == nil {
+		home = resolved
+	}
+	if home = filepath.Clean(home); !filepath.IsAbs(home) || home == filepath.VolumeName(home)+string(filepath.Separator) {
+		return ""
+	}
+	return home
 }
 
 // Teams returns the multi-org relay.Router for cfg's profile.

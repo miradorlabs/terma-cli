@@ -255,15 +255,23 @@ func (e Env) locate(ctx context.Context) (root, gitDir string, id config.Reposit
 
 // EmitFor spools an event stamped with r's project or routed destination, parking it when
 // the spool cannot be written.
-func (e Env) EmitFor(r *Repo, ev spool.Event) bool { return e.emitFor(r, ev, false, true) }
+func (e Env) EmitFor(r *Repo, ev spool.Event) bool { return e.emitFor(r, ev, false, true, true) }
 
-func (e Env) emitFor(r *Repo, ev spool.Event, own, inRun bool) bool {
+// EmitForSession is EmitFor for a record whose terma.agent.id names a session of its own,
+// one an agent opens for a subagent and claims with its parent and its checkout
+// (StartSubagent): it claims the event's session and leaves the subagent's claim as it is,
+// where EmitFor would rewrite it from this hook's checkout, with no parent.
+func (e Env) EmitForSession(r *Repo, ev spool.Event) bool {
+	return e.emitFor(r, ev, false, true, false)
+}
+
+func (e Env) emitFor(r *Repo, ev spool.Event, own, inRun, claimAgent bool) bool {
 	if e.lost(r, 1) {
 		return true
 	}
 	ev = e.stampFor(r, ev, own, inRun)
 	if inRun || e.Routing == nil {
-		e.claimForRelay(r, ev)
+		e.claimForRelay(r, ev, claimAgent)
 	}
 	return e.emitOrPark(r, ev)
 }
@@ -306,10 +314,11 @@ func (e Env) stamp(r *Repo, ev spool.Event) spool.Event {
 }
 
 // claimForRelay claims the event's session for the repository's project or routed location
-// on every hook, not only at start. With no lane it writes nothing and skips OnClaim.
-func (e Env) claimForRelay(r *Repo, ev spool.Event) {
+// on every hook, not only at start, and with claimAgent the agent the event names too.
+// With no lane (signed out, or an unreadable sign-in), it writes nothing and skips OnClaim.
+func (e Env) claimForRelay(r *Repo, ev spool.Event, claimAgent bool) {
 	if e.Routing != nil {
-		e.placeFor(r, ev)
+		e.placeFor(r, ev, claimAgent)
 		return
 	}
 	if r == nil || r.ProjectID == "" || ev.SessionID == "" || e.lane().Lost != "" {
@@ -321,7 +330,7 @@ func (e Env) claimForRelay(r *Repo, ev spool.Event) {
 	c.Parent = e.parent
 	claim.Write(e.StateDir, ev.SessionID, c, e.Time())
 	// A subagent whose telemetry uses its agent id as session id would otherwise be dropped.
-	if agent, _ := ev.Attrs[semconv.TermaAgentIDKey].(string); agent != "" && agent != ev.SessionID {
+	if agent, _ := ev.Attrs[semconv.TermaAgentIDKey].(string); claimAgent && agent != "" && agent != ev.SessionID {
 		claim.Write(e.StateDir, agent, c, e.Time())
 	}
 	if e.OnClaim != nil {

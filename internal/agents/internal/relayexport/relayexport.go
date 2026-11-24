@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -170,3 +171,19 @@ type Own struct{}
 
 // RelayPointed is unknown: the exporter is terma's own.
 func (Own) RelayPointed(string) (bool, bool) { return false, false }
+
+// WithoutRelayToken is value with the first segment of its path, where the relay's token
+// sits, masked when it is an URL on the relay's host: a conflict's value is never a credential.
+func WithoutRelayToken(value, relayEndpoint string) string {
+	u, err := url.Parse(value)
+	relay, rerr := url.Parse(relayEndpoint)
+	if err != nil || rerr != nil || u.Host == "" || u.Host != relay.Host {
+		return value
+	}
+	segments := strings.SplitN(strings.TrimPrefix(u.Path, "/"), "/", 2)
+	if segments[0] == "" {
+		return value
+	}
+	segments[0] = "***"
+	return u.Scheme + "://" + u.Host + "/" + strings.Join(segments, "/")
+}

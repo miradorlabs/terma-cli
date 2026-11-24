@@ -132,13 +132,13 @@ func (c exporter) Status() (harness.Status, error) {
 
 	status := harness.Status{
 		ConfigPath: path,
-		Exists:     f.existed,
-		ProjectID:  codexSpanAttribute(f.otel, semconv.MiradorProjectIDKey),
+		Exists:     f.Existed,
+		ProjectID:  codexSpanAttribute(f.Table, semconv.MiradorProjectIDKey),
 	}
 
 	// Codex has no switch beyond the exporters, so an OTLP exporter present is telemetry on.
 	for _, sk := range codexSignalKeys {
-		shape := codexExporterOf(f.otel[sk.key])
+		shape := codexExporterOf(f.Table[sk.key])
 		if shape.Kind != codexExporterOTLPHTTP && shape.Kind != codexExporterOTLPGRPC {
 			continue
 		}
@@ -146,10 +146,10 @@ func (c exporter) Status() (harness.Status, error) {
 		if status.Endpoint == "" {
 			status.Endpoint = base
 		}
-		if codexTermaExporter(f.otel[sk.key], status.Endpoint, sk.signal) {
+		if codexTermaExporter(f.Table[sk.key], status.Endpoint, sk.signal) {
 			status.Signals = append(status.Signals, sk.signal)
 			// Only a Terma key is named: the exporter may carry somebody else's bearer token.
-			if key := codexKeyFromExporter(f.otel[sk.key]); status.KeyPrefix == "" && serverkey.Is(key) {
+			if key := codexKeyFromExporter(f.Table[sk.key]); status.KeyPrefix == "" && serverkey.Is(key) {
 				status.KeyPrefix = harness.MaskKey(key)
 			}
 		}
@@ -161,12 +161,12 @@ func (c exporter) Status() (harness.Status, error) {
 		Endpoint: status.Endpoint,
 		Signals:  status.Signals,
 		ResourceAttributes: map[string]string{
-			harness.AttrEnduserID:       codexSpanAttribute(f.otel, harness.AttrEnduserID),
+			harness.AttrEnduserID:       codexSpanAttribute(f.Table, harness.AttrEnduserID),
 			semconv.MiradorProjectIDKey: status.ProjectID,
 		},
 	})
 	// A metrics exporter with analytics disabled sends nothing.
-	if codexAnalyticsDisabled(f.doc) {
+	if codexAnalyticsDisabled(f.Doc) {
 		status.Signals = harness.WithoutSignal(status.Signals, harness.SignalMetrics)
 	}
 
@@ -177,7 +177,7 @@ func (c exporter) Status() (harness.Status, error) {
 		return harness.Status{}, err
 	}
 	if j != nil {
-		current, err := canonicalOtel(f.otel)
+		current, err := canonicalOtel(f.Table)
 		if err != nil {
 			return harness.Status{}, err
 		}
@@ -208,7 +208,7 @@ func (c exporter) Connect(e harness.Exporter, clearConflicts bool) error {
 	if err != nil {
 		return err
 	}
-	current, err := canonicalOtel(f.otel)
+	current, err := canonicalOtel(f.Table)
 	if err != nil {
 		return err
 	}
@@ -258,7 +258,7 @@ func (c exporter) Connect(e harness.Exporter, clearConflicts bool) error {
 	j := harness.NewJournal(c.Name(), path, current, rendered, cleared, nil, carried)
 
 	maps.Copy(current, rendered)
-	f.otel, err = otelFromCanonical(current)
+	f.Table, err = otelFromCanonical(current)
 	if err != nil {
 		return err
 	}
@@ -268,7 +268,7 @@ func (c exporter) Connect(e harness.Exporter, clearConflicts bool) error {
 		return err
 	}
 	defer harness.PruneJournals(c.dir)
-	if err := f.save(e.APIKey != ""); err != nil {
+	if err := f.Save(e.APIKey != ""); err != nil {
 		var rollbackErr error
 		if previousJournal != nil {
 			rollbackErr = previousJournal.Save(c.dir)
@@ -297,7 +297,7 @@ func (c exporter) Disconnect() (harness.DisconnectResult, error) {
 	if err != nil {
 		return harness.DisconnectResult{}, err
 	}
-	current, err := canonicalOtel(f.otel)
+	current, err := canonicalOtel(f.Table)
 	if err != nil {
 		return harness.DisconnectResult{}, err
 	}
@@ -306,11 +306,11 @@ func (c exporter) Disconnect() (harness.DisconnectResult, error) {
 
 	defer harness.PruneJournals(c.dir)
 	if result.Removed > 0 || result.Restored > 0 {
-		f.otel, err = otelFromCanonical(current)
+		f.Table, err = otelFromCanonical(current)
 		if err != nil {
 			return result, err
 		}
-		if err := f.save(false); err != nil {
+		if err := f.Save(false); err != nil {
 			return result, err
 		}
 	}
@@ -337,15 +337,15 @@ func (c exporter) Backup(endpoint string) (string, error) {
 		return "", err
 	}
 	if j != nil {
-		return f.backup(false)
+		return f.Backup(false)
 	}
 	pointsAtTerma := false
 	for _, sk := range codexSignalKeys {
-		if codexTermaExporter(f.otel[sk.key], endpoint, sk.signal) {
+		if codexTermaExporter(f.Table[sk.key], endpoint, sk.signal) {
 			pointsAtTerma = true
 		}
 	}
-	return f.backup(!pointsAtTerma)
+	return f.Backup(!pointsAtTerma)
 }
 
 // CurrentCredential returns the key installed for both endpoint and projectID, so a
@@ -359,14 +359,14 @@ func (c exporter) CurrentCredential(endpoint, projectID string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	if codexSpanAttribute(f.otel, semconv.MiradorProjectIDKey) != projectID {
+	if codexSpanAttribute(f.Table, semconv.MiradorProjectIDKey) != projectID {
 		return "", false
 	}
 	for _, sk := range codexSignalKeys {
-		if !codexTermaExporter(f.otel[sk.key], endpoint, sk.signal) {
+		if !codexTermaExporter(f.Table[sk.key], endpoint, sk.signal) {
 			continue
 		}
-		if key := codexKeyFromExporter(f.otel[sk.key]); serverkey.Is(key) {
+		if key := codexKeyFromExporter(f.Table[sk.key]); serverkey.Is(key) {
 			return key, true
 		}
 	}

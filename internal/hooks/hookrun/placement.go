@@ -144,12 +144,15 @@ func (e Env) writeClaim(sessionID string, c claim.Claim, now time.Time) {
 	}
 	e.Routing.noteWriteErr(ErrFailClosed)
 }
-func (e Env) placeFor(r *Repo, ev spool.Event) {
+func (e Env) placeFor(r *Repo, ev spool.Event, claimAgent bool) {
 	if r == nil || r.dest == nil || ev.SessionID == "" || e.lane().Lost != "" {
 		return
 	}
 	tool, _ := ev.Attrs[semconv.GenAIMainAgentNameKey].(string)
-	agent, _ := ev.Attrs[semconv.TermaAgentIDKey].(string)
+	var agent string
+	if claimAgent {
+		agent, _ = ev.Attrs[semconv.TermaAgentIDKey].(string)
+	}
 	e.judge(ev.SessionID, agent, e.repoClaim(r, tool), []routing.Location{r.dest.loc}, true, runs.Why{})
 	if e.OnClaim != nil && r.dest.collected() {
 		e.OnClaim(r.Root)

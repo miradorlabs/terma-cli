@@ -143,6 +143,8 @@ const (
 	TermaFilesPathsKey = "terma.files.paths"
 	// TermaFundingStatusKey is terma.funding.status: Whether the record carries who paid for the session.
 	TermaFundingStatusKey = "terma.funding.status"
+	// TermaHomeDirectoryKey is terma.home_directory: The absolute path of the home directory of the user the relay runs as, symlink-resolved.
+	TermaHomeDirectoryKey = "terma.home_directory"
 	// TermaHookEventKey is terma.hook.event: The agent hook that produced the record.
 	TermaHookEventKey = "terma.hook.event"
 	// TermaInstallMethodKey is terma.install.method: How the relay's terma was installed, which says how it gets new releases.

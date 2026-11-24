@@ -80,7 +80,8 @@ func TestRelayStampsTheCheckout(t *testing.T) {
 }
 
 // Outside git, and on a detached HEAD, a claim names no repository or branch, and the relay
-// stamps none, never the agent's; without tool content it stamps no path or worktree name.
+// stamps none, never the agent's; without tool content it stamps no path, worktree name or
+// home directory. The home directory is the relay's, never the agent's.
 func TestStampCheckoutNamesOnlyWhatTheClaimDoes(t *testing.T) {
 	t.Parallel()
 	linked := claim.Claim{ProjectID: "p", Root: "/work/web-x", Cwd: "/work/web-x/api", Worktree: "web-x", Remote: "https://github.com/acme/web", Branch: "x"}
@@ -89,25 +90,29 @@ func TestStampCheckoutNamesOnlyWhatTheClaimDoes(t *testing.T) {
 		ran         claim.Claim
 		toolContent bool
 		want        map[string]string
+		home        string
 	}{
 		{"outside git", claim.Claim{ProjectID: "p", Cwd: "/home/dev/notes"}, true,
-			map[string]string{semconv.TermaWorkingDirectoryKey: "/home/dev/notes"}},
+			map[string]string{semconv.TermaWorkingDirectoryKey: "/home/dev/notes"}, ""},
 		{"detached", claim.Claim{ProjectID: "p", Repository: config.Repository{Origin: "github.com/acme/web"}, Remote: "https://github.com/acme/web", Root: "/work/web", Cwd: "/work/web"}, true,
 			map[string]string{semconv.VCSRepositoryURLFullKey: "https://github.com/acme/web", semconv.VCSOwnerNameKey: "acme", semconv.VCSRepositoryNameKey: "web",
 				semconv.VCSProviderNameKey: semconv.VCSProviderNameGithub, semconv.TermaRepositoryRootKey: "/work/web", semconv.TermaWorkingDirectoryKey: "/work/web",
-				semconv.TermaRepositoryWorktreeLinkedKey: "false"}},
+				semconv.TermaRepositoryWorktreeLinkedKey: "false"}, ""},
 		{"linked, no tool content", linked, false,
 			map[string]string{semconv.VCSRepositoryURLFullKey: "https://github.com/acme/web", semconv.VCSRefHeadNameKey: "x",
-				semconv.VCSRefHeadTypeKey: "branch", semconv.TermaRepositoryWorktreeLinkedKey: "true"}},
+				semconv.VCSRefHeadTypeKey: "branch", semconv.TermaRepositoryWorktreeLinkedKey: "true"}, ""},
 		{"linked, tool content", linked, true,
 			map[string]string{semconv.VCSRepositoryURLFullKey: "https://github.com/acme/web", semconv.VCSRefHeadNameKey: "x",
 				semconv.VCSRefHeadTypeKey: "branch", semconv.TermaRepositoryWorktreeLinkedKey: "true",
-				semconv.TermaRepositoryRootKey: "/work/web-x", semconv.TermaWorkingDirectoryKey: "/work/web-x/api", semconv.TermaRepositoryWorktreeNameKey: "web-x"}},
+				semconv.TermaRepositoryRootKey: "/work/web-x", semconv.TermaWorkingDirectoryKey: "/work/web-x/api", semconv.TermaRepositoryWorktreeNameKey: "web-x"}, ""},
+		{"home, tool content", claim.Claim{ProjectID: "p", Cwd: "/home/dev/notes"}, true,
+			map[string]string{semconv.TermaWorkingDirectoryKey: "/home/dev/notes", semconv.TermaHomeDirectoryKey: "/home/dev"}, "/home/dev"},
+		{"home, no tool content", claim.Claim{ProjectID: "p", Cwd: "/home/dev/notes"}, false, map[string]string{}, "/home/dev"},
 	} {
 		p := &part{signal: Logs, msg: &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{
 			Resource: &resourcepb.Resource{Attributes: spoofedCheckout()},
 		}}}}
-		stampCheckout(p, c.ran, c.toolContent)
+		stampCheckout(p, c.ran, c.toolContent, c.home)
 		res := p.msg.(*logspb.LogsData).ResourceLogs[0].Resource.Attributes
 		for _, key := range slices.Concat(checkoutSafeKeys, checkoutContentKeys) {
 			if got := attr(res, key); got != c.want[key] {
