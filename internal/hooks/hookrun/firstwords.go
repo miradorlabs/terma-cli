@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	secretOptions = []string{"-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "--oauth2-bearer"}
+	secretOptions = []string{"-u", "--user", "-U", "--proxy-user", "-H", "--header", "--proxy-header", "-p", "--password", "-b", "--cookie", "-d", "--data", "--data-ascii", "--data-raw", "--data-binary", "--data-urlencode", "--json", "--oauth2-bearer"}
 	secretNames   = []string{"pass", "token", "secret", "key", "auth"}
 	userinfo      = regexp.MustCompile(`://[^/\s]+@`)
 )
@@ -72,12 +72,6 @@ func maskWords(command string, depth int) string {
 func shellFields(command string, n int) (raw, bare []string) {
 	var buf strings.Builder
 	start, quote, ansiC, ansiNul, dollar, escaped := -1, rune(0), false, false, false, false
-	flush := func() {
-		if dollar {
-			buf.WriteByte('$')
-			dollar = false
-		}
-	}
 	for i := 0; i < len(command); {
 		r, w := utf8.DecodeRuneInString(command[i:])
 		switch {
@@ -103,7 +97,10 @@ func shellFields(command string, n int) (raw, bare []string) {
 		case dollar && (r == '\'' || r == '"'):
 			dollar, quote, ansiC, ansiNul = false, r, r == '\'', false
 		default:
-			flush()
+			if dollar {
+				buf.WriteByte('$')
+				dollar = false
+			}
 			switch {
 			case r == '\\' && quote != '\'':
 				escaped = true
@@ -134,7 +131,10 @@ func shellFields(command string, n int) (raw, bare []string) {
 		}
 		i += w
 	}
-	if flush(); start >= 0 {
+	if dollar {
+		buf.WriteByte('$')
+	}
+	if start >= 0 {
 		raw, bare = append(raw, command[start:]), append(bare, buf.String())
 	}
 	return raw, bare

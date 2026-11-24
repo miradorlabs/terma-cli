@@ -13,13 +13,13 @@ import (
 // (O_DIRECTORY returns ENOTDIR immediately for non-directories, including FIFOs).
 func openDirNoBlock(dir string) (*os.File, error) {
 	for {
-		fd, err := syscall.Open(dir, syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_CLOEXEC, 0)
-		if errors.Is(err, syscall.EINTR) {
+		if fd, err := syscall.Open(dir, syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_CLOEXEC, 0); errors.Is(err, syscall.EINTR) {
 			continue
 		} else if err != nil {
 			return nil, err
+		} else {
+			return os.NewFile(uintptr(fd), dir), nil
 		}
-		return os.NewFile(uintptr(fd), dir), nil
 	}
 }
 

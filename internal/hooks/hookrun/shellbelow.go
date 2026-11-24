@@ -23,15 +23,15 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 		return "", false
 	}
 	if gd, ok := sc.lookup("GIT_DIR"); ok && gd != "" {
-		wt, _ := sc.lookup("GIT_WORK_TREE")
 		base := cmp.Or(sc.dir, sc.cwd)
 		absGD, ok1 := sc.resolveTarget(base, gd, 1)
-		absWT, ok2 := sc.resolveTarget(base, cmp.Or(wt, dir), 1)
-		if !ok1 || !ok2 || sc.hasRemoteLink(absGD) || sc.hasRemoteLink(absWT) {
-			return "", false
+		if wt, okWT := sc.lookup("GIT_WORK_TREE"); ok1 && !sc.hasRemoteLink(absGD) && okWT && wt != "" {
+			if absWT, ok2 := sc.resolveTarget(base, wt, 1); ok2 && !sc.hasRemoteLink(absWT) {
+				info, err := os.Stat(absGD)
+				return absWT, err == nil && info.IsDir()
+			}
 		}
-		info, err := os.Stat(absGD)
-		return absWT, err == nil && info.IsDir()
+		return "", false
 	}
 	if wt, ok := sc.lookup("GIT_WORK_TREE"); ok && wt != "" {
 		return "", false
@@ -45,8 +45,7 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 				return sc.locateGitdirFile(dotGit, cur)
 			}
 			return "", false
-		}
-		if cur == filepath.Dir(cur) {
+		} else if cur == filepath.Dir(cur) {
 			break
 		}
 	}

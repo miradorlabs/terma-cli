@@ -68,7 +68,14 @@ func parsable(src string) bool {
 				bodies, docs = docs, nil
 				read()
 			}
-			for len(bodies) > 0 && i < len(src) && delimiterLine(src[i+1:lineEnd(src, i+1)], bodies[0]) {
+			for len(bodies) > 0 && i < len(src) {
+				line := src[i+1 : lineEnd(src, i+1)]
+				if bodies[0].stripTabs {
+					line = strings.TrimLeft(line, "\t")
+				}
+				if strings.TrimRight(line, "\r") != bodies[0].delim {
+					break
+				}
 				i, open = lineEnd(src, i+1), slices.Delete(open, body, body+1)
 				if bodies = bodies[1:]; len(bodies) > 0 {
 					read()
@@ -187,10 +194,4 @@ func lineEnd(src string, i int) int {
 		return i + j
 	}
 	return len(src)
-}
-func delimiterLine(line string, h heredoc) bool {
-	if h.stripTabs {
-		line = strings.TrimLeft(line, "\t")
-	}
-	return strings.TrimRight(line, "\r") == h.delim
 }

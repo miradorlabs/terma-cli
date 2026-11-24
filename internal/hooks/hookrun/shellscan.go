@@ -182,8 +182,7 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 	for i := 0; i < len(parts) && rem >= 0; i++ {
 		if pe, ok := parts[i].(*syntax.ParamExp); ok {
 			v := sc.paramValue(pe)
-			if pe.Repl != nil && pe.Repl.All && len(v) > rem {
-				sc.fail()
+			if (pe.Exp != nil && pe.Exp.Op == syntax.OtherParamOps || pe.Repl != nil && pe.Repl.All && len(v) > rem) && sc.fail() {
 				return -1
 			}
 			if rem = sc.consumeFields(v, ifs, rem); rem >= 0 && pe.Exp != nil && pe.Exp.Word != nil {
@@ -192,8 +191,7 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 			if rem >= 0 && pe.Repl != nil && pe.Repl.With != nil {
 				before := rem
 				if rem = sc.checkPartsFields(pe.Repl.With.Parts, ifs, rem, true); rem >= 0 && pe.Repl.All && len(v) > 0 {
-					if per := 1 + (before - rem); len(v) > rem/per {
-						sc.fail()
+					if per := 1 + (before - rem); len(v) > rem/per && sc.fail() {
 						return -1
 					}
 					rem -= len(v) * (1 + before - rem)
@@ -238,11 +236,10 @@ func (sc *scan) fields(w *syntax.Word) ([]string, error) {
 		if ifs := sc.ifs(); err != nil || !sc.charge(sc.size(b)) || ifs != "" && sc.checkPartsFields(b.Parts, ifs, maxShellWords-len(out), false) < 0 {
 			return nil, errOpaque
 		}
-		if f, err := expand.Fields(sc.cfg, b); err != nil {
-			return nil, err
-		} else if out = append(out, f...); len(out) > maxShellWords {
-			sc.fail()
+		if f, err := expand.Fields(sc.cfg, b); err != nil || len(out)+len(f) > maxShellWords && sc.fail() {
 			return nil, errOpaque
+		} else {
+			out = append(out, f...)
 		}
 	}
 	return out, nil
@@ -255,15 +252,13 @@ func (sc *scan) braces(w *syntax.Word) iter.Seq2[*syntax.Word, error] {
 				n += strings.Count(lit.Value, "{")
 			}
 		}
-		if braced := *w; n > maxShellBraces {
-			sc.fail()
+		if braced := *w; n > maxShellBraces && sc.fail() {
 			yield(nil, errOpaque)
 		} else if n == 0 || !syntax.SplitBraces(&braced) {
 			yield(w, nil)
 		} else {
 			for b, err := range expand.BracesSeq(sc.cfg, &braced) {
-				if err != nil || !sc.spend(1) {
-					sc.fail()
+				if (err != nil || !sc.spend(1)) && sc.fail() {
 					b, err = nil, errOpaque
 				}
 				if !yield(b, err) || err != nil {

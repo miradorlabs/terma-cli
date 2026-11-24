@@ -238,7 +238,7 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 	}
 	env := func(k string) (string, bool) {
 		switch k {
-		case "HOME":
+		case "HOME", "USERPROFILE":
 			return parent, true
 		case "GOPATH":
 			return filepath.Join(parent, "go"), true
@@ -269,6 +269,7 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 		"dirname /foo":                  string(filepath.Separator),
 		"dirname foo":                   ".",
 		"basename /a/b/c":               "c",
+		`basename ""`:                   "",
 		"realpath .":                    side,
 		"readlink -f .":                 side,
 		"pwd -P":                        side,
@@ -284,6 +285,11 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 	}
 	if got, err := evalSubst(sc, "mktemp -dt foo.XXX"); err != nil || !strings.HasPrefix(got, os.TempDir()) {
 		t.Errorf("substitute(mktemp -dt) = (%q, %v)", got, err)
+	}
+	scUnresolvedTmp := newScan(side, env, work{deadline: time.Now().Add(time.Minute)})
+	scUnresolvedTmp.vars["TMPDIR"] = nil
+	if got, err := evalSubst(scUnresolvedTmp, "mktemp -d"); err == nil {
+		t.Errorf("substitute(mktemp -d) with unresolved TMPDIR = %q, want error", got)
 	}
 	for _, opaque := range []string{
 		"cat somefile", "mktemp -p /tmp", "mktemp -dp/tmp", "mktemp --tmpdir=/tmp",
@@ -304,7 +310,7 @@ func TestShellSubstKnownOutputs(t *testing.T) {
 			if v, ok := extra[k]; ok {
 				return v, true
 			}
-			if k == "HOME" {
+			if k == "HOME" || k == "USERPROFILE" {
 				return parent, true
 			}
 			return "", false
@@ -905,7 +911,7 @@ func TestScanBoundsAndSafety(t *testing.T) {
 		}
 	}
 
-	// Nested shell commands in firstWords recursively mask secrets while still masking NAME="value with space".
+	// Nested shell commands and curl --data-ascii/--json in firstWords recursively mask secrets while still masking NAME="value with space".
 	for _, tc := range []struct {
 		cmd, leak string
 	}{
@@ -913,6 +919,8 @@ func TestScanBoundsAndSafety(t *testing.T) {
 		{`bash -c 'echo hi; TOKEN=supersecret'`, "supersecret"},
 		{`bash -c 'curl --header "Authorization: Bearer supersecret"'`, "supersecret"},
 		{`sh -c 'bash -c "eval \"curl -u alice:supersecret\""'`, "supersecret"},
+		{`curl --data-ascii supersecret https://example.com`, "supersecret"},
+		{`curl --json '{"token":"supersecret"}' https://example.com`, "supersecret"},
 		{`TOKEN="secret value" cmd`, "secret"},
 	} {
 		if got := firstWords(tc.cmd); strings.Contains(got, tc.leak) {
@@ -921,6 +929,37 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	}
 	if got := firstWords(`TOKEN="secret value" cmd`); got != "TOKEN=… cmd" {
 		t.Errorf(`firstWords(TOKEN="secret value" cmd) = %q, want "TOKEN=… cmd"`, got)
+	}
+
+	// Explicit GIT_DIR without GIT_WORK_TREE fails closed instead of assuming cwd is the worktree.
+	scGDOnly := newScan(wtOnlyRepo, func(k string) (string, bool) {
+		if k == "GIT_DIR" {
+			return customGD, true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	gitBuf.Reset()
+	if err := scGDOnly.substitute(&gitBuf, csGit); err == nil {
+		t.Fatalf("GIT_DIR without GIT_WORK_TREE resolved to %q, want errOpaque", gitBuf.String())
+	}
+
+	// Parameter escape transformation (${V@E}) fails closed before expand.Fields materializes decoded fields.
+	fTransform, err := syntax.NewParser().Parse(strings.NewReader("echo ${V@E}"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	startTr := time.Now()
+	scTr := newScan(dir, func(k string) (string, bool) {
+		if k == "V" {
+			return strings.Repeat(`x\t`, 250000), true
+		}
+		return "", false
+	}, work{deadline: startTr.Add(time.Minute)})
+	if _, err := scTr.fields(fTransform.Stmts[0].Cmd.(*syntax.CallExpr).Args[1]); err == nil || !scTr.unknown {
+		t.Fatalf("${V@E} did not fail closed: err=%v unknown=%v", err, scTr.unknown)
+	}
+	if took := time.Since(startTr); took > 50*time.Millisecond {
+		t.Fatalf("${V@E} took %v, want < 50ms", took)
 	}
 
 	// hasRemoteLink revalidates cwd on every call rather than caching an earlier local check.
@@ -980,7 +1019,7 @@ func TestScanBoundsAndSafety(t *testing.T) {
 		}
 	}
 
-	// hasGoEnv only blocks GOPATH/GOMODCACHE when go/env actually overrides that key.
+	// hasGoEnv only blocks GOPATH/GOMODCACHE when go/env actually overrides that key; on Windows, GOPATH defaults from USERPROFILE.
 	goEnvBenign := filepath.Join(dir, "go-env-benign")
 	goEnvOverride := filepath.Join(dir, "go-env-override")
 	if err := os.WriteFile(goEnvBenign, []byte("GOTOOLCHAIN=auto\n"), 0o600); err != nil {
@@ -991,7 +1030,7 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	}
 	scGoBenign := newScan(dir, func(k string) (string, bool) {
 		switch k {
-		case "HOME":
+		case "HOME", "USERPROFILE":
 			return dir, true
 		case "GOENV":
 			return goEnvBenign, true
@@ -1003,7 +1042,7 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	}
 	scGoOverride := newScan(dir, func(k string) (string, bool) {
 		switch k {
-		case "HOME":
+		case "HOME", "USERPROFILE":
 			return dir, true
 		case "GOENV":
 			return goEnvOverride, true
@@ -1012,6 +1051,23 @@ func TestScanBoundsAndSafety(t *testing.T) {
 	}, work{deadline: time.Now().Add(time.Minute)})
 	if got, ok := gopath(scGoOverride, nil); ok {
 		t.Fatalf("gopath with GOPATH override in go/env = (%q, true), want false", got)
+	}
+	if os.IsPathSeparator('\\') {
+		winProfile := filepath.Join(dir, "win-profile")
+		scWinGP := newScan(dir, func(k string) (string, bool) {
+			switch k {
+			case "HOME":
+				return filepath.Join(dir, "msys-home"), true
+			case "USERPROFILE":
+				return winProfile, true
+			case "GOENV":
+				return "off", true
+			}
+			return "", false
+		}, work{deadline: time.Now().Add(time.Minute)})
+		if got, ok := gopath(scWinGP, nil); !ok || got != filepath.Join(winProfile, "go") {
+			t.Fatalf("windows gopath = (%q, %v), want (%q, true)", got, ok, filepath.Join(winProfile, "go"))
+		}
 	}
 
 	// Remote HOME with ~ or ~/... fails closed (sc.unknown = true) without statting.

@@ -29,10 +29,9 @@ func (sc *scan) candidate(t string, r role) {
 	}
 	c := candidate{t, keyDir, r}
 	res, seen := sc.examined[c]
-	if !seen {
-		if !sc.spend(1) {
-			return
-		}
+	if !seen && !sc.spend(1) {
+		return
+	} else if !seen {
 		res = sc.resolve(t, r, slashed)
 		sc.examined[c] = res
 	}
@@ -44,11 +43,12 @@ func (sc *scan) candidate(t string, r role) {
 	}
 }
 func (sc *scan) resolve(t string, r role, slashed bool) (res cached) {
+	dirs := []string{sc.dir}
+	if sc.cwd != sc.dir {
+		dirs = append(dirs, sc.cwd)
+	}
 	found := false
-	for i, d := range []string{sc.dir, sc.cwd} {
-		if i > 0 && d == sc.dir {
-			break
-		}
+	for i, d := range dirs {
 		if p, info := sc.reach(t, d); p != "" {
 			if found = true; info != nil {
 				if res.named = true; info.IsDir() {
@@ -61,8 +61,8 @@ func (sc *scan) resolve(t string, r role, slashed bool) (res cached) {
 		}
 	}
 	if !found && r.mayCreate(slashed) {
-		for i, d := range []string{sc.dir, sc.cwd} {
-			if p, ok := sc.path(t, d); (i == 0 || d != sc.dir) && ok {
+		for _, d := range dirs {
+			if p, ok := sc.path(t, d); ok {
 				sc.placeParent(p)
 			}
 		}
@@ -84,16 +84,14 @@ func (sc *scan) hasRemoteLinkAt(p string, hops int) bool {
 	for cur := p; ; cur = filepath.Dir(cur) {
 		if chain = append(chain, cur); len(chain) > maxPathComponents {
 			return sc.fail()
-		}
-		if filepath.Dir(cur) == cur {
+		} else if filepath.Dir(cur) == cur {
 			break
 		}
 	}
 	for i := len(chain) - 1; i >= 0; i-- {
 		if !sc.spendStat(1) {
 			return true
-		}
-		if info, err := os.Lstat(chain[i]); err != nil {
+		} else if info, err := os.Lstat(chain[i]); err != nil {
 			return false
 		} else if info.Mode()&fs.ModeSymlink != 0 {
 			if _, bad := sc.resolveLink(chain[i], hops); bad {
@@ -130,21 +128,16 @@ func (sc *scan) resolveLink(p string, hops int) (string, bool) {
 	for ; hops < maxSymlinkHops; hops++ {
 		if !sc.spend(1) {
 			return "", true
-		}
-		raw, err := os.Readlink(cur)
-		if err != nil {
+		} else if raw, err := os.Readlink(cur); err != nil {
 			return cur, false
-		}
-		next, ok := sc.resolveTarget(filepath.Dir(cur), raw, hops+1)
-		if !ok || filepath.Dir(next) != next && sc.hasRemoteLinkAt(filepath.Dir(next), hops+1) {
+		} else if next, ok := sc.resolveTarget(filepath.Dir(cur), raw, hops+1); !ok || filepath.Dir(next) != next && sc.hasRemoteLinkAt(filepath.Dir(next), hops+1) {
 			return "", true
+		} else {
+			cur = next
 		}
-		cur = next
 	}
-	if _, err := os.Readlink(cur); err == nil {
-		return "", sc.fail()
-	}
-	return cur, false
+	_, err := os.Readlink(cur)
+	return cur, err == nil && sc.fail()
 }
 func (sc *scan) reach(w, dir string) (string, os.FileInfo) {
 	p, ok := sc.path(w, dir)
@@ -164,16 +157,16 @@ func (sc *scan) reach(w, dir string) (string, os.FileInfo) {
 			return p, nil
 		} else if resolved, err := filepath.EvalSymlinks(p); err != nil {
 			sc.placeParent(target)
-		} else if remote(resolved, sc.cwd) {
-			sc.fail()
 			return p, nil
-		} else if t, err := os.Stat(resolved); err == nil && t.IsDir() {
+		} else if remote(resolved, sc.cwd) && sc.fail() {
+			return p, nil
+		} else if info, err = os.Stat(resolved); err != nil {
+			sc.place(filepath.Dir(resolved))
+			return p, nil
+		} else if info.IsDir() {
 			sc.place(resolved)
 		} else {
 			sc.place(filepath.Dir(resolved))
-		}
-		if info, err = os.Stat(p); err != nil {
-			return p, nil
 		}
 	default:
 		sc.place(filepath.Dir(p))
@@ -300,13 +293,12 @@ func cutSep(p string) (string, string) {
 	return p, ""
 }
 func shellValue(w string) string {
-	if name, v, ok := strings.Cut(w, "="); ok && (strings.HasPrefix(w, "-") || isName(name)) {
+	switch name, v, ok := strings.Cut(w, "="); {
+	case ok && (strings.HasPrefix(w, "-") || isName(name)):
 		return v
-	}
-	if strings.HasPrefix(w, "-") {
-		if len(w) > 2 && w[1] != '-' {
-			return w[2:]
-		}
+	case len(w) > 2 && w[0] == '-' && w[1] != '-':
+		return w[2:]
+	case strings.HasPrefix(w, "-"):
 		return ""
 	}
 	return w
