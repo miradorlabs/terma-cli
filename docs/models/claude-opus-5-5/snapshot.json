@@ -518,8 +518,8 @@
       "name": "Claude Desktop (Code)",
       "role": "default",
       "first": "4.16336.0",
-      "last": "6.28899.6",
-      "builds": 10,
+      "last": "7.37095.0",
+      "builds": 11,
       "current": true,
       "params": {
         "output_config": {
@@ -624,6 +624,7 @@
               "live_cwd": "<repo>",
               "permission_mode": "auto",
               "platform": "macos",
+              "refused_calls": [],
               "restricted": false,
               "rule_roots": {
                 "cliArg": "<repo>",
@@ -784,6 +785,18 @@
                     "source": "cliArg"
                   },
                   {
+                    "pattern": "/L?brary/Appl?cat?on ?upport/Claude",
+                    "root": "/",
+                    "rule": "Edit(//L?brary/Appl?cat?on ?upport/Claude/**)",
+                    "source": "cliArg"
+                  },
+                  {
+                    "pattern": "/?y?tem/Volume?/Data/L?brary/Appl?cat?on ?upport/Claude",
+                    "root": "/",
+                    "rule": "Edit(//?y?tem/Volume?/Data/L?brary/Appl?cat?on ?upport/Claude/**)",
+                    "source": "cliArg"
+                  },
+                  {
                     "pattern": "/**/ccd-*h.501",
                     "root": "/",
                     "rule": "Edit(//**/ccd-*h.501)",
@@ -799,6 +812,54 @@
                     "pattern": "/**/local-agent-mode-?e???on?",
                     "root": "/",
                     "rule": "Edit(//**/local-agent-mode-?e???on?/**)",
+                    "source": "policySettings"
+                  },
+                  {
+                    "pattern": "/**/Claude-3p/Exten??on? Update Cache",
+                    "root": "/",
+                    "rule": "Edit(//**/Claude-3p/Exten??on? Update Cache/**)",
+                    "source": "policySettings"
+                  },
+                  {
+                    "pattern": "/**/Claude-3p/Claude Exten??on?",
+                    "root": "/",
+                    "rule": "Edit(//**/Claude-3p/Claude Exten??on?/**)",
+                    "source": "policySettings"
+                  },
+                  {
+                    "pattern": "/**/Claude-3p/Claude Exten??on? ?ett?ng?",
+                    "root": "/",
+                    "rule": "Edit(//**/Claude-3p/Claude Exten??on? ?ett?ng?/**)",
+                    "source": "policySettings"
+                  },
+                  {
+                    "pattern": "/**/Claude-3p/download?-under-way",
+                    "root": "/",
+                    "rule": "Edit(//**/Claude-3p/download?-under-way/**)",
+                    "source": "policySettings"
+                  },
+                  {
+                    "pattern": "/**/Claude-3p/dxt-?tag?ng",
+                    "root": "/",
+                    "rule": "Edit(//**/Claude-3p/dxt-?tag?ng/**)",
+                    "source": "policySettings"
+                  },
+                  {
+                    "pattern": "/**/Claude-3p/uv-runt?me",
+                    "root": "/",
+                    "rule": "Edit(//**/Claude-3p/uv-runt?me/**)",
+                    "source": "policySettings"
+                  },
+                  {
+                    "pattern": "/**/Cache?/claude-ho?tloop-plug?n?",
+                    "root": "/",
+                    "rule": "Edit(//**/Cache?/claude-ho?tloop-plug?n?/**)",
+                    "source": "policySettings"
+                  },
+                  {
+                    "pattern": "/**/Claude-3p/?mport-bundle?",
+                    "root": "/",
+                    "rule": "Edit(//**/Claude-3p/?mport-bundle?/**)",
                     "source": "policySettings"
                   }
                 ]
@@ -830,8 +891,8 @@
       "name": "Claude Desktop (Code)",
       "role": "side_request",
       "first": "4.16336.0",
-      "last": "6.28899.6",
-      "builds": 10,
+      "last": "7.37095.0",
+      "builds": 11,
       "current": true
     }
   ]
