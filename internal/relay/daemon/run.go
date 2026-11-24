@@ -198,7 +198,7 @@ func Run(ctx context.Context, c Config) (Result, error) {
 			open.Done()
 		}
 	}
-	srv := &http.Server{Handler: r.Handler(), ConnContext: r.ConnContext, ConnState: track,
+	srv := &http.Server{Handler: accepted.handler(r.Handler()), ConnContext: accepted.connContext(r.ConnContext), ConnState: track,
 		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 2 * time.Minute}
 	served := make(chan error, 1)
 	go func() { served <- srv.Serve(ln) }()
