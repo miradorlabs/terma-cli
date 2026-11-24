@@ -39,7 +39,7 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 		return "", false
 	}
 	cur, err := filepath.Abs(dir)
-	for err == nil && sc.spend(1) {
+	for err == nil && sc.spendStat(1) {
 		dotGit := filepath.Join(cur, ".git")
 		if info, err := os.Lstat(dotGit); err == nil {
 			if info.IsDir() {

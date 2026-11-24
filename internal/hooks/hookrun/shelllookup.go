@@ -79,13 +79,13 @@ func (sc *scan) hasRemoteLink(p string) bool {
 	clean := filepath.Clean(p)
 	if sc.cwd != "" && clean == filepath.Clean(sc.cwd) {
 		if !sc.cwdChecked {
-			sc.cwdChecked, sc.cwdRemote = true, sc.hasRemoteLinkAt(clean, 0, 0)
+			sc.cwdChecked, sc.cwdRemote = true, sc.hasRemoteLinkAt(clean, 0)
 		}
 		return sc.cwdRemote
 	}
-	return sc.hasRemoteLinkAt(clean, 0, 1)
+	return sc.hasRemoteLinkAt(clean, 0)
 }
-func (sc *scan) hasRemoteLinkAt(p string, hops, cost int) bool {
+func (sc *scan) hasRemoteLinkAt(p string, hops int) bool {
 	if remote(p, sc.cwd) || len(p) > maxPathBytes {
 		sc.unknown = true
 		return true
@@ -101,7 +101,7 @@ func (sc *scan) hasRemoteLinkAt(p string, hops, cost int) bool {
 		}
 	}
 	for i := len(chain) - 1; i >= 0; i-- {
-		if !sc.spend(cost) {
+		if !sc.spendStat(1) {
 			return true
 		}
 		if info, err := os.Lstat(chain[i]); err != nil {
@@ -148,7 +148,7 @@ func (sc *scan) resolveLink(p string, hops int) (string, bool) {
 		if !ok {
 			return "", true
 		}
-		if cur, hops = next, hops+1; filepath.Dir(cur) != cur && sc.hasRemoteLinkAt(filepath.Dir(cur), hops, 1) {
+		if cur, hops = next, hops+1; filepath.Dir(cur) != cur && sc.hasRemoteLinkAt(filepath.Dir(cur), hops) {
 			return "", true
 		}
 	}
@@ -240,8 +240,7 @@ func (sc *scan) path(w, dir string) (string, bool) {
 	return sc.resolveTarget(base, rel, 0)
 }
 func hasDotDot(p string) bool {
-	return p == ".." || strings.HasPrefix(p, "../") || strings.Contains(p, "/..") ||
-		os.IsPathSeparator('\\') && (strings.HasPrefix(p, `..\`) || strings.Contains(p, `\..`))
+	return p == ".." || strings.HasPrefix(p, "../") || strings.Contains(p, "/..") || os.IsPathSeparator('\\') && (strings.HasPrefix(p, `..\`) || strings.Contains(p, `\..`))
 }
 
 // cleanSafeAt resolves symlinks and checks remote shares before collapsing any ".." segment.
@@ -259,7 +258,7 @@ func (sc *scan) cleanSafeAt(base, rel string, hops int) (string, bool) {
 			cur = filepath.Join(cur, part)
 			continue
 		}
-		if sc.hasRemoteLinkAt(cur, hops, 1) || !sc.spend(1) {
+		if sc.hasRemoteLinkAt(cur, hops) || !sc.spend(1) {
 			return "", false
 		}
 		if info, err := os.Lstat(cur); err == nil && info.Mode()&fs.ModeSymlink != 0 {

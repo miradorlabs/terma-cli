@@ -13,16 +13,13 @@ import (
 
 // Bounds on a shell reach scan (maxShellTime is overridden to 1s in tests).
 const (
-	shellTime, maxShellPlaces, maxShellLookups, maxShellWords = 20 * time.Millisecond, 256, 4096, 16384
-	maxShellBytes, maxShellDepth, maxShellBraces              = 1 << 20, 4, 16
-	maxGlobSegments, substitutionSize                         = 3, 4096
-	UnknownReach                                              = "\x00unknown" // NUL-prefixed so it cannot collide with a path
+	shellTime, maxShellPlaces, maxShellLookups, maxShellWords     = 20 * time.Millisecond, 256, 4096, 16384
+	maxShellBytes, maxShellDepth, maxShellBraces, maxGlobSegments = 1 << 20, 4, 16, 3
+	substitutionSize, maxShellStats                               = 4096, 32768
+	UnknownReach                                                  = "\x00unknown" // NUL-prefixed so it cannot collide with a path
 )
 
-var (
-	maxShellTime = shellTime
-	errOpaque    = errors.New("an expansion ShellPaths cannot resolve")
-)
+var maxShellTime, errOpaque = shellTime, errors.New("an expansion ShellPaths cannot resolve")
 
 func unknownReach(command string) string { return UnknownReach + "\x00" + firstWords(command) }
 func isUnknownReach(p string) bool       { return strings.HasPrefix(p, UnknownReach) }
@@ -65,8 +62,8 @@ type scan struct {
 	work
 }
 type work struct {
-	lookups, bytes, words int
-	deadline              time.Time
+	lookups, stats, bytes, words int
+	deadline                     time.Time
 }
 type candidate struct {
 	word, dir string
@@ -136,9 +133,11 @@ func (sc *scan) budget(counter *int, n, limit int) bool {
 	*counter += n
 	return true
 }
-func (sc *scan) spend(n int) bool  { return sc.budget(&sc.lookups, n, maxShellLookups) }
-func (sc *scan) charge(n int) bool { return sc.budget(&sc.bytes, n, maxShellBytes) }
-func (sc *scan) size(w *syntax.Word) int {
+func (sc *scan) spend(n int) bool        { return sc.budget(&sc.lookups, n, maxShellLookups) }
+func (sc *scan) spendStat(n int) bool    { return sc.budget(&sc.stats, n, maxShellStats) }
+func (sc *scan) charge(n int) bool       { return sc.budget(&sc.bytes, n, maxShellBytes) }
+func (sc *scan) size(w *syntax.Word) int { return sc.sizeIn(w, false) }
+func (sc *scan) sizeIn(w *syntax.Word, opaqueSubst bool) int {
 	n := 0
 	syntax.Walk(w, func(node syntax.Node) bool {
 		switch x := node.(type) {
@@ -147,10 +146,13 @@ func (sc *scan) size(w *syntax.Word) int {
 		case *syntax.SglQuoted:
 			n += len(x.Value)
 		case *syntax.ParamExp:
-			n += sc.paramSize(x)
+			n += sc.paramSize(x, opaqueSubst)
 			return false
 		case *syntax.CmdSubst, *syntax.ProcSubst, *syntax.ArithmExp:
 			n += substitutionSize
+			if _, arith := x.(*syntax.ArithmExp); !arith && opaqueSubst {
+				n = maxShellBytes + 1
+			}
 			return false
 		}
 		return n <= maxShellBytes
@@ -167,18 +169,18 @@ func (sc *scan) paramValue(pe *syntax.ParamExp) string {
 	}
 	return v
 }
-func (sc *scan) paramSize(pe *syntax.ParamExp) int {
+func (sc *scan) paramSize(pe *syntax.ParamExp, opaqueSubst bool) int {
 	n := len(sc.paramValue(pe))
 	if pe.Repl != nil && pe.Repl.With != nil {
 		base := max(n, 1)
-		if with := sc.size(pe.Repl.With); with >= (maxShellBytes+1)/base {
+		if with := sc.sizeIn(pe.Repl.With, opaqueSubst || pe.Repl.All && n > 0); with >= (maxShellBytes+1)/base {
 			n = maxShellBytes + 1
 		} else {
 			n = base * (1 + with)
 		}
 	}
 	if pe.Exp != nil && pe.Exp.Word != nil {
-		n += sc.size(pe.Exp.Word)
+		n += sc.sizeIn(pe.Exp.Word, opaqueSubst)
 	}
 	return min(n, maxShellBytes+1)
 }
@@ -190,7 +192,7 @@ func (sc *scan) ifs() string {
 }
 func (sc *scan) fieldsBounded(w *syntax.Word, limit int) bool {
 	ifs := sc.ifs()
-	return ifs == "" || sc.checkPartsFields(w.Parts, ifs, limit, false, false) >= 0
+	return ifs == "" || sc.checkPartsFields(w.Parts, ifs, limit, false) >= 0
 }
 func (sc *scan) chargeFields(v string) bool {
 	if ifs := sc.ifs(); ifs != "" {
@@ -198,7 +200,7 @@ func (sc *scan) chargeFields(v string) bool {
 	}
 	return true
 }
-func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, inParam, noSubst bool) int {
+func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, inParam bool) int {
 	for i := 0; i < len(parts) && rem >= 0; i++ {
 		if pe, ok := parts[i].(*syntax.ParamExp); ok {
 			v := sc.paramValue(pe)
@@ -207,11 +209,11 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 				return -1
 			}
 			if rem = sc.consumeFields(v, ifs, rem); rem >= 0 && pe.Exp != nil && pe.Exp.Word != nil {
-				rem = sc.checkPartsFields(pe.Exp.Word.Parts, ifs, rem, true, noSubst)
+				rem = sc.checkPartsFields(pe.Exp.Word.Parts, ifs, rem, true)
 			}
 			if rem >= 0 && pe.Repl != nil && pe.Repl.With != nil {
 				before := rem
-				if rem = sc.checkPartsFields(pe.Repl.With.Parts, ifs, rem, true, noSubst || pe.Repl.All && len(v) > 1); rem >= 0 && pe.Repl.All && len(v) > 0 {
+				if rem = sc.checkPartsFields(pe.Repl.With.Parts, ifs, rem, true); rem >= 0 && pe.Repl.All && len(v) > 0 {
 					if per := 1 + (before - rem); len(v) > rem/per {
 						sc.unknown = true
 						return -1
@@ -223,16 +225,11 @@ func (sc *scan) checkPartsFields(parts []syntax.WordPart, ifs string, rem int, i
 		} else if inParam {
 			switch p := parts[i].(type) {
 			case *syntax.DblQuoted:
-				rem = sc.checkPartsFields(p.Parts, ifs, rem, true, noSubst)
+				rem = sc.checkPartsFields(p.Parts, ifs, rem, true)
 			case *syntax.Lit:
 				rem = sc.consumeFields(p.Value, ifs, rem)
 			case *syntax.SglQuoted:
 				rem = sc.consumeFields(p.Value, ifs, rem)
-			case *syntax.CmdSubst:
-				if noSubst {
-					sc.unknown = true
-					return -1
-				}
 			}
 		}
 	}
