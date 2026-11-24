@@ -26,8 +26,6 @@ type grokHookInput struct {
 	ToolUseID string `json:"tool_use_id"`
 	ToolInput struct {
 		FilePath string `json:"file_path"`
-		// Background is spawn_subagent's: whether the subagent runs while the parent goes on.
-		Background json.RawMessage `json:"background"`
 	} `json:"tool_input"`
 	// ToolResponse is the tool's result; only its type, whether it applied an edit, and the
 	// subagent fields subagent.go names are read.

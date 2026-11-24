@@ -2,6 +2,8 @@ package grok_test
 
 import (
 	"encoding/json"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
@@ -24,11 +26,11 @@ const (
 	subagentsFixture = "headless_subagents_foreground_awaited_killed"
 )
 
-// subagentRecord is what a test expects of one terma.subagent.call or terma.subagent.end: a
-// zero duration means none, and an empty kind or call id means the attribute is absent.
+// subagentRecord is what a test expects of one terma.subagent.call or terma.subagent.end: an
+// empty kind, call id or duration means the attribute is absent. The duration is the number as
+// text, so a record that carries a zero is told from one that carries none.
 type subagentRecord struct {
-	agent, kind, call, status string
-	durationMs                float64
+	agent, kind, call, status, durationMs string
 }
 
 func subagentRecords(t *testing.T, sp *spool.Spool) (calls, ends []subagentRecord) {
@@ -51,7 +53,7 @@ func subagentRecords(t *testing.T, sp *spool.Spool) (calls, ends []subagentRecor
 			r := subagentRecord{status: str(e.Attrs[semconv.TermaOperationStatusKey]), agent: str(e.Attrs[semconv.TermaAgentIDKey]),
 				kind: str(e.Attrs[semconv.GenAIAgentNameKey]), call: str(e.Attrs[semconv.GenAIToolCallIDKey])}
 			if d, ok := e.Attrs[semconv.TermaOperationDurationMsKey]; ok {
-				r.durationMs = hookruntest.Num(d)
+				r.durationMs = strconv.FormatFloat(hookruntest.Num(d), 'f', -1, 64)
 			}
 			out = append(out, r)
 		}
@@ -75,10 +77,10 @@ func sameRecords(t *testing.T, what string, got, want []subagentRecord) {
 }
 
 var (
-	foregroundCallRecord = subagentRecord{agent: foregroundChild, kind: "general-purpose", call: foregroundCall, status: "completed", durationMs: 3004}
+	foregroundCallRecord = subagentRecord{agent: foregroundChild, kind: "general-purpose", call: foregroundCall, status: "completed", durationMs: "3004"}
 	awaitedCallRecord    = subagentRecord{agent: awaitedChild, call: awaitedCall, status: "async_launched"}
 	killedCallRecord     = subagentRecord{agent: killedChild, call: killedCall, status: "async_launched"}
-	awaitedEndRecord     = subagentRecord{agent: awaitedChild, status: "completed", durationMs: 4080}
+	awaitedEndRecord     = subagentRecord{agent: awaitedChild, status: "completed", durationMs: "4080"}
 	killedEndRecord      = subagentRecord{agent: killedChild, status: "aborted"}
 )
 
@@ -163,19 +165,59 @@ func TestSubagentToolResultsSendOnlyWhatTheySay(t *testing.T) {
 			calls: []subagentRecord{foregroundCallRecord, killedCallRecord},
 			ends:  []subagentRecord{awaitedEndRecord, killedEndRecord},
 		},
-		"background text naming two": {
-			edit:  editTool("spawn_subagent", withText("subagent_id: "+awaitedChild+"\nsubagent_id: "+killedChild)),
+		// Only grok's own two lines are read: an id anywhere else in the text, the description
+		// the model wrote included, names nobody.
+		"text naming a subagent but not opening with grok's line": {
+			edit:  editTool("spawn_subagent", withText("Done.\nsubagent_id: "+awaitedChild)),
 			calls: []subagentRecord{foregroundCallRecord, killedCallRecord},
 			ends:  []subagentRecord{awaitedEndRecord, killedEndRecord},
 		},
-		"text from a foreground call": {
+		"a description naming another subagent": {
+			edit: editTool("spawn_subagent", withText("Subagent started in background.\nsubagent_id: "+awaitedChild+
+				"\ndescription: two lines\nsubagent_id: "+killedChild)),
+			calls: []subagentRecord{foregroundCallRecord, awaitedCallRecord, killedCallRecord},
+			ends:  []subagentRecord{awaitedEndRecord, killedEndRecord},
+		},
+		"an id of another shape": {
+			edit:  editTool("spawn_subagent", withText("Subagent started in background.\nsubagent_id: secret words\ndescription: x")),
+			calls: []subagentRecord{foregroundCallRecord, killedCallRecord},
+			ends:  []subagentRecord{awaitedEndRecord, killedEndRecord},
+		},
+		// The text alone says a launch went to the background: the input's flag is not read.
+		"a background launch whose input does not say so": {
 			edit: editTool("spawn_subagent", func(m map[string]any) {
-				if in, _ := m["tool_input"].(map[string]any); in["background"] == true {
-					in["background"] = false
+				if in, _ := m["tool_input"].(map[string]any); in != nil {
+					delete(in, "background")
 				}
 			}),
-			calls: []subagentRecord{foregroundCallRecord},
+			calls: []subagentRecord{foregroundCallRecord, awaitedCallRecord, killedCallRecord},
 			ends:  []subagentRecord{awaitedEndRecord, killedEndRecord},
+		},
+		// The launch hook alone makes a subagent known: here its SubagentStart names nobody.
+		"a wait on a subagent only its launch hook named": {
+			edit: func(event string, payload []byte) []byte {
+				if event != "subagent_start" || !strings.Contains(string(payload), awaitedChild) {
+					return payload
+				}
+				return []byte(strings.ReplaceAll(string(payload), awaitedChild, ""))
+			},
+			calls: []subagentRecord{foregroundCallRecord, awaitedCallRecord, killedCallRecord},
+			ends:  []subagentRecord{awaitedEndRecord, killedEndRecord},
+		},
+		// completed with an exit code that is not zero, or with none, is not taken for a success.
+		"a wait on a run that completed with a failing exit code": {
+			edit: editTool("get_command_or_subagent_output", func(m map[string]any) {
+				setResponse(m, `{"type":"TaskOutput","Result":{"task_id":"`+awaitedChild+`","status":"completed","exit_code":1,"duration_secs":4.08}}`)
+			}),
+			calls: []subagentRecord{foregroundCallRecord, awaitedCallRecord, killedCallRecord},
+			ends:  []subagentRecord{killedEndRecord},
+		},
+		"a wait on a run that completed with no exit code": {
+			edit: editTool("get_command_or_subagent_output", func(m map[string]any) {
+				setResponse(m, `{"type":"TaskOutput","Result":{"task_id":"`+awaitedChild+`","status":"completed","duration_secs":4.08}}`)
+			}),
+			calls: []subagentRecord{foregroundCallRecord, awaitedCallRecord, killedCallRecord},
+			ends:  []subagentRecord{killedEndRecord},
 		},
 		"a child's own launch": {
 			edit: editTool("spawn_subagent", func(m map[string]any) {
@@ -217,8 +259,8 @@ func TestSubagentToolResultsSendOnlyWhatTheySay(t *testing.T) {
 		},
 		"a wait on several": {
 			edit: editTool("get_command_or_subagent_output", func(m map[string]any) {
-				setResponse(m, `{"type":"TaskOutput","Result":[{"task_id":"`+awaitedChild+`","status":"completed","duration_secs":4.08},`+
-					`{"task_id":"`+foregroundChild+`","status":"completed"},{"task_id":"97460317-abd9-43f1-9c4a-9a96e412bf07","status":"completed"}]}`)
+				setResponse(m, `{"type":"TaskOutput","Result":[{"task_id":"`+awaitedChild+`","status":"completed","exit_code":0,"duration_secs":4.08},`+
+					`{"task_id":"`+foregroundChild+`","status":"completed","exit_code":0},{"task_id":"97460317-abd9-43f1-9c4a-9a96e412bf07","status":"completed","exit_code":0}]}`)
 			}),
 			calls: []subagentRecord{foregroundCallRecord, awaitedCallRecord, killedCallRecord},
 			ends:  []subagentRecord{awaitedEndRecord, {agent: foregroundChild, status: "completed"}, killedEndRecord},

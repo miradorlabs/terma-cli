@@ -1,6 +1,7 @@
 package hookrun_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -8,8 +9,39 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
+
+// A record that names an agent claims the agent's id for the relay too, for an agent whose
+// telemetry uses that id as its session. EmitForSession does not: there the agent is a session
+// of its own, whose claim, with its parent and its checkout, another hook wrote. Both claim
+// the record's session.
+func TestEmitForSessionLeavesTheAgentsClaimAlone(t *testing.T) {
+	root, stateDir, sp := hookruntest.Project(t)
+	hookruntest.RelayOn(t, stateDir)
+	now := time.Now()
+	env := hookrun.Env{StateDir: stateDir, Now: now, Cwd: root, Spool: sp, Team: hookruntest.Team, Policy: hookruntest.Admitting(root), Account: hookruntest.Account}
+	r, err := env.Repo(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	about := func(session, agent string) spool.Event {
+		return spool.Event{Name: semconv.TermaSubagentCallEvent, SessionID: session,
+			Attrs: map[string]any{semconv.GenAIMainAgentNameKey: "someagent", semconv.TermaAgentIDKey: agent}}
+	}
+	env.EmitForSession(r, about("parent-a", "child-a"))
+	env.EmitFor(r, about("parent-b", "child-b"))
+	for id, want := range map[string]bool{"parent-a": true, "child-a": false, "parent-b": true, "child-b": true} {
+		if _, ok := claim.Read(stateDir, id, now); ok != want {
+			t.Errorf("claim for %s: %v, want %v", id, ok, want)
+		}
+	}
+	if got := len(hookruntest.Named(hookruntest.Spooled(t, sp), semconv.TermaSubagentCallEvent)); got != 2 {
+		t.Errorf("%d records spooled, want 2", got)
+	}
+}
 
 // A launch is one marker per (session, agent), {}\n, under the agent's state directory; it
 // proves that session's launch alone, ages out like the spool, and a hook with no spool

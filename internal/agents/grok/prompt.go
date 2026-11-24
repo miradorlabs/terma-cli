@@ -12,8 +12,9 @@ import (
 // promptMaxBytes bounds a prompt's text, as a reply's is.
 const promptMaxBytes = 16 << 10
 
-// promptID is the id grok gives a prompt someone wrote, a person or a parent agent: a UUID.
-var promptID = regexp.MustCompile(`^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$`)
+// uuidShape is the shape of the ids grok mints: a session's, a subagent's being its session's,
+// and the id of a prompt someone wrote, a person or a parent agent.
+var uuidShape = regexp.MustCompile(`^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$`)
 
 // userPromptSubmit claims the session and spools the prompt as terma.user.message: grok's
 // export loses a headless run's prompt when it beats the export's start, and this hook always
@@ -34,7 +35,7 @@ func userPromptSubmit(ctx context.Context, env hookrun.Env) error {
 	}
 	// With no id the message could not be told from another, and an id of another shape is a
 	// turn grok started itself; dispatch still claims the session.
-	if !promptID.MatchString(in.PromptID) {
+	if !uuidShape.MatchString(in.PromptID) {
 		return nil
 	}
 	r, ok := env.Open(ctx, in.SessionID, in.Cwd)

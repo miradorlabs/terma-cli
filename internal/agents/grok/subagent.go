@@ -90,15 +90,18 @@ func subagentTool(ctx context.Context, env hookrun.Env, in *grokHookInput) {
 	if launched != "" {
 		env.RememberSubagent(subagentDir, in.SessionID, launched)
 	}
+	// The child is a session of its own, claimed with its parent and its checkout by
+	// SubagentStart: these records, sent from the parent's checkout, must not rewrite that.
 	for _, ev := range events {
-		env.EmitFor(r, ev)
+		env.EmitForSession(r, ev)
 	}
 }
 
 // spawnResult is spawn_subagent's result as far as terma reads it: a foreground run's
 // {"type":"SubagentCompleted","subagent_id":…,"subagent_type":…,"duration_ms":…}, or a
-// background launch's {"type":"Text","text":…}, whose text names the child on a line of its
-// own. The output and description have no field, so they are never decoded.
+// background launch's {"type":"Text","text":…}, whose text opens with grok's own line and
+// names the child on the next (launchedInBackground). A foreground run's output has no field,
+// so it is never decoded.
 type spawnResult struct {
 	Type         string          `json:"type"`
 	SubagentID   string          `json:"subagent_id"`
@@ -120,14 +123,11 @@ func subagentCall(env hookrun.Env, in *grokHookInput) (ev spool.Event, child str
 	switch {
 	case res.Type == "SubagentCompleted":
 		status = "completed"
-	case res.Type == "Text" && background(in.ToolInput.Background):
-		status, child = "async_launched", textSubagentID(res.Text)
-		if child == "" {
-			env.Logf("%s background result names no subagent", in.ToolName)
-			return spool.Event{}, "", false
-		}
+	case res.Type == "Text":
+		status, child = "async_launched", launchedInBackground(res.Text)
 	}
-	if !session.ValidID(child) || child == in.SessionID {
+	// A subagent's id is its session's, a UUID: nothing of another shape is taken for one.
+	if !uuidShape.MatchString(child) || child == in.SessionID {
 		env.Logf("%s result names no subagent", in.ToolName)
 		return spool.Event{}, "", false
 	}
@@ -146,23 +146,18 @@ func subagentCall(env hookrun.Env, in *grokHookInput) (ev spool.Event, child str
 	return spool.Event{Name: semconv.TermaSubagentCallEvent, SessionID: in.SessionID, Attrs: attrs}, child, true
 }
 
-// background reports whether spawn_subagent's background argument is true.
-func background(raw json.RawMessage) bool { return string(bytes.TrimSpace(raw)) == "true" }
+// backgroundLaunch opens the text of a background launch's result: grok's own line, then the
+// child on the next. The description after them is the model's and is never read.
+const backgroundLaunch = "Subagent started in background.\nsubagent_id: "
 
-// textSubagentID is the child a background launch's text names, on the one line
-// "subagent_id: <id>"; "" when no line, or more than one, does.
-func textSubagentID(text string) string {
-	var id string
-	for line := range strings.SplitSeq(text, "\n") {
-		v, ok := strings.CutPrefix(line, "subagent_id: ")
-		if !ok {
-			continue
-		}
-		if id != "" || !session.ValidID(v) {
-			return ""
-		}
-		id = v
+// launchedInBackground is the child a background launch's text names in its second line; ""
+// when the text does not open with grok's two lines.
+func launchedInBackground(text string) string {
+	rest, ok := strings.CutPrefix(text, backgroundLaunch)
+	if !ok {
+		return ""
 	}
+	id, _, _ := strings.Cut(rest, "\n")
 	return id
 }
 
@@ -171,6 +166,7 @@ func textSubagentID(text string) string {
 type taskResult struct {
 	TaskID       string          `json:"task_id"`
 	Status       string          `json:"status"`
+	ExitCode     json.RawMessage `json:"exit_code"`
 	DurationSecs json.RawMessage `json:"duration_secs"`
 	Outcome      string          `json:"outcome"`
 }
@@ -178,9 +174,10 @@ type taskResult struct {
 // subagentEnds are the terma.subagent.end records a wait on or a kill of tasks reports, one
 // for each task terma saw this session launch as a subagent: a wait's
 // {"type":"TaskOutput","Result":{…}} (or, not yet seen, a list of them) whose status is
-// completed, and a kill's {"type":"KillTask","Result":{…}} whose outcome is killed, which
-// ends it aborted. No other status is read: grok's words for a failure have not been seen. The
-// record names no tool call: this one did not launch the subagent.
+// completed and whose exit code is zero, and a kill's {"type":"KillTask","Result":{…}} whose
+// outcome is killed, which ends it aborted. No other status is read: grok's words for a
+// failure have not been seen. The record names no tool call: this one did not launch the
+// subagent.
 func subagentEnds(env hookrun.Env, in *grokHookInput, want string) []spool.Event {
 	var out struct {
 		Type   string          `json:"type"`
@@ -205,7 +202,7 @@ func subagentEnds(env hookrun.Env, in *grokHookInput, want string) []spool.Event
 		}
 		var status string
 		switch {
-		case want == "TaskOutput" && task.Status == "completed":
+		case want == "TaskOutput" && task.Status == "completed" && exitedZero(task.ExitCode):
 			status = "completed"
 		case want == "KillTask" && task.Outcome == "killed":
 			status = "aborted"
@@ -226,4 +223,12 @@ func subagentEnds(env hookrun.Env, in *grokHookInput, want string) []spool.Event
 		events = append(events, spool.Event{Name: semconv.TermaSubagentEndEvent, SessionID: in.SessionID, Attrs: attrs})
 	}
 	return events
+}
+
+// exitedZero reports whether a finished task's exit code is there and zero, as a subagent
+// that completed was seen to report; a completed task with any other code, or none, is not
+// taken for a success.
+func exitedZero(raw json.RawMessage) bool {
+	code, _, ok := hookrun.JSONNumber(raw, true)
+	return ok && code == 0
 }
