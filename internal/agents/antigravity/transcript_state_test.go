@@ -129,7 +129,7 @@ func (g *transcriptRig) readCut(n int) {
 	if err != nil {
 		g.t.Fatal(err)
 	}
-	conv := openAntigravityConversation(context.Background(), env, r, &antigravityHookInput{ConversationID: g.id, TranscriptPath: g.transcript}, nil)
+	conv := openAntigravityConversation(context.Background(), env, r, &antigravityHookInput{ConversationID: g.id, TranscriptPath: g.transcript})
 	defer conv.close()
 	conv.read(&doneAfter{Context: context.Background(), n: n})
 }

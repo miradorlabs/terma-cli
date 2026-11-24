@@ -100,7 +100,7 @@ var antigravityKept = map[string]bool{"USER_INPUT": true, "PLANNER_RESPONSE": tr
 // next call line is handed on marked withheld, with no pairing of a result to its call. The
 // batch and its taint are tracked for every line read, before the boundary too, as Results
 // is.
-func readAntigravitySteps(ctx context.Context, path string, last antigravityCallState, prompt int64, refuses func(json.RawMessage) bool, emit func(s antigravityStep) bool) (antigravityCallState, error) {
+func readAntigravitySteps(ctx context.Context, path string, last antigravityCallState, prompt int64, refuses func(name string, args json.RawMessage) bool, emit func(s antigravityStep) bool) (antigravityCallState, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		// Missing too: a subagent's first hooks run before its transcript exists.
@@ -224,8 +224,8 @@ func readAntigravitySteps(ctx context.Context, path string, last antigravityCall
 // antigravityBatch is the batch being read: the results that follow the last call line, none
 // when it asked for no tool, withheld when it asked for a refused call or could not be read.
 // Whether a call is refused is worked out only when a result of the batch is handed on or the
-// read stops, and once, so a state that begins does not judge every path the transcript ever
-// named.
+// read stops, and once, so a state that begins does not judge every call the transcript ever
+// held.
 type antigravityBatch struct {
 	// open is that the last call line asked for tools, or could not be read: a GENERIC line is
 	// a tool's result only then. False before any call line.
@@ -234,7 +234,7 @@ type antigravityBatch struct {
 	tainted bool
 	// pending are the calls of a call line not judged yet; nil once judged.
 	pending []antigravityToolCall
-	refuses func(json.RawMessage) bool
+	refuses func(name string, args json.RawMessage) bool
 }
 
 // begin is a call line asking for calls: a batch of its own, judged later. One that asks for
@@ -264,22 +264,14 @@ func (b *antigravityBatch) isTainted() bool {
 // and never judges the calls again.
 func (b *antigravityBatch) judged() bool { return b.isTainted() }
 
-// antigravityCallsRefused reports whether refuses refuses the arguments of any of calls, or
-// one has arguments the reader cannot judge: none at all, or not a JSON object. {} and null
-// name no file. With no refuses to judge by, any call is refused.
-//
-// The hook judges its own call's arguments by the same rule, with one difference: a call with
-// no args, or args that are not an object, is refused here, so its batch's results are
-// withheld, while its hook, which then has no arguments to attach, sends the call as it would
-// any other. No transcript seen has such a call: 243 of them, 12,180 tool calls of 57 tools,
-// argument-less MCP calls included, all carry an object.
-func antigravityCallsRefused(calls []antigravityToolCall, refuses func(json.RawMessage) bool) bool {
+// antigravityCallsRefused reports whether refuses refuses any of calls, by its tool's name and
+// arguments (antigravityPaths.refuses). With no refuses to judge by, any call is refused.
+func antigravityCallsRefused(calls []antigravityToolCall, refuses func(name string, args json.RawMessage) bool) bool {
 	if refuses == nil {
 		return len(calls) > 0
 	}
 	for _, c := range calls {
-		var args map[string]json.RawMessage
-		if len(c.Args) == 0 || json.Unmarshal(c.Args, &args) != nil || refuses(c.Args) {
+		if refuses(c.Name, c.Args) {
 			return true
 		}
 	}

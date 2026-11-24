@@ -40,7 +40,7 @@ type antigravityConversation struct {
 	// This hook's scratch, gone with it.
 	// content is the content the hook may attach, worked out once (contentFor).
 	content *antigravityContent
-	// paths judges the paths the hook meets, each folder placed once.
+	// paths judges the paths the hook meets.
 	paths *antigravityPaths
 	// call is the tool call a PostToolUse spools, and its time.
 	call antigravityOwnCall
@@ -76,15 +76,10 @@ func (o *antigravityOwnCall) time(next func() time.Time) time.Time {
 }
 
 // openAntigravityConversation takes the conversation's lock, waiting up to
-// antigravityCallLockWait for another of its hooks, and loads its calls state. paths judges
-// the paths the hook meets under it, with what the hook placed before it took the lock; nil
-// for a hook that placed none. Without a transcript of agy's shape, a spool or a safe id, it
-// holds nothing.
-func openAntigravityConversation(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *antigravityHookInput, paths *antigravityPaths) *antigravityConversation {
-	if paths == nil {
-		paths = newAntigravityPaths(e.Policy)
-	}
-	c := &antigravityConversation{e: e, r: r, in: in, call: antigravityOwnCall{step: -1}, paths: paths}
+// antigravityCallLockWait for another of its hooks, and loads its calls state. Without a
+// transcript of agy's shape, a spool or a safe id, it holds nothing.
+func openAntigravityConversation(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in *antigravityHookInput) *antigravityConversation {
+	c := &antigravityConversation{e: e, r: r, in: in, call: antigravityOwnCall{step: -1}, paths: newAntigravityPaths(e.Policy)}
 	transcript := antigravityTranscript(in)
 	id := in.id()
 	if transcript == "" || e.Spool == nil || !session.ValidID(id) {
@@ -156,12 +151,11 @@ func (c *antigravityConversation) contentFor() antigravityContent {
 	return *c.content
 }
 
-// refuses reports whether the content of a tool call with these arguments is refused
-// (antigravityPaths.refuses), a relative path judged from the conversation's cwd: the
-// transcript's reader judges every call a call line asks for by it. A PostToolUse judges its
-// own call by the same paths before it takes the lock (postToolUse).
-func (c *antigravityConversation) refuses(args json.RawMessage) bool {
-	return c.paths.refuses(c.e.Cwd, args)
+// refuses reports whether the content of a call of tool name with these arguments is refused
+// (antigravityPaths.refuses), a relative path judged from the conversation's cwd: the hook
+// judges its own call by it, and the transcript's reader every call a call line asks for.
+func (c *antigravityConversation) refuses(name string, args json.RawMessage) bool {
+	return c.paths.refuses(c.e.Cwd, name, args)
 }
 
 // close saves the state, when it changed or began, and lets the lock go. A hook defers it

@@ -508,33 +508,21 @@ Two rules keep another repository's content out. A conversation sends no content
 while any folder it works in is outside a repository your team's policy collects: resumed
 from such a repository, or from a folder outside git, it sends none for the rest of its
 life. In global mode a folder outside git is collected, as a session outside git is. A
-folder that is a link is judged by the repository it leads to. terma reads every argument
-value that looks like a path, under any key and inside lists and nested objects: one line of
-at most 4,096 bytes that is an absolute path, or `~` or a path under it. Under a key that
-names a file or folder, such as `Path`, a relative value is read as a path too. Under any
-other key, a relative value is read as one when it climbs with `..`, such as
-`../other-repo/file.txt`, or names a file or folder that is there in the folder the agent
-works in. So a word that happens to be a file name there is read as a path, and shown. A
-`file://` link is read as the file it names, a path used as an object's key is read too, and
-so is one inside a JSON-encoded string. A command's text, a web URL and other text are not
-read as paths. A tool call whose arguments
-name a file or folder in a repository the policy does not collect sends no arguments, and
-its result is withheld. When the model asked for several calls in one response, the results
-of the others are withheld too, though their arguments are sent: `agy`'s transcript does
-not say which result belongs to which call. Links, nested clones and submodules are followed
-to the repository that holds the file, and a file terma cannot place counts as not
-collected. A file in no repository at all, such as a note in your home folder, is shown, as
-Claude Code and Codex show it. Whether a value names a file or a folder is read from the
-disk, not from its key. A tool that lists or searches a folder returns what is under it, so
-outside global mode a folder is refused when it is in no repository, or when it holds a
-nested clone or a submodule the policy does not collect. A folder that holds 20,000 folders
-or more, or one terma cannot read, is refused too, since terma cannot tell what the rest
-holds. A folder that is not there yet is refused in no repository only under a key that
-names a folder, such as `DirectoryPath`. With `GIT_DIR` set in the agent's environment,
-terma cannot tell which repository a file belongs to, so no content is sent. Not caught: a
-shell command that reads another repository, a tool that searches the folder the agent
-works in without naming it when that folder holds a clone the policy does not collect, and
-a reply that repeats what a refused read returned.
+folder that is a link is judged by the repository it leads to. The second rule covers
+`agy`'s own file and folder tools only: the tools that read, write and edit a file, and
+`list_dir`, `grep_search` and `find_by_name`. A call of one of them that names a file or
+folder in a repository the policy does not collect sends no arguments, and its result is
+withheld. So are the results of the other calls the model asked for in the same response,
+though their arguments are sent: `agy`'s transcript does not say which result belongs to
+which call. Links, nested clones and submodules are followed to the repository that holds
+the path. A path terma cannot place counts as not collected, and so does one under `~`, or
+any path with `GIT_DIR` set in the agent's environment. A file in no repository at all,
+such as a note in your home folder, is shown, as Claude Code and Codex show it. A folder in
+no repository is not, outside global mode, since a listing or a search of it returns what
+is under it. Every other tool's content, an MCP tool's and a shell command's among them, is
+sent under the session's consent with no check of what its arguments name, as Claude
+Code's and Codex's is. A search of a collected repository returns the files of a clone
+nested in it, and a reply can repeat what a refused read returned.
 
 T3 Code runs its own copy of Antigravity, with a folder of its own in place of `~/.gemini`.
 Setup writes the same hook into each T3 Code Antigravity provider folder too:

@@ -13,7 +13,8 @@
 //   - Which hook may send (turn.go): one of the turn's own checkout and lane, while the
 //     turn's record stands. The rule is stated there once.
 //   - Which content may go (content_paths.go): the developer's consent, the policy's switches,
-//     every workspace collected, and the judgement of each path a call's arguments name.
+//     every workspace collected, and for agy's own file and folder tools the checkout of each
+//     path a call names; no other tool's arguments are judged.
 //   - What is sent (call.go, content.go): a model call, a prompt, a reply and a tool's result,
 //     cut to size. transcript.go's send picks them for a line; PostToolUse sends the tool
 //     call with its arguments.

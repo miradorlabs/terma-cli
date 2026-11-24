@@ -187,14 +187,11 @@ func TestAntigravityCallLineWithNoStepTaints(t *testing.T) {
 	}
 }
 
-// A tainted batch still links the subagent it opened: the link is not content. A folder a
-// tool runs in (Cwd) is judged as a file is.
+// A tainted batch still links the subagent it opened: the link is not content.
 func TestAntigravityTaintedBatchStillLinksItsSubagent(t *testing.T) {
-	excluded := filepath.Dir(excludedFile(t))
 	g := newTranscriptRig(t, parentConversation, "transcript_subagent_parent.jsonl")
 	other := strings.ReplaceAll(strings.Replace(g.lines[2], `"step_index":2`, `"step_index":3`, 1), childConversation, turnsConversation)
-	g.lines = []string{g.lines[0], withCalls(subagentCall1, `{"name":"invoke_subagent","args":{}}`,
-		`{"name":"run_command","args":{"CommandLine":"made-up","Cwd":"`+hookruntest.InJSON(excluded)+`"}}`), g.lines[2], other}
+	g.lines = []string{g.lines[0], withCalls(subagentCall1, `{"name":"invoke_subagent","args":{}}`, readCall(excludedFile(t))), g.lines[2], other}
 	g.write(1)
 	g.hook(preInvocation, begin("1"))
 	g.write(4)
@@ -205,5 +202,29 @@ func TestAntigravityTaintedBatchStillLinksItsSubagent(t *testing.T) {
 	}
 	if len(got[semconv.TermaToolResultEvent]) != 0 {
 		t.Errorf("results of the tainted batch went: %v", got[semconv.TermaToolResultEvent])
+	}
+}
+
+// A decision, not a gap: a batch of tools outside agy's own file and folder tools is never
+// tainted by what their arguments name, an argument-less call included, so every result goes,
+// as Claude Code's and Codex's do.
+func TestAntigravityOtherToolsResultsGoAsClaudeCodesAndCodexsDo(t *testing.T) {
+	calls := otherToolCalls(excludedFile(t))
+	g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
+	g.lines = []string{g.lines[0], callLine(1, calls...)}
+	for i := range calls {
+		g.lines = append(g.lines, resultLine(2+i))
+	}
+	g.write(2)
+	g.hook(preInvocation, begin("1"))
+	g.hook(postToolUse, toolUse(2, "mcp_server_read", string(argsJSON(t, map[string]any{"path": excludedFile(t)}))))
+	g.write(len(g.lines))
+	g.hook(stop, stopped)
+	got := g.drain()
+	if args, _ := stepContent(got, "step-2"); !args {
+		t.Error("the MCP tool's arguments did not go")
+	}
+	if n := len(got[semconv.TermaToolResultEvent]); n != len(calls) {
+		t.Errorf("%d results went, want %d", n, len(calls))
 	}
 }

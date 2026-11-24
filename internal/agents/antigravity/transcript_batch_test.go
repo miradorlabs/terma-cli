@@ -40,7 +40,7 @@ func TestAntigravityBatch(t *testing.T) {
 		{"a refused batch passed by the next", false, false, []step{begin(refused), begin(shown)}, true, false, 1},
 	} {
 		judged := 0
-		b := antigravityBatch{open: tc.open, tainted: tc.saved, refuses: func(args json.RawMessage) bool {
+		b := antigravityBatch{open: tc.open, tainted: tc.saved, refuses: func(_ string, args json.RawMessage) bool {
 			judged++
 			return string(args) == `{"Path":"refused"}`
 		}}
@@ -72,7 +72,7 @@ func TestAntigravityReaderMarksResultsOnlyInsideABatch(t *testing.T) {
 	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	never := func(json.RawMessage) bool { return false }
+	never := func(string, json.RawMessage) bool { return false }
 	results := map[int64]bool{}
 	read := func(last antigravityCallState, until int64) antigravityCallState {
 		t.Helper()

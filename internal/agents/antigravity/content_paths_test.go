@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -13,8 +14,7 @@ import (
 )
 
 // pathRig is a collected checkout, a second collected one, an excluded one, an excluded clone
-// nested in the collected one, a folder of the collected one that does not hold the clone,
-// and a folder in no repository.
+// nested in the collected one, a folder of the collected one, and a folder in no repository.
 type pathRig struct {
 	collected, other, excluded, nested, sub, none string
 	pol                                           config.Policy
@@ -76,84 +76,149 @@ func TestAntigravityPathOwner(t *testing.T) {
 	}
 }
 
-// A call is refused when its arguments name a file in an excluded checkout, under any key
-// and for any tool; a file in no repository is shown or refused by the package's answer, both
-// ways.
-func TestAntigravityRefusesAFileOfAnExcludedCheckout(t *testing.T) {
+// A call of one of agy's own file and folder tools is judged by the paths under its keys:
+// refused when one is in a checkout the policy does not collect, or cannot be placed. A file in
+// no repository is shown; a folder there is refused outside global mode. Every tool and key of
+// the table is checked, and arguments terma cannot judge are refused.
+func TestAntigravityJudgesAgysOwnFileAndFolderTools(t *testing.T) {
 	g := newPathRig(t)
-	refuses := func(tool, key, path string) bool {
-		in := &antigravityHookInput{}
-		if err := jsonUnmarshalInto(`{"name":"`+tool+`","args":{"`+key+`":"`+hookruntest.InJSON(path)+`","Other":1}}`, in); err != nil {
+	link := filepath.Join(g.collected, "into-excluded")
+	links := os.Symlink(g.excluded, link) == nil
+	global := config.Policy{Mode: config.ModeGlobal}
+	type row struct {
+		name, path string
+		pol        config.Policy
+		want       bool
+	}
+	for name, tool := range antigravityPathTools {
+		// at is what the tool names in dir: the folder itself, or its file.
+		at := func(dir string) string {
+			if tool.folder {
+				return dir
+			}
+			return filepath.Join(dir, "file.txt")
+		}
+		climb, err := filepath.Rel(g.collected, at(g.excluded))
+		if err != nil {
 			t.Fatal(err)
 		}
-		return newAntigravityPaths(g.pol).refuses(g.collected, in.ToolCall.Args)
-	}
-	for _, tc := range []struct {
-		tool, key, path string
-		want            bool
-	}{
-		{"read_file", "Path", filepath.Join(g.collected, "file.txt"), false},
-		{"read_file", "Path", filepath.Join(g.other, "file.txt"), false},
-		{"read_file", "Path", filepath.Join(g.excluded, "file.txt"), true},
-		{"view_file", "AbsolutePath", filepath.Join(g.excluded, "file.txt"), true},
-		{"some_mcp_tool", "file_path", filepath.Join(g.nested, "file.txt"), true},
-		{"read_file", "Path", filepath.Join(g.none, "file.txt"), false},
-		{"run_command", "CommandLine", "cat " + filepath.Join(g.excluded, "file.txt"), false},
-		// The folder a tool lists, searches or runs in.
-		{"list_dir", "DirectoryPath", g.excluded, true},
-		{"grep_search", "SearchPath", g.excluded, true},
-		{"find_by_name", "SearchDirectory", g.nested, true},
-		{"run_command", "Cwd", g.excluded, true},
-		{"run_command", "Cwd", g.sub, false},
-		// The checkout's root holds the excluded clone nested in it.
-		{"run_command", "Cwd", g.collected, true},
-		// A folder in no repository is refused whatever the answer for files: a search of one
-		// above several repositories returns their files.
-		{"grep_search", "SearchPath", g.none, true},
-		{"list_dir", "DirectoryPath", g.none, true},
-		{"run_command", "Cwd", g.none, true},
-	} {
-		if got := refuses(tc.tool, tc.key, tc.path); got != tc.want {
-			t.Errorf("%s %s=%s: refused %v, want %v", tc.tool, tc.key, tc.path, got, tc.want)
+		inside, err := filepath.Rel(g.collected, at(g.sub))
+		if err != nil {
+			t.Fatal(err)
+		}
+		rows := []row{
+			{"the collected checkout", at(g.sub), g.pol, false},
+			{"an excluded checkout", at(g.excluded), g.pol, true},
+			{"an excluded clone nested in the collected one", at(g.nested), g.pol, true},
+			{"relative inside the checkout", inside, g.pol, false},
+			{"relative, climbing into an excluded checkout", climb, g.pol, true},
+			{"the home folder", "~/x", g.pol, true},
+			{"no repository", at(g.none), g.pol, tool.folder},
+			{"no repository, global mode", at(g.none), global, false},
+		}
+		if links {
+			rows = append(rows, row{"through a link into an excluded checkout", at(link), g.pol, true})
+		}
+		for _, key := range tool.keys {
+			for _, r := range rows {
+				args := argsJSON(t, map[string]any{key: r.path, "Other": 1})
+				if got := newAntigravityPaths(r.pol).refuses(g.collected, name, args); got != r.want {
+					t.Errorf("%s %s, %s: refused %v, want %v", name, key, r.name, got, r.want)
+				}
+			}
+		}
+		for _, raw := range []string{"", `"made-up"`, `1`, `["made-up"]`, `null`, `{}`, `{"` + tool.keys[0] + `":1}`} {
+			if !newAntigravityPaths(g.pol).refuses(g.collected, name, json.RawMessage(raw)) {
+				t.Errorf("%s with arguments %q: shown", name, raw)
+			}
 		}
 	}
-	// Global mode collects a session outside git, so a folder outside git is searched freely.
-	global := &antigravityHookInput{}
-	if err := jsonUnmarshalInto(`{"name":"grep_search","args":{"SearchPath":"`+hookruntest.InJSON(g.none)+`"}}`, global); err != nil {
-		t.Fatal(err)
-	}
-	if newAntigravityPaths(config.Policy{Mode: config.ModeGlobal}).refuses(g.collected, global.ToolCall.Args) {
-		t.Error("global mode refused a search of a folder outside git")
-	}
+
 	defer func(was bool) { antigravityShowsFilesInNoRepository = was }(antigravityShowsFilesInNoRepository)
 	antigravityShowsFilesInNoRepository = false
-	if !refuses("read_file", "Path", filepath.Join(g.none, "file.txt")) {
+	file := func(path string) json.RawMessage { return argsJSON(t, map[string]any{"Path": path}) }
+	if !newAntigravityPaths(g.pol).refuses(g.collected, "read_file", file(filepath.Join(g.none, "file.txt"))) {
 		t.Error("a file in no repository was shown with the answer withholding it")
 	}
-	if refuses("read_file", "Path", filepath.Join(g.collected, "file.txt")) {
+	if newAntigravityPaths(g.pol).refuses(g.collected, "read_file", file(filepath.Join(g.collected, "file.txt"))) {
 		t.Error("withholding files in no repository refused a collected one")
 	}
 }
 
-// A call whose arguments name more paths than terma judges is refused, though every one is
-// collected: the count runs across the call's keys, and a value that is not a path counts
-// for nothing.
-func TestAntigravityRefusesACallNamingTooManyPaths(t *testing.T) {
+// A decision, not a gap: terma judges no other tool's arguments, an MCP tool's, a shell
+// command's or one it has never seen, whatever they name. Claude Code's and Codex's tools are
+// not checked either; their content goes under the session's consent.
+func TestAntigravityOtherToolsAreNotJudgedAsClaudeCodesAndCodexsAreNot(t *testing.T) {
 	g := newPathRig(t)
-	file := filepath.Join(g.collected, "file.txt")
-	for _, n := range []int{antigravityPathsPerCall, antigravityPathsPerCall + 1} {
-		list := make([]string, n-1)
-		for i := range list {
-			list[i] = file
-		}
-		args, err := json.Marshal(map[string]any{"Paths": list, "Path": file, "Query": "made-up", "Limit": 3})
-		if err != nil {
+	for _, c := range otherToolCalls(filepath.Join(g.excluded, "file.txt")) {
+		var call antigravityToolCall
+		if err := json.Unmarshal([]byte(c), &call); err != nil {
 			t.Fatal(err)
 		}
-		want := n > antigravityPathsPerCall
-		if got := newAntigravityPaths(g.pol).refuses(g.collected, args); got != want {
-			t.Errorf("%d collected paths: refused %v, want %v", n, got, want)
+		if newAntigravityPaths(g.pol).refuses(g.collected, call.Name, call.Args) {
+			t.Errorf("%s: refused", c)
 		}
+	}
+}
+
+// otherToolCalls are calls of tools outside antigravityPathTools whose arguments name path in
+// ways a table tool's would be refused for; the last has no arguments.
+func otherToolCalls(path string) []string {
+	q := `"` + hookruntest.InJSON(path) + `"`
+	return []string{
+		`{"name":"mcp_server_read","args":{"path":` + q + `}}`,
+		`{"name":"call_mcp_tool","args":{"ServerName":"made-up","ToolName":"read","Arguments":{"path":` + q + `}}}`,
+		`{"name":"run_command","args":{"CommandLine":"cat ` + hookruntest.InJSON(path) + `"}}`,
+		`{"name":"made_up_tool","args":{"uri":"file://` + hookruntest.InJSON(filepath.ToSlash(path)) + `","paths":[` + q + `,` + q + `]}}`,
+		`{"name":"made_up_tool"}`,
+	}
+}
+
+// argsJSON is v as a call's arguments.
+func argsJSON(t *testing.T, v any) json.RawMessage {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+// The reader judges a call line's calls by name and arguments: one refused call refuses the
+// line, and a line of other tools is never refused, an argument-less one included. With no
+// rule to judge by, any call is refused.
+func TestAntigravityCallsRefused(t *testing.T) {
+	g := newPathRig(t)
+	refuses := func(name string, args json.RawMessage) bool {
+		return newAntigravityPaths(g.pol).refuses(g.collected, name, args)
+	}
+	calls := func(raw ...string) []antigravityToolCall {
+		var out []antigravityToolCall
+		if err := json.Unmarshal([]byte("["+strings.Join(raw, ",")+"]"), &out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	others := otherToolCalls(filepath.Join(g.excluded, "file.txt"))
+	for _, tc := range []struct {
+		name  string
+		calls []antigravityToolCall
+		want  bool
+	}{
+		{"other tools only", calls(others...), false},
+		{"a collected read among them", calls(append(others, readCall(filepath.Join(g.collected, "file.txt")))...), false},
+		{"an excluded read among them", calls(append(others, readCall(filepath.Join(g.excluded, "file.txt")))...), true},
+		{"a read with no arguments", calls(`{"name":"read_file"}`), true},
+	} {
+		if got := antigravityCallsRefused(tc.calls, refuses); got != tc.want {
+			t.Errorf("%s: refused %v, want %v", tc.name, got, tc.want)
+		}
+		if !antigravityCallsRefused(tc.calls, nil) {
+			t.Errorf("%s: shown with no rule to judge by", tc.name)
+		}
+	}
+	if antigravityCallsRefused(nil, nil) {
+		t.Error("no calls refused with no rule to judge by")
 	}
 }
 
@@ -213,7 +278,7 @@ func TestAntigravityWorkspacesMustAllBeCollected(t *testing.T) {
 
 // Where a path's checkout cannot be trusted, it is unresolved: a path that starts with "~",
 // and every path with GIT_DIR in the hook's environment, so no workspace is collected then,
-// global mode or not.
+// global mode or not, and no call of a table tool is shown.
 func TestAntigravityPathOwnerFailsClosed(t *testing.T) {
 	g := newPathRig(t)
 	for _, tc := range []struct {
@@ -232,41 +297,12 @@ func TestAntigravityPathOwnerFailsClosed(t *testing.T) {
 	if got := newAntigravityPaths(g.pol).owner("", filepath.Join(g.excluded, "file.txt")); got != ownerUnresolved {
 		t.Errorf("with GIT_DIR set: owner %d", got)
 	}
+	if !newAntigravityPaths(g.pol).refuses(g.collected, "read_file", argsJSON(t, map[string]any{"Path": filepath.Join(g.collected, "file.txt")})) {
+		t.Error("with GIT_DIR set, a read was shown")
+	}
 	for _, pol := range []config.Policy{g.pol, {Mode: config.ModeGlobal}} {
 		if newAntigravityPaths(pol).workspacesCollected(g.collected, &antigravityHookInput{}) {
 			t.Errorf("with GIT_DIR set, mode %q collected the workspace", pol.Mode)
 		}
-	}
-}
-
-// The transcript's reader refuses a call whose arguments it cannot judge: none at all, or not
-// a JSON object. {} and null name no file. With no rule to judge by, it refuses any call.
-func TestAntigravityCallsRefusedWithArgumentsItCannotJudge(t *testing.T) {
-	never := func(json.RawMessage) bool { return false }
-	for _, tc := range []struct {
-		name, call string
-		want       bool
-	}{
-		{"no args", `{"name":"read_file"}`, true},
-		{"a string", `{"name":"read_file","args":"made-up"}`, true},
-		{"a number", `{"name":"read_file","args":1}`, true},
-		{"an array", `{"name":"read_file","args":["made-up"]}`, true},
-		{"an empty object", `{"name":"read_file","args":{}}`, false},
-		{"null", `{"name":"read_file","args":null}`, false},
-		{"an object", `{"name":"run_command","args":{"CommandLine":"made-up"}}`, false},
-	} {
-		var calls []antigravityToolCall
-		if err := json.Unmarshal([]byte(`[{"name":"run_command","args":{}},`+tc.call+`]`), &calls); err != nil {
-			t.Fatal(err)
-		}
-		if got := antigravityCallsRefused(calls, never); got != tc.want {
-			t.Errorf("%s: refused %v, want %v", tc.name, got, tc.want)
-		}
-		if !antigravityCallsRefused(calls, nil) {
-			t.Errorf("%s: shown with no rule to judge by", tc.name)
-		}
-	}
-	if antigravityCallsRefused(nil, nil) {
-		t.Error("no calls refused with no rule to judge by")
 	}
 }
