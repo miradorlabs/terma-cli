@@ -56,6 +56,7 @@ func runIsolated(m *testing.M) int {
 		"TERMA_CONFIG_DIR":    home + "/.config/terma",
 		"TERMA_STATE_DIR":     home + "/.local/state/terma",
 		"GEMINI_CLI_HOME":     home,
+		"T3CODE_HOME":         home + "/.t3",
 		"COPILOT_HOME":        home + "/.copilot",
 		"VSCODE_APPDATA":      home + "/.vscode-data",
 		"ZDOTDIR":             home,

@@ -591,9 +591,64 @@ events:
         requirement_level: required
       - ref: terma.message.phase
       - ref: terma.turn.id
+      - ref: terma.step.index
       - ref: gen_ai.request.model
       - ref: terma.agent.id
       - ref: gen_ai.agent.name
+
+  - name: terma.user.message
+    stability: development
+    requirement_level: recommended
+    brief: One prompt to an agent whose export may lose its prompts, from the agent's prompt hook.
+    note: >
+      Sent for every prompt, with its text only while the team's policy collects prompts and
+      the developer chose the agent; a withheld prompt still counts as one. One from a prompt
+      hook names no turn: nothing joins the hook's prompt id to the turn the agent's export
+      names. An agent whose transcript names the turn (Antigravity) sends the prompt from the
+      transcript, with terma.turn.id, terma.step.index and terma.evidence.source. A subagent's
+      prompt names the subagent's kind in gen_ai.agent.name: the parent agent wrote it, not
+      the person.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.message.id
+        requirement_level: required
+      - ref: terma.message.text
+      - ref: terma.message.truncated
+      - ref: gen_ai.agent.name
+      - ref: terma.turn.id
+      - ref: terma.step.index
+      - ref: terma.evidence.source
+
+  - name: terma.tool.result
+    stability: development
+    requirement_level: recommended
+    brief: One tool call's result, read apart from the call; it joins the call's own record by its call id.
+    note: >
+      Sent by an agent that learns a call's result from another source than the call, later
+      (Antigravity's transcript). It names no tool: the result's source does not. Tool content
+      through and through: delivery sends it whole while the team's policy collects tool
+      content and the developer chose the agent, and drops it otherwise.
+    attributes:
+      - ref: session.id
+        requirement_level: required
+      - ref: gen_ai.main_agent.name
+        requirement_level: required
+      - ref: terma.evidence.source
+        requirement_level: required
+      - ref: gen_ai.tool.call.id
+        requirement_level: required
+      - ref: gen_ai.tool.call.result
+        requirement_level: required
+        note: >
+          The result's text, cut at terma's bound with the characters dropped named at its
+          end. Tool content, withheld unless the team's policy collects it.
+        annotations:
+          content: tool
+      - ref: terma.step.index
+      - ref: terma.turn.id
 
   - name: terma.session.title
     stability: development

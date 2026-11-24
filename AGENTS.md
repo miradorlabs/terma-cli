@@ -122,7 +122,10 @@ its working tree, the directory in it and the worktree's name with tool content 
 claim names the session that opened it where the agent's own telemetry does not (OMP's,
 `hookrun.Extension.ClaimParent`), which the relay stamps as `terma.session.parent.id`
 (`stampParent`). Hook events never pass the relay, so delivery applies
-the same rules when it sends them. A session marked not collected is dropped on arrival;
+the same rules when it sends them. Antigravity has no export, so its hooks send its content
+too: the prompt and the reply from the transcript, a tool call's arguments from `PostToolUse`
+and each tool's result as `terma.tool.result`. Which of it may go is ruled in
+`internal/agents/antigravity/content_paths.go` and `turn.go`. A session marked not collected is dropped on arrival;
 everything else unclaimed is held briefly and dropped: nothing unclaimed leaves the
 machine. The exception is a policy in global mode, which collects every session on the
 machine: it admits every repository, a hook outside git claims its session for the

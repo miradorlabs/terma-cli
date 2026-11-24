@@ -2,7 +2,6 @@ package antigravity
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -44,36 +43,91 @@ func (Agent) UserHooksPath() (string, error) {
 	return filepath.Join(home, ".gemini", "config", "hooks.json"), err
 }
 
-// PlanUserHooks writes terma's named hook into <dir>/hooks.json, or takes it out; it
-// writes none for an agy too old to run them.
+// PlanUserHooks writes terma's named hook into <dir>/hooks.json, or takes it out. While
+// the agy on PATH is too old to run the hooks it writes none into ~/.gemini, the home that
+// agy uses: with no client's home here it refuses, saying why; beside one it plans nothing
+// there, with a note saying why, so setup goes on to the clients' homes, which run their own
+// agy.
 func (Agent) PlanUserHooks(dir string, command func(string) string, install bool) (hookmgr.Plan, error) {
-	if why, old := tooOld(context.Background()); install && old {
-		return hookmgr.Plan{}, errors.New(why)
+	if install {
+		if why, old := tooOldFor(dir); old {
+			if clients, _ := clientHomes(); len(clients) > 0 {
+				return hookmgr.Plan{Notes: []string{"left ~/.gemini out: " + why}}, nil
+			}
+			return hookmgr.Plan{}, errors.New(why)
+		}
 	}
 	return planUserHooks(dir, command, install)
 }
 
-// refreshHooksFile points the hooks terma wrote into agy's file at this terma, as `terma
-// update --refresh` does after the binary moved; a file without them is left alone. Not on
-// Windows, where terma does not offer Antigravity and a shared home holds another
-// system's hooks.
+// refreshHooksFile points terma's hooks in each Antigravity home's file at this terma, as
+// `terma update --refresh` does after the binary moved, and names the files it changed.
+// When one home's file has the hook switched on, a home that is there and names no terma
+// hook gets it too, so a home a client made after setup is covered; not ~/.gemini while the
+// agy on PATH is too old (see PlanUserHooks). A hook named terma that is switched off or
+// edited is the developer's: it stays, and is never copied. Not on Windows, where terma
+// does not offer Antigravity.
 func (a Agent) refreshHooksFile() (string, bool, error) {
 	if runtime.GOOS == "windows" {
 		return "", false, nil
 	}
-	path, err := a.UserHooksPath()
+	paths, err := a.UserHooksPaths()
 	if err != nil {
 		return "", false, err
 	}
-	data, err := hookmgr.ReadFile(path)
-	if err != nil || !bytes.Contains(data, []byte(" hook --user antigravity-")) {
-		return path, false, err
+	files := readHooksFiles(paths)
+	errs := files.errs
+	if len(files.carry) == 0 {
+		return "", false, errors.Join(errs...)
+	}
+	if !files.on {
+		files.bare = nil
 	}
 	terma, err := procinfo.AbsExecutable()
 	if err != nil {
-		return path, false, err
+		return "", false, errors.Join(append(errs, err)...)
 	}
-	return refreshHooks(path, terma)
+	var changed []string
+	for _, path := range files.carry {
+		if _, ok, err := refreshHooks(path, terma); err != nil {
+			errs = append(errs, err)
+		} else if ok {
+			changed = append(changed, path)
+		}
+	}
+	for _, path := range files.bare {
+		if ok, err := installHooks(path, terma); err != nil {
+			errs = append(errs, err)
+		} else if ok {
+			changed = append(changed, path)
+		}
+	}
+	return strings.Join(changed, ", "), len(changed) > 0, errors.Join(errs...)
+}
+
+// namesNoTermaHook reports whether a hooks file, data as read (nil when absent), has no
+// top-level terma member; one refresh cannot parse is not judged to have none.
+func namesNoTermaHook(data []byte) bool {
+	_, top, err := parseHooks(data)
+	if err != nil {
+		return false
+	}
+	_, named := top[antigravityHookName]
+	return !named
+}
+
+// installHooks writes terma's hook into the hooks file at path as setup does, creating its
+// folder, and reports whether it changed the file.
+func installHooks(path, terma string) (bool, error) {
+	dir := filepath.Dir(path)
+	plan, err := planHooks(dir, hookmgr.UserHookCommand(terma), modeInstall)
+	if err != nil || plan.Empty() {
+		return false, err
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return false, err
+	}
+	return true, hookmgr.ApplyThroughLinks(dir, plan)
 }
 
 // refreshHooks rewrites the entries of terma's already in the hooks file at path to run

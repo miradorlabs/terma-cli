@@ -198,7 +198,8 @@ func TestOutgoingWithholdsOnlyWhatThePolicyDoes(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	call := spool.Event{Repository: app, Name: semconv.TermaToolCallEvent, Attrs: map[string]any{semconv.GenAIToolCallArgumentsKey: "a", semconv.GenAIToolNameKey: "exec"}}
-	approval := spool.Event{Repository: app, Name: semconv.TermaApprovalRequestedEvent, Attrs: map[string]any{semconv.TermaApprovalReasonKey: "r"}}
+	approval := spool.Event{Repository: app, Name: semconv.TermaApprovalRequestedEvent, Attrs: map[string]any{semconv.GenAIMainAgentNameKey: "codex", semconv.TermaApprovalReasonKey: "r"}}
+	codexChosen := func(tool string, _ hookrun.Consent) bool { return tool == "codex" }
 	promptsOnly := config.Policy{Mode: config.ModeRepo, Repositories: listed, IncludePrompts: true}
 	everything := config.Policy{Mode: config.ModeRepo, Repositories: listed, IncludePrompts: true, IncludeToolContent: true}
 	if out, ok := (Router{ConfigDir: dir}).Outgoing(promptsOnly, "p1", call); !ok || out.Attrs[semconv.GenAIToolCallArgumentsKey] != nil || out.Attrs[semconv.GenAIToolNameKey] != "exec" {
@@ -207,7 +208,7 @@ func TestOutgoingWithholdsOnlyWhatThePolicyDoes(t *testing.T) {
 	if call.Attrs[semconv.GenAIToolCallArgumentsKey] != "a" {
 		t.Fatal("Outgoing changed the spooled event")
 	}
-	if out, ok := (Router{ConfigDir: dir}).Outgoing(everything, "p1", approval); !ok || out.Attrs[semconv.TermaApprovalReasonKey] != "r" {
+	if out, ok := (Router{ConfigDir: dir, Consent: codexChosen}).Outgoing(everything, "p1", approval); !ok || out.Attrs[semconv.TermaApprovalReasonKey] != "r" {
 		t.Fatalf("approval = %+v, %v", out, ok)
 	}
 	// Not validated: nothing leaves at all.
@@ -322,8 +323,14 @@ func TestEveryHookEventKindIsClassified(t *testing.T) {
 			}
 			kind, _ := strconv.Unquote(lit.Value)
 			kinds++
-			if _, content := hookContent[kind]; content == contentFree[kind] {
-				t.Errorf("%s (%s): classify it in exactly one of hookContent or contentFree", name.Name, kind)
+			lists := 0
+			for _, in := range []bool{hookContent[kind] != nil, contentFree[kind], promptContent[kind] != nil} {
+				if in {
+					lists++
+				}
+			}
+			if lists != 1 {
+				t.Errorf("%s (%s): classify it in exactly one of hookContent, contentFree or promptContent", name.Name, kind)
 			}
 		}
 		return true
@@ -457,6 +464,137 @@ func TestHookEventsNameTheUser(t *testing.T) {
 			t.Errorf("p1's events left without their user:\n%s", body)
 		case strings.Contains(body, "s-p2") && strings.Contains(body, semconv.TermaUserIDKey):
 			t.Errorf("p2's events named a user:\n%s", body)
+		}
+	}
+}
+
+// A prompt a hook spooled (terma.user.message) always leaves, so it counts: whole while the
+// policy collects prompts and its agent still has the developer's consent, without its text
+// once prompts are withheld or the agent was deselected, whatever happened to tool content.
+// The spooled event stays as it was.
+func TestOutgoingWithholdsAPromptsTextAlone(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	prompt := spool.Event{Repository: app, Name: semconv.TermaUserMessageEvent, Attrs: map[string]any{
+		semconv.GenAIMainAgentNameKey: "fake", semconv.TermaMessageIDKey: "m1",
+		semconv.TermaMessageTextKey: "fix the bug", semconv.TermaMessageTruncatedKey: false,
+	}}
+	consent := func(ok bool) func(string, hookrun.Consent) bool {
+		return func(tool string, _ hookrun.Consent) bool { return ok && tool == "fake" }
+	}
+	policy := func(prompts, toolContent bool) config.Policy {
+		return config.Policy{Mode: config.ModeRepo, Repositories: listed, IncludePrompts: prompts, IncludeToolContent: toolContent}
+	}
+	for _, tc := range []struct {
+		name     string
+		pol      config.Policy
+		consent  func(string, hookrun.Consent) bool
+		withText bool
+	}{
+		{"everything, consented", policy(true, true), consent(true), true},
+		{"prompts only, consented", policy(true, false), consent(true), true},
+		{"everything, deselected", policy(true, true), consent(false), false},
+		{"everything, no one to ask", policy(true, true), nil, false},
+		{"prompts withheld", policy(false, true), consent(true), false},
+		{"nothing but logs", policy(false, false), consent(true), false},
+	} {
+		out, ok := (Router{ConfigDir: dir, Consent: tc.consent}).Outgoing(tc.pol, "p1", prompt)
+		if !ok || out.Attrs[semconv.TermaMessageIDKey] != "m1" || out.Attrs[semconv.GenAIMainAgentNameKey] != "fake" {
+			t.Errorf("%s: %+v, %v", tc.name, out, ok)
+			continue
+		}
+		_, text := out.Attrs[semconv.TermaMessageTextKey]
+		_, cut := out.Attrs[semconv.TermaMessageTruncatedKey]
+		if text != tc.withText || cut != tc.withText {
+			t.Errorf("%s: text %v, truncated %v, want %v", tc.name, text, cut, tc.withText)
+		}
+	}
+	if prompt.Attrs[semconv.TermaMessageTextKey] != "fix the bug" {
+		t.Fatal("Outgoing changed the spooled event")
+	}
+}
+
+// A tool's input (a call's arguments, an approval's reason) leaves only while the agent that
+// spooled it is still chosen, checked before an open policy's shortcut: a Codex Desktop
+// approval reason still leaves for a chosen Codex, and an Antigravity call queued under an
+// open policy loses its arguments once Antigravity is deselected. The rest of the event leaves.
+func TestOutgoingWithholdsAToolsInputOnceItsAgentIsDeselected(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	everything := config.Policy{Mode: config.ModeRepo, Repositories: listed, IncludePrompts: true, IncludeToolContent: true}
+	chosen := func(agents ...string) func(string, hookrun.Consent) bool {
+		return func(tool string, _ hookrun.Consent) bool { return slices.Contains(agents, tool) }
+	}
+	approval := spool.Event{Repository: app, Name: semconv.TermaApprovalRequestedEvent, Attrs: map[string]any{semconv.GenAIMainAgentNameKey: "codex", semconv.TermaApprovalReasonKey: "r"}}
+	call := spool.Event{Repository: app, Name: semconv.TermaToolCallEvent, Attrs: map[string]any{
+		semconv.GenAIMainAgentNameKey: "antigravity", semconv.GenAIToolCallIDKey: "step-4", semconv.GenAIToolCallArgumentsKey: map[string]any{"Path": "/w/a.go"},
+	}}
+	for _, tc := range []struct {
+		name    string
+		e       spool.Event
+		consent func(string, hookrun.Consent) bool
+		key     string
+		kept    bool
+	}{
+		{"codex approval, codex chosen", approval, chosen("codex"), semconv.TermaApprovalReasonKey, true},
+		{"codex approval, codex deselected", approval, chosen("antigravity"), semconv.TermaApprovalReasonKey, false},
+		{"antigravity call, chosen", call, chosen("antigravity"), semconv.GenAIToolCallArgumentsKey, true},
+		{"antigravity call, deselected", call, chosen("codex"), semconv.GenAIToolCallArgumentsKey, false},
+		{"antigravity call, no one to ask", call, nil, semconv.GenAIToolCallArgumentsKey, false},
+	} {
+		out, ok := (Router{ConfigDir: dir, Consent: tc.consent}).Outgoing(everything, "p1", tc.e)
+		if !ok {
+			t.Errorf("%s: dropped", tc.name)
+			continue
+		}
+		if _, has := out.Attrs[tc.key]; has != tc.kept {
+			t.Errorf("%s: %s kept %v, want %v", tc.name, tc.key, has, tc.kept)
+		}
+		if out.Attrs[semconv.GenAIMainAgentNameKey] != tc.e.Attrs[semconv.GenAIMainAgentNameKey] {
+			t.Errorf("%s: the rest of the event did not leave: %v", tc.name, out.Attrs)
+		}
+	}
+	if _, has := call.Attrs[semconv.GenAIToolCallArgumentsKey]; !has {
+		t.Fatal("Outgoing changed the spooled event")
+	}
+}
+
+// A tool's result (terma.tool.result) is tool content through and through: sent whole while
+// the policy collects tool content, its repository is listed and its agent is chosen, and
+// dropped whole otherwise; prompts alone do not send it.
+func TestAToolResultLeavesWholeOrNotAtAll(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	result := spool.Event{Repository: app, Name: semconv.TermaToolResultEvent, Attrs: map[string]any{
+		semconv.GenAIMainAgentNameKey: "antigravity", semconv.GenAIToolCallIDKey: "step-5", semconv.GenAIToolCallResultKey: "made-up output",
+	}}
+	chosen := func(tool string, _ hookrun.Consent) bool { return tool == "antigravity" }
+	deselected := func(string, hookrun.Consent) bool { return false }
+	policy := func(prompts, toolContent bool, repos []string) config.Policy {
+		return config.Policy{Mode: config.ModeRepo, Repositories: repos, IncludePrompts: prompts, IncludeToolContent: toolContent}
+	}
+	for _, tc := range []struct {
+		name    string
+		pol     config.Policy
+		consent func(string, hookrun.Consent) bool
+		sent    bool
+	}{
+		{"everything, chosen", policy(true, true, listed), chosen, true},
+		{"tool content only, chosen", policy(false, true, listed), chosen, true},
+		{"prompts only", policy(true, false, listed), chosen, false},
+		{"nothing but logs", policy(false, false, listed), chosen, false},
+		{"everything, deselected", policy(true, true, listed), deselected, false},
+		{"everything, no one to ask", policy(true, true, listed), nil, false},
+		{"the repository left the list", policy(true, true, []string{"github.com/acme/other"}), chosen, false},
+		{"no policy", config.NoPolicy("", ""), chosen, false},
+	} {
+		out, ok := (Router{ConfigDir: dir, Consent: tc.consent}).Outgoing(tc.pol, "p1", result)
+		if ok != tc.sent {
+			t.Errorf("%s: sent %v, want %v", tc.name, ok, tc.sent)
+			continue
+		}
+		if ok && out.Attrs[semconv.GenAIToolCallResultKey] != "made-up output" {
+			t.Errorf("%s: left without its text: %v", tc.name, out.Attrs)
 		}
 	}
 }

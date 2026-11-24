@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -425,6 +426,87 @@ func TestSetupWithAntigravityAloneTurnsHooksOn(t *testing.T) {
 	}
 	if out, _ := runTerma(t, "status"); !strings.Contains(out, "switched off or out of date") {
 		t.Errorf("status with agy's hooks gone:\n%s", out)
+	}
+}
+
+// T3 Code runs its own Antigravity from a home of its own: setup writes terma's hook there
+// too, beside the developer's other named hooks, and names the file when asked to show what
+// it wrote; teardown takes it out.
+func TestSetupWritesAgyHooksIntoT3CodesHomes(t *testing.T) {
+	if !testApp.agents.IsSupported("antigravity") {
+		t.Skip("Antigravity is Coming Soon on Windows")
+	}
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	signInTo(t, gateway, orgA())
+	t3 := filepath.Join(os.Getenv("T3CODE_HOME"), "userdata", "providers", "antigravity", "a1")
+	if err := os.MkdirAll(filepath.Join(t3, "antigravity-acp"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t3, "config", "hooks.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	const guard = `{"fleet-secret-guard": {"PreToolUse": [{"matcher": "", "hooks": [{"type": "command", "command": "/opt/fleet/guard"}]}]}}`
+	if err := os.WriteFile(path, []byte(guard), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTerma(t, "setup", "--harness", "antigravity", "--verbose")
+	if err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	hooks, err := os.ReadFile(path)
+	if err != nil || !strings.Contains(string(hooks), "hook --user antigravity-stop") || !strings.Contains(string(hooks), "/opt/fleet/guard") {
+		t.Fatalf("T3 Code's agy hooks = %s, %v", hooks, err)
+	}
+	if !strings.Contains(out, filepath.Join("antigravity", "a1", "config", "hooks.json")) {
+		t.Errorf("setup did not name T3 Code's hooks file:\n%s", out)
+	}
+	if gemini, err := os.ReadFile(filepath.Join(os.Getenv("HOME"), ".gemini", "config", "hooks.json")); err != nil || !strings.Contains(string(gemini), "hook --user antigravity-stop") {
+		t.Fatalf("agy's own hooks = %s, %v", gemini, err)
+	}
+	if out, err := runTerma(t, "teardown", "--yes"); err != nil {
+		t.Fatalf("teardown: %v\n%s", err, out)
+	}
+	hooks, err = os.ReadFile(path)
+	if err != nil || strings.Contains(string(hooks), "hook --user") || !strings.Contains(string(hooks), "/opt/fleet/guard") {
+		t.Fatalf("after teardown, T3 Code's agy hooks = %s, %v", hooks, err)
+	}
+}
+
+// An agy on PATH too old for terma's hooks holds back only ~/.gemini, the home it uses:
+// setup leaves that out, says why, and still writes T3 Code's home, which runs T3 Code's
+// own agy.
+func TestSetupWithAnOldAgyWritesT3CodesHomes(t *testing.T) {
+	if !testApp.agents.IsSupported("antigravity") || runtime.GOOS == "windows" {
+		t.Skip("Antigravity is Coming Soon on Windows")
+	}
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	signInTo(t, gateway, orgA())
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "agy"), []byte("#!/bin/sh\necho 1.1.9\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t3 := filepath.Join(os.Getenv("T3CODE_HOME"), "userdata", "providers", "antigravity", "a1")
+	if err := os.MkdirAll(filepath.Join(t3, "antigravity-acp"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runTerma(t, "setup", "--harness", "antigravity", "--yes", "--verbose")
+	if err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if hooks, err := os.ReadFile(filepath.Join(t3, "config", "hooks.json")); err != nil || !strings.Contains(string(hooks), "hook --user antigravity-stop") {
+		t.Fatalf("T3 Code's agy hooks = %s, %v", hooks, err)
+	}
+	if _, err := os.Stat(filepath.Join(os.Getenv("HOME"), ".gemini", "config", "hooks.json")); !os.IsNotExist(err) {
+		t.Errorf("setup wrote ~/.gemini's hooks for an old agy: %v", err)
+	}
+	if !strings.Contains(out, "left ~/.gemini out") || !strings.Contains(out, "1.2.4 or later") {
+		t.Errorf("setup did not say why it left ~/.gemini out:\n%s", out)
 	}
 }
 

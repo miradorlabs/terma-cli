@@ -239,9 +239,10 @@ installs it automatically.
 
 After an update, the new version also refreshes what earlier versions wrote in your home
 directory — the wrapped Claude Code status line, the OpenCode plugin, the relay's service —
-keeping every choice you made. It works from what is on disk, never signs in, and never
-adds a file. After an update the relay installed, the relay has the new version run it
-before it restarts, and otherwise your next terma command runs it. On the latest release,
+keeping every choice you made. It works from what is on disk, never signs in, and adds no
+file but one: terma's hook in a T3 Code Antigravity folder made after setup, as described
+under Antigravity below. After an update the relay installed, the relay has the new version
+run it before it restarts, and otherwise your next terma command runs it. On the latest release,
 `terma update` does just that refresh.
 
 ## Scripted and headless setup
@@ -472,7 +473,7 @@ Antigravity's `agy` has no telemetry export, so nothing of it passes the relay. 
 one named hook, `terma`, to `~/.gemini/config/hooks.json`, which every `agy` session loads,
 and leaves the file's other hooks, and its comments, as they are. It needs `agy` 1.2.4 or later,
 the first whose Stop hook runs reliably; `terma doctor` names the version it finds. Those hooks report the model, each turn,
-each tool step (its name and whether it failed, never its arguments) and how the turn
+each tool step (its name and whether it failed) and how the turn
 ended, and the files `agy`'s own file tools write are stamped on your commits. Each hook
 also reads the conversation's transcript and sends every model call written since the last
 one: its model and its input, cache-read and output tokens. `agy` does not count thinking
@@ -489,6 +490,65 @@ saw it are never sent. A subagent is its own conversation, linked to the one tha
 conversation lasts, so one you resume from a second repository is still recorded under the
 first, whichever of the two your team's policy collects
 ([#174](https://github.com/miradorlabs/terma-cli/issues/174)).
+
+What a conversation says goes by the same rule, from the same hooks, while you chose
+Antigravity at setup (or in global mode). Each prompt and each reply goes while your team's
+policy collects prompts. A prompt still counts when its text is withheld. Each tool call's
+arguments and each tool's result go while the policy collects tool content. The prompt and
+the reply come from the transcript, never from the copy `agy` repeats in every hook. A
+prompt from T3 Code loses T3 Code's own instructions and notes first, and keeps only the
+request; when terma cannot tell where the request starts and ends, the prompt goes without
+its text. A prompt or a reply longer than 16 KiB is cut there and marked as cut. A result is
+cut at 16 KiB and ends with how many characters were dropped. Arguments longer than 16 KiB
+keep their short values, such as a path or a command, and each long value is cut to 2 KiB
+and ends the same way. Thinking is not sent. A tool's result on a transcript line over 8 MiB
+is lost.
+
+Two rules limit what a session sends of another repository's content. They do not cover
+every tool. terma checks what a call names for `agy`'s own file and folder tools only. A
+shell command or an MCP tool that reads a repository your team's policy does not collect
+sends its arguments and its result under the session's consent, as it does for Claude Code
+and Codex.
+
+The first rule is about where the conversation works. A conversation sends no content at all
+while any folder it works in is outside a repository your team's policy collects: resumed
+from such a repository, or from a folder outside git, it sends none for the rest of its
+life. In global mode a folder outside git is collected, as a session outside git is. A
+folder that is a link is judged by the repository it leads to.
+
+The second rule covers `agy`'s own file and folder tools: the tools that read, write and
+edit a file, and `list_dir`, `grep_search` and `find_by_name`. A call of one of them that
+names a file or folder in a repository the policy does not collect sends no arguments, and
+its result is withheld. So are the results of the other calls the model asked for in the
+same response, though their arguments are sent: `agy`'s transcript does not say which result
+belongs to which call. Links, nested clones and submodules are followed to the repository
+that holds the path. A path terma cannot place counts as not collected, and so does one
+under `~`, or any path with `GIT_DIR` set in the agent's environment. A file in no
+repository at all, such as a note in your home folder, is shown, as Claude Code and Codex
+show it. A folder in no repository is not, outside global mode, since a listing or a search
+of it returns what is under it.
+
+What the two rules leave: every tool outside that list is sent with no check of what its
+arguments name. A search of a collected repository returns the files of a clone nested in
+it. A reply can repeat what a refused read returned.
+
+T3 Code runs its own copy of Antigravity, with a folder of its own in place of `~/.gemini`.
+Setup writes the same hook into each T3 Code Antigravity provider folder too:
+`~/.t3/userdata/providers/<instance>/<id>/config/hooks.json`, or the same path under
+`$T3CODE_HOME` when that is set to an absolute path. terma finds these folders by the
+`antigravity-acp` folder T3 Code keeps in each, whatever you named the instance, and offers
+Antigravity at setup when one is there, even with no `agy` on your PATH. Setup then writes
+`~/.gemini/config/hooks.json` too, for an `agy` you install later; a refresh never makes
+`~/.gemini`. With an `agy` on your PATH older than 1.2.4, terma leaves `~/.gemini` out and
+says so, and still sets up T3 Code's folders, which run T3 Code's own copy. A folder T3
+Code creates after setup is picked up by the next
+`terma setup`. It is also picked up by `terma update --refresh`, and on its own the first
+time terma runs after an upgrade, when another folder has terma's hook switched on. A
+`terma` hook you set `"enabled": false` in one folder stays off there and is never copied
+to another. While a folder lacks the hook, `terma doctor` names its file. T3 Code
+threads report what `agy` sessions do: the session, each turn, each tool step, each model
+call with its tokens, what was said, and the files its file tools write. They report no
+plan, quota or account, since T3 Code runs Antigravity with no status line.
 
 Setup also puts `terma hook antigravity-statusline` in `statusLine` in
 `~/.gemini/antigravity-cli/settings.json`. Its payload is the only place `agy` names your
