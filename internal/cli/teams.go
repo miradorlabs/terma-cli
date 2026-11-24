@@ -36,16 +36,10 @@ func (app *App) newTeamsCommand() *cobra.Command {
 		Use:   "teams",
 		Short: "Choose which teams this machine sends telemetry to",
 		Long: `List every organization and team your sign-in belongs to and choose which ones
-this machine sends telemetry to.
-
-Each team shows what its collection policy asks for before you tick it. Ticking a team
-fetches its policy and asks you to decide each binding its policy needs. A binding says
-which organization an owner (github.com/acme) or a repository belongs to on this
-machine: only that organization collects it, and personal never does. Bindings outlive
-unticking: what stays bound to an organization collects nowhere until you unbind it.
-
-Each record goes to the most specific ticked team policy that matches where it ran
-(exact repository before wildcard, then selection order), with personal last.`,
+this machine sends telemetry to. Ticking a team fetches its policy and asks you
+to decide each binding it needs. Bindings say which organization owns an owner or
+repository on this machine and outlive unticking (personal never collects bound
+repositories). Records route to the most specific ticked team, with personal last.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return app.runTeams(cmd, f) },
 	}
@@ -98,14 +92,13 @@ func (app *App) runTeams(cmd *cobra.Command, f teamsFlags) error {
 	default:
 		v = app.listTeams(cmd.Context(), cfg, st)
 	}
-	if errors.Is(err, errCancelled) {
+	switch {
+	case errors.Is(err, errCancelled):
 		fmt.Fprintln(cmd.OutOrStdout(), "Cancelled. Nothing was changed.")
 		return nil
-	}
-	if err != nil {
+	case err != nil:
 		return err
-	}
-	if f.json {
+	case f.json:
 		return output.Render(cmd.OutOrStdout(), output.FormatJSON, output.Table{}, v)
 	}
 	renderTeams(cmd.OutOrStdout(), v)
@@ -123,14 +116,14 @@ func verifyTeamsAccount(dir string, cfg *config.Config, st routing.State) error 
 }
 
 func loadRoutingState(stateDir, profile string) (routing.State, error) {
-	st, ok, err := routing.Load(stateDir, profile)
-	switch {
+	switch st, ok, err := routing.Load(stateDir, profile); {
 	case err != nil:
 		return routing.State{}, fmt.Errorf("this machine's routing state cannot be read, so nothing is sent: run `terma setup` to choose your teams again: %w", err)
 	case !ok:
 		return routing.State{}, errors.New("this profile has no routing state, so nothing is sent: run `terma setup` to choose your teams")
+	default:
+		return st, nil
 	}
-	return st, nil
 }
 
 func renderTeams(w io.Writer, v teamsView) {

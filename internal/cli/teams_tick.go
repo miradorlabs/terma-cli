@@ -200,10 +200,10 @@ func askBinding(a tickAsker, tk *tick, key, why string) (*bindingOp, error) {
 		{Label: "refuse it", Note: "no organization collects it; personal may"},
 		{Label: "decide later", Note: "what it matches is held until you decide"},
 	})
-	if err != nil || i == 2 {
+	switch {
+	case err != nil || i == 2:
 		return nil, err
-	}
-	if i == 1 {
+	case i == 1:
 		return &bindingOp{key: key, refuse: true}, nil
 	}
 	return &bindingOp{key: key, org: tk.team.OrganizationID}, nil

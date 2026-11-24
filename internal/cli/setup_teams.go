@@ -101,6 +101,11 @@ func (app *App) setupTeams(cmd *cobra.Command, cfg *config.Config, org *organiza
 		}
 	}
 	ui.policyFetched(teamName, primary.Policy)
+	if !f.desktopGrant && !f.assumeYes && app.canAsk != nil && app.canAsk() && config.PolicyStub() == "" && app.flags.projectID == "" && f.org == "" {
+		if err := app.setupMultiTeamChecklist(cmd, cfg, committed, ui); err != nil {
+			return config.Policy{}, "", err
+		}
+	}
 	return primary.Policy, teamName, nil
 }
 

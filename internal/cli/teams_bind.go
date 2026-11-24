@@ -16,6 +16,13 @@ import (
 var errPersonalBinding = errors.New("a personal organization cannot be bound: unbind or refuse so personal may collect it")
 
 func resolveBindingFlags(cmd *cobra.Command, planned *routing.State, f teamsFlags, ask bool, names *teamNames, list func() teamsView, ch *teamsChange) error {
+	apply := func(op bindingOp, change string) error {
+		if err := op.apply(planned); err != nil {
+			return err
+		}
+		ch.ops, ch.changes = append(ch.ops, op), append(ch.changes, change)
+		return nil
+	}
 	for _, raw := range f.binds {
 		keyRaw, orgRaw, ok := strings.Cut(raw, "=")
 		if !ok || strings.TrimSpace(keyRaw) == "" || strings.TrimSpace(orgRaw) == "" {
@@ -32,8 +39,7 @@ func resolveBindingFlags(cmd *cobra.Command, planned *routing.State, f teamsFlag
 		op := bindingOp{key: key, org: org}
 		if owner := routing.Owner(key); owner != "" {
 			if b, ok := planned.Bindings[owner]; ok && (b.Refused || b.Organization != org) {
-				conflict := owner + " is " + bindingWords(b, *names) + ": bind " + key + " to " + cmp.Or(orgName, org) + " against it?"
-				if err := confirmConflict(cmd, conflict, ask, f.assumeYes); err != nil {
+				if err := confirmConflict(cmd, owner+" is "+bindingWords(b, *names)+": bind "+key+" to "+cmp.Or(orgName, org)+" against it?", ask, f.assumeYes); err != nil {
 					return err
 				}
 				op.override = true
@@ -41,10 +47,9 @@ func resolveBindingFlags(cmd *cobra.Command, planned *routing.State, f teamsFlag
 		} else if err := keepRepositoryDecisions(cmd, planned, key, org, orgName, false, *names, ask, &ch.ops, &ch.changes, &ch.warnings); err != nil {
 			return err
 		}
-		if err := op.apply(planned); err != nil {
+		if err := apply(op, describeOp(op, orgName)); err != nil {
 			return err
 		}
-		ch.ops, ch.changes = append(ch.ops, op), append(ch.changes, describeOp(op, orgName))
 	}
 	for _, raw := range f.refuses {
 		key, err := bindingKeyOf(raw)
@@ -57,10 +62,9 @@ func resolveBindingFlags(cmd *cobra.Command, planned *routing.State, f teamsFlag
 			}
 		}
 		op := bindingOp{key: key, refuse: true}
-		if err := op.apply(planned); err != nil {
+		if err := apply(op, describeOp(op, "")); err != nil {
 			return err
 		}
-		ch.ops, ch.changes = append(ch.ops, op), append(ch.changes, describeOp(op, ""))
 	}
 	for _, raw := range f.unbinds {
 		key, err := bindingKeyOf(raw)
@@ -70,11 +74,10 @@ func resolveBindingFlags(cmd *cobra.Command, planned *routing.State, f teamsFlag
 		if _, ok := planned.Bindings[key]; !ok {
 			return fmt.Errorf("%s has no decision to remove", key)
 		}
-		op := bindingOp{key: key}
-		if err := op.apply(planned); err != nil {
+		if err := apply(bindingOp{key: key}, ""); err != nil {
 			return err
 		}
-		ch.ops, ch.changes = append(ch.ops, op), append(ch.changes, "unbound "+key+"; it is now "+unboundStatus(*planned, key, *names))
+		ch.changes[len(ch.changes)-1] = "unbound " + key + "; it is now " + unboundStatus(*planned, key, *names)
 	}
 	return nil
 }
@@ -159,14 +162,14 @@ func resolveOrg(ref string, names teamNames, list func() teamsView) (id, name st
 	v := list()
 	if orgID := strings.ToLower(parseOrgRef(ref).ID); orgID != "" {
 		if i := slices.IndexFunc(v.Organizations, func(o orgRow) bool { return strings.EqualFold(o.ID, orgID) }); i >= 0 {
-			o := v.Organizations[i]
-			switch {
+			switch o := v.Organizations[i]; {
 			case o.Type == "personal":
 				return "", "", errPersonalBinding
 			case o.Inaccessible:
 				return "", "", fmt.Errorf("you no longer have access to %s, so it cannot be bound", orgTitle(o))
+			default:
+				return o.ID, cmp.Or(o.Name, names.Orgs[o.ID]), nil
 			}
-			return o.ID, cmp.Or(o.Name, names.Orgs[o.ID]), nil
 		}
 		if v.Unlisted == "" {
 			return "", "", fmt.Errorf("organization %q is not one of your organizations", ref)
@@ -184,9 +187,7 @@ func resolveOrg(ref string, names teamNames, list func() teamsView) (id, name st
 			orgs = append(orgs, organization{ID: o.ID, Name: o.Name})
 		}
 	}
-	idx, err := matchUniqueRef(organizationKind, orgs, ref, func(o organization) string {
-		return fmt.Sprintf("%s (%s)", cmp.Or(o.Name, o.ID), o.ID)
-	})
+	idx, err := matchUniqueRef(organizationKind, orgs, ref, func(o organization) string { return fmt.Sprintf("%s (%s)", cmp.Or(o.Name, o.ID), o.ID) })
 	if err != nil {
 		if personalMatch {
 			return "", "", errPersonalBinding

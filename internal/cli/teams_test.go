@@ -1020,3 +1020,113 @@ func TestTeamsSignInNeededMessageAndInvalidStateFailure(t *testing.T) {
 		}
 	})
 }
+
+func TestSetupInteractiveChecklistHookup(t *testing.T) {
+	runSetup := func(t *testing.T, f *fakeAuth, account string, sf setupFlags) (*setupUI, error) {
+		t.Helper()
+		cfg, err := testApp.loadConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+		cfg.Account = account
+		cfg.OrganizationID = orgA().ID
+		cfg.OrganizationName = orgA().Name
+		cfg.ProjectID = teamsAcmeWeb
+		cmd := &cobra.Command{}
+		var out strings.Builder
+		cmd.SetOut(&out)
+		cmd.SetErr(&out)
+		cmd.SetContext(t.Context())
+		ui := newSetupUI(&out, false)
+		org := orgA()
+		_, _, err = testApp.setupTeams(cmd, cfg, &org, sf, ui)
+		return ui, err
+	}
+
+	t.Run("interactive setup ticks second org team via checklist", func(t *testing.T) {
+		f, account := routedMachine(t, "alice", nil)
+		prevAsk, prevForm, prevPick := testApp.canAsk, testApp.runForm, testApp.pickOne
+		t.Cleanup(func() { testApp.canAsk, testApp.runForm, testApp.pickOne = prevAsk, prevForm, prevPick })
+		testApp.canAsk = func() bool { return true }
+		testApp.pickOne = func(*cobra.Command, string, []pickRow, func(string) (int, error)) (int, error) { return 0, nil }
+		formCalled := false
+		testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
+			formCalled = true
+			items := slices.Clone(form.Items)
+			for i := range items {
+				if items[i].Label == "Beta Core" {
+					items[i].Selected = true
+				}
+			}
+			return items, nil
+		}
+		if _, err := runSetup(t, f, account, setupFlags{}); err != nil {
+			t.Fatalf("setupTeams: %v", err)
+		}
+		if !formCalled {
+			t.Fatal("expected interactive setup to invoke multi-team checklist")
+		}
+		st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var ids []string
+		for _, tm := range st.Teams {
+			ids = append(ids, tm.TeamID)
+		}
+		if !slices.Contains(ids, teamsAcmeWeb) || !slices.Contains(ids, betaCore) {
+			t.Fatalf("teams = %v, want both %s and %s", ids, teamsAcmeWeb, betaCore)
+		}
+		if st.Bindings["github.com/beta/core"].Organization != orgB().ID {
+			t.Fatalf("beta binding = %+v, want %s", st.Bindings["github.com/beta/core"], orgB().ID)
+		}
+	})
+
+	t.Run("stale generation during setup checklist fails closed without replaying consent", func(t *testing.T) {
+		f, account := routedMachine(t, "alice", nil)
+		prevAsk, prevForm, prevPick := testApp.canAsk, testApp.runForm, testApp.pickOne
+		t.Cleanup(func() { testApp.canAsk, testApp.runForm, testApp.pickOne = prevAsk, prevForm, prevPick })
+		testApp.canAsk = func() bool { return true }
+		testApp.pickOne = func(*cobra.Command, string, []pickRow, func(string) (int, error)) (int, error) { return 0, nil }
+		testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
+			// Concurrent write bumps Generation while the setup checklist is open.
+			if _, err := routing.Update(testApp.stateDir, config.DefaultProfile, routing.Expect{Account: account}, func(s *routing.State) error {
+				return s.Refuse("github.com/concurrent/repo")
+			}); err != nil {
+				t.Fatalf("concurrent update: %v", err)
+			}
+			items := slices.Clone(form.Items)
+			for i := range items {
+				if items[i].Label == "Beta Core" {
+					items[i].Selected = true
+				}
+			}
+			return items, nil
+		}
+		_, err := runSetup(t, f, account, setupFlags{})
+		if !errors.Is(err, routing.ErrStaleGeneration) {
+			t.Fatalf("err = %v, want ErrStaleGeneration", err)
+		}
+		st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if slices.ContainsFunc(st.Teams, func(tm routing.Team) bool { return tm.TeamID == betaCore }) {
+			t.Fatal("stale checklist consent must not tick Beta Core")
+		}
+	})
+
+	t.Run("assumeYes skips interactive checklist", func(t *testing.T) {
+		f, account := routedMachine(t, "alice", nil)
+		prevAsk, prevForm := testApp.canAsk, testApp.runForm
+		t.Cleanup(func() { testApp.canAsk, testApp.runForm = prevAsk, prevForm })
+		testApp.canAsk = func() bool { return true }
+		testApp.runForm = func(*prompt.Form) ([]prompt.Item, error) {
+			t.Fatal("runForm must not be called under --yes")
+			return nil, nil
+		}
+		if _, err := runSetup(t, f, account, setupFlags{assumeYes: true}); err != nil {
+			t.Fatalf("setupTeams -y: %v", err)
+		}
+	})
+}

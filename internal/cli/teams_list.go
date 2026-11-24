@@ -18,8 +18,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
-// teamsView is `terma teams`' list: every organization the developer belongs to,
-// each organization's teams with what their policies collect, and the bindings.
 type teamsView struct {
 	Organizations []orgRow     `json:"organizations"`
 	Unlisted      string       `json:"unlisted,omitempty"`
@@ -29,7 +27,6 @@ type teamsView struct {
 	Warnings      []string     `json:"warnings,omitempty"`
 }
 
-// orgRow is one organization and its teams, listed on the single user token.
 type orgRow struct {
 	ID           string    `json:"id"`
 	Name         string    `json:"name,omitempty"`
@@ -39,7 +36,6 @@ type orgRow struct {
 	Teams        []teamRow `json:"teams"`
 }
 
-// teamRow is one team: whether it is ticked, and what its policy collects.
 type teamRow struct {
 	ID           string             `json:"id"`
 	Name         string             `json:"name,omitempty"`
@@ -53,7 +49,6 @@ type teamRow struct {
 	Unreadable   string             `json:"unreadable,omitempty"`
 }
 
-// bindingRow is one decision about an owner or a repository.
 type bindingRow struct {
 	Key          string `json:"key"`
 	Organization string `json:"organization,omitempty"`
@@ -61,7 +56,6 @@ type bindingRow struct {
 	Refused      bool   `json:"refused,omitempty"`
 }
 
-// pendingRow is a binding left to decide, and the entry that needs it.
 type pendingRow struct {
 	Key          string `json:"key"`
 	Organization string `json:"organization"`
@@ -146,20 +140,16 @@ type listedTeam struct {
 	err    error
 }
 
-// fetchTeams lists each org's teams and reads each team's policy on one shared api.Client
-// (serializing refreshes via tokenGen), capped at listLimit in-flight requests while
-// preserving listing order.
 func (app *App) fetchTeams(ctx context.Context, client *api.Client, authURL string, orgs []organization) []listedOrg {
 	out := make([]listedOrg, len(orgs))
 	slots := make(chan struct{}, listLimit)
-	limited := func(request func()) bool {
+	run := func(fn func() error) error {
 		select {
 		case slots <- struct{}{}:
 			defer func() { <-slots }()
-			request()
-			return true
+			return fn()
 		case <-ctx.Done():
-			return false
+			return ctx.Err()
 		}
 	}
 	var wg sync.WaitGroup
@@ -167,10 +157,7 @@ func (app *App) fetchTeams(ctx context.Context, client *api.Client, authURL stri
 		org := &out[i]
 		wg.Go(func() {
 			var projects []project
-			if !limited(func() { projects, org.err = fetchProjects(ctx, client, o.ID) }) {
-				org.err = ctx.Err()
-			}
-			if org.err != nil {
+			if org.err = run(func() (err error) { projects, err = fetchProjects(ctx, client, o.ID); return err }); org.err != nil {
 				return
 			}
 			org.teams = make([]listedTeam, len(projects))
@@ -178,9 +165,7 @@ func (app *App) fetchTeams(ctx context.Context, client *api.Client, authURL stri
 				team := &org.teams[j]
 				team.project = p
 				wg.Go(func() {
-					if !limited(func() { team.policy, team.err = fetchTeamPolicy(ctx, client, authURL, o.ID, p.ID) }) {
-						team.err = ctx.Err()
-					}
+					team.err = run(func() (err error) { team.policy, err = fetchTeamPolicy(ctx, client, authURL, o.ID, p.ID); return err })
 				})
 			}
 		})
@@ -189,8 +174,6 @@ func (app *App) fetchTeams(ctx context.Context, client *api.Client, authURL stri
 	return out
 }
 
-// teamsAPIClient returns one shared API client authenticated with the profile's single
-// user token, verified against account (State.Account).
 func (app *App) teamsAPIClient(cfg *config.Config, account string) (*api.Client, error) {
 	if cfg.APIKey != "" || cfg.ServerKeySignIn || account == sendas.NoPersonLane {
 		return nil, errServerKeyTeams
@@ -219,8 +202,6 @@ func fetchTeamPolicy(ctx context.Context, client *api.Client, authURL, organizat
 	return pol, nil
 }
 
-// mergeState marks selected teams, adds any missing from the listing, and fills bindings
-// and pending decisions.
 func (v *teamsView) mergeState(st routing.State, names teamNames, now time.Time) {
 	for i := range v.Organizations {
 		for j := range v.Organizations[i].Teams {
@@ -248,12 +229,11 @@ func (v *teamsView) mergeState(st routing.State, names teamNames, now time.Time)
 			Name: cmp.Or(names.Orgs[b.Organization], v.orgName(b.Organization))})
 	}
 	v.Pending = pendingBindings(st)
-	// Personal is always last.
 	slices.SortStableFunc(v.Organizations, func(a, b orgRow) int {
-		if (a.Type == "personal") == (b.Type == "personal") {
+		switch {
+		case (a.Type == "personal") == (b.Type == "personal"):
 			return 0
-		}
-		if a.Type == "personal" {
+		case a.Type == "personal":
 			return 1
 		}
 		return -1
@@ -275,7 +255,6 @@ func (v *teamsView) orgName(id string) string {
 	return ""
 }
 
-// pendingBindings lists the bindings ticked organizations' entries need with no decision yet.
 func pendingBindings(st routing.State) []pendingRow {
 	var out []pendingRow
 	for _, t := range st.Teams {
@@ -284,12 +263,7 @@ func pendingBindings(st routing.State) []pendingRow {
 		}
 		for _, raw := range t.Policy.Repositories {
 			e, ok := routing.ParseEntry(raw, t.Policy.Wildcards)
-			if !ok || slices.ContainsFunc(out, func(p pendingRow) bool { return p.Key == e.Key() }) {
-				continue
-			}
-			_, hasKey := st.Bindings[e.Key()]
-			_, hasOwner := st.Bindings[routing.Owner(e.Key())]
-			if hasKey || (!e.Wildcard() && hasOwner) {
+			if !ok || alreadyDecided(st.Bindings, e) || slices.ContainsFunc(out, func(p pendingRow) bool { return p.Key == e.Key() }) {
 				continue
 			}
 			out = append(out, pendingRow{Key: e.Key(), Organization: t.OrganizationID, TeamID: t.TeamID, Entry: raw})
@@ -318,7 +292,6 @@ func orgNotAccessibleErr(err error) bool {
 func teamLabel(names teamNames, t routing.Team) string {
 	return orgTeamLabel(names.Orgs[t.OrganizationID], cmp.Or(names.Teams[t.TeamID], t.TeamID))
 }
-
 func orgTeamLabel(org, team string) string {
 	if org == "" || strings.HasPrefix(team, org) {
 		return team

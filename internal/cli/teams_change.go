@@ -50,23 +50,21 @@ func (app *App) applyTeamsWithView(cmd *cobra.Command, cfg *config.Config, st ro
 	if err := resolveBindingFlags(cmd, &planned, f, ask, &names, list, ch); err != nil {
 		return teamsView{}, err
 	}
-	for _, group := range []struct {
-		refs    []string
-		release bool
+	for _, g := range []struct {
+		refs []string
+		rel  bool
 	}{{f.deselects, false}, {f.releases, true}} {
-		for _, ref := range group.refs {
+		for _, ref := range g.refs {
 			t, err := selectedTeam(st, ref, names, list)
 			if err != nil {
 				return teamsView{}, err
 			}
-			if state := t.StateAt(time.Now()); group.release && state != routing.Suspended && state != routing.Refused {
+			if state := t.StateAt(time.Now()); g.rel && state != routing.Suspended && state != routing.Refused {
 				return teamsView{}, fmt.Errorf("%s is %s, not suspended or refused: `terma teams --deselect %s` unticks it", teamLabel(names, t), strings.ReplaceAll(string(state), "_", " "), quoteArg(ref))
 			}
-			if slices.ContainsFunc(ch.untick, func(u routing.Team) bool { return u.EnrollmentID == t.EnrollmentID }) {
-				continue
+			if !slices.ContainsFunc(ch.untick, func(u routing.Team) bool { return u.EnrollmentID == t.EnrollmentID }) {
+				ch.untick, ch.released[t.EnrollmentID] = append(ch.untick, t), g.rel
 			}
-			ch.untick = append(ch.untick, t)
-			ch.released[t.EnrollmentID] = group.release
 		}
 	}
 	if len(f.selects) > 0 {
@@ -99,7 +97,6 @@ func (app *App) applyTeamsWithView(cmd *cobra.Command, cfg *config.Config, st ro
 	if err != nil {
 		return teamsView{}, formatCASConflict(err)
 	}
-
 	for _, tk := range ch.ticks {
 		if committed, ok := next.Team(tk.enrollment); ok {
 			_ = routing.StoreTeamPolicy(app.stateDir, committed)
@@ -141,18 +138,12 @@ func (ch *teamsChange) write(s *routing.State, now time.Time) error {
 		}
 	}
 	for _, t := range ch.untick {
-		if ch.released[t.EnrollmentID] {
-			live, ok := s.Team(t.EnrollmentID)
-			if !ok {
-				return fmt.Errorf("team %s was unticked meanwhile", t.TeamID)
-			}
-			if state := live.StateAt(now); state != routing.Suspended && state != routing.Refused {
-				return fmt.Errorf("team %s is now %s, not suspended or refused: `terma teams --deselect %s` unticks it", t.TeamID, strings.ReplaceAll(string(state), "_", " "), quoteArg(t.TeamID))
-			}
-		}
-		if !s.Deselect(t.EnrollmentID) {
+		if live, ok := s.Team(t.EnrollmentID); !ok {
 			return fmt.Errorf("team %s was unticked meanwhile", t.TeamID)
+		} else if state := live.StateAt(now); ch.released[t.EnrollmentID] && state != routing.Suspended && state != routing.Refused {
+			return fmt.Errorf("team %s is now %s, not suspended or refused: `terma teams --deselect %s` unticks it", t.TeamID, strings.ReplaceAll(string(state), "_", " "), quoteArg(t.TeamID))
 		}
+		s.Deselect(t.EnrollmentID)
 	}
 	for _, tk := range ch.ticks {
 		for _, op := range tk.ops {
@@ -203,13 +194,11 @@ func describeOp(op bindingOp, orgName string) string {
 
 func matchUniqueRef[T any](k matchKind[T], items []T, ref string, label func(T) string) (int, error) {
 	q := strings.TrimSpace(ref)
+	var exact []int
 	for i := range items {
 		if k.id(items[i]) == q {
 			return i, nil
 		}
-	}
-	var exact []int
-	for i := range items {
 		if strings.EqualFold(k.name(items[i]), q) {
 			exact = append(exact, i)
 		}
@@ -233,8 +222,7 @@ func selectedTeam(st routing.State, ref string, names teamNames, list func() tea
 	if len(st.Teams) == 0 {
 		return routing.Team{}, fmt.Errorf("no ticked team matches %q: none is ticked", ref)
 	}
-	live := list()
-	candidates := make([]project, 0, len(st.Teams))
+	live, candidates := list(), make([]project, 0, len(st.Teams))
 	for _, t := range st.Teams {
 		name := names.Teams[t.TeamID]
 		if r := live.findTeam(t.OrganizationID, t.TeamID); r != nil && r.Name != "" {
@@ -243,9 +231,7 @@ func selectedTeam(st routing.State, ref string, names teamNames, list func() tea
 		candidates = append(candidates, project{ID: t.TeamID, Name: name})
 	}
 	k := matchKind[project]{noun: "ticked team", id: projectKind.id, name: projectKind.name}
-	idx, err := matchUniqueRef(k, candidates, ref, func(p project) string {
-		return fmt.Sprintf("%s (%s)", cmp.Or(p.Name, p.ID), p.ID)
-	})
+	idx, err := matchUniqueRef(k, candidates, ref, func(p project) string { return fmt.Sprintf("%s (%s)", cmp.Or(p.Name, p.ID), p.ID) })
 	if err != nil {
 		return routing.Team{}, err
 	}
@@ -260,7 +246,7 @@ func unselectedTeam(v teamsView, ref string) (orgRow, teamRow, error) {
 	var all []candidate
 	for _, o := range v.Organizations {
 		for _, t := range o.Teams {
-			all = append(all, candidate{org: o, team: t})
+			all = append(all, candidate{o, t})
 		}
 	}
 	k := matchKind[candidate]{noun: "team", id: func(c candidate) string { return c.team.ID }, name: func(c candidate) string { return c.team.Name }}

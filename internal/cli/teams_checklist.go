@@ -3,6 +3,7 @@ package cli
 import (
 	"cmp"
 	"errors"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -54,8 +55,6 @@ func checklistDiff(v teamsView, slots []checklistSlot, result []prompt.Item, bas
 	return ff
 }
 
-// runTeamsChecklist shows the interactive checklist for an already-fetched teamsView v
-// and commits toggles via CAS against st.
 func (app *App) runTeamsChecklist(cmd *cobra.Command, cfg *config.Config, st routing.State, v teamsView, f teamsFlags) (teamsView, error) {
 	form, slots := teamsForm(v)
 	if len(form.Items) == 0 {
@@ -66,14 +65,55 @@ func (app *App) runTeamsChecklist(cmd *cobra.Command, cfg *config.Config, st rou
 		run = prompt.Run
 	}
 	result, err := run(form)
+	if errors.Is(err, prompt.ErrCancelled) {
+		return teamsView{}, errCancelled
+	}
 	if err != nil {
-		if errors.Is(err, prompt.ErrCancelled) {
-			return teamsView{}, errCancelled
-		}
 		return teamsView{}, err
 	}
 	if ff := checklistDiff(v, slots, result, f); ff.changes() {
 		return app.applyTeamsWithView(cmd, cfg, st, v, true, ff)
 	}
 	return v, nil
+}
+
+// setupMultiTeamChecklist lets interactive `terma setup` tick additional teams across all
+// organizations via the shared CAS checklist when the developer belongs to multiple teams.
+func (app *App) setupMultiTeamChecklist(cmd *cobra.Command, cfg *config.Config, st routing.State, ui *setupUI) error {
+	v := app.listTeams(cmd.Context(), cfg, st)
+	var count int
+	for _, o := range v.Organizations {
+		count += len(o.Teams)
+	}
+	if count <= 1 {
+		return nil
+	}
+	v, err := app.runTeamsChecklist(cmd, cfg, st, v, teamsFlags{})
+	if errors.Is(err, errCancelled) || (err == nil && len(v.Changes) == 0) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var ticked []string
+	for _, o := range v.Organizations {
+		for _, t := range o.Teams {
+			if t.Selected {
+				ticked = append(ticked, orgTeamLabel(o.Name, cmp.Or(t.Name, t.ID)))
+			}
+		}
+	}
+	if len(ticked) == 0 {
+		ui.Warn("Teams", "none ticked, so nothing is collected")
+		ui.Then("Run `terma teams` to choose the teams this machine sends telemetry to.")
+	} else {
+		ui.Summary("Teams", strings.Join(ticked, ", "))
+	}
+	for _, w := range v.Warnings {
+		ui.Caution("Teams", w)
+	}
+	if len(v.Pending) > 0 {
+		ui.Then("Run `terma teams` to decide pending repository bindings.")
+	}
+	return nil
 }
