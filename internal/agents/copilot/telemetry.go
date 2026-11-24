@@ -23,7 +23,8 @@ func (Agent) CaptureRules() shape.CaptureRules {
 			"github.copilot.context.skills", "github.copilot.context.custom_agent_names"},
 		// Strings only: a number or a flag passes whatever its key (a request's AI credits,
 		// its billing multiplier), and a key no rule names is withheld with the content.
-		// Each is one CLI 1.0.96 sends, read from its own export, but for the last three.
+		// Each is one CLI 1.0.96 sends, read from its own export, unless its comment says
+		// where else it was read.
 		SafeKeys: []string{
 			// The ids of a turn and of its requests, who started a request (user or agent),
 			// the kind of agent, a tool's kind, a command's exit status, the account's
@@ -55,10 +56,12 @@ func (Agent) CaptureRules() shape.CaptureRules {
 			// seen first on CI's exports in October 2026.
 			"gen_ai.request.reasoning.level",
 			// Its session.timing.* spans, one per phase of a turn, which a feature flag of the
-			// service turns on (seen on CI's exports in November 2026): the phase and segment
-			// timed, how the turn ended and what opened the session, and the ids of the turn
-			// and its request, as interaction_id and service_request_id are above. Named one by
-			// one, so another field under the prefix is withheld until it is read.
+			// service turns on: the phase and segment timed, how the turn ended and what opened
+			// the session, and the ids of the turn and its request, as interaction_id and
+			// service_request_id are above. Read from the keys CI's relay counted in November
+			// 2026 and from the runtime's strings, not from an export: no value of them has
+			// been seen. Named one by one, so another field under the prefix is withheld
+			// until it is read.
 			"github.copilot.session.timing.phase", "github.copilot.session.timing.segment",
 			"github.copilot.session.timing.outcome", "github.copilot.session.timing.creationOrigin",
 			"github.copilot.session.timing.interactionId", "github.copilot.session.timing.requestId",

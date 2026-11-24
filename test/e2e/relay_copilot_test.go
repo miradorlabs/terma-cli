@@ -50,17 +50,28 @@ func TestRelayCopilot(t *testing.T) {
 				// The turn arrived whole: its agent span, a request with its token counts, and the edit.
 				names := map[string]bool{}
 				tokens := false
-				// A span that names no session is its trace's, as the relay places it: the
-				// runtime's session.timing.* spans, one per phase of a turn, carry no id.
+				// A span is the session's when it names it. One that names no session, as the
+				// runtime's session.timing.* spans do, one per phase of a turn, is the session's
+				// when the relay placed it there: by its trace, which a span of the session
+				// names, or by the process that sent it, said on its resource (checkOnlyClaimed).
 				traces := map[string]bool{}
 				for _, s := range e.spans {
 					if s.Attrs["gen_ai.conversation.id"] == sid {
 						traces[string(s.Proto.GetTraceId())] = true
 					}
 				}
+				ofSession := func(s Span) bool {
+					if v := s.Attrs["gen_ai.conversation.id"]; v != "" {
+						return v == sid
+					}
+					if s.Resource["terma.relay.attribution"] == "process" {
+						return s.Resource["terma.relay.session.id"] == sid
+					}
+					return traces[string(s.Proto.GetTraceId())]
+				}
 				for _, s := range e.spans {
-					if v := s.Attrs["gen_ai.conversation.id"]; v != sid && (v != "" || !traces[string(s.Proto.GetTraceId())]) {
-						t.Errorf("relay forwarded span %s of another session: gen_ai.conversation.id=%q", s.Name, v)
+					if !ofSession(s) {
+						t.Errorf("relay forwarded span %s of another session: gen_ai.conversation.id=%q", s.Name, s.Attrs["gen_ai.conversation.id"])
 					}
 					names[strings.Fields(s.Name)[0]] = true
 					tokens = tokens || s.Attrs["gen_ai.usage.input_tokens"] != "" && s.Attrs["gen_ai.usage.output_tokens"] != ""
