@@ -12,9 +12,12 @@ import (
 )
 
 func TestEnsureRoutingRelayGatesPreRoutingRelays(t *testing.T) {
-	origWait := preRoutingWait
-	preRoutingWait = 120 * time.Millisecond
-	t.Cleanup(func() { preRoutingWait = origWait })
+	if GateStopWait < 11*time.Second {
+		t.Fatalf("GateStopWait = %v, want >= 11s to cover normal relay shutdown", GateStopWait)
+	}
+	origWait := GateStopWait
+	GateStopWait = 120 * time.Millisecond
+	t.Cleanup(func() { GateStopWait = origWait })
 
 	t.Run("no relay running succeeds", func(t *testing.T) {
 		if err := EnsureRoutingRelay(t.TempDir(), "2.0.0"); err != nil {
@@ -106,11 +109,16 @@ func writeRunInfo(t *testing.T, dir string, info RunInfo) {
 }
 
 func TestWithRoutingRelayGateHoldsRelayLockExclusively(t *testing.T) {
-	origWait := preRoutingWait
-	preRoutingWait = 120 * time.Millisecond
-	t.Cleanup(func() { preRoutingWait = origWait })
+	origWait := GateStopWait
+	GateStopWait = 120 * time.Millisecond
+	t.Cleanup(func() { GateStopWait = origWait })
 
-	t.Run("holds relay lock across fn when idle", func(t *testing.T) {
+	t.Run("holds relay lock across fn when idle without spawning", func(t *testing.T) {
+		restarted := 0
+		origRestart := restartRelay
+		restartRelay = func(string, string) { restarted++ }
+		t.Cleanup(func() { restartRelay = origRestart })
+
 		stateDir := t.TempDir()
 		dir := claim.Dir(stateDir)
 		called := false
@@ -129,6 +137,9 @@ func TestWithRoutingRelayGateHoldsRelayLockExclusively(t *testing.T) {
 		if !called {
 			t.Fatal("fn was not called")
 		}
+		if restarted != 0 {
+			t.Fatalf("restartRelay called %d times when no relay was running; want 0", restarted)
+		}
 		// Lock must be released after WithRoutingRelayGate returns.
 		unlock, err := flock.TryLock(filepath.Join(dir, LockFile))
 		if err != nil {
@@ -137,7 +148,46 @@ func TestWithRoutingRelayGateHoldsRelayLockExclusively(t *testing.T) {
 		unlock()
 	})
 
-	t.Run("refuses to run fn without lock when relay refuses to release", func(t *testing.T) {
+	t.Run("restarts stopped relay after releasing lock even when fn fails", func(t *testing.T) {
+		stateDir := t.TempDir()
+		dir := claim.Dir(stateDir)
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		unlock, err := flock.TryLock(filepath.Join(dir, LockFile))
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeRunInfo(t, dir, RunInfo{PID: os.Getpid(), Version: "2.0.0", Routing: true})
+		go func() {
+			time.Sleep(30 * time.Millisecond)
+			unlock()
+		}()
+
+		restarted := 0
+		lockFreeOnRestart := false
+		origRestart := restartRelay
+		restartRelay = func(string, string) {
+			restarted++
+			if u, err := flock.TryLock(filepath.Join(dir, LockFile)); err == nil {
+				lockFreeOnRestart = true
+				u()
+			}
+		}
+		t.Cleanup(func() { restartRelay = origRestart })
+
+		wantErr := os.ErrPermission
+		if err := WithRoutingRelayGate(stateDir, "2.0.0", func() error {
+			return wantErr
+		}); err != wantErr {
+			t.Fatalf("WithRoutingRelayGate = %v, want %v", err, wantErr)
+		}
+		if restarted != 1 || !lockFreeOnRestart {
+			t.Fatalf("restartRelay called=%d lockFreeOnRestart=%v, want 1 and true", restarted, lockFreeOnRestart)
+		}
+	})
+
+	t.Run("refuses to run fn without lock when routing relay refuses to release", func(t *testing.T) {
 		stateDir := t.TempDir()
 		dir := claim.Dir(stateDir)
 		if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -150,14 +200,18 @@ func TestWithRoutingRelayGateHoldsRelayLockExclusively(t *testing.T) {
 		defer unlock()
 		writeRunInfo(t, dir, RunInfo{PID: os.Getpid(), Version: "2.0.0", Routing: true})
 		called := false
-		if err := WithRoutingRelayGate(stateDir, "2.0.0", func() error {
+		err = WithRoutingRelayGate(stateDir, "2.0.0", func() error {
 			called = true
 			return nil
-		}); err == nil {
+		})
+		if err == nil {
 			t.Fatal("WithRoutingRelayGate succeeded without acquiring relay lock")
 		}
 		if called {
 			t.Fatal("fn ran while another process still held relay lock")
+		}
+		if err.Error() != "the running relay did not release its lock in time; retry once it stops" {
+			t.Fatalf("unexpected error for routing-capable relay lock timeout: %v", err)
 		}
 	})
 }

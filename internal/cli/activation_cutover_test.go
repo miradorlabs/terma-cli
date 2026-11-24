@@ -282,6 +282,10 @@ func TestServerKeySetupWritesNoPersonRoutingStateAndOmitsProjectHeader(t *testin
 // Activation in terma setup and terma update --refresh refuses to write routing.State
 // while a pre-routing relay (!RunInfo.Routing) holds the relay lock.
 func TestActivationGatesOnRoutingCapableRelay(t *testing.T) {
+	origWait := daemon.GateStopWait
+	daemon.GateStopWait = 120 * time.Millisecond
+	t.Cleanup(func() { daemon.GateStopWait = origWait })
+
 	f := newFakeAuth(t)
 	authSandbox(t, f)
 	sandboxMachine(t)
@@ -770,6 +774,10 @@ func TestSetupRecoveryAppliesOrgAccessLostToAllSiblings(t *testing.T) {
 // A pre-routing relay that starts while setup's policy fetch is in flight (after the early
 // check passed) still prevents setup from writing routing.State.
 func TestActivationGateBlocksPreRoutingRelayStartedInFlight(t *testing.T) {
+	origWait := daemon.GateStopWait
+	daemon.GateStopWait = 120 * time.Millisecond
+	t.Cleanup(func() { daemon.GateStopWait = origWait })
+
 	f := newFakeAuth(t)
 	authSandbox(t, f)
 	sandboxMachine(t)
