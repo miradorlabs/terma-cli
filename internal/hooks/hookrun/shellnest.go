@@ -6,11 +6,7 @@ import (
 )
 
 // Pre-parse bounds preventing deep parser recursion or huge expression backtracking.
-const (
-	maxShellNesting = 4096
-	maxShellExpr    = 4096
-	separators      = " \t\n;&|()<>"
-)
+const maxShellNesting, maxShellExpr, separators = 4096, 4096, " \t\n;&|()<>"
 
 var compounds = []string{"if", "for", "while", "until", "case", "select"}
 
@@ -67,8 +63,7 @@ func parsable(src string) bool {
 				read()
 			}
 			for len(bodies) > 0 && i < len(src) && delimiterLine(src[i+1:lineEnd(src, i+1)], bodies[0]) {
-				i = lineEnd(src, i+1)
-				open = slices.Delete(open, body, body+1)
+				i, open = lineEnd(src, i+1), slices.Delete(open, body, body+1)
 				if bodies = bodies[1:]; len(bodies) > 0 {
 					read()
 				}
@@ -123,10 +118,9 @@ func parsable(src string) bool {
 			for j < len(src) && 'a' <= src[j] && src[j] <= 'z' {
 				j++
 			}
-			switch word := src[i:j]; {
-			case slices.Contains(compounds, word):
+			if word := src[i:j]; slices.Contains(compounds, word) {
 				links++
-			case word == "let": // its words are expressions
+			} else if word == "let" { // its words are expressions
 				end := strings.IndexAny(src[j:], "\n;&|")
 				if end > maxShellExpr || end < 0 && len(src)-j > maxShellExpr {
 					return false

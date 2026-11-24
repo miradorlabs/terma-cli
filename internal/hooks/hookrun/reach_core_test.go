@@ -778,10 +778,43 @@ func TestScanBoundsAndSafety(t *testing.T) {
 		{`curl -H"X-Api: key=topsecret" https://example.com`, "topsecret"},
 		{`curl https://alice:supersecret"@"example.com/x`, "supersecret"},
 		{`re""dis-cli -a topsecret ping`, "topsecret"},
+		{`curl $'--password' hunter2 https://example.com`, "hunter2"},
+		{`curl $'--user' alice:hunter2 https://example.com`, "hunter2"},
+		{`curl $'\x2d\x2dpassword' hunter2 https://example.com`, "hunter2"},
+		{`curl $'\055u' alice:hunter2 https://example.com`, "hunter2"},
+		{`curl $'\u002dp' hunter2 https://example.com`, "hunter2"},
+		{`curl $"--user" alice:hunter2 https://example.com`, "hunter2"},
+		{`curl $'--user=alice:hunter2' https://example.com`, "hunter2"},
+		{`curl $'-u'hunter2 https://example.com`, "hunter2"},
 	} {
 		if got := firstWords(tc.cmd); strings.Contains(got, tc.leak) {
 			t.Errorf("firstWords(%q) = %q, leaked %q", tc.cmd, got, tc.leak)
 		}
+	}
+
+	// Remote HOME with ~ or ~/... fails closed (sc.unknown = true) without statting.
+	scRemoteHome := newScan(dir, func(k string) (string, bool) {
+		if k == "HOME" {
+			return "//host/share", true
+		}
+		return "", false
+	}, work{deadline: time.Now().Add(time.Minute)})
+	if _, ok := scRemoteHome.path("~/repo/file", dir); ok || !scRemoteHome.unknown {
+		t.Fatalf("path(~/repo/file) with remote HOME: ok=%v unknown=%v, want (false, true)", ok, scRemoteHome.unknown)
+	}
+
+	// Non-cwd hasRemoteLink and safeLocate both charge the shared maxShellLookups budget.
+	budgetDir := filepath.Join(dir, "budget-a", "budget-b", "budget-c")
+	if err := os.MkdirAll(budgetDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	scBudgetLink := newScan(dir, os.LookupEnv, work{lookups: maxShellLookups - 1, deadline: time.Now().Add(time.Minute)})
+	if !scBudgetLink.hasRemoteLink(budgetDir) || !scBudgetLink.unknown {
+		t.Fatalf("hasRemoteLink near lookup limit did not exhaust budget: unknown=%v lookups=%d", scBudgetLink.unknown, scBudgetLink.lookups)
+	}
+	scBudgetLoc := newScan(dir, os.LookupEnv, work{lookups: maxShellLookups - 1, deadline: time.Now().Add(time.Minute)})
+	if _, ok := scBudgetLoc.safeLocate(budgetDir); ok || !scBudgetLoc.unknown {
+		t.Fatalf("safeLocate near lookup limit did not exhaust budget: ok=%v unknown=%v lookups=%d", ok, scBudgetLoc.unknown, scBudgetLoc.lookups)
 	}
 }
 
