@@ -56,16 +56,14 @@ func maskWords(command string, depth int) string {
 		masked := userinfo.ReplaceAllString(b, "://…@")
 		name, _, eq := strings.Cut(masked, "=")
 		switch {
-		case secret:
+		case secret || strings.Contains(b, "$(") || strings.Contains(b, "`") || depth >= 2 && strings.ContainsAny(b, " \t\n"):
 			words[i] = "…"
 		case len(b) > 2 && b[0] == '-' && b[1] != '-':
 			words[i] = b[:2] + "…"
 		case eq && name != "" && !strings.ContainsAny(name, " \t\n"):
 			words[i] = name + "=…"
 		case strings.ContainsAny(b, " \t\n"):
-			if depth >= 2 || strings.Contains(b, "$(") || strings.Contains(b, "`") {
-				words[i] = "…"
-			} else if inner := maskWords(b, depth+1); inner != b {
+			if inner := maskWords(b, depth+1); inner != b {
 				words[i] = inner
 			}
 		case masked != b:

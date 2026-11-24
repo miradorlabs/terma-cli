@@ -1272,12 +1272,14 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 		}
 	}
 
-	// 9. firstWords masks command substitutions (both $(...) and backticks) after secret flags and in arguments.
+	// 9. firstWords masks command substitutions (both $(...) and backticks) after secret flags and in arguments, even without whitespace.
 	for _, cmd := range []string{
 		`curl -u $(echo alice:SECRET) https://example.com`,
 		"curl -u `echo alice:SECRET` https://example.com",
 		`echo $(curl -u alice:SECRET https://example.com)`,
 		"echo `curl -u alice:SECRET https://example.com`",
+		`echo $(curl${IFS}-u${IFS}alice:SECRET)`,
+		"echo `curl${IFS}-u${IFS}alice:SECRET`",
 	} {
 		if got := firstWords(cmd); strings.Contains(got, "SECRET") {
 			t.Errorf("firstWords(%q) = %q, leaked SECRET", cmd, got)
@@ -1344,17 +1346,25 @@ func TestReachCoreHardeningRegressions(t *testing.T) {
 		t.Fatalf("safeLocate(repoA/link -> repoB/sub) = (%q, %v), want (%q, true)", got, ok, resolvedRepoB)
 	}
 
-	// 13. core.worktree in .git/config.worktree fails closed in safeLocate.
-	wtCfgRepo := filepath.Join(dir, "wt-cfg-repo")
-	if err := os.MkdirAll(filepath.Join(wtCfgRepo, ".git"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(wtCfgRepo, ".git", "config.worktree"), []byte("[core]\n\tworktree = /elsewhere\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	scWTCfg := newScan(wtCfgRepo, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
-	if got, ok := scWTCfg.safeLocate(wtCfgRepo); ok {
-		t.Fatalf("safeLocate with .git/config.worktree = (%q, true), want false", got)
+	// 13. core.worktree in .git/config.worktree, inline [core] worktree = ..., and [include] fail closed in safeLocate.
+	for _, tc := range []struct {
+		name, file, body string
+	}{
+		{"config.worktree", "config.worktree", "[core]\n\tworktree = /elsewhere\n"},
+		{"inline-worktree", "config", "[core] worktree = /elsewhere\n"},
+		{"include-section", "config", "[include]\n\tpath = /elsewhere\n"},
+	} {
+		rdir := filepath.Join(dir, "wt-"+tc.name)
+		if err := os.MkdirAll(filepath.Join(rdir, ".git"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(rdir, ".git", tc.file), []byte(tc.body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		scWTCfg := newScan(rdir, func(string) (string, bool) { return "", false }, work{deadline: time.Now().Add(time.Minute)})
+		if got, ok := scWTCfg.safeLocate(rdir); ok {
+			t.Fatalf("safeLocate(%s) = (%q, true), want false", tc.name, got)
+		}
 	}
 }
 

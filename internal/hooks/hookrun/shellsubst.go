@@ -234,8 +234,12 @@ func (sc *scan) safeLocate(dir string) (string, bool) {
 }
 func (sc *scan) hasWorktreeConfig(gitDir string) bool {
 	match := func(l string) bool {
-		k, _, eq := strings.Cut(l, "=")
-		return eq && strings.EqualFold(strings.TrimSpace(k), "worktree")
+		t := strings.TrimSpace(l)
+		if strings.HasPrefix(t, "[") {
+			_, t, _ = strings.Cut(t, "]")
+		}
+		k, _, eq := strings.Cut(t, "=")
+		return strings.HasPrefix(strings.ToLower(strings.TrimSpace(l)), "[include") || eq && strings.EqualFold(strings.TrimSpace(k), "worktree")
 	}
 	return sc.fileHasLine(filepath.Join(gitDir, "config"), match) || sc.fileHasLine(filepath.Join(gitDir, "config.worktree"), match)
 }
