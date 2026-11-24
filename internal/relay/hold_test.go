@@ -2,11 +2,13 @@ package relay
 
 import (
 	"bytes"
+	"encoding/json"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -110,5 +112,66 @@ func BenchmarkRelayNotCollectedExport(b *testing.B) {
 	postBench(b, r.Handler(), body)
 	if c := r.Stats().Snapshot().Counters; c["held_parts"] != 0 {
 		b.Fatalf("a marked session's export was held: %v", c)
+	}
+}
+
+// /held says, for the token alone, what the hold keeps and why: an unclaimed session, a
+// trace no record has named, a session claimed by other processes, with the processes its
+// claim names; a part the next sweep releases waits for nothing.
+func TestRelayHeldSaysWhy(t *testing.T) {
+	t.Parallel()
+	u := newUpstream(t)
+	f := newFixture()
+	f.claim("E", claim.Claim{ProjectID: "p1", PIDs: []int{4242}})
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, Hold: time.Minute, Lookup: f.lookup, Now: f.clock,
+		Resolve: func(c claim.Claim) (Policy, error) { return allPolicies(u)[c.ProjectID], nil }})
+	// No sweep runs, so what /held lists stays put between the asks.
+	t.Cleanup(r.cancelSend)
+	srv := httptest.NewServer(r.Handler())
+	t.Cleanup(srv.Close)
+	postProto(t, srv, "/v1/logs", logsOf("C", 2))
+	postProto(t, srv, "/v1/logs", logsOf("E", 1))
+	postProto(t, srv, "/v1/traces", sessionlessSpans([]byte("0123456789abcdef"), 3))
+
+	held := func(tok string) (int, []Waiting) {
+		req, _ := http.NewRequest(http.MethodGet, srv.URL+"/held", nil)
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := srv.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var w []Waiting
+		_ = json.NewDecoder(resp.Body).Decode(&w)
+		return resp.StatusCode, w
+	}
+	if code, _ := held("wrong"); code != http.StatusUnauthorized {
+		t.Fatalf("/held without the token = %d", code)
+	}
+	reasons := func() map[string]Waiting {
+		code, ws := held(token)
+		if code != http.StatusOK {
+			t.Fatalf("/held = %d", code)
+		}
+		out := map[string]Waiting{}
+		for _, w := range ws {
+			out[w.Key+"/"+string(w.Signal)] = w
+		}
+		return out
+	}
+	got := reasons()
+	if w := got["C/logs"]; w.Reason != whyUnclaimed || w.Records != 2 || w.Parts != 1 {
+		t.Errorf("C = %+v", w)
+	}
+	if w := got["E/logs"]; w.Reason != whyProcess || !slices.Equal(w.ClaimPIDs, []int{4242}) {
+		t.Errorf("E = %+v", w)
+	}
+	if w := got[tracePrefix+"30313233343536373839616263646566/traces"]; w.Reason != whyNoTrace || w.Records != 3 {
+		t.Errorf("trace = %+v; held %v", w, got)
+	}
+
+	f.claim("C", claim.Claim{ProjectID: "p1"})
+	if w := reasons()["C/logs"]; w.Reason != "" || w.Records != 2 {
+		t.Errorf("claimed C = %+v", w)
 	}
 }
