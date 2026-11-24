@@ -2239,8 +2239,8 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 	}
 
 	// 11. Windows-illegal component chars do not fail closed, and bare 100-CJK-char filenames resolve on Windows.
-	scIll := newScan(specDir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
-	for _, tok := range []string{"*.go", "a:b", "foo\nbar"} {
+	for _, tok := range []string{"*.go", "foo:bar", "foo\nbar"} {
+		scIll := newScan(specDir, os.LookupEnv, work{deadline: time.Now().Add(time.Minute)})
 		scIll.candidate(tok, plain)
 		if scIll.unknown {
 			t.Errorf("candidate(%q, plain) unexpectedly marked scan unknown", tok)
@@ -2256,6 +2256,45 @@ func TestAbbreviatedSecretOptionsAndLogicalCd(t *testing.T) {
 		scCJK.candidate(cjkName, plain)
 		if !slices.Contains(scCJK.out, cjkDir) {
 			t.Errorf("candidate(100-CJK-char file) out=%q, want %q", scCJK.out, cjkDir)
+		}
+	}
+
+	// 12. parsable counts compound keywords, let, and operators across \<LF> and \<CRLF> continuations.
+	for _, tc := range []struct {
+		name string
+		src  string
+		want bool
+	}{
+		{"lf_if", strings.Repeat("i\\\nf true; then ", maxShellNesting+2) + strings.Repeat("fi; ", maxShellNesting+2), false},
+		{"crlf_if", strings.Repeat("i\\\r\nf true; then ", maxShellNesting+2) + strings.Repeat("fi; ", maxShellNesting+2), false},
+		{"lf_let", "l\\\net a=" + strings.Repeat("1+\\\n", 1500) + "1", false},
+		{"lf_arith", "(\\\n(" + strings.Repeat("1+", 2100) + "1)\\\n)", false},
+		{"lf_heredoc", "cat <<EO\\\nF\nhello\nEOF\n", true},
+	} {
+		if got := parsable(tc.src); got != tc.want {
+			t.Errorf("parsable(%s) = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+
+	// 13. file:// and file:/ URLs strip query and fragment before path traversal.
+	for _, tc := range []struct {
+		raw, want string
+	}{
+		{"file:///tmp/link#v", "/tmp/link"},
+		{"file:///tmp/link?a=1#b", "/tmp/link"},
+		{"file:/tmp/link#v", "/tmp/link"},
+		{"file://localhost/tmp/link?q=1", "/tmp/link"},
+		{"file:///tmp/a%3Fb%23c?q=1", "/tmp/a?b#c"},
+	} {
+		if got, isURL, bad := urlPath(tc.raw); !isURL || bad || got != tc.want {
+			t.Errorf("urlPath(%q) = (%q, %v, %v), want (%q, true, false)", tc.raw, got, isURL, bad, tc.want)
+		}
+	}
+
+	// 14. curl --url-query masks secret values including empty-name =SECRET.
+	for _, cmd := range []string{"curl --url-query =SECRET /missing", "curl --url-q =SECRET /missing"} {
+		if got := firstWords(cmd); strings.Contains(got, "SECRET") {
+			t.Errorf("firstWords(%q) = %q, leaked SECRET", cmd, got)
 		}
 	}
 }

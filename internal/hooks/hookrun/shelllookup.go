@@ -13,17 +13,13 @@ import (
 )
 
 func (sc *scan) candidate(t string, r role) {
-	if !r.whole() {
-		t = shellValue(t)
-	}
+	t = pick(r.whole(), t, shellValue(t))
 	if p, isURL, bad := urlPath(t); bad && sc.fail() {
 		return
 	} else if isURL {
 		t = p
 	}
-	if filepath.Separator == '/' && strings.HasPrefix(t, "///") && strings.TrimLeft(t, "/") != "" {
-		t = "/" + strings.TrimLeft(t, "/")
-	}
+	t = pick(filepath.Separator == '/' && strings.HasPrefix(t, "///") && strings.TrimLeft(t, "/") != "", "/"+strings.TrimLeft(t, "/"), t)
 	slashed, keyDir := pathLike(t), sc.dir
 	if t == "" || !slashed && r.needsSlash() || sc.away(t, r) {
 		return
@@ -266,6 +262,9 @@ func urlPath(w string) (string, bool, bool) {
 	}
 	if !ok || !isScheme(scheme) || !strings.EqualFold(scheme, "file") {
 		return "", ok && isScheme(scheme), false
+	}
+	if k := strings.IndexAny(rest, "?#"); k >= 0 {
+		rest = rest[:k]
 	}
 	if len(rest) > 9 && strings.EqualFold(rest[:9], "localhost") && rest[9] == '/' {
 		rest = rest[9:]

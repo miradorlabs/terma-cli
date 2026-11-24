@@ -24,10 +24,7 @@ func (d dirHandle) lstat(name string) (fs.FileInfo, error) {
 		return nil, fs.ErrNotExist
 	}
 	fi, err := d.r.Lstat(name)
-	if errors.Is(err, syscall.Errno(123)) || errors.Is(err, syscall.Errno(161)) {
-		return nil, fs.ErrNotExist
-	}
-	return fi, err
+	return fi, pick(errors.Is(err, syscall.Errno(123)) || errors.Is(err, syscall.Errno(161)), fs.ErrNotExist, err)
 }
 func (d dirHandle) openSubDir(name string, want fs.FileInfo) (dirHandle, error) {
 	r, err := d.r.OpenRoot(name)
