@@ -857,6 +857,9 @@ func TestTeamsSignInNeededMessageAndInvalidStateFailure(t *testing.T) {
 		if _, _, err := teamsJSON(t, "--bind", "github.com/acme/api="+strings.ToUpper(hexPersonal)); err == nil || !strings.Contains(err.Error(), "personal") {
 			t.Fatalf("bind Personal by uppercase id err = %v, want personal rejection", err)
 		}
+		if _, _, err := teamsJSON(t, "--bind", "github.com/acme/api=00000000-0000-4000-8000-000000000099"); err == nil || !strings.Contains(err.Error(), "not one of your organizations") {
+			t.Fatalf("bind unknown UUID err = %v, want unknown-org rejection", err)
+		}
 	})
 
 	t.Run("unbinding a repository reports inherited owner decision", func(t *testing.T) {

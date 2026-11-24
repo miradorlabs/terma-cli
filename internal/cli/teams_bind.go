@@ -74,8 +74,7 @@ func resolveBindingFlags(cmd *cobra.Command, planned *routing.State, f teamsFlag
 		if err := op.apply(planned); err != nil {
 			return err
 		}
-		ch.ops = append(ch.ops, op)
-		ch.changes = append(ch.changes, "unbound "+key+"; it is now "+unboundStatus(*planned, key, *names))
+		ch.ops, ch.changes = append(ch.ops, op), append(ch.changes, "unbound "+key+"; it is now "+unboundStatus(*planned, key, *names))
 	}
 	return nil
 }
@@ -111,14 +110,13 @@ func bindingWords(b routing.Binding, names teamNames) string {
 }
 
 func confirmConflict(cmd *cobra.Command, question string, ask, assumeYes bool) error {
-	if assumeYes {
+	switch {
+	case assumeYes:
 		return nil
-	}
-	if !ask {
+	case !ask:
 		return errors.New(question + " Pass --yes to make it")
 	}
-	ok, err := confirmDefault(cmd, question, false)
-	if err != nil || ok {
+	if ok, err := confirmDefault(cmd, question, false); err != nil || ok {
 		return err
 	}
 	return errCancelled
@@ -165,6 +163,9 @@ func resolveOrg(ref string, names teamNames, list func() teamsView) (id, name st
 				return "", "", errPersonalBinding
 			}
 			return v.Organizations[i].ID, cmp.Or(v.Organizations[i].Name, names.Orgs[v.Organizations[i].ID]), nil
+		}
+		if v.Unlisted == "" {
+			return "", "", fmt.Errorf("organization %q is not one of your organizations", ref)
 		}
 		return orgID, names.Orgs[orgID], nil
 	}
