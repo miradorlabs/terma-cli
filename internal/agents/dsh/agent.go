@@ -30,7 +30,11 @@ func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "dsh's own export goes to DeepSeek; terma's plugin exports tokens (auxiliary calls included) and tool calls through the local relay only; no cost"}
 }
 
+// RefreshMachine rewrites an installed DSH plugin with this build's template.
+func (Agent) RefreshMachine() (string, bool, error) { return refreshPlugin() }
+
 var (
-	_ agents.Covered = Agent{}
-	_ agents.Agent   = Agent{}
+	_ agents.Covered          = Agent{}
+	_ agents.Agent            = Agent{}
+	_ agents.MachineRefresher = Agent{}
 )

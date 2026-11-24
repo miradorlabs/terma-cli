@@ -18,7 +18,11 @@ import (
 //go:embed plugin/terma.mjs
 var dshPluginTemplate string
 
-const dshConfigMarker = "const CONFIG = null /* terma:config */"
+const (
+	dshConfigPrefix = "const CONFIG = "
+	dshConfigSuffix = " /* terma:config */"
+	dshConfigMarker = dshConfigPrefix + "null" + dshConfigSuffix
+)
 
 type pluginConfig struct {
 	Version            int               `json:"version"`
@@ -53,7 +57,28 @@ func renderPlugin(cfg pluginConfig) (string, error) {
 	if !strings.Contains(dshPluginTemplate, dshConfigMarker) {
 		return "", errors.New("dsh plugin template has no configuration line")
 	}
-	return strings.Replace(dshPluginTemplate, dshConfigMarker, "const CONFIG = "+string(data)+" /* terma:config */", 1), nil
+	return strings.Replace(dshPluginTemplate, dshConfigMarker, dshConfigPrefix+string(data)+dshConfigSuffix, 1), nil
+}
+
+// refreshPlugin re-splices an installed DSH plugin's configuration into this build's template.
+func refreshPlugin() (string, bool, error) {
+	dir, err := home()
+	if err != nil {
+		return "", false, err
+	}
+	return relayexport.RefreshTemplate(filepath.Join(dir, "plugins", "terma-relay.mjs"), func(data []byte) ([]byte, bool, error) {
+		_, rest, ok := strings.Cut(string(data), dshConfigPrefix)
+		if !ok {
+			return nil, false, nil
+		}
+		literal, _, ok := strings.Cut(rest, dshConfigSuffix)
+		var cfg pluginConfig
+		if !ok || json.Unmarshal([]byte(literal), &cfg) != nil || cfg.Version != 1 || cfg.Endpoint == "" {
+			return nil, false, nil
+		}
+		text, err := renderPlugin(cfg)
+		return []byte(text), err == nil, err
+	})
 }
 
 // writePlugin writes terma's plugin and appends its insert to dsh's home patch, a YAML
@@ -68,11 +93,8 @@ func writePlugin(cfg pluginConfig) (string, error) {
 		return "", err
 	}
 	path := filepath.Join(home, "plugins", "terma-relay.mjs")
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return "", err
-	}
 	// The plugin holds the relay's local token: private to this user.
-	if err := config.WriteFileAtomic(path, []byte(text), 0o600); err != nil {
+	if err := relayexport.WriteOwn(path, []byte(text), 0o600); err != nil {
 		return "", err
 	}
 	patch := filepath.Join(home, "cordis.patch.yml")

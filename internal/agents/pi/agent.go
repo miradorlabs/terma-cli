@@ -34,7 +34,11 @@ func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "Pi has no OTLP export; terma's extension exports tokens, cost and tool calls through the local relay only"}
 }
 
+// RefreshMachine rewrites an installed Pi extension with this build's template.
+func (Agent) RefreshMachine() (string, bool, error) { return refreshExtension() }
+
 var (
-	_ agents.Covered = Agent{}
-	_ agents.Agent   = Agent{}
+	_ agents.Covered          = Agent{}
+	_ agents.Agent            = Agent{}
+	_ agents.MachineRefresher = Agent{}
 )

@@ -301,3 +301,10 @@ func (t *Turns) dest(cwd string) *dest {
 	t.dests[cwd] = d
 	return d
 }
+func (rt *Routing) dropRunCache(ids ...string) {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	for _, id := range ids {
+		delete(rt.runs, id)
+	}
+}
