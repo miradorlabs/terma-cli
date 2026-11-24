@@ -2,6 +2,7 @@ package hookrun
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -16,6 +17,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
+// ErrFailClosed signals that a reach hook could not verify or persist routing state,
+// instructing dispatch.Run to exit non-zero so extension plugins fail closed.
+var ErrFailClosed = errors.New("reach classification failed closed")
+
 // Routing holds a profile's routing state and compiled Router for one hook process.
 // When Env.Routing is non-nil it replaces Policy and Team; nil keeps the pre-cutover fallback.
 type Routing struct {
@@ -25,6 +30,7 @@ type Routing struct {
 	router             *routing.Router
 	mu                 sync.Mutex
 	runs               map[string]*ledgerRun
+	writeErr           error
 }
 type ledgerRun struct {
 	id              string
@@ -299,3 +305,26 @@ func (rt *Routing) dropRunCache(ids ...string) {
 		delete(rt.runs, id)
 	}
 }
+
+func (rt *Routing) noteWriteErr(err error) {
+	if rt == nil || err == nil {
+		return
+	}
+	rt.mu.Lock()
+	if rt.writeErr == nil {
+		rt.writeErr = err
+	}
+	rt.mu.Unlock()
+}
+
+func (rt *Routing) takeWriteErr() error {
+	if rt == nil {
+		return nil
+	}
+	rt.mu.Lock()
+	err := rt.writeErr
+	rt.writeErr = nil
+	rt.mu.Unlock()
+	return err
+}
+

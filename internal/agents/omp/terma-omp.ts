@@ -31,73 +31,34 @@ type TermaConfig = {
 // runs as the agent exits awaits: the agent's exit would otherwise cut the payload off; with
 // untilExit, once the hook has exited, for a caller that orders its hooks. It reports whether
 // the hook took the payload: with untilExit, whether it exited cleanly.
-const HOOK_TIMEOUT_MS = 2000
-const HOOK_KILL_GRACE_MS = 250
-const MAX_HOOK_QUEUE = 64
+const HOOK_TIMEOUT_MS = 2000, HOOK_KILL_GRACE_MS = 250, MAX_HOOK_QUEUE = 64
 
 function spawnHook(event: string, payload: Record<string, unknown>, untilExit = false, timeoutMs = 0): { result: Promise<boolean>; exit: Promise<void> } {
   if (!CONFIG) return { result: Promise.resolve(false), exit: Promise.resolve() }
   let resolveExit!: () => void
   const exit = new Promise<void>((r) => { resolveExit = r })
   const result = new Promise<boolean>((resolve) => {
-    let settled = false
-    let exited = false
-    let child: ReturnType<typeof spawn> | null = null
-    let timer: any
-    let killTimer: any
-    const finish = (ok: boolean) => {
-      if (settled) return
-      settled = true
-      if (timer) clearTimeout(timer)
-      if (killTimer) clearTimeout(killTimer)
-      resolve(ok)
-    }
-    const markExited = () => {
-      if (exited) return
-      exited = true
-      if (timer) clearTimeout(timer)
-      if (killTimer) clearTimeout(killTimer)
-      resolveExit()
-    }
+    let settled = false, exited = false, child: ReturnType<typeof spawn> | null = null, timer: any, killTimer: any
+    const finish = (ok: boolean) => { if (!settled) { settled = true; clearTimeout(timer); clearTimeout(killTimer); resolve(ok) } }
+    const markExited = () => { if (!exited) { exited = true; clearTimeout(timer); clearTimeout(killTimer); resolveExit() } }
+    const sendKill = (sig: NodeJS.Signals) => { try { child?.kill(sig) } catch (err: any) { if (err?.code === "ESRCH") markExited() } }
     try {
       const [cmd, ...args] = CONFIG!.hookCommand
       child = spawn(cmd, [...args, event], { stdio: ["pipe", "ignore", "ignore"], detached: false })
-      child.on("error", () => {
-        markExited()
-        finish(false)
-      })
-      child.on("close", (code: number | null) => {
-        markExited()
-        if (untilExit) finish(code === 0)
-      })
+      child.on("error", () => { markExited(); finish(false) })
+      child.on("close", (code: number | null) => { markExited(); if (untilExit) finish(code === 0) })
       child.stdin.on("error", () => { if (!untilExit) finish(false) })
       if (untilExit && timeoutMs > 0) {
         timer = setTimeout(() => {
-          if (!child) {
-            markExited()
-            return finish(false)
-          }
-          try { child.kill("SIGTERM") } catch (err: any) {
-            if (err && err.code === "ESRCH") markExited()
-          }
-          killTimer = setTimeout(() => {
-            try { child?.kill("SIGKILL") } catch (err: any) {
-              if (err && err.code === "ESRCH") markExited()
-            }
-            child?.unref?.()
-            finish(false)
-          }, HOOK_KILL_GRACE_MS)
+          if (!child) { markExited(); return finish(false) }
+          sendKill("SIGTERM")
+          killTimer = setTimeout(() => { sendKill("SIGKILL"); child?.unref?.(); finish(false) }, HOOK_KILL_GRACE_MS)
           killTimer?.unref?.()
         }, timeoutMs)
         timer?.unref?.()
       }
-      child.stdin.end(JSON.stringify(payload), () => {
-        if (!untilExit) finish(true)
-      })
-    } catch {
-      markExited()
-      finish(false)
-    }
+      child.stdin.end(JSON.stringify(payload), () => { if (!untilExit) finish(true) })
+    } catch { markExited(); finish(false) }
   })
   return { result, exit }
 }
@@ -339,6 +300,7 @@ export default async function (omp: any) {
   const tainted = new Set<string>()
   const fenced = new Set<string>()
   const fencing = new Map<string, Promise<boolean>>()
+  const runGen = new Map<string, number>()
   const markSet = (set: Set<string>, s: string, parent: string) => {
     if (s) set.add(s)
     if (parent) set.add(parent)
@@ -351,6 +313,7 @@ export default async function (omp: any) {
     if (isFenced(s, parent)) return Promise.resolve(true)
     const active = fencing.get(s)
     if (active) return active
+    const gen = runGen.get(s) ?? 0
     // Fail-closed fence: await lifecycle drain (bounded) and flip the run to Mixed via
     // an unresolvable shell reach before tool execution continues. If fencing also fails,
     // tool_call blocks execution so OMP's native OTLP export cannot leak under a stale claim.
@@ -366,9 +329,9 @@ export default async function (omp: any) {
       }, true, HOOK_TIMEOUT_MS)
       lifecycle = lifecycle.then(() => run.exit, () => run.exit)
       const ok = await awaitWithin(run.result, HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS + 500, false)
-      if (ok) markSet(fenced, s, parent)
+      if (ok && (runGen.get(s) ?? 0) === gen) markSet(fenced, s, parent)
       return ok
-    })().finally(() => { fencing.delete(s) })
+    })().finally(() => { if (fencing.get(s) === p) fencing.delete(s) })
     fencing.set(s, p)
     return p
   }
@@ -392,7 +355,14 @@ export default async function (omp: any) {
 
   omp.on("session_start", (event: any, ctx: any) => {
     session = sessionOf(ctx)
-    return queuedHook("omp-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason, parent_session_id: parentOf(ctx) || undefined }).then(() => undefined)
+    const parent = parentOf(ctx)
+    if (session) {
+      runGen.set(session, (runGen.get(session) ?? 0) + 1)
+      fenced.delete(session)
+      fencing.delete(session)
+      if (!parent) tainted.delete(session)
+    }
+    return queuedHook("omp-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason, parent_session_id: parent || undefined }).then(() => undefined)
   })
 
   // The session's end is handed over first: it must land within OMP's 2 s, or the next

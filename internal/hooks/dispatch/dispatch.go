@@ -6,6 +6,7 @@ package dispatch
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -111,17 +112,16 @@ func Run(ctx context.Context, d Deps, r Request) int {
 		fmt.Fprintf(r.Stderr, "terma hook: unknown event %q (ignored)\n", r.Event)
 		return 0
 	}
-	run(ctx, d, r, e.Handler, e.Flush, agents.Tool(e.Agent))
-	return 0
+	return run(ctx, d, r, e.Handler, e.Flush, agents.Tool(e.Agent))
 }
 
-func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush bool, tool string) {
+func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush bool, tool string) int {
 	if r.HooksOff {
-		return
+		return 0
 	}
 	p := d.Profile()
 	if r.Cwd == "" {
-		return
+		return 0
 	}
 	// Stdout is the hook's reply to the agent, which may feed it to the model. A bounded
 	// copy of the payload lets a hook that spooled nothing still claim its session.
@@ -153,7 +153,9 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 	}
 	ctx, cancel := context.WithTimeout(ctx, handlerTimeout)
 	defer cancel()
-	_ = handler(ctx, env)
+	if err := handler(ctx, env); errors.Is(err, hookrun.ErrFailClosed) {
+		return 1
+	}
 	if !claimed && tool != "" {
 		if s, ok := d.Agents.PayloadSession(r.Event, payload.Bytes()); ok {
 			claimed, claimedIn = hookrun.ClaimFromPayload(ctx, env, s, tool), cmp.Or(s.Cwd, r.Cwd)
@@ -168,6 +170,7 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 	if flush && env.Spool != nil && !flushed {
 		d.Flush()
 	}
+	return 0
 }
 
 // boundedBuffer keeps the first max bytes, so an oversized payload cannot inflate it.

@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"path/filepath"
 	"slices"
@@ -149,6 +150,10 @@ func (x Extension) toolReach(ctx context.Context, env Env) error {
 	if !session.ValidID(in.SessionID) {
 		return nil
 	}
+	if env.Routing != nil && !env.Routing.Usable() {
+		return ErrFailClosed
+	}
+	_ = env.Routing.takeWriteErr()
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
 	subagent := session.ValidID(in.ParentSessionID) && in.ParentSessionID != in.SessionID
 	if subagent {
@@ -157,14 +162,15 @@ func (x Extension) toolReach(ctx context.Context, env Env) error {
 			env.parent = in.ParentSessionID
 		}
 	}
-	paths := extensionReachPaths(in, env.Cwd)
-	if len(paths) == 0 {
-		return nil
+	if paths := extensionReachPaths(in, env.Cwd); len(paths) > 0 {
+		r, _ := env.Repo(ctx)
+		env.Classify(ctx, r, session.Session{ID: in.SessionID, Tool: x.Tool, Model: in.Model}, paths, nil)
+		if subagent {
+			env.propagateMixed(in.ParentSessionID, in.SessionID, x.Tool)
+		}
 	}
-	r, _ := env.Repo(ctx)
-	env.Classify(ctx, r, session.Session{ID: in.SessionID, Tool: x.Tool, Model: in.Model}, paths, nil)
-	if subagent {
-		env.propagateMixed(in.ParentSessionID, in.SessionID, x.Tool)
+	if err := env.Routing.takeWriteErr(); err != nil {
+		return fmt.Errorf("%w: %w", ErrFailClosed, err)
 	}
 	return nil
 }
