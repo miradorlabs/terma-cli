@@ -3,6 +3,228 @@
   "harness": "codex",
   "steps": [
     {
+      "version": "0.172.0",
+      "previous": "0.171.0",
+      "changes": [
+        {
+          "id": "telemetry.surfaces.metrics/codex.exec_command.calls",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.exec_command.calls (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.exec_command.duration_total_ms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.exec_command.duration_total_ms (10 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sandbox_integrity.check",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.sandbox_integrity.check",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sandbox_integrity.duration_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.sandbox_integrity.duration_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sandbox_integrity.preparation_ms",
+          "category": "telemetry",
+          "op": "removed",
+          "title": "Telemetry surface no longer sent: metrics/codex.sandbox_integrity.preparation_ms",
+          "impact": "degrading",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/capture_binding_with_metadata.parent",
+          "category": "telemetry",
+          "op": "changed",
+          "title": "Telemetry surfaces.traces/capture_binding_with_metadata.parent changed: \"traces/mcp.runtime.resolve_for_step\" → \"traces/mcp.binding.capture\"",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/mcp.binding.cache_lock_wait",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/mcp.binding.cache_lock_wait (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/mcp.binding.capture",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/mcp.binding.capture (10 fields)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.traces/mcp.binding.catalog_capture",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/mcp.binding.catalog_capture (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/mcp.binding.catalog_revision_wait",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/mcp.binding.catalog_revision_wait (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/mcp.binding.normalize_tools",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/mcp.binding.normalize_tools (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/mcp.binding.startup_wait",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/mcp.binding.startup_wait (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.connector_tool_result_passthrough",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.connector_tool_result_passthrough",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.guardianv3.housekeeper",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.guardianv3.housekeeper",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.guardianv3.housekeeper.batch_timeout_ms",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.guardianv3.housekeeper.batch_timeout_ms",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.guardianv3.housekeeper.routing_instructions",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.guardianv3.housekeeper.routing_instructions",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.guardianv3.max_instruction_tokens",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.guardianv3.max_instruction_tokens",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.guardianv3.message_board_in_memory",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.guardianv3.message_board_in_memory",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.guardianv3.reviewer",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.guardianv3.reviewer",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.features.guardianv3.reviewer.retrieval_instructions",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.guardianv3.reviewer.retrieval_instructions",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.realtime_frames_local",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.realtime_frames_local",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.tui.keymap.default",
+          "category": "config",
+          "op": "changed",
+          "title": "Default of tui.keymap: {\"agents\":{\"archive\":null,\"delete\":null,\"fork\":null,\"hide… → {\"agents\":{\"archive\":null,\"delete\":null,\"fork\":null,\"hide…",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.tui.keymap.agents.default",
+          "category": "config",
+          "op": "changed",
+          "title": "Default of tui.keymap.agents: {\"archive\":null,\"delete\":null,\"fork\":null,\"hide\":null,\"ne… → {\"archive\":null,\"delete\":null,\"fork\":null,\"hide\":null,\"ne…",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "config.options.tui.keymap.agents.next_group",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: tui.keymap.agents.next_group",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.tui.keymap.agents.previous_group",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: tui.keymap.agents.previous_group",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false status --porcelain=v2 --branch --no-ahead-behind --ignore-submodules=dirty.phases.exit",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "`git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false status --por …` no longer runs at exit (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.git -c safe.bareRepository=explicit config --null --get core.fsmonitor.phases.exit",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "`git -c safe.bareRepository=explicit config --null --get core.fsmonitor` no longer runs at exit (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        }
+      ]
+    },
+    {
       "version": "0.171.0",
       "previous": "0.170.0",
       "changes": [
@@ -801,340 +1023,6 @@
           "documented": false
         },
         {
-          "id": "telemetry.surfaces.metrics/codex.rollout.persistence.append",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: metrics/codex.rollout.persistence.append",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/codex.rollout.persistence.bytes_removed",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: metrics/codex.rollout.persistence.bytes_removed",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/codex.rollout.persistence.item_bytes_v2",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: metrics/codex.rollout.persistence.item_bytes_v2",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/codex.rollout.persistence.turn_bytes_v2",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surface no longer sent: metrics/codex.rollout.persistence.turn_bytes_v2",
-          "impact": "degrading",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.traces/list_models.root",
-          "category": "telemetry",
-          "op": "removed",
-          "title": "Telemetry surfaces.traces/list_models.root removed",
-          "impact": "notable",
-          "documented": true
-        },
-        {
-          "id": "telemetry.surfaces.traces/mcp.runtime.apps_catalog_wait",
-          "category": "telemetry",
-          "op": "added",
-          "title": "New telemetry surface: traces/mcp.runtime.apps_catalog_wait (9 fields)",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "cli.commands.codex exec.options.--trust",
-          "category": "cli",
-          "op": "added",
-          "title": "New flag `codex exec --trust`",
-          "impact": "informational",
-          "documented": true
-        },
-        {
-          "id": "cli.commands.codex review.options.--trust",
-          "category": "cli",
-          "op": "added",
-          "title": "New flag `codex review --trust`",
-          "impact": "informational",
-          "documented": true
-        },
-        {
-          "id": "cli.help.exec --help",
-          "category": "cli",
-          "op": "changed",
-          "title": "Full help text of `exec --help` changed (+203 −0 chars)",
-          "impact": "informational",
-          "documented": true
-        },
-        {
-          "id": "cli.help.exec -h",
-          "category": "cli",
-          "op": "changed",
-          "title": "Full help text of `exec -h` changed (+203 −0 chars)",
-          "impact": "informational",
-          "documented": true
-        },
-        {
-          "id": "cli.help.review --help",
-          "category": "cli",
-          "op": "changed",
-          "title": "Full help text of `review --help` changed (+310 −107 chars)",
-          "impact": "informational",
-          "documented": true
-        },
-        {
-          "id": "cli.help.review -h",
-          "category": "cli",
-          "op": "changed",
-          "title": "Full help text of `review -h` changed (+353 −100 chars)",
-          "impact": "informational",
-          "documented": true
-        },
-        {
-          "id": "config.options.auto_review.experimental_policy_template",
-          "category": "config",
-          "op": "removed",
-          "title": "Setting no longer read: auto_review.experimental_policy_template",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "config.options.auto_review.extra_policy",
-          "category": "config",
-          "op": "removed",
-          "title": "Setting no longer read: auto_review.extra_policy",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "config.options.features.daybreak_program_propagation",
-          "category": "config",
-          "op": "added",
-          "title": "New setting: features.daybreak_program_propagation",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "config.options.features.gateway_setup_wizard",
-          "category": "config",
-          "op": "added",
-          "title": "New setting: features.gateway_setup_wizard",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "config.options.features.incremental_tools_legacy",
-          "category": "config",
-          "op": "added",
-          "title": "New setting: features.incremental_tools_legacy",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "config.options.features.incremental_tools_legacy_gcp",
-          "category": "config",
-          "op": "added",
-          "title": "New setting: features.incremental_tools_legacy_gcp",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "config.options.features.mcp_lazy_stdio_startup",
-          "category": "config",
-          "op": "added",
-          "title": "New setting: features.mcp_lazy_stdio_startup",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "config.options.model_providers.<name>.gateway_oauth.description",
-          "category": "config",
-          "op": "changed",
-          "title": "model_providers.<name>.gateway_oauth description changed (+63 −63 chars)",
-          "impact": "informational",
-          "documented": true
-        },
-        {
-          "id": "config.options.model_providers.<name>.gateway_oauth.credential_export",
-          "category": "config",
-          "op": "added",
-          "title": "New setting: model_providers.<name>.gateway_oauth.credential_export",
-          "impact": "notable",
-          "documented": true
-        },
-        {
-          "id": "config.options.model_providers.<name>.gateway_oauth.device_authorization_url",
-          "category": "config",
-          "op": "added",
-          "title": "New setting: model_providers.<name>.gateway_oauth.device_authorization_url",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "config.options.tui.collapse_turn_details",
-          "category": "config",
-          "op": "added",
-          "title": "New setting: tui.collapse_turn_details",
-          "impact": "informational",
-          "documented": true
-        },
-        {
-          "id": "config.options.tui.keymap.default",
-          "category": "config",
-          "op": "changed",
-          "title": "Default of tui.keymap: {\"agents\":{\"archive\":null,\"delete\":null,\"fork\":null,\"hide… → {\"agents\":{\"archive\":null,\"delete\":null,\"fork\":null,\"hide…",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "config.options.tui.keymap.global.default",
-          "category": "config",
-          "op": "changed",
-          "title": "Default of tui.keymap.global: {\"change_host\":null,\"clear_terminal\":null,\"copy\":null,\"eq… → {\"change_host\":null,\"clear_terminal\":null,\"close_sidebar_…",
-          "impact": "notable",
-          "documented": false
-        },
-        {
-          "id": "config.options.tui.keymap.global.close_sidebar_tab",
-          "category": "config",
-          "op": "added",
-          "title": "New setting: tui.keymap.global.close_sidebar_tab",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "config.options.tui.keymap.global.focus_sidebar_tabs",
-          "category": "config",
-          "op": "added",
-          "title": "New setting: tui.keymap.global.focus_sidebar_tabs",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "config.options.tui.keymap.global.sidebar_down",
-          "category": "config",
-          "op": "added",
-          "title": "New setting: tui.keymap.global.sidebar_down",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "config.options.tui.keymap.global.sidebar_up",
-          "category": "config",
-          "op": "added",
-          "title": "New setting: tui.keymap.global.sidebar_up",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "filesystem.darwin/arm64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false status --porcelain --ignore-submodules=dirty",
-          "category": "filesystem",
-          "op": "changed",
-          "title": "Command changed: `git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false status --por …` (+25 −0 chars) (darwin/arm64)",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "filesystem.linux/amd64.paths.<tmp>.ops.write",
-          "category": "filesystem",
-          "op": "added",
-          "title": "Now writes <tmp> (linux/amd64)",
-          "impact": "notable",
-          "documented": true
-        },
-        {
-          "id": "filesystem.linux/amd64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false remote -v.phases.exit",
-          "category": "filesystem",
-          "op": "added",
-          "title": "`git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false remote -v` now also runs at exit (linux/amd64)",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "filesystem.linux/amd64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false rev-parse HEAD.phases.exit",
-          "category": "filesystem",
-          "op": "added",
-          "title": "`git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false rev-parse HE …` now also runs at exit (linux/amd64)",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "filesystem.linux/amd64.exec.git -c safe.bareRepository=explicit config --null --get core.fsmonitor.phases.exit",
-          "category": "filesystem",
-          "op": "added",
-          "title": "`git -c safe.bareRepository=explicit config --null --get core.fsmonitor` now also runs at exit (linux/amd64)",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "filesystem.linux/amd64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false status --porcelain --ignore-submodules=dirty",
-          "category": "filesystem",
-          "op": "changed",
-          "title": "Command changed: `git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false status --por …` (+25 −0 chars) (linux/amd64)",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "filesystem.linux/amd64.exec./proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\",\"mis… -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_1=\"${CODEX_PERMISSION_PROFILE+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_1=\"${CODEX_PERMISSION_PROFILE-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_2=\"${CODEX_PLUGIN_METRICS_OUTPUT+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_2=\"${CODEX_PLUGIN_METRICS_OUTPUT-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_3=\"${CODEX_SESSION_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_3=\"${CODEX_SESSION_ID-}\"\n…",
-          "category": "filesystem",
-          "op": "removed",
-          "title": "Command no longer run: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (linux/amd64)",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "filesystem.linux/amd64.exec.bwrap --as-pid-1 --new-session --die-with-parent --ro-bind / / --dev /dev --perms 000 --tmpfs <tmp>/codex-daemon-<id> --remount-ro <tmp>/codex-daemon-<id> --bind <tmp> <tmp> --perms 000 --tmpfs <tmp>/codex-daemon-<id> --remount-ro <tmp>/codex-daemon-<id> --perms 555 --tmpfs <tmp>/.git --remount-ro <tmp>/.git --perms 555 --tmpfs <tmp>/.agents --remount-ro <tmp>/.agents --perms 555 --tmpfs <tmp>/.codex --remount-ro <tmp>/.codex --perms 555 --tmpfs <tmp>/.aws --remount-ro <tmp>/.aws --ro-bind <tmp>/codex-bwrap-synthetic-mount-targets-<id> <tmp>/codex-bwrap-synthetic-mount-targets-<id> --bind <repo> <repo> --ro-bind <repo>/.git <repo>/.git --perms 555 --tmpfs <repo>/.agents --remount-ro <repo>/.agents --perms 555 --tmpfs <repo>/.codex --remount-ro <repo>/.codex --perms 555 --tmpfs <repo>/.aws --remount-ro <repo>/.aws --unshare-user --unshare-pid --unshare-ipc --unshare-net --cap-drop ALL --argv0 codex-linux-sandbox -- <install>/codex --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\",\"mis… --apply-seccomp-then-exec -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_1=\"${CODEX_PERMISSION_PROFILE+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_1=\"${CODEX_PERMISSION_PROFILE-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_2=\"${CODEX_PLUGIN_METRICS_OUTPUT+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_2=\"${CODEX_PLUGIN_METRICS_OUTPUT-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_3=\"${CODEX_SESSION_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_3=\"${CODEX_SESSION_ID-}\"\n…",
-          "category": "filesystem",
-          "op": "removed",
-          "title": "Command no longer run: `bwrap --as-pid-1 --new-session --die-with-parent --ro-bind / / --dev /dev --perms 000 --tmpfs <tmp>/ …` (linux/amd64)",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "filesystem.linux/amd64.exec.codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\",\"mis… -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_1=\"${CODEX_PERMISSION_PROFILE+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_1=\"${CODEX_PERMISSION_PROFILE-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_2=\"${CODEX_PLUGIN_METRICS_OUTPUT+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_2=\"${CODEX_PLUGIN_METRICS_OUTPUT-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_3=\"${CODEX_SESSION_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_3=\"${CODEX_SESSION_ID-}\"\n…",
-          "category": "filesystem",
-          "op": "removed",
-          "title": "Command no longer run: `codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"m …` (linux/amd64)",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "filesystem.linux/amd64.exec.codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\",\"mis… --apply-seccomp-then-exec -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_1=\"${CODEX_PERMISSION_PROFILE+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_1=\"${CODEX_PERMISSION_PROFILE-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_2=\"${CODEX_PLUGIN_METRICS_OUTPUT+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_2=\"${CODEX_PLUGIN_METRICS_OUTPUT-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_3=\"${CODEX_SESSION_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_3=\"${CODEX_SESSION_ID-}\"\n…",
-          "category": "filesystem",
-          "op": "removed",
-          "title": "Command no longer run: `codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"m …` (linux/amd64)",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "binary.sdk.sqlx-core",
-          "category": "binary",
-          "op": "removed",
-          "title": "Binary sdk.sqlx-core: 0.9.0 → none",
-          "impact": "informational",
-          "documented": false
-        }
-      ]
-    },
-    {
-      "version": "0.168.0",
-      "previous": "0.167.2",
-      "changes": [
-        {
-          "id": "tools.exec.description",
-          "category": "tools",
-          "op": "changed",
-          "title": "exec tool description changed (+281 −862 chars)",
-          "impact": "notable",
-          "documented": true
-        },
-        {
           "id": "telemetry.surfaces.logs/codex.api_request",
           "category": "telemetry",
           "op": "added",
@@ -1228,7 +1116,7 @@
           "op": "added",
           "title": "New telemetry surface: metrics/codex.auth.selection.duration (3 fields)",
           "impact": "informational",
-          "documented": true
+          "documented": false
         },
         {
           "id": "telemetry.surfaces.metrics/codex.auth_storage.duration",
@@ -1236,7 +1124,7 @@
           "op": "added",
           "title": "New telemetry surface: metrics/codex.auth_storage.duration (11 fields)",
           "impact": "informational",
-          "documented": true
+          "documented": false
         },
         {
           "id": "telemetry.surfaces.metrics/codex.auth_storage.operation",
@@ -1327,38 +1215,6 @@
           "documented": false
         },
         {
-          "id": "telemetry.surfaces.metrics/codex.rollout.persistence.append",
-          "category": "telemetry",
-          "op": "added",
-          "title": "New telemetry surface: metrics/codex.rollout.persistence.append (2 fields)",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/codex.rollout.persistence.bytes_removed",
-          "category": "telemetry",
-          "op": "added",
-          "title": "New telemetry surface: metrics/codex.rollout.persistence.bytes_removed (4 fields)",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/codex.rollout.persistence.item_bytes_v2",
-          "category": "telemetry",
-          "op": "added",
-          "title": "New telemetry surface: metrics/codex.rollout.persistence.item_bytes_v2 (5 fields)",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/codex.rollout.persistence.turn_bytes_v2",
-          "category": "telemetry",
-          "op": "added",
-          "title": "New telemetry surface: metrics/codex.rollout.persistence.turn_bytes_v2 (4 fields)",
-          "impact": "informational",
-          "documented": false
-        },
-        {
           "id": "telemetry.surfaces.metrics/codex.rollout_compression.materialize",
           "category": "telemetry",
           "op": "added",
@@ -1379,30 +1235,6 @@
           "category": "telemetry",
           "op": "added",
           "title": "New telemetry surface: metrics/codex.rollout_compression.read.io_duration_ms (6 fields)",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/codex.sandbox_integrity.check",
-          "category": "telemetry",
-          "op": "added",
-          "title": "New telemetry surface: metrics/codex.sandbox_integrity.check (9 fields)",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/codex.sandbox_integrity.duration_ms",
-          "category": "telemetry",
-          "op": "added",
-          "title": "New telemetry surface: metrics/codex.sandbox_integrity.duration_ms (2 fields)",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "telemetry.surfaces.metrics/codex.sandbox_integrity.preparation_ms",
-          "category": "telemetry",
-          "op": "added",
-          "title": "New telemetry surface: metrics/codex.sandbox_integrity.preparation_ms (3 fields)",
           "impact": "informational",
           "documented": false
         },
@@ -1964,7 +1796,7 @@
           "op": "added",
           "title": "New telemetry surface: traces/codex.sampling (12 fields)",
           "impact": "informational",
-          "documented": false
+          "documented": true
         },
         {
           "id": "telemetry.surfaces.traces/codex.tool_blocking",
@@ -1980,7 +1812,7 @@
           "op": "added",
           "title": "New telemetry surface: traces/codex.turn_input (11 fields)",
           "impact": "informational",
-          "documented": true
+          "documented": false
         },
         {
           "id": "telemetry.surfaces.traces/collect_explicit_skill_mentions",
@@ -2076,7 +1908,7 @@
           "op": "added",
           "title": "New telemetry surface: traces/exec_command (17 fields)",
           "impact": "informational",
-          "documented": true
+          "documented": false
         },
         {
           "id": "telemetry.surfaces.traces/exec_command/events/codex.tool_result_ready",
@@ -2220,7 +2052,7 @@
           "op": "added",
           "title": "New telemetry surface: traces/initialize (17 fields)",
           "impact": "informational",
-          "documented": false
+          "documented": true
         },
         {
           "id": "telemetry.surfaces.traces/instructions.load",
@@ -2236,7 +2068,7 @@
           "op": "added",
           "title": "New telemetry surface: traces/list_models (10 fields)",
           "impact": "informational",
-          "documented": false
+          "documented": true
         },
         {
           "id": "telemetry.surfaces.traces/load",
@@ -2259,6 +2091,14 @@
           "category": "telemetry",
           "op": "added",
           "title": "New telemetry surface: traces/load_with_cli_overrides (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.traces/mcp.runtime.apps_catalog_wait",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: traces/mcp.runtime.apps_catalog_wait (9 fields)",
           "impact": "informational",
           "documented": false
         },
@@ -2332,7 +2172,7 @@
           "op": "added",
           "title": "New telemetry surface: traces/op.dispatch.shutdown (11 fields)",
           "impact": "informational",
-          "documented": true
+          "documented": false
         },
         {
           "id": "telemetry.surfaces.traces/op.dispatch.turn_input",
@@ -2340,7 +2180,7 @@
           "op": "added",
           "title": "New telemetry surface: traces/op.dispatch.turn_input (11 fields)",
           "impact": "informational",
-          "documented": true
+          "documented": false
         },
         {
           "id": "telemetry.surfaces.traces/persist_rollout_items",
@@ -2588,7 +2428,7 @@
           "op": "added",
           "title": "New telemetry surface: traces/session_init.thread_persistence (10 fields)",
           "impact": "informational",
-          "documented": false
+          "documented": true
         },
         {
           "id": "telemetry.surfaces.traces/session_init/events/event otel/src/events/session_telemetry.rs",
@@ -2796,7 +2636,7 @@
           "op": "added",
           "title": "New telemetry surface: traces/unified_exec.exec_command (15 fields)",
           "impact": "informational",
-          "documented": true
+          "documented": false
         },
         {
           "id": "telemetry.surfaces.traces/unified_exec.open_session",
@@ -2811,6 +2651,316 @@
           "category": "telemetry",
           "op": "added",
           "title": "New telemetry surface: traces/world_state.build (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "cli.commands.codex exec.options.--trust",
+          "category": "cli",
+          "op": "added",
+          "title": "New flag `codex exec --trust`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.codex review.options.--trust",
+          "category": "cli",
+          "op": "added",
+          "title": "New flag `codex review --trust`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.exec --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `exec --help` changed (+203 −0 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.exec -h",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `exec -h` changed (+203 −0 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.review --help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `review --help` changed (+310 −107 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.review -h",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `review -h` changed (+353 −100 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.auto_review.experimental_policy_template",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: auto_review.experimental_policy_template",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.auto_review.extra_policy",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: auto_review.extra_policy",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.daybreak_program_propagation",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.daybreak_program_propagation",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.gateway_setup_wizard",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.gateway_setup_wizard",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.incremental_tools_legacy",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.incremental_tools_legacy",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.incremental_tools_legacy_gcp",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.incremental_tools_legacy_gcp",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.features.mcp_lazy_stdio_startup",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: features.mcp_lazy_stdio_startup",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.model_providers.<name>.gateway_oauth.description",
+          "category": "config",
+          "op": "changed",
+          "title": "model_providers.<name>.gateway_oauth description changed (+63 −63 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.model_providers.<name>.gateway_oauth.credential_export",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: model_providers.<name>.gateway_oauth.credential_export",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "config.options.model_providers.<name>.gateway_oauth.device_authorization_url",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: model_providers.<name>.gateway_oauth.device_authorization_url",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.tui.collapse_turn_details",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: tui.collapse_turn_details",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.tui.keymap.default",
+          "category": "config",
+          "op": "changed",
+          "title": "Default of tui.keymap: {\"agents\":{\"archive\":null,\"delete\":null,\"fork\":null,\"hide… → {\"agents\":{\"archive\":null,\"delete\":null,\"fork\":null,\"hide…",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.tui.keymap.global.default",
+          "category": "config",
+          "op": "changed",
+          "title": "Default of tui.keymap.global: {\"change_host\":null,\"clear_terminal\":null,\"copy\":null,\"eq… → {\"change_host\":null,\"clear_terminal\":null,\"close_sidebar_…",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.tui.keymap.global.close_sidebar_tab",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: tui.keymap.global.close_sidebar_tab",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.tui.keymap.global.focus_sidebar_tabs",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: tui.keymap.global.focus_sidebar_tabs",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.tui.keymap.global.sidebar_down",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: tui.keymap.global.sidebar_down",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.tui.keymap.global.sidebar_up",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: tui.keymap.global.sidebar_up",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.darwin/arm64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false status --porcelain --ignore-submodules=dirty",
+          "category": "filesystem",
+          "op": "changed",
+          "title": "Command changed: `git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false status --por …` (+25 −0 chars) (darwin/arm64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.paths.<tmp>.ops.write",
+          "category": "filesystem",
+          "op": "added",
+          "title": "Now writes <tmp> (linux/amd64)",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false remote -v.phases.exit",
+          "category": "filesystem",
+          "op": "added",
+          "title": "`git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false remote -v` now also runs at exit (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false rev-parse HEAD.phases.exit",
+          "category": "filesystem",
+          "op": "added",
+          "title": "`git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false rev-parse HE …` now also runs at exit (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.git -c safe.bareRepository=explicit config --null --get core.fsmonitor.phases.exit",
+          "category": "filesystem",
+          "op": "added",
+          "title": "`git -c safe.bareRepository=explicit config --null --get core.fsmonitor` now also runs at exit (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false status --porcelain --ignore-submodules=dirty",
+          "category": "filesystem",
+          "op": "changed",
+          "title": "Command changed: `git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false status --por …` (+25 −0 chars) (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.exec./proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\",\"mis… -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_1=\"${CODEX_PERMISSION_PROFILE+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_1=\"${CODEX_PERMISSION_PROFILE-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_2=\"${CODEX_PLUGIN_METRICS_OUTPUT+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_2=\"${CODEX_PLUGIN_METRICS_OUTPUT-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_3=\"${CODEX_SESSION_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_3=\"${CODEX_SESSION_ID-}\"\n…",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "Command no longer run: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.bwrap --as-pid-1 --new-session --die-with-parent --ro-bind / / --dev /dev --perms 000 --tmpfs <tmp>/codex-daemon-<id> --remount-ro <tmp>/codex-daemon-<id> --bind <tmp> <tmp> --perms 000 --tmpfs <tmp>/codex-daemon-<id> --remount-ro <tmp>/codex-daemon-<id> --perms 555 --tmpfs <tmp>/.git --remount-ro <tmp>/.git --perms 555 --tmpfs <tmp>/.agents --remount-ro <tmp>/.agents --perms 555 --tmpfs <tmp>/.codex --remount-ro <tmp>/.codex --perms 555 --tmpfs <tmp>/.aws --remount-ro <tmp>/.aws --ro-bind <tmp>/codex-bwrap-synthetic-mount-targets-<id> <tmp>/codex-bwrap-synthetic-mount-targets-<id> --bind <repo> <repo> --ro-bind <repo>/.git <repo>/.git --perms 555 --tmpfs <repo>/.agents --remount-ro <repo>/.agents --perms 555 --tmpfs <repo>/.codex --remount-ro <repo>/.codex --perms 555 --tmpfs <repo>/.aws --remount-ro <repo>/.aws --unshare-user --unshare-pid --unshare-ipc --unshare-net --cap-drop ALL --argv0 codex-linux-sandbox -- <install>/codex --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\",\"mis… --apply-seccomp-then-exec -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_1=\"${CODEX_PERMISSION_PROFILE+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_1=\"${CODEX_PERMISSION_PROFILE-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_2=\"${CODEX_PLUGIN_METRICS_OUTPUT+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_2=\"${CODEX_PLUGIN_METRICS_OUTPUT-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_3=\"${CODEX_SESSION_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_3=\"${CODEX_SESSION_ID-}\"\n…",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "Command no longer run: `bwrap --as-pid-1 --new-session --die-with-parent --ro-bind / / --dev /dev --perms 000 --tmpfs <tmp>/ …` (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\",\"mis… -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_1=\"${CODEX_PERMISSION_PROFILE+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_1=\"${CODEX_PERMISSION_PROFILE-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_2=\"${CODEX_PLUGIN_METRICS_OUTPUT+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_2=\"${CODEX_PLUGIN_METRICS_OUTPUT-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_3=\"${CODEX_SESSION_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_3=\"${CODEX_SESSION_ID-}\"\n…",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "Command no longer run: `codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"m …` (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "filesystem.linux/amd64.exec.codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"managed\",\"file_system\":{\"type\":\"restricted\",\"entries\":[{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"root\"}},\"access\":\"read\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>\"},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"slash_tmp\"}},\"access\":\"write\"},{\"path\":{\"type\":\"special\",\"value\":{\"kind\":\"tmpdir\"}},\"access\":\"write\"},{\"path\":{\"type\":\"path\",\"path\":\"<repo>/.git\"},\"access\":\"read\",\"mis… --apply-seccomp-then-exec -- /bin/bash -c __CODEX_SNAPSHOT_OVERRIDE_SET_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_0=\"${CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_1=\"${CODEX_PERMISSION_PROFILE+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_1=\"${CODEX_PERMISSION_PROFILE-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_2=\"${CODEX_PLUGIN_METRICS_OUTPUT+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_2=\"${CODEX_PLUGIN_METRICS_OUTPUT-}\"\n__CODEX_SNAPSHOT_OVERRIDE_SET_3=\"${CODEX_SESSION_ID+x}\"\n__CODEX_SNAPSHOT_OVERRIDE_3=\"${CODEX_SESSION_ID-}\"\n…",
+          "category": "filesystem",
+          "op": "removed",
+          "title": "Command no longer run: `codex-linux-sandbox --sandbox-policy-cwd <repo> --command-cwd <repo> --permission-profile {\"type\":\"m …` (linux/amd64)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "binary.sdk.sqlx-core",
+          "category": "binary",
+          "op": "removed",
+          "title": "Binary sdk.sqlx-core: 0.9.0 → none",
+          "impact": "informational",
+          "documented": false
+        }
+      ]
+    },
+    {
+      "version": "0.168.0",
+      "previous": "0.167.2",
+      "changes": [
+        {
+          "id": "tools.exec.description",
+          "category": "tools",
+          "op": "changed",
+          "title": "exec tool description changed (+281 −862 chars)",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sandbox_integrity.check",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.sandbox_integrity.check (9 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sandbox_integrity.duration_ms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.sandbox_integrity.duration_ms (2 fields)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "telemetry.surfaces.metrics/codex.sandbox_integrity.preparation_ms",
+          "category": "telemetry",
+          "op": "added",
+          "title": "New telemetry surface: metrics/codex.sandbox_integrity.preparation_ms (3 fields)",
           "impact": "informational",
           "documented": false
         },
@@ -4807,14 +4957,6 @@
           "category": "config",
           "op": "added",
           "title": "New setting: features.incremental_tools_legacy",
-          "impact": "informational",
-          "documented": false
-        },
-        {
-          "id": "filesystem.darwin/arm64.sockets.connections.tcp <proxy>",
-          "category": "filesystem",
-          "op": "removed",
-          "title": "No longer connects to <proxy> (tcp) (darwin/arm64)",
           "impact": "informational",
           "documented": false
         },

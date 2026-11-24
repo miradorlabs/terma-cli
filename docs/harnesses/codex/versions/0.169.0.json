@@ -73270,6 +73270,9 @@
       },
       "tracer": "eslogger",
       "unobserved": {
+        "connections": [
+          "tcp <proxy>"
+        ],
         "paths": [
           "<home>/Library",
           "<home>/Library/Logs",

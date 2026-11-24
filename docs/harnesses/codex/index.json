@@ -11,26 +11,56 @@
       "language": "rust"
     },
     "changelog": "https://github.com/openai/codex/releases",
-    "latest": "0.171.0",
+    "latest": "0.172.0",
     "support": "supported",
-    "versions_tracked": 108,
+    "versions_tracked": 109,
     "first_tracked": "2026-01-25",
     "last_change": {
-      "from": "0.170.0",
-      "to": "0.171.0",
-      "at": "2026-11-20T01:10:01.695546758Z",
-      "released_at": "2026-11-20T00:51:29.762Z",
-      "changes": 76,
+      "from": "0.171.0",
+      "to": "0.172.0",
+      "at": "2026-11-24T00:44:18.786549385Z",
+      "released_at": "2026-11-24T00:09:39.503Z",
+      "changes": 27,
       "categories": {
-        "cli": 8,
-        "config": 40,
-        "filesystem": 18,
-        "telemetry": 8,
-        "tools": 2
+        "config": 13,
+        "filesystem": 2,
+        "telemetry": 12
       }
     }
   },
   "versions": [
+    {
+      "version": "0.172.0",
+      "released_at": "2026-11-24T00:09:39.503Z",
+      "captured_at": "2026-11-24T00:44:18.786549385Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "0.171.0",
+      "changes": 27,
+      "categories": {
+        "config": 13,
+        "filesystem": 2,
+        "telemetry": 12
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 3,
+        "informational": 22,
+        "notable": 2
+      },
+      "undocumented": 23,
+      "highlights": [
+        "Telemetry surface no longer sent: metrics/codex.sandbox_integrity.check",
+        "Telemetry surface no longer sent: metrics/codex.sandbox_integrity.duration_ms",
+        "Telemetry surface no longer sent: metrics/codex.sandbox_integrity.preparation_ms"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-24T00:44:18.786549385Z",
+      "attempts": 1
+    },
     {
       "version": "0.171.0",
       "released_at": "2026-11-20T00:51:29.762Z",
@@ -139,7 +169,7 @@
       ],
       "support": "supported",
       "previous": "0.168.0",
-      "changes": 42,
+      "changes": 240,
       "categories": {
         "behavior": 1,
         "binary": 1,
@@ -147,19 +177,19 @@
         "config": 17,
         "filesystem": 10,
         "prompt": 1,
-        "telemetry": 6
+        "telemetry": 204
       },
       "impact": {
         "breaking": 0,
-        "degrading": 4,
-        "informational": 28,
-        "notable": 10
+        "degrading": 0,
+        "informational": 231,
+        "notable": 9
       },
-      "undocumented": 31,
+      "undocumented": 214,
       "highlights": [
-        "Telemetry surface no longer sent: metrics/codex.rollout.persistence.append",
-        "Telemetry surface no longer sent: metrics/codex.rollout.persistence.bytes_removed",
-        "Telemetry surface no longer sent: metrics/codex.rollout.persistence.item_bytes_v2"
+        "System prompt changed (+634 −476 chars)",
+        "Behaviour: subagents system 1 text changed",
+        "Setting no longer read: auto_review.experimental_policy_template"
       ],
       "signing": "valid",
       "attempted_at": "2026-11-13T13:08:26.328461566Z",
@@ -168,27 +198,27 @@
     {
       "version": "0.168.0",
       "released_at": "2026-11-13T04:00:31.594Z",
-      "captured_at": "2026-11-13T09:01:26.428937767Z",
+      "captured_at": "2026-11-24T00:44:18.786549385Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.167.2",
-      "changes": 253,
+      "changes": 46,
       "categories": {
         "cli": 5,
         "config": 37,
-        "telemetry": 210,
+        "telemetry": 3,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 247,
+        "informational": 40,
         "notable": 6
       },
-      "undocumented": 224,
+      "undocumented": 36,
       "highlights": [
         "exec tool description changed (+281 −862 chars)",
         "New setting: features.hosted_search_policy",
@@ -235,22 +265,22 @@
       ],
       "support": "supported",
       "previous": "0.167.0",
-      "changes": 6,
+      "changes": 5,
       "categories": {
         "config": 1,
-        "filesystem": 5
+        "filesystem": 4
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 6,
+        "informational": 5,
         "notable": 0
       },
-      "undocumented": 6,
+      "undocumented": 5,
       "highlights": [
         "New setting: features.incremental_tools_legacy",
-        "No longer connects to <proxy> (tcp) (darwin/arm64)",
-        "Command changed: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (+424 −426 chars) (linux/amd64)"
+        "Command changed: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (+424 −426 chars) (linux/amd64)",
+        "Command changed: `bwrap --as-pid-1 --new-session --die-with-parent --ro-bind / / --dev /dev --perms 000 --tmpfs <tmp>/ …` (+424 −426 chars) (linux/amd64)"
       ],
       "signing": "valid"
     },

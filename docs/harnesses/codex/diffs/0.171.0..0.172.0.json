@@ -1,0 +1,1795 @@
+{
+  "schema_version": 1,
+  "harness": "codex",
+  "from": "0.171.0",
+  "to": "0.172.0",
+  "generated_at": "2026-11-24T00:44:18.786549385Z",
+  "source": {
+    "compare": "https://github.com/openai/codex/compare/rust-v0.171.0...rust-v0.172.0"
+  },
+  "changelog": {
+    "url": "https://github.com/openai/codex/releases/tag/rust-v0.172.0",
+    "text": "## New Features\n\n- Follow thread links from search results and transcripts to open saved conversations and nested agents in the terminal. (#62332)\n- Press `Tab` to complete arguments for supported slash commands. For example, `/mcp lo` completes to `/mcp login`. (#62343)\n- Jump between task groups in the agent command center with `Shift+Up` and `Shift+Down`. (#62200)\n- Optional stdio MCP servers with cached tool lists now start on their first tool call by default. (#62366)\n- Set an approval reviewer for individual connected app tools in `config.toml`. (#62360)\n- App-server clients can select Amazon Bedrock Runtime during setup or sign-in. (#62222)\n\n## Bug Fixes\n\n- `codex exec resume` restores saved sandbox permissions, the working directory, and workspace roots unless explicitly overridden. (#62194)\n- Remote sessions preserve working directories, workspace roots, and writable paths when the client and server run on different operating systems. (#62375, #62376, #62377)\n- Codex reports provider errors as soon as they arrive in a response stream and identifies which API spend limit was reached. (#62329, #62356)\n- Interrupting a parent turn preserves queued replies from child agents for the next turn. (#62348)\n- Use `PageUp` and `PageDown` to read and submit answer choices that are taller than the terminal’s answer area. (#62209)\n- Cloud replies that finish after history loads now update in place, keeping the terminal transcript in order. (#62403)\n\n## Documentation\n\n- The bundled `openai-docs` skill now covers migration to GPT-6.2 Astra and Sol, including endpoint choices and tool-calling requirements. (#62447)\n\n## Chores\n\n- Code Mode now uses gRPC for all host connections. The `code_mode_host_grpc` setting is deprecated. (#62476)\n- Python formatting and SDK type generation now verify dependency hashes against the repository lockfile. (#62346)\n\n## Changelog\n\nFull Changelog: https://github.com/openai/codex/compare/rust-v0.171.0...rust-v0.172.0\n\n- #62190 Route turn and response checkpoints through the rollout budget policy @anp-oai\n- #62192 Distinguish Windows sandbox provisioning timeouts and pipe closures @zm-oai\n- #62194 Preserve saved sandbox permissions when resuming `codex exec` @viyatb-oai\n- #62200 Add task group navigation to the agent command center @bc-openai\n- #62202 Omit unknown server versions from `/status` @bc-openai\n- #62205 Keep sandbox preparation with the command through launch @viyatb-oai\n- #62206 Prevent duplicate initial context when injection races the first turn @euroelessar\n- #62209 Allow paging through long choices in async questions @bc-openai\n- #62215 Resolve Linux sandbox mode once before launching the helper @viyatb-oai\n- #62222 Allow Bedrock Runtime selection during setup and login @alexsong-oai\n- #62225 Tag Guardian review counts with turn origin @cazhang-oai\n- #62245 Refactor realtime handoff and history access @zahan-oai\n- #62251 Derive realtime input receipts from thread history @zahan-oai\n- #62271 Gate local realtime frame history on paginated storage @zahan-oai\n- #62274 Support independent refreshes of managed Guardian policy @ioanbudea-OAI\n- #62276 Refresh managed Guardian policy independently of MCP @ioanbudea-OAI\n- #62284 Use the system clock for in-memory MCP message boards @jif-oai\n- #62288 Persist realtime handoffs before accepting turn input @zahan-oai\n- #62292 Route injected plaintext agent mail through the native mailbox @jif-oai\n- #62299 Preserve pending realtime speech when a call ends @zahan-oai\n- #62302 Route local MCP board notifications through response item injection @jif-oai\n- #62308 Extract Guardian verdict execution and pending-action context @felixxia-oai\n- #62309 Use attached Guardian reviewers for synchronous approvals @felixxia-oai\n- #62310 Use Guardian V3 board evidence for synchronous approvals @felixxia-oai\n- #62314 Keep authorization evidence local to agent forks @rhan-oai\n- #62317 Move sandbox preparation into platform backends @viyatb-oai\n- #62320 Trace MCP binding capture and tool catalog refresh @bkotsopoulos\n- #62325 Accept inbound Noise connections in remote exec-server @richardopenai\n- #62326 Measure plugin recommendation latency during initial context setup @bkotsopoulos\n- #62329 Report API spend limit errors by scope @apcha-oai\n- #62331 Migrate the Windows MXC sandbox to the public V1 SDK @iceweasel-oai\n- #62332 Open Codex thread links inside the TUI @bc-openai\n- #62335 Let users open the command center from provider error screens @bc-openai\n- #62337 Box the config reload future for persistent MCP tool approvals @dylan-hurd-oai\n- #62338 Account for macOS voice build parallelism in Bazel @dylan-hurd-oai\n- #62343 Add slash command argument completion to the TUI composer @bc-openai\n- #62346 Verify dependency hashes when running Python repository tools @colby-oai\n- #62348 Preserve queued agent messages when a parent turn is interrupted @jif-oai\n- #62350 Support piped I/O when starting Seatbelt sandbox commands @charliemarsh-oai\n- #62353 Add a shared sandbox launcher for Linux and macOS @charliemarsh-oai\n- #62354 Treat statusless bio and cyber policy errors as terminal @charliemarsh-oai\n- #62356 Surface Responses stream errors as soon as they arrive @charliemarsh-oai\n- #62357 Report why turn critical path capture is incomplete @akak-oai\n- #62358 Reserve credential permission tables in Codex configuration @viyatb-oai\n- #62360 Allow per-tool approval reviewers for Codex apps @jameswt-oai\n- #62362 Make sidebar file preview errors easier to act on @fcoury-oai\n- #62366 Enable lazy startup for stdio MCP servers by default @charliemarsh-oai\n- #62370 Share config layer entries across snapshots @charliemarsh-oai\n- #62372 Make Guardian V3 routing and retrieval guidance configurable @felixxia-oai\n- #62373 Add opt-in in-memory message boards for Guardian v3 @felixxia-oai\n- #62374 Reconsider denials in attached Guardian reviews @felixxia-oai\n- #62375 Preserve app-server thread working directories across platforms @etraut-openai\n- #62376 Preserve sandbox writable roots across client and server platforms @etraut-openai\n- #62377 Preserve workspace roots across client and server platforms @etraut-openai\n- #62378 Remove the 4,000-byte prompt limit for `thread/sample` @keyz\n- #62382 Skip the sandbox denial wait when unified exec output closes @richardopenai\n- #62384 Centralize transcript overlay input routing @fcoury-oai\n- #62386 Prepare managed proxy settings once per sandbox command @viyatb-oai\n- #62387 Expose custom status lines in `/experimental` @joesavona\n- #62388 Support optional Apps tool results in Responses requests @ssetty-oai\n- #62389 Pause runtime sandbox integrity checks @iceweasel-oai\n- #62390 Highlight clickable links and controls on hover in the fullscreen TUI @fcoury-oai\n- #62392 Pass eligible connector results through to ChatGPT Responses @ssetty-oai\n- #62400 Test saved chat hover highlighting in the sidebar chooser @fcoury-oai\n- #62403 Reconcile unfinished Cloud replies in the TUI transcript @bc-openai\n- #62407 Deduplicate large tool output strings in rollout traces @cassirer-openai\n- #62415 Enable network access in the shell snapshot filesystem test @TAFOYA-OAI\n- #62419 Allow per-sample model overrides in `thread/sample` @keyz\n- #62420 Box the future returned by response item injection @charliemarsh-oai\n- #62421 Reject provider query parameters for connector result passthrough @ssetty-oai\n- #62423 Include nested Apps tool results in Code Mode sampling requests @ssetty-oai\n- #62430 Support tool-specific JavaScript preloads in Code Mode @hlevy-openai\n- #62432 Add opt-in OAuth discovery to config server loaders @vishnu-oai\n- #62434 Expand connector result metadata coverage across auth configurations @ssetty-oai\n- #62435 Let extensions attach metadata to MCP tool requests @tepman-oai\n- #62437 Defer Git worktree status until the turn starts @ningyi-oai\n- #62439 Add Windows MXC sandbox launch diagnostics @iceweasel-oai\n- #62447 Update the `openai-docs` skill for GPT-6.2 @kkahadze-oai\n- #62474 Send authorized connector results over Responses WebSockets @ssetty-oai\n- #62476 Use gRPC for all code-mode host connections @cconger\n- #62477 Box the thread startup future in `spawn_thread` @charliemarsh-oai\n- #62489 Honor elastic budgets for attached Guardian reviews @felixxia-oai\n- #62496 Refresh managed Guardian policy across Codex threads @ioanbudea-OAI\n- #62499 Expose Daybreak availability in model discovery @igorrybalka-oai\n- #62507 Add Statsig counters for `exec_command` latency @jif-oai"
+  },
+  "summary": {
+    "changes": 27,
+    "categories": {
+      "config": 13,
+      "filesystem": 2,
+      "telemetry": 12
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 3,
+      "informational": 22,
+      "notable": 2
+    },
+    "undocumented": 23
+  },
+  "changes": [
+    {
+      "id": "telemetry.surfaces.metrics/codex.exec_command.calls",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/codex.exec_command.calls"
+      ],
+      "title": "New telemetry surface: metrics/codex.exec_command.calls (10 fields)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "keys": {
+          "app.version": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "auth_mode": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "command_category": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "originator": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "sandbox": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "sandbox_policy": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "shell_snapshot_mode": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "success": {
+            "class": "safe",
+            "kinds": [
+              "bool"
+            ]
+          }
+        }
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 9,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/otel/src/metrics/names.rs#L9"
+          },
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 1350,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/otel/src/events/session_telemetry.rs#L1350"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/codex.exec_command.duration_total_ms",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/codex.exec_command.duration_total_ms"
+      ],
+      "title": "New telemetry surface: metrics/codex.exec_command.duration_total_ms (10 fields)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "keys": {
+          "app.version": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "auth_mode": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "command_category": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "model": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "originator": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "sandbox": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "sandbox_policy": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "session_source": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "shell_snapshot_mode": {
+            "class": "unclassified",
+            "kinds": [
+              "text"
+            ]
+          },
+          "success": {
+            "class": "safe",
+            "kinds": [
+              "bool"
+            ]
+          }
+        }
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/otel/src/metrics/names.rs",
+            "line": 8,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/otel/src/metrics/names.rs#L8"
+          },
+          {
+            "path": "codex-rs/otel/src/events/session_telemetry.rs",
+            "line": 1349,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/otel/src/events/session_telemetry.rs#L1349"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/codex.sandbox_integrity.check",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/codex.sandbox_integrity.check"
+      ],
+      "title": "Telemetry surface no longer sent: metrics/codex.sandbox_integrity.check",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "backend": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "checker": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "dependency": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "error_kind": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "has_deny_globs": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "multiple_hard_links": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "multiple_write_roots": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "outcome": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "target_resolution_changed": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/exec-server/src/sandbox_integrity/telemetry.rs",
+            "line": 97,
+            "url": "https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/exec-server/src/sandbox_integrity/telemetry.rs#L97"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/codex.sandbox_integrity.duration_ms",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/codex.sandbox_integrity.duration_ms"
+      ],
+      "title": "Telemetry surface no longer sent: metrics/codex.sandbox_integrity.duration_ms",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "backend": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "has_deny_globs": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/exec-server/src/sandbox_integrity/telemetry.rs",
+            "line": 41,
+            "url": "https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/exec-server/src/sandbox_integrity/telemetry.rs#L41"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.metrics/codex.sandbox_integrity.preparation_ms",
+      "category": "telemetry",
+      "op": "removed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "metrics/codex.sandbox_integrity.preparation_ms"
+      ],
+      "title": "Telemetry surface no longer sent: metrics/codex.sandbox_integrity.preparation_ms",
+      "impact": "degrading",
+      "before": {
+        "keys": {
+          "backend": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "has_deny_globs": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "outcome": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/exec-server/src/sandbox_integrity/telemetry.rs",
+            "line": 50,
+            "url": "https://github.com/openai/codex/blob/rust-v0.171.0/codex-rs/exec-server/src/sandbox_integrity/telemetry.rs#L50"
+          }
+        ],
+        "gone": true
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.traces/capture_binding_with_metadata.parent",
+      "category": "telemetry",
+      "op": "changed",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/capture_binding_with_metadata",
+        "parent"
+      ],
+      "title": "Telemetry surfaces.traces/capture_binding_with_metadata.parent changed: \"traces/mcp.runtime.resolve_for_step\" → \"traces/mcp.binding.capture\"",
+      "impact": "informational",
+      "before": "traces/mcp.runtime.resolve_for_step",
+      "after": "traces/mcp.binding.capture",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "telemetry.surfaces.traces/mcp.binding.cache_lock_wait",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/mcp.binding.cache_lock_wait"
+      ],
+      "title": "New telemetry surface: traces/mcp.binding.cache_lock_wait (9 fields)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "keys": {
+          "busy_ns": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "code.file.path": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "code.line.number": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "code.module.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "idle_ns": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "mirador.project.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "target": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "thread.id": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "thread.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-mcp/src/runtime.rs",
+            "line": 611,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/codex-mcp/src/runtime.rs#L611"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.traces/mcp.binding.capture",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/mcp.binding.capture"
+      ],
+      "title": "New telemetry surface: traces/mcp.binding.capture (10 fields)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "keys": {
+          "busy_ns": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "cache_hit": {
+            "class": "unclassified",
+            "kinds": [
+              "bool"
+            ]
+          },
+          "code.file.path": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "code.line.number": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "code.module.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "idle_ns": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "mirador.project.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "target": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "thread.id": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "thread.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-mcp/src/runtime.rs",
+            "line": 599,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/codex-mcp/src/runtime.rs#L599"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "telemetry.surfaces.traces/mcp.binding.catalog_capture",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/mcp.binding.catalog_capture"
+      ],
+      "title": "New telemetry surface: traces/mcp.binding.catalog_capture (9 fields)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "keys": {
+          "busy_ns": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "code.file.path": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "code.line.number": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "code.module.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "idle_ns": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "mirador.project.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "target": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "thread.id": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "thread.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-mcp/src/connection_manager/tool_catalog.rs",
+            "line": 474,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/codex-mcp/src/connection_manager/tool_catalog.rs#L474"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.traces/mcp.binding.catalog_revision_wait",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/mcp.binding.catalog_revision_wait"
+      ],
+      "title": "New telemetry surface: traces/mcp.binding.catalog_revision_wait (9 fields)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "keys": {
+          "busy_ns": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "code.file.path": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "code.line.number": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "code.module.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "idle_ns": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "mirador.project.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "target": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "thread.id": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "thread.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-mcp/src/connection_manager/tool_catalog.rs",
+            "line": 122,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/codex-mcp/src/connection_manager/tool_catalog.rs#L122"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.traces/mcp.binding.normalize_tools",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/mcp.binding.normalize_tools"
+      ],
+      "title": "New telemetry surface: traces/mcp.binding.normalize_tools (9 fields)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "keys": {
+          "busy_ns": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "code.file.path": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "code.line.number": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "code.module.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "idle_ns": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "mirador.project.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "target": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "thread.id": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "thread.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-mcp/src/tools.rs",
+            "line": 134,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/codex-mcp/src/tools.rs#L134"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "telemetry.surfaces.traces/mcp.binding.startup_wait",
+      "category": "telemetry",
+      "op": "added",
+      "path": [
+        "telemetry",
+        "surfaces",
+        "traces/mcp.binding.startup_wait"
+      ],
+      "title": "New telemetry surface: traces/mcp.binding.startup_wait (9 fields)",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "keys": {
+          "busy_ns": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "code.file.path": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "code.line.number": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "code.module.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "idle_ns": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "mirador.project.id": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "target": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          },
+          "thread.id": {
+            "class": "safe",
+            "kinds": [
+              "number"
+            ]
+          },
+          "thread.name": {
+            "class": "safe",
+            "kinds": [
+              "text"
+            ]
+          }
+        }
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/codex-mcp/src/connection_manager/tool_catalog.rs",
+            "line": 384,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/codex-mcp/src/connection_manager/tool_catalog.rs#L384"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.connector_tool_result_passthrough",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.connector_tool_result_passthrough"
+      ],
+      "title": "New setting: features.connector_tool_result_passthrough",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1345,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/features/src/lib.rs#L1345"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardianv3.housekeeper",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv3.housekeeper"
+      ],
+      "title": "New setting: features.guardianv3.housekeeper",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/loader/mod.rs",
+            "line": 1382,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/config/src/loader/mod.rs#L1382"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardianv3.housekeeper.batch_timeout_ms",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv3.housekeeper.batch_timeout_ms"
+      ],
+      "title": "New setting: features.guardianv3.housekeeper.batch_timeout_ms",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Time budget for routing one batch, in milliseconds. Defaults to 90,000.",
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardianv3.housekeeper.routing_instructions",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv3.housekeeper.routing_instructions"
+      ],
+      "title": "New setting: features.guardianv3.housekeeper.routing_instructions",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Guidance for grouping originals into channels and describing their topics. Ignored in project config.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/loader/mod.rs",
+            "line": 1382,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/config/src/loader/mod.rs#L1382"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardianv3.max_instruction_tokens",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv3.max_instruction_tokens"
+      ],
+      "title": "New setting: features.guardianv3.max_instruction_tokens",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Maximum estimated tokens per custom routing or retrieval prompt. Unset means uncapped. Ignored in project config.",
+        "type": "integer"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/loader/mod.rs",
+            "line": 1378,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/config/src/loader/mod.rs#L1378"
+          },
+          {
+            "path": "codex-rs/core/src/config/mod.rs",
+            "line": 3221,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/core/src/config/mod.rs#L3221"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardianv3.message_board_in_memory",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv3.message_board_in_memory"
+      ],
+      "title": "New setting: features.guardianv3.message_board_in_memory",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Keep each fresh root's Guardian board in memory until the runtime closes. Defaults to false.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.features.guardianv3.reviewer",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv3.reviewer"
+      ],
+      "title": "New setting: features.guardianv3.reviewer",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "object"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/loader/mod.rs",
+            "line": 1383,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/config/src/loader/mod.rs#L1383"
+          },
+          {
+            "path": "codex-rs/core/src/client.rs",
+            "line": 2953,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/core/src/client.rs#L2953"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.features.guardianv3.reviewer.retrieval_instructions",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.guardianv3.reviewer.retrieval_instructions"
+      ],
+      "title": "New setting: features.guardianv3.reviewer.retrieval_instructions",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Guidance for searching the Guardian board and managing channel subscriptions. Ignored in project config.",
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/loader/mod.rs",
+            "line": 1383,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/config/src/loader/mod.rs#L1383"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.features.realtime_frames_local",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "features.realtime_frames_local"
+      ],
+      "title": "New setting: features.realtime_frames_local",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/app-server/src/request_processors/config_processor.rs",
+            "line": 82,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/app-server/src/request_processors/config_processor.rs#L82"
+          },
+          {
+            "path": "codex-rs/features/src/lib.rs",
+            "line": 1537,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/features/src/lib.rs#L1537"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap",
+        "default"
+      ],
+      "title": "Default of tui.keymap: {\"agents\":{\"archive\":null,\"delete\":null,\"fork\":null,\"hide… → {\"agents\":{\"archive\":null,\"delete\":null,\"fork\":null,\"hide…",
+      "impact": "notable",
+      "before": {
+        "agents": {
+          "archive": null,
+          "delete": null,
+          "fork": null,
+          "hide": null,
+          "new_task": null,
+          "new_worktree": null,
+          "rename": null,
+          "resume": null,
+          "search": null,
+          "stop": null,
+          "toggle_grouping": null,
+          "toggle_pin": null
+        },
+        "approval": {
+          "approve": null,
+          "approve_for_prefix": null,
+          "approve_for_session": null,
+          "cancel": null,
+          "decline": null,
+          "deny": null,
+          "open_fullscreen": null,
+          "open_thread": null
+        },
+        "chat": {
+          "decrease_reasoning_effort": null,
+          "edit_queued_message": null,
+          "increase_reasoning_effort": null,
+          "interrupt_turn": null,
+          "next_permission_mode": null,
+          "open_presets": null,
+          "previous_permission_mode": null,
+          "prompt_stack_back": null,
+          "skip_question": null,
+          "toggle_voice": null,
+          "toggle_voice_mute": null
+        },
+        "composer": {
+          "history_search_next": null,
+          "history_search_previous": null,
+          "queue": null,
+          "redo": null,
+          "submit": null,
+          "toggle_shortcuts": null,
+          "undo": null
+        },
+        "editor": {
+          "delete_backward": null,
+          "delete_backward_word": null,
+          "delete_forward": null,
+          "delete_forward_word": null,
+          "insert_newline": null,
+          "kill_line_end": null,
+          "kill_line_start": null,
+          "kill_whole_line": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_left": null,
+          "move_word_right": null,
+          "yank": null
+        },
+        "global": {
+          "change_host": null,
+          "choose_cloud_environment": null,
+          "clear_terminal": null,
+          "close_sidebar_tab": null,
+          "copy": null,
+          "equalize_pane_widths": null,
+          "find_transcript": null,
+          "focus_activity": null,
+          "focus_main_composer": null,
+          "focus_pane_left": null,
+          "focus_pane_right": null,
+          "focus_sidebar_content": null,
+          "focus_sidebar_tabs": null,
+          "hide_pane": null,
+          "leader": null,
+          "maximize_pane_width": null,
+          "minimize_pane_width": null,
+          "move_divider_left": null,
+          "move_divider_right": null,
+          "open_agents": null,
+          "open_external_editor": null,
+          "open_transcript": null,
+          "queue": null,
+          "resize_panes": null,
+          "select_transcript": null,
+          "sidebar_down": null,
+          "sidebar_up": null,
+          "submit": null,
+          "toggle_fast_mode": null,
+          "toggle_pane_zoom": null,
+          "toggle_raw_output": null,
+          "toggle_shortcuts": null,
+          "toggle_side_conversation": null,
+          "toggle_vim_mode": null
+        },
+        "list": {
+          "accept": null,
+          "cancel": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "move_down": null,
+          "move_left": null,
+          "move_right": null,
+          "move_up": null,
+          "page_down": null,
+          "page_up": null
+        },
+        "pager": {
+          "close": null,
+          "close_transcript": null,
+          "find": null,
+          "half_page_down": null,
+          "half_page_up": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "mark_markdown": null,
+          "page_down": null,
+          "page_up": null,
+          "scroll_down": null,
+          "scroll_up": null
+        },
+        "vim_normal": {
+          "append_after_cursor": null,
+          "append_line_end": null,
+          "cancel_operator": null,
+          "change_to_line_end": null,
+          "delete_char": null,
+          "delete_to_line_end": null,
+          "enter_insert": null,
+          "enter_replace_mode": null,
+          "find_backward": null,
+          "find_forward": null,
+          "insert_line_start": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_backward": null,
+          "move_word_end": null,
+          "move_word_forward": null,
+          "open_line_above": null,
+          "open_line_below": null,
+          "paste_after": null,
+          "redo": null,
+          "repeat_last_change": null,
+          "replace_char": null,
+          "start_change_operator": null,
+          "start_delete_operator": null,
+          "start_yank_operator": null,
+          "substitute_char": null,
+          "till_backward": null,
+          "till_forward": null,
+          "undo": null,
+          "yank_line": null
+        },
+        "vim_operator": {
+          "cancel": null,
+          "delete_line": null,
+          "motion_down": null,
+          "motion_find_backward": null,
+          "motion_find_forward": null,
+          "motion_jump_bottom": null,
+          "motion_jump_top": null,
+          "motion_left": null,
+          "motion_line_end": null,
+          "motion_line_start": null,
+          "motion_right": null,
+          "motion_till_backward": null,
+          "motion_till_forward": null,
+          "motion_up": null,
+          "motion_word_backward": null,
+          "motion_word_end": null,
+          "motion_word_forward": null,
+          "select_around_text_object": null,
+          "select_inner_text_object": null,
+          "yank_line": null
+        },
+        "vim_search": {
+          "backward": null,
+          "forward": null,
+          "next": null,
+          "previous": null
+        },
+        "vim_text_object": {
+          "backtick": null,
+          "big_word": null,
+          "braces": null,
+          "brackets": null,
+          "cancel": null,
+          "double_quote": null,
+          "parentheses": null,
+          "single_quote": null,
+          "word": null
+        }
+      },
+      "after": {
+        "agents": {
+          "archive": null,
+          "delete": null,
+          "fork": null,
+          "hide": null,
+          "new_task": null,
+          "new_worktree": null,
+          "next_group": null,
+          "previous_group": null,
+          "rename": null,
+          "resume": null,
+          "search": null,
+          "stop": null,
+          "toggle_grouping": null,
+          "toggle_pin": null
+        },
+        "approval": {
+          "approve": null,
+          "approve_for_prefix": null,
+          "approve_for_session": null,
+          "cancel": null,
+          "decline": null,
+          "deny": null,
+          "open_fullscreen": null,
+          "open_thread": null
+        },
+        "chat": {
+          "decrease_reasoning_effort": null,
+          "edit_queued_message": null,
+          "increase_reasoning_effort": null,
+          "interrupt_turn": null,
+          "next_permission_mode": null,
+          "open_presets": null,
+          "previous_permission_mode": null,
+          "prompt_stack_back": null,
+          "skip_question": null,
+          "toggle_voice": null,
+          "toggle_voice_mute": null
+        },
+        "composer": {
+          "history_search_next": null,
+          "history_search_previous": null,
+          "queue": null,
+          "redo": null,
+          "submit": null,
+          "toggle_shortcuts": null,
+          "undo": null
+        },
+        "editor": {
+          "delete_backward": null,
+          "delete_backward_word": null,
+          "delete_forward": null,
+          "delete_forward_word": null,
+          "insert_newline": null,
+          "kill_line_end": null,
+          "kill_line_start": null,
+          "kill_whole_line": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_left": null,
+          "move_word_right": null,
+          "yank": null
+        },
+        "global": {
+          "change_host": null,
+          "choose_cloud_environment": null,
+          "clear_terminal": null,
+          "close_sidebar_tab": null,
+          "copy": null,
+          "equalize_pane_widths": null,
+          "find_transcript": null,
+          "focus_activity": null,
+          "focus_main_composer": null,
+          "focus_pane_left": null,
+          "focus_pane_right": null,
+          "focus_sidebar_content": null,
+          "focus_sidebar_tabs": null,
+          "hide_pane": null,
+          "leader": null,
+          "maximize_pane_width": null,
+          "minimize_pane_width": null,
+          "move_divider_left": null,
+          "move_divider_right": null,
+          "open_agents": null,
+          "open_external_editor": null,
+          "open_transcript": null,
+          "queue": null,
+          "resize_panes": null,
+          "select_transcript": null,
+          "sidebar_down": null,
+          "sidebar_up": null,
+          "submit": null,
+          "toggle_fast_mode": null,
+          "toggle_pane_zoom": null,
+          "toggle_raw_output": null,
+          "toggle_shortcuts": null,
+          "toggle_side_conversation": null,
+          "toggle_vim_mode": null
+        },
+        "list": {
+          "accept": null,
+          "cancel": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "move_down": null,
+          "move_left": null,
+          "move_right": null,
+          "move_up": null,
+          "page_down": null,
+          "page_up": null
+        },
+        "pager": {
+          "close": null,
+          "close_transcript": null,
+          "find": null,
+          "half_page_down": null,
+          "half_page_up": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "mark_markdown": null,
+          "page_down": null,
+          "page_up": null,
+          "scroll_down": null,
+          "scroll_up": null
+        },
+        "vim_normal": {
+          "append_after_cursor": null,
+          "append_line_end": null,
+          "cancel_operator": null,
+          "change_to_line_end": null,
+          "delete_char": null,
+          "delete_to_line_end": null,
+          "enter_insert": null,
+          "enter_replace_mode": null,
+          "find_backward": null,
+          "find_forward": null,
+          "insert_line_start": null,
+          "jump_bottom": null,
+          "jump_top": null,
+          "move_down": null,
+          "move_left": null,
+          "move_line_end": null,
+          "move_line_start": null,
+          "move_right": null,
+          "move_up": null,
+          "move_word_backward": null,
+          "move_word_end": null,
+          "move_word_forward": null,
+          "open_line_above": null,
+          "open_line_below": null,
+          "paste_after": null,
+          "redo": null,
+          "repeat_last_change": null,
+          "replace_char": null,
+          "start_change_operator": null,
+          "start_delete_operator": null,
+          "start_yank_operator": null,
+          "substitute_char": null,
+          "till_backward": null,
+          "till_forward": null,
+          "undo": null,
+          "yank_line": null
+        },
+        "vim_operator": {
+          "cancel": null,
+          "delete_line": null,
+          "motion_down": null,
+          "motion_find_backward": null,
+          "motion_find_forward": null,
+          "motion_jump_bottom": null,
+          "motion_jump_top": null,
+          "motion_left": null,
+          "motion_line_end": null,
+          "motion_line_start": null,
+          "motion_right": null,
+          "motion_till_backward": null,
+          "motion_till_forward": null,
+          "motion_up": null,
+          "motion_word_backward": null,
+          "motion_word_end": null,
+          "motion_word_forward": null,
+          "select_around_text_object": null,
+          "select_inner_text_object": null,
+          "yank_line": null
+        },
+        "vim_search": {
+          "backward": null,
+          "forward": null,
+          "next": null,
+          "previous": null
+        },
+        "vim_text_object": {
+          "backtick": null,
+          "big_word": null,
+          "braces": null,
+          "brackets": null,
+          "cancel": null,
+          "double_quote": null,
+          "parentheses": null,
+          "single_quote": null,
+          "word": null
+        }
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/config/src/loader/mod.rs",
+            "line": 1461,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/config/src/loader/mod.rs#L1461"
+          },
+          {
+            "path": "codex-rs/core/src/config/edit.rs",
+            "line": 158,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/core/src/config/edit.rs#L158"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.agents.default",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.agents",
+        "default"
+      ],
+      "title": "Default of tui.keymap.agents: {\"archive\":null,\"delete\":null,\"fork\":null,\"hide\":null,\"ne… → {\"archive\":null,\"delete\":null,\"fork\":null,\"hide\":null,\"ne…",
+      "impact": "notable",
+      "before": {
+        "archive": null,
+        "delete": null,
+        "fork": null,
+        "hide": null,
+        "new_task": null,
+        "new_worktree": null,
+        "rename": null,
+        "resume": null,
+        "search": null,
+        "stop": null,
+        "toggle_grouping": null,
+        "toggle_pin": null
+      },
+      "after": {
+        "archive": null,
+        "delete": null,
+        "fork": null,
+        "hide": null,
+        "new_task": null,
+        "new_worktree": null,
+        "next_group": null,
+        "previous_group": null,
+        "rename": null,
+        "resume": null,
+        "search": null,
+        "stop": null,
+        "toggle_grouping": null,
+        "toggle_pin": null
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/agent-roles/src/loader.rs",
+            "line": 78,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/agent-roles/src/loader.rs#L78"
+          },
+          {
+            "path": "codex-rs/agent-roles/src/loader.rs",
+            "line": 179,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/agent-roles/src/loader.rs#L179"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "config.options.tui.keymap.agents.next_group",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.agents.next_group"
+      ],
+      "title": "New setting: tui.keymap.agents.next_group",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Select the first task in the next group.",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/app/agent_center/hints.rs",
+            "line": 76,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/tui/src/app/agent_center/hints.rs#L76"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.tui.keymap.agents.previous_group",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "tui.keymap.agents.previous_group"
+      ],
+      "title": "New setting: tui.keymap.agents.previous_group",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Select the first task in the previous group.",
+        "type": "array|string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "codex-rs/tui/src/app/agent_center/hints.rs",
+            "line": 82,
+            "url": "https://github.com/openai/codex/blob/rust-v0.172.0/codex-rs/tui/src/app/agent_center/hints.rs#L82"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false status --porcelain=v2 --branch --no-ahead-behind --ignore-submodules=dirty.phases.exit",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false status --porcelain=v2 --branch --no-ahead-behind --ignore-submodules=dirty",
+        "phases",
+        "exit"
+      ],
+      "title": "`git -c safe.bareRepository=explicit -c core.hooksPath=/dev/null -c core.fsmonitor=false status --por …` no longer runs at exit (linux/amd64)",
+      "impact": "informational",
+      "before": "exit",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "filesystem.linux/amd64.exec.git -c safe.bareRepository=explicit config --null --get core.fsmonitor.phases.exit",
+      "category": "filesystem",
+      "op": "removed",
+      "path": [
+        "filesystem",
+        "linux/amd64",
+        "exec",
+        "git -c safe.bareRepository=explicit config --null --get core.fsmonitor",
+        "phases",
+        "exit"
+      ],
+      "title": "`git -c safe.bareRepository=explicit config --null --get core.fsmonitor` no longer runs at exit (linux/amd64)",
+      "impact": "informational",
+      "before": "exit",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

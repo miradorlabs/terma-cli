@@ -73345,7 +73345,12 @@
         "listening": {},
         "unix": {}
       },
-      "tracer": "eslogger"
+      "tracer": "eslogger",
+      "unobserved": {
+        "connections": [
+          "tcp <proxy>"
+        ]
+      }
     },
     "linux/amd64": {
       "decoys": {

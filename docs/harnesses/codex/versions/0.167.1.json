@@ -28687,6 +28687,9 @@
       },
       "tracer": "eslogger",
       "unobserved": {
+        "connections": [
+          "tcp <proxy>"
+        ],
         "exec": [
           "<xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git",
           "sh -c <xcode>/usr/bin/xcodebuild -sdk <xcode>/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -find git 2> /dev/null"

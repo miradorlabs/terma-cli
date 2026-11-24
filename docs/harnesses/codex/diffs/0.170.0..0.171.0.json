@@ -3,7 +3,7 @@
   "harness": "codex",
   "from": "0.170.0",
   "to": "0.171.0",
-  "generated_at": "2026-11-20T01:10:01.695546758Z",
+  "generated_at": "2026-11-24T00:44:18.786549385Z",
   "source": {
     "compare": "https://github.com/openai/codex/compare/rust-v0.170.0...rust-v0.171.0"
   },

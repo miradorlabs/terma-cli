@@ -1,7 +1,41 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-23T18:53:04.497531851Z",
+  "generated_at": "2026-11-24T00:44:18.786549385Z",
   "versions": [
+    {
+      "harness": "codex",
+      "name": "Codex CLI",
+      "version": "0.172.0",
+      "released_at": "2026-11-24T00:09:39.503Z",
+      "captured_at": "2026-11-24T00:44:18.786549385Z",
+      "platforms": [
+        "darwin/arm64",
+        "linux/amd64"
+      ],
+      "support": "supported",
+      "previous": "0.171.0",
+      "changes": 27,
+      "categories": {
+        "config": 13,
+        "filesystem": 2,
+        "telemetry": 12
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 3,
+        "informational": 22,
+        "notable": 2
+      },
+      "undocumented": 23,
+      "highlights": [
+        "Telemetry surface no longer sent: metrics/codex.sandbox_integrity.check",
+        "Telemetry surface no longer sent: metrics/codex.sandbox_integrity.duration_ms",
+        "Telemetry surface no longer sent: metrics/codex.sandbox_integrity.preparation_ms"
+      ],
+      "signing": "valid",
+      "attempted_at": "2026-11-24T00:44:18.786549385Z",
+      "attempts": 1
+    },
     {
       "harness": "claude",
       "name": "Claude Code",
@@ -1036,7 +1070,7 @@
       ],
       "support": "supported",
       "previous": "0.168.0",
-      "changes": 42,
+      "changes": 240,
       "categories": {
         "behavior": 1,
         "binary": 1,
@@ -1044,19 +1078,19 @@
         "config": 17,
         "filesystem": 10,
         "prompt": 1,
-        "telemetry": 6
+        "telemetry": 204
       },
       "impact": {
         "breaking": 0,
-        "degrading": 4,
-        "informational": 28,
-        "notable": 10
+        "degrading": 0,
+        "informational": 231,
+        "notable": 9
       },
-      "undocumented": 31,
+      "undocumented": 214,
       "highlights": [
-        "Telemetry surface no longer sent: metrics/codex.rollout.persistence.append",
-        "Telemetry surface no longer sent: metrics/codex.rollout.persistence.bytes_removed",
-        "Telemetry surface no longer sent: metrics/codex.rollout.persistence.item_bytes_v2"
+        "System prompt changed (+634 −476 chars)",
+        "Behaviour: subagents system 1 text changed",
+        "Setting no longer read: auto_review.experimental_policy_template"
       ],
       "signing": "valid",
       "attempted_at": "2026-11-13T13:08:26.328461566Z",
@@ -1067,27 +1101,27 @@
       "name": "Codex CLI",
       "version": "0.168.0",
       "released_at": "2026-11-13T04:00:31.594Z",
-      "captured_at": "2026-11-13T09:01:26.428937767Z",
+      "captured_at": "2026-11-24T00:44:18.786549385Z",
       "platforms": [
         "darwin/arm64",
         "linux/amd64"
       ],
       "support": "supported",
       "previous": "0.167.2",
-      "changes": 253,
+      "changes": 46,
       "categories": {
         "cli": 5,
         "config": 37,
-        "telemetry": 210,
+        "telemetry": 3,
         "tools": 1
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 247,
+        "informational": 40,
         "notable": 6
       },
-      "undocumented": 224,
+      "undocumented": 36,
       "highlights": [
         "exec tool description changed (+281 −862 chars)",
         "New setting: features.hosted_search_policy",
@@ -1377,22 +1411,22 @@
       ],
       "support": "supported",
       "previous": "0.167.0",
-      "changes": 6,
+      "changes": 5,
       "categories": {
         "config": 1,
-        "filesystem": 5
+        "filesystem": 4
       },
       "impact": {
         "breaking": 0,
         "degrading": 0,
-        "informational": 6,
+        "informational": 5,
         "notable": 0
       },
-      "undocumented": 6,
+      "undocumented": 5,
       "highlights": [
         "New setting: features.incremental_tools_legacy",
-        "No longer connects to <proxy> (tcp) (darwin/arm64)",
-        "Command changed: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (+424 −426 chars) (linux/amd64)"
+        "Command changed: `/proc/self/exe --codex-run-as-process-setup <n> <n> pipe  <repo> <install>/codex codex-linux-sandbox …` (+424 −426 chars) (linux/amd64)",
+        "Command changed: `bwrap --as-pid-1 --new-session --die-with-parent --ro-bind / / --dev /dev --perms 000 --tmpfs <tmp>/ …` (+424 −426 chars) (linux/amd64)"
       ],
       "signing": "valid"
     },
@@ -6180,39 +6214,6 @@
         "SendMessage tool parameter summary: description changed (+199 −84 chars)",
         "SendMessage tool parameter to: pattern added",
         "New command: `claude import`"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.221",
-      "released_at": "2026-08-03T22:16:25.561Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.220",
-      "changes": 23,
-      "categories": {
-        "binary": 1,
-        "cli": 2,
-        "config": 18,
-        "prompt": 2
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 21,
-        "notable": 2
-      },
-      "undocumented": 20,
-      "highlights": [
-        "Interactive system prompt changed (+169 −173 chars)",
-        "System prompt changed (+169 −173 chars)",
-        "New flag `claude --autocompact`"
       ],
       "signing": "valid"
     }
