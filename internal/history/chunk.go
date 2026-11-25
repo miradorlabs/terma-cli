@@ -145,15 +145,17 @@ func countLogs(msg *logspb.LogsData) int {
 // recorded in snap or derived from transcript tool reach (reachMixedAt when hasReachMixed),
 // drops records newer than maxRecordTime when resuming a transcript modified after an
 // interrupted upload, or drops every record when the ledger is unreadable (failing closed).
+// dropped counts the Mixed drops only: a record past maxRecordTime is left for a later run.
 func FilterMixedLogs(msg *logspb.LogsData, snap runs.Snapshot, lookup func(id string) runs.Snapshot, reachMixedAt time.Time, hasReachMixed bool, maxRecordTime time.Time) (kept, dropped int) {
 	if msg == nil {
 		return 0, 0
 	}
+	later := func(lr *logspb.LogRecord) bool {
+		t := logRecordTime(lr)
+		return !maxRecordTime.IsZero() && !t.IsZero() && t.After(maxRecordTime)
+	}
 	isMixed := func(lr *logspb.LogRecord) bool {
 		t := logRecordTime(lr)
-		if !maxRecordTime.IsZero() && !t.IsZero() && t.After(maxRecordTime) {
-			return true
-		}
 		if hasReachMixed && (reachMixedAt.IsZero() || t.IsZero() || !t.Before(reachMixedAt)) {
 			return true
 		}
@@ -176,6 +178,9 @@ func FilterMixedLogs(msg *logspb.LogsData, snap runs.Snapshot, lookup func(id st
 		for _, sl := range rl.GetScopeLogs() {
 			var keptLR []*logspb.LogRecord
 			for _, lr := range sl.GetLogRecords() {
+				if later(lr) {
+					continue
+				}
 				if isMixed(lr) {
 					dropped++
 					continue

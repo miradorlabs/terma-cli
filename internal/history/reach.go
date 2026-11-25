@@ -242,10 +242,10 @@ func familyMixedAt(resolver *cwdResolver, segs []segReachInfo, subagents bool) (
 		cache[key] = res
 		return res
 	}
+	if found && earliest.IsZero() {
+		return earliest, true
+	}
 	for _, rs := range segs {
-		if found && earliest.IsZero() {
-			break
-		}
 		if len(rs.reaches) == 0 {
 			continue
 		}
@@ -270,6 +270,9 @@ func familyMixedAt(resolver *cwdResolver, segs []segReachInfo, subagents bool) (
 			}
 			if reachCrosses(tr, baseRoot, goneRoot, bases, resolver, classify) {
 				mark(tr.At)
+				if earliest.IsZero() {
+					return earliest, true
+				}
 			}
 		}
 	}
