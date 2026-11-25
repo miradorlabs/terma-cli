@@ -411,8 +411,8 @@ func TestClaudeUnreadableSubagentsDirSetsCompanionReadError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) != 1 || !files[0].CompanionReadError {
-		t.Fatalf("expected CompanionReadError=true for unreadable subagents dir, got %+v", files)
+	if len(files) != 1 || files[0].CompanionReadError != subDir {
+		t.Fatalf("expected CompanionReadError to name the unreadable subagents dir, got %+v", files)
 	}
 }
 

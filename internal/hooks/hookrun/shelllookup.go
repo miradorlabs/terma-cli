@@ -58,11 +58,12 @@ func (sc *scan) candidatePath(t string, r role, fallback bool) {
 			} else if (r == creates || slashed && (r == plain || r == folder || r == slashedOnly)) && !res.named {
 				if p, ok := sc.path(t, d); ok {
 					if rPath, parent, _, found := sc.walkPath(p, true); !found && !sc.unknown && parent != "" && (!fallback || filepath.Dir(rPath) == parent && strings.ContainsAny(strings.TrimRight(t, `/\`), `/\`)) {
-						// In historical mode, preserve the missing path when its nearest
-						// existing ancestor is a non-root directory (e.g. /work/deleted-b/notes
-						// instead of /work), while letting root-anchored non-path strings like
-						// /v1/logs resolve via parent "/" like live hooks.
-						if sc.historical && rPath != "" && parent != filepath.Dir(parent) {
+						// In historical mode, place the missing path itself rather than its
+						// nearest existing ancestor: the ancestor (often "/" or a home folder)
+						// may be nobody's while the path once belonged to an organization.
+						// Missing absolute paths are therefore unknown by design, including
+						// strings that only look like paths (such as an API route).
+						if sc.historical && rPath != "" {
 							sc.place(rPath)
 						} else {
 							sc.place(parent)

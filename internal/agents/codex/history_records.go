@@ -64,11 +64,15 @@ func (p *codexHistoryParser) ensureSegment(ts time.Time) {
 	}
 }
 
+// uniqueNanos returns ts in Unix nanoseconds, moved just after the previous record of the
+// same kind when they collide. An untimed record stays at zero: a made-up time would read
+// as a dated record from before any Mixed cutoff, while a zero time is dropped whenever a
+// cutoff exists.
 func (p *codexHistoryParser) uniqueNanos(kind string, ts time.Time) uint64 {
-	var nanos uint64
-	if !ts.IsZero() && ts.UnixNano() > 0 {
-		nanos = uint64(ts.UnixNano())
+	if ts.IsZero() || ts.UnixNano() <= 0 {
+		return 0
 	}
+	nanos := uint64(ts.UnixNano())
 	if prev := p.lastEventNanos[kind]; nanos <= prev {
 		nanos = prev + 1
 	}

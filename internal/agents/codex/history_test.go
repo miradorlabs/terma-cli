@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -531,4 +532,87 @@ func cxBoolTrue(attrs []*commonpb.KeyValue, key string) bool {
 		}
 	}
 	return false
+}
+
+func hasUnknownReach(paths []string) bool {
+	return slices.ContainsFunc(paths, func(p string) bool { return strings.Contains(p, "\x00unknown") })
+}
+
+func TestCodexArgvRendersAsShellCommandAndRelativeCwdJoins(t *testing.T) {
+	dir := t.TempDir()
+	other := t.TempDir()
+	for _, argv := range [][]string{
+		{"bash", "-l", "-c", "ls sub"},
+		{"env", "FOO=1", "go", "version"},
+		{"echo", "$foo"},
+	} {
+		if got := codexCommandReachPaths(argv, dir, dir); hasUnknownReach(got) {
+			t.Errorf("%q: unexpected unknown reach: %q", argv, got)
+		}
+	}
+	target := filepath.Join(other, "notes.txt")
+	if err := os.WriteFile(target, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// The scan reports an existing file by its folder.
+	if got := codexCommandReachPaths([]string{"head", "-c", "80", target}, dir, dir); !slices.ContainsFunc(got, func(p string) bool { return strings.HasSuffix(p, other) || strings.HasSuffix(p, target) }) {
+		t.Errorf("head -c 80 %s: target not reached: %q", target, got)
+	}
+	if got := codexCommandReachPaths([]string{"grep", "-r", "x", other}, dir, dir); !slices.ContainsFunc(got, func(p string) bool { return strings.HasSuffix(p, other) }) {
+		t.Errorf("grep -r x %s: directory not reached: %q", other, got)
+	}
+	if got := shellArgvCommand([]string{"FOO=1", "if", "a b", "it's", ""}); got != `'FOO=1' if 'a b' 'it'\''s' ''` {
+		t.Errorf("shellArgvCommand = %s", got)
+	}
+	if got := codexNormalizeCwd("sub", "/work/a"); got != filepath.Join("/work/a", "sub") {
+		t.Errorf("codexNormalizeCwd(sub, /work/a) = %q", got)
+	}
+	if got := codexNormalizeCwd("sub", ""); got != "sub" {
+		t.Errorf("codexNormalizeCwd(sub, \"\") = %q", got)
+	}
+}
+
+func TestCodexUntimedPromptStaysUntimed(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("CODEX_HOME", home)
+	sessDir := filepath.Join(home, "sessions", "2026", "10", "03")
+	if err := os.MkdirAll(sessDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sid := "019d2b54-7a10-7000-8000-000000000201"
+	path := filepath.Join(sessDir, "rollout-2026-10-03T10-00-00-"+sid+".jsonl")
+	lines := []string{
+		`{"timestamp":"2026-10-03T10:00:00Z","type":"session_meta","payload":{"id":"` + sid + `","cwd":"/work/repo-a"}}`,
+		`{"timestamp":"2026-10-03T10:00:01Z","type":"event_msg","payload":{"type":"user_message","message":"first"}}`,
+		`{"timestamp":"2026-10-03T10:00:02Z","type":"response_item","payload":{"type":"function_call","call_id":"c-read","name":"exec_command","arguments":"{\"cmd\":\"cat /work/repo-b/secret.go\"}"}}`,
+		`{"type":"event_msg","payload":{"type":"user_message","message":"UNTIMED_AFTER_READ"}}`,
+	}
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	err := (Agent{}).ReadHistory(context.Background(), agents.HistoryFile{SourceSystem: codexSourceSystem, SessionID: sid, Path: path}, agents.HistoryReadOptions{}, func(seg agents.HistorySegment) error {
+		for _, rl := range seg.NativeLogs.GetResourceLogs() {
+			for _, sl := range rl.GetScopeLogs() {
+				for _, lr := range sl.GetLogRecords() {
+					if cxStr(lr.Attributes, "prompt") != "UNTIMED_AFTER_READ" {
+						continue
+					}
+					found = true
+					// A made-up time would read as a dated record from before the read, so it
+					// would survive a Mixed cutoff; a zero time is dropped under any cutoff.
+					if lr.TimeUnixNano != 0 || lr.ObservedTimeUnixNano != 0 {
+						t.Errorf("untimed prompt got time %d/%d, want 0", lr.TimeUnixNano, lr.ObservedTimeUnixNano)
+					}
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Fatal("untimed prompt was not emitted")
+	}
 }

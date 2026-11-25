@@ -29,6 +29,7 @@ const (
 	SkipPendingBinding    = "pending_binding"
 	SkipWrongEnvironment  = "wrong_environment"
 	SkipEmptyAfterFilter  = "empty_after_filter"
+	SkipRecordTooLarge    = "record_too_large"
 	SkipTeamBlockedPrefix = "team_blocked:"
 )
 
@@ -106,6 +107,9 @@ type Summary struct {
 	SkippedSegments map[string]int  `json:"skipped_segments,omitempty"`
 	Failed          []FailedSession `json:"failed,omitempty"`
 	TeamIssues      []TeamIssue     `json:"team_issues,omitempty"`
+	// Unreadable names up to three transcripts or directories discovery could not read;
+	// sessions that may depend on them were skipped as unreadable.
+	Unreadable []string `json:"unreadable,omitempty"`
 }
 
 func newSummary(dryRun bool) Summary {
@@ -134,6 +138,16 @@ func (s *Summary) addSkippedSegment(reason string, n int) {
 		s.SkippedSegments = map[string]int{}
 	}
 	s.SkippedSegments[reason] += n
+}
+
+// maxUnreadablePaths caps Summary.Unreadable so one broken directory cannot flood output.
+const maxUnreadablePaths = 3
+
+func (s *Summary) addUnreadable(path string) {
+	if path == "" || len(s.Unreadable) >= maxUnreadablePaths || slices.Contains(s.Unreadable, path) {
+		return
+	}
+	s.Unreadable = append(s.Unreadable, path)
 }
 
 // SortedSkipKeys returns map keys sorted for deterministic output.

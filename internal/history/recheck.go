@@ -12,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"google.golang.org/protobuf/proto"
-
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
@@ -29,40 +27,40 @@ type fileSnapshot struct {
 	count   int
 }
 
-func statHistoryFile(f agents.HistoryFile) (fileSnapshot, bool) {
+// statHistoryFile snapshots a transcript and its companion files, returning a skip reason
+// when the session cannot be uploaded as discovered: SkipMissingFile when a known file is
+// gone or not a regular file, SkipUnreadable when a file or watch directory cannot be
+// inspected, and SkipActive when a watch directory holds a transcript discovery did not
+// list (a companion that appeared since, which no pass would read).
+func statHistoryFile(f agents.HistoryFile) (fileSnapshot, string) {
 	if f.Path == "" {
-		return fileSnapshot{modTime: f.ModTime}, true
+		return fileSnapshot{modTime: f.ModTime}, ""
 	}
-	info, err := os.Lstat(f.Path)
-	if err != nil || !info.Mode().IsRegular() {
-		return fileSnapshot{}, false
-	}
-	snap := fileSnapshot{
-		modTime: info.ModTime(),
-		size:    info.Size(),
-		count:   1,
-	}
-	seen := map[string]bool{filepath.Clean(f.Path): true}
-	addFile := func(path string, required bool) bool {
+	var snap fileSnapshot
+	known := map[string]bool{}
+	add := func(path string) string {
 		clean := filepath.Clean(path)
-		if seen[clean] {
-			return true
+		if known[clean] {
+			return ""
 		}
-		seen[clean] = true
+		known[clean] = true
 		fi, err := os.Lstat(clean)
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return SkipUnreadable
+		}
 		if err != nil || !fi.Mode().IsRegular() {
-			return !required
+			return SkipMissingFile
 		}
 		if fi.ModTime().After(snap.modTime) {
 			snap.modTime = fi.ModTime()
 		}
 		snap.size += fi.Size()
 		snap.count++
-		return true
+		return ""
 	}
-	for _, p := range f.ExtraPaths {
-		if !addFile(p, true) {
-			return fileSnapshot{}, false
+	for _, p := range append([]string{f.Path}, f.ExtraPaths...) {
+		if reason := add(p); reason != "" {
+			return fileSnapshot{}, reason
 		}
 	}
 	for _, dir := range f.WatchDirs {
@@ -71,27 +69,40 @@ func statHistoryFile(f agents.HistoryFile) (fileSnapshot, bool) {
 			if errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
-			return fileSnapshot{}, false
+			return fileSnapshot{}, SkipUnreadable
 		}
 		for _, ent := range entries {
 			if ent.IsDir() || ent.Type()&os.ModeSymlink != 0 || !strings.HasSuffix(ent.Name(), ".jsonl") {
 				continue
 			}
-			addFile(filepath.Join(dir, ent.Name()), false)
+			path := filepath.Join(dir, ent.Name())
+			if known[path] {
+				continue
+			}
+			fi, err := os.Lstat(path)
+			switch {
+			case errors.Is(err, fs.ErrNotExist):
+			case err != nil:
+				return fileSnapshot{}, SkipUnreadable
+			case fi.Mode().IsRegular():
+				return fileSnapshot{}, SkipActive
+			}
 		}
 	}
-	return snap, true
+	return snap, ""
 }
 
-func statSessionFiles(f agents.HistoryFile, descendants []agents.HistoryFile) (fileSnapshot, bool) {
-	snap, ok := statHistoryFile(f)
-	if !ok {
-		return fileSnapshot{}, false
+// statSessionFiles snapshots f and its spawn family, returning the first skip reason any
+// of them reports (see statHistoryFile).
+func statSessionFiles(f agents.HistoryFile, descendants []agents.HistoryFile) (fileSnapshot, string) {
+	snap, reason := statHistoryFile(f)
+	if reason != "" {
+		return fileSnapshot{}, reason
 	}
 	for _, d := range descendants {
-		ds, dok := statHistoryFile(d)
-		if !dok {
-			return fileSnapshot{}, false
+		ds, reason := statHistoryFile(d)
+		if reason != "" {
+			return fileSnapshot{}, reason
 		}
 		if ds.modTime.After(snap.modTime) {
 			snap.modTime = ds.modTime
@@ -99,7 +110,7 @@ func statSessionFiles(f agents.HistoryFile, descendants []agents.HistoryFile) (f
 		snap.size += ds.size
 		snap.count += ds.count
 	}
-	return snap, true
+	return snap, ""
 }
 
 func policyContentMatches(a, b config.Policy) bool {
@@ -252,6 +263,30 @@ func measureDryRunSession(
 ) (map[string]dryRunRouteEst, error) {
 	snap, lookup := newRunSnapLookup(opts.StateDir, f.SessionID)
 	byRoute := map[string]dryRunRouteEst{}
+	// Chunk each route's batches as the upload would, so the estimate counts request
+	// bodies and a record over the request limit leaves the session out of that route.
+	writers := map[string]*ChunkWriter{}
+	tooLarge := map[string]bool{}
+	writerFor := func(eid string) *ChunkWriter {
+		if w := writers[eid]; w != nil {
+			return w
+		}
+		w := NewChunkWriter(opts.MaxReqBytes, func(ch Chunk) error {
+			cur := byRoute[eid]
+			cur.bytes += int64(len(ch.Body))
+			byRoute[eid] = cur
+			return nil
+		})
+		writers[eid] = w
+		return w
+	}
+	noteChunkErr := func(eid string, err error) error {
+		if _, ok := errors.AsType[*PermanentError](err); ok {
+			tooLarge[eid] = true
+			return nil
+		}
+		return err
+	}
 	err := src.ReadHistory(ctx, f, agents.HistoryReadOptions{IncludeSupplemental: true}, func(seg agents.HistorySegment) error {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -292,17 +327,36 @@ func measureDryRunSession(
 		cur := byRoute[eid]
 		cur.team = target.Team
 		cur.records += n
-		cur.bytes += int64(proto.Size(prepared))
 		byRoute[eid] = cur
-		return nil
+		if tooLarge[eid] {
+			return nil
+		}
+		return noteChunkErr(eid, writerFor(eid).Add(prepared))
 	})
-	return byRoute, err
+	if err != nil {
+		return byRoute, err
+	}
+	for eid, w := range writers {
+		if tooLarge[eid] {
+			continue
+		}
+		if err := noteChunkErr(eid, w.Flush()); err != nil {
+			return byRoute, err
+		}
+	}
+	for eid := range tooLarge {
+		delete(byRoute, eid)
+		sum.addSkippedSession(SkipRecordTooLarge, 1)
+	}
+	return byRoute, nil
 }
 
 // classifyReachedPath classifies a reached path without spawning git subprocesses.
 // Uses gitx.LocateFS so deleted subdirectories inside an existing checkout still resolve
-// to their enclosing repository, while missing paths outside baseRoot and outside
-// nobody's directories fail closed (unknown=true) even when no Personal team is selected.
+// to their enclosing repository (baseRoot, the segment's own checkout root, counts as
+// nobody's), while any other missing path outside nobody's directories fails closed
+// (unknown=true), even under a working directory outside git: a deleted organization
+// repository there must not read as the developer's own folder.
 func classifyReachedPath(cand, baseRoot string) reachedClass {
 	info, statErr := os.Stat(cand)
 	if statErr == nil {
@@ -328,9 +382,6 @@ func classifyReachedPath(cand, baseRoot string) reachedClass {
 			return reachedClass{loc: routing.Location{Kind: routing.Repository, Repository: origin}}
 		}
 	}
-	if baseRoot != "" && isSubpathOf(cand, baseRoot) {
-		return reachedClass{nobody: true}
-	}
 	if hookrun.IsNobodyDir(cand) || hookrun.IsNobodyDir(filepath.Dir(cand)) {
 		return reachedClass{nobody: true}
 	}
@@ -345,9 +396,4 @@ func sameCleanPath(a, b string) bool {
 	ra, ea := filepath.EvalSymlinks(ca)
 	rb, eb := filepath.EvalSymlinks(cb)
 	return ea == nil && eb == nil && ra == rb
-}
-
-func isSubpathOf(path, base string) bool {
-	rel, err := filepath.Rel(filepath.Clean(base), filepath.Clean(path))
-	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }

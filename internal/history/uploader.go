@@ -119,7 +119,7 @@ func Upload(ctx context.Context, opts Options) (Summary, error) {
 	}
 
 	resolver := newCwdResolver(opts.State, opts.AuthURL, opts.ServerKey, opts.ServerKeyTeam, opts.ServerKeyAuthURL, now)
-	reachCache := map[string]cachedCompanionReach{}
+	reachCache := map[string]familyVerdict{}
 	buckets, err := discoverAndPlan(ctx, opts, resolver, existingStates, resumableByRoute, resumableKeys, labelFor, cachedUserID, now, activeWindow, reachCache, &sum)
 	if err != nil {
 		return sum, err
@@ -157,7 +157,7 @@ func discoverAndPlan(
 	userIDFor func(routing.Team, string) string,
 	now time.Time,
 	activeWindow time.Duration,
-	reachCache map[string]cachedCompanionReach,
+	reachCache map[string]familyVerdict,
 	sum *Summary,
 ) (map[string]*routeBucket, error) {
 	buckets := map[string]*routeBucket{}
@@ -206,7 +206,8 @@ func discoverAndPlan(
 				sum.addSkippedSession(SkipOutsideSince, 1)
 				continue
 			}
-			if f.CompanionReadError || slices.ContainsFunc(companions, func(c agents.HistoryFile) bool { return c.CompanionReadError }) {
+			if unreadable := familyReadError(f, companions); unreadable != "" {
+				sum.addUnreadable(unreadable)
 				sum.addSkippedSession(SkipUnreadable, 1)
 				continue
 			}
@@ -217,20 +218,12 @@ func discoverAndPlan(
 				records    int
 			}
 			var segSums []segSummary
-			var reachSegs []segReachInfo
-			isChild := f.ParentSessionID != ""
 			// Pass 1 never retains protobuf payloads in memory (even on --dry-run).
 			err := src.ReadHistory(ctx, f, agents.HistoryReadOptions{IncludeSupplemental: false}, func(seg agents.HistorySegment) error {
 				if err := ctx.Err(); err != nil {
 					return err
 				}
 				target, ok, skipReason := resolver.resolve(ctx, seg.Cwd, seg.FallbackRepoURL, seg.FallbackBranch)
-				if opts.DryRun {
-					reachSegs = append(reachSegs, segReachInfo{
-						cwd: seg.Cwd, subagent: isChild || seg.Subagent, reaches: seg.ToolReaches,
-						earliest: earliestSegmentTime(seg), target: target, ok: ok,
-					})
-				}
 				if seg.RecordCount > 0 {
 					segSums = append(segSums, segSummary{target: target, ok: ok, skipReason: skipReason, records: seg.RecordCount})
 				}
@@ -268,19 +261,24 @@ func discoverAndPlan(
 			if !opts.DryRun || !anyRouted {
 				continue
 			}
-			var reachMixedAt time.Time
-			var hasReachMixed bool
-			if len(companions) > 0 || missingParent != "" {
-				compSegs, compCutoff, hasCompCutoff, cerr := collectCompanionReach(ctx, opts.StateDir, src, resolver, companions, missingParent, reachCache)
-				if cerr != nil {
+			snap, statSkip := statSessionFiles(f, companions)
+			if statSkip != "" {
+				sum.addSkippedSession(statSkip, 1)
+				continue
+			}
+			reachMixedAt, hasReachMixed, cerr := familyCutoff(ctx, opts, src, resolver, f, companions, missingParent, snap, reachCache)
+			if cerr != nil {
+				if errors.Is(cerr, context.Canceled) {
 					sum.Interrupted = true
 					return nil, cerr
 				}
-				reachSegs = append(reachSegs, compSegs...)
-				reachMixedAt, hasReachMixed = mergeMixedCutoff(reachMixedAt, hasReachMixed, compCutoff, hasCompCutoff)
+				if errors.Is(cerr, fs.ErrNotExist) {
+					sum.addSkippedSession(SkipMissingFile, 1)
+				} else {
+					sum.addSkippedSession(SkipUnreadable, 1)
+				}
+				continue
 			}
-			rAt, hasR := sessionReachMixedAt(resolver, reachSegs)
-			reachMixedAt, hasReachMixed = mergeMixedCutoff(reachMixedAt, hasReachMixed, rAt, hasR)
 
 			// Pass 2 (bounded memory) streams segments one at a time for dry-run estimates.
 			byRoute, merr := measureDryRunSession(ctx, opts, src, f, key, resolver, existingStates, resumableByRoute, reachMixedAt, hasReachMixed, userIDFor, sum)
@@ -315,7 +313,7 @@ func processRoute(
 	nowFn func() time.Time,
 	report func(ProgressEvent),
 	orgBlocked map[string]string,
-	reachCache map[string]cachedCompanionReach,
+	reachCache map[string]familyVerdict,
 	sum *Summary,
 ) error {
 	eid := b.team.EnrollmentID

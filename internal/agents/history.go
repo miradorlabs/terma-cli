@@ -32,9 +32,9 @@ type HistoryFile struct {
 	// OutsideSince reports whether the transcript's latest modification time predates
 	// HistoryDiscoverOptions.Since and must be skipped without reading.
 	OutsideSince bool
-	// CompanionReadError reports that companion or sibling transcripts could not be
-	// enumerated or inspected during discovery, so uploading must fail closed.
-	CompanionReadError bool
+	// CompanionReadError is the path of a companion or sibling transcript (or its
+	// directory) that discovery could not read. Non-empty means uploading must fail closed.
+	CompanionReadError string
 }
 
 // HistoryDiscoverOptions configures discovery of past session transcripts.

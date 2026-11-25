@@ -36,7 +36,7 @@ func uploadOneSession(
 	report func(ProgressEvent),
 	sum *Summary,
 	orgBlocked map[string]string,
-	reachCache map[string]cachedCompanionReach,
+	reachCache map[string]familyVerdict,
 ) (stopRoute bool, fatalErr error) {
 	if err := ctx.Err(); err != nil {
 		sum.Interrupted = true
@@ -46,9 +46,9 @@ func uploadOneSession(
 
 	// Re-stat transcript and spawn-family files right before reading so a session resumed
 	// while earlier routes were draining is never uploaded mid-write or marked done early.
-	preSnap, exists := statSessionFiles(sp.file, sp.companions)
-	if !exists {
-		sum.addSkippedSession(SkipMissingFile, 1)
+	preSnap, statSkip := statSessionFiles(sp.file, sp.companions)
+	if statSkip != "" {
+		sum.addSkippedSession(statSkip, 1)
 		return false, nil
 	}
 	now := nowFn()
@@ -77,22 +77,8 @@ func uploadOneSession(
 
 	runSnap, lookupSnap := newRunSnapLookup(opts.StateDir, sp.file.SessionID)
 
-	// Pass 1 (lightweight): collect routing and tool-reach metadata across the session and
-	// its entire spawn family without retaining protobuf log records in memory.
-	var reachSegs []segReachInfo
-	isChild := sp.file.ParentSessionID != ""
-	readErr := sp.source.ReadHistory(ctx, sp.file, agents.HistoryReadOptions{IncludeSupplemental: false}, func(seg agents.HistorySegment) error {
-		target, ok, _ := sessionResolver.resolve(ctx, seg.Cwd, seg.FallbackRepoURL, seg.FallbackBranch)
-		reachSegs = append(reachSegs, segReachInfo{
-			cwd:      seg.Cwd,
-			subagent: isChild || seg.Subagent,
-			reaches:  seg.ToolReaches,
-			earliest: earliestSegmentTime(seg),
-			target:   target,
-			ok:       ok,
-		})
-		return nil
-	})
+	// Pass 1 reads the spawn family's routing and tool reach, without keeping log records.
+	reachMixedAt, hasReachMixed, readErr := familyCutoff(ctx, opts, sp.source, sessionResolver, sp.file, sp.companions, sp.missingParent, preSnap, reachCache)
 	if readErr != nil {
 		if errors.Is(readErr, context.Canceled) {
 			sum.Interrupted = true
@@ -106,22 +92,10 @@ func uploadOneSession(
 		return false, nil
 	}
 
-	var reachMixedAt time.Time
-	var hasReachMixed bool
-	if len(sp.companions) > 0 || sp.missingParent != "" {
-		compSegs, compCutoff, hasCompCutoff, cerr := collectCompanionReach(ctx, opts.StateDir, sp.source, sessionResolver, sp.companions, sp.missingParent, reachCache)
-		if cerr != nil {
-			sum.Interrupted = true
-			return true, cerr
-		}
-		reachSegs = append(reachSegs, compSegs...)
-		reachMixedAt, hasReachMixed = mergeMixedCutoff(reachMixedAt, hasReachMixed, compCutoff, hasCompCutoff)
-	}
-
 	// Re-stat immediately after Pass 1 so a turn appended while reading never leaves.
-	afterReadSnap, stillExists := statSessionFiles(sp.file, sp.companions)
-	if !stillExists {
-		sum.addSkippedSession(SkipMissingFile, 1)
+	afterReadSnap, statSkip := statSessionFiles(sp.file, sp.companions)
+	if statSkip != "" {
+		sum.addSkippedSession(statSkip, 1)
 		return false, nil
 	}
 	if afterReadSnap != preSnap || nowFn().Sub(afterReadSnap.modTime) < activeWindow {
@@ -134,16 +108,13 @@ func uploadOneSession(
 		resumeMax = prev.SourceModTime
 	}
 
-	rAt, hasR := sessionReachMixedAt(sessionResolver, reachSegs)
-	reachMixedAt, hasReachMixed = mergeMixedCutoff(reachMixedAt, hasReachMixed, rAt, hasR)
-
 	lastCheckTeam := freshTeam
 	lastOrgEpochs := orgEpochSnapshot(freshState.Teams, freshTeam.OrganizationID, freshTeam.AuthURL)
 	beforeAttempt := func(context.Context) error {
 		curNow := nowFn()
-		snap, existsNow := statSessionFiles(sp.file, sp.companions)
-		if !existsNow {
-			return &preAttemptStopError{skipReason: SkipMissingFile, reason: "session transcript removed during upload", active: true}
+		snap, statSkip := statSessionFiles(sp.file, sp.companions)
+		if statSkip != "" {
+			return &preAttemptStopError{skipReason: statSkip, reason: "session transcript changed or removed during upload", active: true}
 		}
 		if snap != preSnap || curNow.Sub(snap.modTime) < activeWindow {
 			return &preAttemptStopError{skipReason: SkipActive, reason: "session transcript modified during upload", active: true}
@@ -274,9 +245,9 @@ func uploadOneSession(
 
 	// Re-stat right before marking done: if the user resumed the session while we were
 	// uploading it, keep it in_progress so later turns are never skipped.
-	postSnap, stillHere := statSessionFiles(sp.file, sp.companions)
-	if !stillHere {
-		sum.addSkippedSession(SkipMissingFile, 1)
+	postSnap, statSkip := statSessionFiles(sp.file, sp.companions)
+	if statSkip != "" {
+		sum.addSkippedSession(statSkip, 1)
 		return false, nil
 	}
 	if postSnap != preSnap || nowFn().Sub(postSnap.modTime) < activeWindow {

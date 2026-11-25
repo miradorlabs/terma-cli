@@ -1852,7 +1852,7 @@ func TestSpawnFamilyChildSiblingOrphanDeletedShellTargetGitDashCAndFetchedAtTick
 	}
 }
 
-func TestUnroutedMainWithSubagentsTimeScopedResumeApiRouteNoFalseMixedAndCompanionError(t *testing.T) {
+func TestUnroutedMainWithSubagentsResumeAcrossOrgsAndCompanionError(t *testing.T) {
 	t.Parallel()
 	stateDir := t.TempDir()
 	repoA := initTestGitRepo(t, "https://github.com/org-a/app.git")
@@ -1916,16 +1916,16 @@ func TestUnroutedMainWithSubagentsTimeScopedResumeApiRouteNoFalseMixedAndCompani
 	s3SubB := makeNativeSegment("claude", "s-del-main-sub", repoB, "DEL_MAIN_SUB_B_LEAK", day1.Add(time.Minute))
 	s3SubB.Subagent = true
 
-	// 4. Parent + child finish cleanly in Org A on Day 1; parent resumes cleanly in Org B on Day 2 -> BOTH upload!
+	// 4. Parent + child finish in Org A on Day 1; parent resumes in Org B on Day 2. A family
+	// with subagents must sit in one organization, so Day 1 uploads and Day 2 is withheld.
 	s4MainA := makeNativeSegment("claude", "s-resumed-with-sub", repoA, "DAY1_MAIN_A_OK", day1)
 	s4SubA := makeNativeSegment("claude", "s-resumed-with-sub", repoA, "DAY1_SUB_A_OK", day1.Add(time.Minute))
 	s4SubA.Subagent = true
-	s4MainB := makeNativeSegment("claude", "s-resumed-with-sub", repoB, "DAY2_MAIN_B_OK", day2)
+	s4MainB := makeNativeSegment("claude", "s-resumed-with-sub", repoB, "DAY2_MAIN_B_LEAK", day2)
 
-	// 5. Common root-anchored route strings (`rg '/v1/logs' internal/`) and `grep 'go.mod/v2' docs.md` stay CLEAN!
+	// 5. A missing path inside the segment's own checkout (`grep 'go.mod/v2' docs.md`) stays clean.
 	s5Clean := makeNativeSegment("claude", "s-route-regex", repoA, "ROUTE_REGEX_CLEAN_OK", day1.Add(5*time.Minute))
 	s5Clean.ToolReaches = []agents.HistoryToolReach{
-		{At: day1.Add(time.Minute), Cwd: repoA, Paths: hookrun.Alone(hookrun.ShellPathsHistorical("rg '/v1/logs' internal/", repoA)...)},
 		{At: day1.Add(2 * time.Minute), Cwd: repoA, Paths: hookrun.Alone(hookrun.ShellPathsHistorical("grep 'go.mod/v2' docs.md", repoA)...)},
 	}
 
@@ -1940,7 +1940,7 @@ func TestUnroutedMainWithSubagentsTimeScopedResumeApiRouteNoFalseMixedAndCompani
 			{SourceSystem: "claude", SessionID: "s-del-main-sub", ModTime: day1},
 			{SourceSystem: "claude", SessionID: "s-resumed-with-sub", ModTime: day2},
 			{SourceSystem: "claude", SessionID: "s-route-regex", ModTime: day1},
-			{SourceSystem: "claude", SessionID: "s-comp-err", ModTime: day1, CompanionReadError: true},
+			{SourceSystem: "claude", SessionID: "s-comp-err", ModTime: day1, CompanionReadError: "/nonexistent/subagents"},
 		},
 		segments: map[string][]agents.HistorySegment{
 			"s-unrouted-main-sub": {s1Main, s1Sub},
@@ -1969,16 +1969,16 @@ func TestUnroutedMainWithSubagentsTimeScopedResumeApiRouteNoFalseMixedAndCompani
 			t.Errorf("expected %q uploaded to team-a", want)
 		}
 	}
-	if !strings.Contains(gotB, "DAY2_MAIN_B_OK") {
-		t.Errorf("expected DAY2_MAIN_B_OK uploaded to team-b")
-	}
 	all := gotA + "\n" + gotB
-	for _, leak := range []string{"UNROUTED_PARENT_SUB_B_LEAK", "SIB_SUB_B_CROSS_LEAK", "DEL_MAIN_SUB_B_LEAK", "COMP_ERR_LEAK"} {
+	for _, leak := range []string{"UNROUTED_PARENT_SUB_B_LEAK", "SIB_SUB_B_CROSS_LEAK", "DEL_MAIN_SUB_B_LEAK", "COMP_ERR_LEAK", "DAY2_MAIN_B_LEAK"} {
 		if strings.Contains(all, leak) {
 			t.Fatalf("leaked %q upstream!", leak)
 		}
 	}
 	if sum.SkippedSessions[SkipUnreadable] != 1 {
 		t.Errorf("expected 1 unreadable skip for CompanionReadError, got %+v", sum.SkippedSessions)
+	}
+	if len(sum.Unreadable) != 1 || sum.Unreadable[0] != "/nonexistent/subagents" {
+		t.Errorf("Summary.Unreadable = %v, want the companion path", sum.Unreadable)
 	}
 }

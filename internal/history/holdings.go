@@ -140,11 +140,19 @@ func (c *APIHoldingsChecker) Check(ctx context.Context, team routing.Team, sessi
 			if resp.ProjectID == "" || resp.ProjectID != team.TeamID {
 				return HeldSet{}, fmt.Errorf("holdings response project_id %q does not match requested team %q", resp.ProjectID, team.TeamID)
 			}
+			if resp.Pagination.Page != page {
+				return HeldSet{}, fmt.Errorf("holdings response page %d does not match requested page %d", resp.Pagination.Page, page)
+			}
 			for _, s := range *resp.Sessions {
 				held.Add(s.SourceSystem, s.SessionID)
 			}
-			if resp.Pagination.TotalPages <= page || len(*resp.Sessions) == 0 {
+			if resp.Pagination.TotalPages <= page {
 				break
+			}
+			// An empty page that is not the last would end the walk early and report
+			// sessions on later pages as not held, so fail closed instead.
+			if len(*resp.Sessions) == 0 {
+				return HeldSet{}, fmt.Errorf("holdings page %d is empty but total_pages=%d", page, resp.Pagination.TotalPages)
 			}
 			if page == holdingsMaxPages {
 				return HeldSet{}, fmt.Errorf("holdings pagination exceeded %d pages (total_pages=%d)", holdingsMaxPages, resp.Pagination.TotalPages)

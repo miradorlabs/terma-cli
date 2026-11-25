@@ -117,24 +117,15 @@ func nobodys(dir string) bool {
 // (root, kernel/device filesystems, OS directories, or shared scratch space outside home).
 func IsNobodyDir(dir string) bool { return nobodys(dir) }
 
-// ExpandReach expands paths (including Alone/Search markers and subdirectories) relative
-// to cwd using the same static scan live reach hooks run, returning concrete paths and
-// whether any path or command had statically unknown reach.
-func ExpandReach(paths []string, cwd string) (expanded []string, unknown bool) {
-	return expandReachWith(paths, cwd, os.LookupEnv, false)
-}
-
-// ExpandReachHistorical expands historical tool-reach paths without consulting the current
-// process's environment (aside from HOME/USERPROFILE).
+// ExpandReachHistorical expands historical tool-reach paths (including Alone/Search markers
+// and subdirectories) relative to cwd with the static scan live reach hooks run, without
+// consulting the current process's environment (aside from HOME/USERPROFILE). It returns
+// the concrete paths and whether any path or command had statically unknown reach.
 func ExpandReachHistorical(paths []string, cwd string) (expanded []string, unknown bool) {
-	return expandReachWith(paths, cwd, historicalEnv, true)
-}
-
-func expandReachWith(paths []string, cwd string, env func(string) (string, bool), historical bool) (expanded []string, unknown bool) {
 	if len(paths) == 0 {
 		return nil, false
 	}
-	scanned := searchedByWork(paths, cwd, env, work{deadline: time.Now().Add(maxShellTime), historical: historical})
+	scanned := searchedByWork(paths, cwd, historicalEnv, work{deadline: time.Now().Add(maxShellTime), historical: true})
 	out := make([]string, 0, len(scanned))
 	for _, p := range scanned {
 		if isUnknownReach(p) {

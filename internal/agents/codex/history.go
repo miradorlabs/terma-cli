@@ -46,12 +46,19 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 	}
 
 	bySession := map[string]agents.HistoryFile{}
-	anyUnreadable := false
+	// unreadable is the first rollout or directory discovery could not read. A rollout
+	// it cannot read may be any session's parent or child, so every session fails closed.
+	unreadable := ""
+	noteUnreadable := func(path string) {
+		if unreadable == "" {
+			unreadable = path
+		}
+	}
 	for _, sub := range []string{"sessions", "archived_sessions"} {
 		dir := filepath.Join(home, sub)
 		if _, err := os.Stat(dir); err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
-				anyUnreadable = true
+				noteUnreadable(dir)
 			}
 			continue
 		}
@@ -61,7 +68,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 			}
 			if walkErr != nil {
 				if !errors.Is(walkErr, fs.ErrNotExist) {
-					anyUnreadable = true
+					noteUnreadable(path)
 				}
 				return nil
 			}
@@ -81,7 +88,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 			info, err := d.Info()
 			if err != nil {
 				if !errors.Is(err, fs.ErrNotExist) {
-					anyUnreadable = true
+					noteUnreadable(path)
 				}
 				return nil
 			}
@@ -92,9 +99,9 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 			active := now.Sub(modTime) < activeWindow
 			outside := !opts.Since.IsZero() && modTime.Before(opts.Since)
 			sid := codexSessionIDFromFilename(base)
-			metaID, parentID, unreadable := peekCodexRolloutMeta(path)
-			if unreadable {
-				anyUnreadable = true
+			metaID, parentID, peekFailed := peekCodexRolloutMeta(path)
+			if peekFailed {
+				noteUnreadable(path)
 			}
 			if metaID != "" {
 				sid = metaID
@@ -123,9 +130,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 
 	out := make([]agents.HistoryFile, 0, len(bySession))
 	for _, hf := range bySession {
-		if anyUnreadable {
-			hf.CompanionReadError = true
-		}
+		hf.CompanionReadError = unreadable
 		out = append(out, hf)
 	}
 	slices.SortFunc(out, func(a, b agents.HistoryFile) int {
@@ -237,6 +242,9 @@ func (Agent) ReadHistory(ctx context.Context, file agents.HistoryFile, opts agen
 
 var _ agents.HistorySource = Agent{}
 
+// codexNormalizeCwd turns a recorded working directory (possibly a file:// URL) into a
+// path. A relative result is taken against fallback when there is one, since
+// CommandExecution and FileChange items can record a cwd relative to the session's.
 func codexNormalizeCwd(raw, fallback string) string {
 	s := strings.TrimSpace(raw)
 	if s == "" {
@@ -244,35 +252,43 @@ func codexNormalizeCwd(raw, fallback string) string {
 	}
 	if strings.HasPrefix(s, "file://") {
 		if u, err := url.Parse(s); err == nil && u.Path != "" {
-			return filepath.FromSlash(u.Path)
+			s = filepath.FromSlash(u.Path)
+		} else {
+			s = strings.TrimPrefix(s, "file://")
 		}
-		return strings.TrimPrefix(s, "file://")
+	}
+	if !filepath.IsAbs(s) && fallback != "" {
+		return filepath.Join(fallback, s)
 	}
 	return s
 }
 
-func isPOSIXShell(exe string) bool {
-	base := strings.ToLower(strings.TrimSuffix(filepath.Base(exe), ".exe"))
-	switch base {
-	case "sh", "bash", "zsh", "dash", "ksh", "ash", "fish", "su":
-		return true
-	}
-	return false
-}
+// shellReserved lists the words a shell reads as syntax when they start a command.
+const shellReserved = "if then else elif fi for while until do done case esac select function time coproc in"
 
-func shellQuoteArgv(argv []string) string {
-	var b strings.Builder
+// shellArgvCommand renders argv as the shell command that would run it. Words a shell
+// reads as themselves stay bare, so the scanner still sees command names and flags (it
+// reads them as literal words and a quoted word has none); everything else is single-quoted
+// so "$foo", spaces and globs keep their argv boundaries and meaning. The first word is
+// also quoted when a shell would read it as an assignment or a reserved word.
+func shellArgvCommand(argv []string) string {
+	words := make([]string, len(argv))
 	for i, arg := range argv {
-		if i > 0 {
-			b.WriteByte(' ')
+		bare := arg != "" && strings.Trim(arg, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_@%+=:,./-") == ""
+		if i == 0 && (strings.Contains(arg, "=") || slices.Contains(strings.Fields(shellReserved), arg)) {
+			bare = false
 		}
-		b.WriteByte('\'')
-		b.WriteString(strings.ReplaceAll(arg, "'", `'\''`))
-		b.WriteByte('\'')
+		words[i] = arg
+		if !bare {
+			words[i] = "'" + strings.ReplaceAll(arg, "'", `'\''`) + "'"
+		}
 	}
-	return b.String()
+	return strings.Join(words, " ")
 }
 
+// codexCommandReachPaths returns what a CommandExecution's argv reaches: its working
+// directory when it differs from the session's, and the paths the shell scan finds in the
+// command, which unwraps `bash -c '<script>'` the same way the live Codex hook does.
 func codexCommandReachPaths(cmd []string, itemCwd, sessionCwd string) []string {
 	dir := codexNormalizeCwd(itemCwd, sessionCwd)
 	var out []string
@@ -282,17 +298,7 @@ func codexCommandReachPaths(cmd []string, itemCwd, sessionCwd string) []string {
 	if len(cmd) == 0 {
 		return out
 	}
-	// Unwrap -c/-lc/-cl ONLY for recognized POSIX shells so non-shell commands like
-	// ["head", "-c", "80", "/work/B/notes"] keep all arguments, and shell-quote direct
-	// argv tokens so literal arguments like "$foo" or spaces preserve argv boundaries.
-	if len(cmd) >= 3 && isPOSIXShell(cmd[0]) && (cmd[1] == "-c" || cmd[1] == "-lc" || cmd[1] == "-cl") {
-		out = append(out, hookrun.Alone(hookrun.ShellPathsHistorical(cmd[2], dir)...)...)
-		if len(cmd) > 3 {
-			out = append(out, hookrun.Alone(hookrun.ShellPathsHistorical(shellQuoteArgv(append([]string{"_"}, cmd[3:]...)), dir)...)...)
-		}
-		return out
-	}
-	return append(out, hookrun.Alone(hookrun.ShellPathsHistorical(shellQuoteArgv(cmd), dir)...)...)
+	return append(out, hookrun.Alone(hookrun.ShellPathsHistorical(shellArgvCommand(cmd), dir)...)...)
 }
 
 func codexToolReachPaths(name, args, cwd string) []string {

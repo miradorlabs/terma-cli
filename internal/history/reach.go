@@ -1,12 +1,12 @@
 package history
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
@@ -19,19 +19,26 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/runs"
 )
 
+// segReachInfo is what the Mixed check needs from one transcript segment: where it ran,
+// what its tool calls reached, and when it started.
 type segReachInfo struct {
 	cwd      string
-	subagent bool
 	reaches  []agents.HistoryToolReach
 	earliest time.Time
 	target   RouteTarget
-	ok       bool
 }
 
 type reachedClass struct {
 	loc     routing.Location
 	nobody  bool
 	unknown bool
+}
+
+// orgClass is the organization a location belongs to, as routing.Router.OrganizationOf
+// reports it, plus the repository so a pending binding compares equal to itself.
+type orgClass struct {
+	org, repo   string
+	pending, ok bool
 }
 
 func mergeMixedCutoff(cur time.Time, hasCur bool, at time.Time, hasAt bool) (time.Time, bool) {
@@ -44,87 +51,133 @@ func mergeMixedCutoff(cur time.Time, hasCur bool, at time.Time, hasAt bool) (tim
 	return cur, true
 }
 
-type cachedCompanionReach struct {
-	segs         []segReachInfo
-	ledgerCutoff time.Time
-	hasCutoff    bool
+func (r *cwdResolver) orgOf(loc routing.Location) orgClass {
+	if loc.Kind == "" {
+		return orgClass{}
+	}
+	org, pending, ok := r.router.OrganizationOf(loc, r.now)
+	repo := ""
+	if loc.Kind == routing.Repository {
+		repo = routing.Normalize(loc.Repository)
+	}
+	return orgClass{org: org, repo: repo, pending: pending, ok: ok}
 }
 
-func collectCompanionReach(
+// crosses mirrors Routing.crossing in internal/hooks/hookrun/placement.go.
+func crosses(a, b orgClass) bool {
+	if !a.ok || !b.ok {
+		return false
+	}
+	if (a.pending || b.pending) && a.repo != "" && a.repo == b.repo {
+		return false
+	}
+	return a.pending || b.pending || a.org != b.org
+}
+
+// familyVerdict is what a spawn family's transcripts say about its Mixed cutoff, for the
+// file snapshot and routing state it was read under.
+type familyVerdict struct {
+	snap  fileSnapshot
+	state string
+	at    time.Time
+	mixed bool
+}
+
+// familyCutoff returns the Mixed cutoff for the spawn family of f (f plus companions):
+// the transcripts' verdict from familyMixedAt, merged with every companion's live run
+// ledger. The transcript verdict is cached per family, file snapshot and routing state, so
+// each member of a family reads the family once; the ledgers are read on every call, since
+// a live hook can mark a run Mixed between two members' uploads. An error reading f itself
+// is returned; a companion that cannot be read withholds everything.
+func familyCutoff(
 	ctx context.Context,
-	stateDir string,
+	opts Options,
 	src agents.HistorySource,
 	resolver *cwdResolver,
+	f agents.HistoryFile,
 	companions []agents.HistoryFile,
 	missingParent string,
-	cache map[string]cachedCompanionReach,
-) ([]segReachInfo, time.Time, bool, error) {
-	var out []segReachInfo
-	var ledgerCutoff time.Time
-	hasLedgerCutoff := false
+	snap fileSnapshot,
+	cache map[string]familyVerdict,
+) (time.Time, bool, error) {
+	if missingParent != "" {
+		// A child whose parent transcript is gone: the parent may have crossed
+		// organizations before spawning it.
+		return time.Time{}, true, nil
+	}
+	ids := []string{f.SessionID}
+	for _, c := range companions {
+		ids = append(ids, c.SessionID)
+	}
+	slices.Sort(ids)
+	key := f.SourceSystem + "\x00" + strings.Join(ids, "\x00")
+	state := fmt.Sprintf("%s:%d:%d", resolver.state.StateID, resolver.state.Generation, resolver.state.ConsentGeneration)
+
+	var at time.Time
+	var mixed bool
+	if hit, ok := cache[key]; ok && hit.snap == snap && hit.state == state {
+		at, mixed = hit.at, hit.mixed
+	} else {
+		subagents := len(companions) > 0 || f.ParentSessionID != ""
+		var segs []segReachInfo
+		collect := func(seg agents.HistorySegment) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			subagents = subagents || seg.Subagent
+			target, _, _ := resolver.resolve(ctx, seg.Cwd, seg.FallbackRepoURL, seg.FallbackBranch)
+			segs = append(segs, segReachInfo{cwd: seg.Cwd, reaches: seg.ToolReaches, earliest: earliestSegmentTime(seg), target: target})
+			return nil
+		}
+		if err := src.ReadHistory(ctx, f, agents.HistoryReadOptions{IncludeSupplemental: false}, collect); err != nil {
+			return time.Time{}, false, err
+		}
+		readAll := true
+		for _, comp := range companions {
+			if err := src.ReadHistory(ctx, comp, agents.HistoryReadOptions{IncludeSupplemental: false}, collect); err != nil {
+				if errors.Is(err, context.Canceled) {
+					return time.Time{}, false, err
+				}
+				readAll = false
+				break
+			}
+		}
+		if readAll {
+			at, mixed = familyMixedAt(resolver, segs, subagents)
+			if cache != nil {
+				cache[key] = familyVerdict{snap: snap, state: state, at: at, mixed: mixed}
+			}
+		} else {
+			at, mixed = time.Time{}, true
+		}
+	}
+
 	farPast := time.Unix(1, 0).UTC()
 	farFuture := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
-	if missingParent != "" {
-		// Parent transcript is missing from disk: fail closed rather than uploading a
-		// spawned child whose parent may have crossed organizations before spawning it.
-		ledgerCutoff, hasLedgerCutoff = time.Time{}, true
-	}
-	stateKey := ""
-	if resolver != nil {
-		stateKey = fmt.Sprintf("%s:%d:%d", resolver.state.StateID, resolver.state.Generation, resolver.state.ConsentGeneration)
-	}
 	for _, comp := range companions {
-		if err := ctx.Err(); err != nil {
-			return nil, time.Time{}, false, err
+		if mAt, m := runs.Read(opts.StateDir, comp.SessionID).MixedInterval(farPast, farFuture); m {
+			at, mixed = mergeMixedCutoff(at, mixed, mAt, true)
 		}
-		cacheKey := fmt.Sprintf("%s\x00%s\x00%s\x00%s\x00%d", stateKey, comp.SourceSystem, comp.SessionID, comp.Path, comp.ModTime.UnixNano())
-		if cache != nil {
-			if hit, ok := cache[cacheKey]; ok {
-				out = append(out, hit.segs...)
-				ledgerCutoff, hasLedgerCutoff = mergeMixedCutoff(ledgerCutoff, hasLedgerCutoff, hit.ledgerCutoff, hit.hasCutoff)
-				continue
-			}
-		}
-		var compSegs []segReachInfo
-		var compCutoff time.Time
-		hasCompCutoff := false
-		if mAt, mixed := runs.Read(stateDir, comp.SessionID).MixedInterval(farPast, farFuture); mixed {
-			compCutoff, hasCompCutoff = mergeMixedCutoff(compCutoff, hasCompCutoff, mAt, true)
-		}
-		isChild := comp.ParentSessionID != ""
-		err := src.ReadHistory(ctx, comp, agents.HistoryReadOptions{IncludeSupplemental: false}, func(seg agents.HistorySegment) error {
-			target, ok, _ := resolver.resolve(ctx, seg.Cwd, seg.FallbackRepoURL, seg.FallbackBranch)
-			compSegs = append(compSegs, segReachInfo{
-				cwd:      seg.Cwd,
-				subagent: isChild || seg.Subagent,
-				reaches:  seg.ToolReaches,
-				earliest: earliestSegmentTime(seg),
-				target:   target,
-				ok:       ok,
-			})
-			return nil
-		})
-		if err != nil {
-			if errors.Is(err, context.Canceled) {
-				return nil, time.Time{}, false, err
-			}
-			// Fail closed when any transcript in the spawn family cannot be read.
-			compCutoff, hasCompCutoff = time.Time{}, true
-		}
-		if cache != nil {
-			cache[cacheKey] = cachedCompanionReach{segs: compSegs, ledgerCutoff: compCutoff, hasCutoff: hasCompCutoff}
-		}
-		out = append(out, compSegs...)
-		ledgerCutoff, hasLedgerCutoff = mergeMixedCutoff(ledgerCutoff, hasLedgerCutoff, compCutoff, hasCompCutoff)
 	}
-	return out, ledgerCutoff, hasLedgerCutoff, nil
+	return at, mixed, nil
 }
 
-// sessionReachMixedAt inspects every segment of a session (including unrouted/blocked
-// segments and companion/spawned subagents) using historical static expansion, the nobodys
-// filter, and routing.Router.OrganizationOf. Returning one earliest cutoff ensures cross-org
-// reach is never reset by a later cwd change or hidden by held/uncollected subagents.
-func sessionReachMixedAt(resolver *cwdResolver, segs []segReachInfo) (time.Time, bool) {
+// familyMixedAt returns the earliest moment from which a spawn family's content must be
+// withheld; a zero time with true withholds everything. Two rules apply.
+//
+// A family with subagents must sit in one organization, because a subagent's output flows
+// into its parent at times the transcripts do not pin down. So when the segments' working
+// directories span two organizations, the family is cut from when the second one appears,
+// and a working directory that can no longer be placed cuts it from that segment's start.
+// The cost is deliberate: a parent that later resumes in another organization is withheld
+// from then on even if its subagents had finished. That needs two organizations,
+// subagents, and a session resumed across them, so it is rare, and it fails closed.
+//
+// Every tool call's reach is compared with its own segment's organization, or with every
+// organization in the family when the segment's own cannot be placed. A transcript without
+// subagents that resumes in a second repository therefore still splits cleanly by working
+// directory.
+func familyMixedAt(resolver *cwdResolver, segs []segReachInfo, subagents bool) (time.Time, bool) {
 	if resolver == nil || len(segs) == 0 {
 		return time.Time{}, false
 	}
@@ -134,138 +187,51 @@ func sessionReachMixedAt(resolver *cwdResolver, segs []segReachInfo) (time.Time,
 		earliest, found = mergeMixedCutoff(earliest, found, at, true)
 	}
 
-	type orgClass struct {
-		org, repo   string
-		pending, ok bool
-	}
-	orgOf := func(loc routing.Location) orgClass {
-		if loc.Kind == "" {
-			return orgClass{}
-		}
-		org, pending, ok := resolver.router.OrganizationOf(loc, resolver.now)
-		repo := ""
-		if loc.Kind == routing.Repository {
-			repo = routing.Normalize(loc.Repository)
-		}
-		return orgClass{org: org, repo: repo, pending: pending, ok: ok}
-	}
-	crosses := func(a, b orgClass) bool {
-		if !a.ok || !b.ok {
-			return false
-		}
-		if (a.pending || b.pending) && a.repo != "" && a.repo == b.repo {
-			return false
-		}
-		return a.pending || b.pending || a.org != b.org
-	}
-
-	type timedOrg struct {
-		at  time.Time
-		org orgClass
-	}
-	var mainTimed, subTimed []timedOrg
-	var unknownMainAt time.Time
-	hasUnknownMain, hasSubagent := false, false
+	// Segments are flushed in fixed-size chunks, so compare distinct organizations rather
+	// than segment pairs. A class whose start is unknown (zero) in any segment is unknown.
+	var classes []orgClass
+	starts := map[orgClass]time.Time{}
 	for _, rs := range segs {
-		if rs.subagent {
-			hasSubagent = true
-			if oc := orgOf(rs.target.Location); oc.ok {
-				subTimed = append(subTimed, timedOrg{at: rs.earliest, org: oc})
-			}
-			continue
-		}
-		if rs.target.Location.Kind == "" {
-			if rs.cwd != "" {
-				unknownMainAt, hasUnknownMain = mergeMixedCutoff(unknownMainAt, hasUnknownMain, rs.earliest, true)
-			}
-			continue
-		}
-		if oc := orgOf(rs.target.Location); oc.ok {
-			mainTimed = append(mainTimed, timedOrg{at: rs.earliest, org: oc})
-		}
-	}
-	slices.SortStableFunc(mainTimed, func(a, b timedOrg) int { return a.at.Compare(b.at) })
-
-	// mainInForceAt returns the main-segment organization(s) active at timestamp at (the
-	// latest main segment with m.at <= at, falling back to the earliest main segment).
-	// Comparing subagents only against the main placement in force when they ran avoids
-	// false Mixed marks when a parent finishes in org A and later resumes in org B.
-	mainInForceAt := func(at time.Time) []orgClass {
-		if len(mainTimed) == 0 {
-			return nil
-		}
-		if at.IsZero() {
-			out := make([]orgClass, len(mainTimed))
-			for i, m := range mainTimed {
-				out[i] = m.org
-			}
-			return out
-		}
-		chosen := mainTimed[0].at
-		for _, m := range mainTimed {
-			if !m.at.After(at) {
-				chosen = m.at
-			} else {
-				break
-			}
-		}
-		var out []orgClass
-		for _, m := range mainTimed {
-			if m.at.Equal(chosen) {
-				out = append(out, m.org)
-			}
-		}
-		return out
-	}
-
-	// If a main segment had an unresolvable cwd (deleted repo or origin mismatch) while
-	// subagents exist, fail closed because the parent's organization is unknown.
-	if hasUnknownMain && hasSubagent {
-		mark(unknownMainAt)
-	}
-	for _, rs := range segs {
-		if !rs.subagent {
-			continue
-		}
-		if rs.target.Location.Kind == "" {
-			if rs.cwd != "" && (len(mainTimed) > 0 || len(subTimed) > 0) {
+		oc := resolver.orgOf(rs.target.Location)
+		if !oc.ok {
+			if subagents && rs.target.Location.Kind == "" && rs.cwd != "" {
 				mark(rs.earliest)
 			}
 			continue
 		}
-		subClass := orgOf(rs.target.Location)
-		for _, mc := range mainInForceAt(rs.earliest) {
-			if crosses(mc, subClass) {
-				mark(rs.earliest)
-				break
-			}
+		start, seen := starts[oc]
+		switch {
+		case !seen:
+			classes = append(classes, oc)
+			start = rs.earliest
+		case start.IsZero() || rs.earliest.IsZero():
+			start = time.Time{}
+		case rs.earliest.Before(start):
+			start = rs.earliest
 		}
+		starts[oc] = start
 	}
-	// Sibling subagents running under the same main placement (including when the main
-	// session has no resolved org, e.g. OutsideGit with no Personal team) must not span
-	// different organizations.
-	for i := range subTimed {
-		mi := mainInForceAt(subTimed[i].at)
-		for j := i + 1; j < len(subTimed); j++ {
-			if !crosses(subTimed[i].org, subTimed[j].org) {
-				continue
+	if subagents {
+		for i, a := range classes {
+			for _, b := range classes[i+1:] {
+				if !crosses(a, b) {
+					continue
+				}
+				sa, sb := starts[a], starts[b]
+				switch {
+				case sa.IsZero() || sb.IsZero():
+					mark(time.Time{})
+				case sa.After(sb):
+					mark(sa)
+				default:
+					mark(sb)
+				}
 			}
-			mj := mainInForceAt(subTimed[j].at)
-			if len(mi) > 0 && len(mj) > 0 && !slices.Equal(mi, mj) {
-				continue
-			}
-			at := subTimed[j].at
-			if subTimed[i].at.IsZero() || subTimed[j].at.IsZero() {
-				at = time.Time{}
-			} else if subTimed[i].at.After(at) {
-				at = subTimed[i].at
-			}
-			mark(at)
 		}
 	}
 
-	// Cache directory classification results (not "skip visited"), so an out-of-order
-	// earlier subagent reach to the same org-B directory still moves earliest backward.
+	// Cache classification results per call (not "skip visited"), so an earlier reach to
+	// the same directory still moves the cutoff backward.
 	cache := map[string]reachedClass{}
 	classify := func(cand, baseRoot string) reachedClass {
 		key := cand + "\x00" + baseRoot
@@ -276,102 +242,100 @@ func sessionReachMixedAt(resolver *cwdResolver, segs []segReachInfo) (time.Time,
 		cache[key] = res
 		return res
 	}
-
-	allSubOrgs := make([]orgClass, len(subTimed))
-	for i, s := range subTimed {
-		allSubOrgs[i] = s.org
-	}
 	for _, rs := range segs {
 		if len(rs.reaches) == 0 {
 			continue
 		}
-		segOrg := orgOf(rs.target.Location)
-		baseRoot := cmp.Or(rs.target.Checkout.Root, rs.target.Checkout.Cwd)
+		bases := classes
+		if own := resolver.orgOf(rs.target.Location); own.ok {
+			bases = []orgClass{own}
+		}
+		if len(bases) == 0 {
+			continue
+		}
+		baseRoot := rs.target.Checkout.Root
+		// A segment placed by the origin its transcript recorded, because its checkout is
+		// since deleted, has no root on disk: what it reached under its own working
+		// directory was that checkout. A working directory outside git gets no such pass.
+		goneRoot := ""
+		if baseRoot == "" && rs.target.Location.Kind == routing.Repository {
+			goneRoot = rs.target.Checkout.Cwd
+		}
 		for _, tr := range rs.reaches {
 			if found && !earliest.IsZero() && !tr.At.IsZero() && !tr.At.Before(earliest) {
 				continue
 			}
-			var bases []orgClass
-			switch {
-			case rs.subagent:
-				inForce := mainInForceAt(cmp.Or(tr.At, rs.earliest))
-				bases = append(bases, inForce...)
-				if segOrg.ok {
-					bases = append(bases, segOrg)
-				}
-				if len(inForce) == 0 {
-					bases = append(bases, allSubOrgs...)
-				}
-			case segOrg.ok:
-				bases = []orgClass{segOrg}
-			default:
-				// Unrouted main segment (e.g. OutsideGit without Personal, or missing_cwd):
-				// compare its tool reaches against the active main org and all subagent orgs.
-				bases = append(bases, mainInForceAt(cmp.Or(tr.At, rs.earliest))...)
-				bases = append(bases, allSubOrgs...)
-			}
-			if len(bases) == 0 {
-				continue
-			}
-			expanded, unknown := hookrun.ExpandReachHistorical(tr.Paths, tr.Cwd)
-			if unknown {
+			if reachCrosses(tr, baseRoot, goneRoot, bases, resolver, classify) {
 				mark(tr.At)
-				continue
-			}
-			for _, p := range expanded {
-				if !filepath.IsAbs(p) && tr.Cwd != "" {
-					p = filepath.Join(tr.Cwd, p)
-				}
-				p = filepath.Clean(p)
-				if !filepath.IsAbs(p) {
-					continue
-				}
-				candidates := []string{p}
-				if target, err := filepath.EvalSymlinks(p); err == nil && target != p {
-					candidates = append(candidates, target)
-				}
-				crossed := false
-				for _, cand := range candidates {
-					cls := classify(cand, baseRoot)
-					if cls.nobody {
-						continue
-					}
-					if cls.unknown {
-						mark(tr.At)
-						crossed = true
-						break
-					}
-					reachedOrg := orgOf(cls.loc)
-					for _, b := range bases {
-						if crosses(b, reachedOrg) {
-							mark(tr.At)
-							crossed = true
-							break
-						}
-					}
-					if crossed {
-						break
-					}
-				}
-				if crossed {
-					break
-				}
 			}
 		}
 	}
 	return earliest, found
 }
 
+// reachCrosses reports whether one tool call reached somewhere whose organization is
+// unknown or crosses one of bases. Paths under goneRoot, the segment's own deleted
+// checkout, are its own.
+func reachCrosses(tr agents.HistoryToolReach, baseRoot, goneRoot string, bases []orgClass, resolver *cwdResolver, classify func(cand, baseRoot string) reachedClass) bool {
+	expanded, unknown := hookrun.ExpandReachHistorical(tr.Paths, tr.Cwd)
+	if unknown {
+		return true
+	}
+	for _, p := range expanded {
+		if !filepath.IsAbs(p) && tr.Cwd != "" {
+			p = filepath.Join(tr.Cwd, p)
+		}
+		p = filepath.Clean(p)
+		if !filepath.IsAbs(p) {
+			continue
+		}
+		candidates := []string{p}
+		if target, err := filepath.EvalSymlinks(p); err == nil && target != p {
+			candidates = append(candidates, target)
+		}
+		for _, cand := range candidates {
+			if goneRoot != "" && pathUnder(cand, goneRoot) {
+				continue
+			}
+			cls := classify(cand, baseRoot)
+			if cls.nobody {
+				continue
+			}
+			if cls.unknown {
+				return true
+			}
+			reached := resolver.orgOf(cls.loc)
+			if slices.ContainsFunc(bases, func(b orgClass) bool { return crosses(b, reached) }) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// pathUnder reports whether path is root or lies below it, by name alone.
+func pathUnder(path, root string) bool {
+	rel, err := filepath.Rel(filepath.Clean(root), filepath.Clean(path))
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+// earliestSegmentTime returns when a segment started: the earliest timestamp among its log
+// records and tool reaches, or zero when any of them is untimed (its start is then unknown).
 func earliestSegmentTime(seg agents.HistorySegment) time.Time {
 	var best time.Time
+	untimed := false
+	consider := func(t time.Time) {
+		if t.IsZero() {
+			untimed = true
+		} else if best.IsZero() || t.Before(best) {
+			best = t
+		}
+	}
 	scan := func(msg *logspb.LogsData) {
 		for _, rl := range msg.GetResourceLogs() {
 			for _, sl := range rl.GetScopeLogs() {
 				for _, lr := range sl.GetLogRecords() {
-					t := logRecordTime(lr)
-					if !t.IsZero() && (best.IsZero() || t.Before(best)) {
-						best = t
-					}
+					consider(logRecordTime(lr))
 				}
 			}
 		}
@@ -379,9 +343,10 @@ func earliestSegmentTime(seg agents.HistorySegment) time.Time {
 	scan(seg.NativeLogs)
 	scan(seg.SupplementalLogs)
 	for _, tr := range seg.ToolReaches {
-		if !tr.At.IsZero() && (best.IsZero() || tr.At.Before(best)) {
-			best = tr.At
-		}
+		consider(tr.At)
+	}
+	if untimed {
+		return time.Time{}
 	}
 	return best
 }

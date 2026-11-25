@@ -130,19 +130,20 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 }
 
 // findClaudeSubagents lists regular .jsonl files in a session's subagents directory and
-// returns them sorted, their latest modification time, and whether reading failed with a
-// non-ErrNotExist error (so callers fail closed instead of treating unreadable children as absent).
-func findClaudeSubagents(dir string) ([]string, time.Time, bool) {
+// returns them sorted, their latest modification time, and the directory or entry that
+// could not be read for a reason other than not existing, empty when none (so callers fail
+// closed instead of treating unreadable children as absent).
+func findClaudeSubagents(dir string) ([]string, time.Time, string) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return nil, time.Time{}, false
+			return nil, time.Time{}, ""
 		}
-		return nil, time.Time{}, true
+		return nil, time.Time{}, dir
 	}
 	var paths []string
 	var latest time.Time
-	readErr := false
+	readErr := ""
 	for _, ent := range entries {
 		if ent.IsDir() || !strings.HasSuffix(ent.Name(), ".jsonl") {
 			continue
@@ -152,8 +153,8 @@ func findClaudeSubagents(dir string) ([]string, time.Time, bool) {
 		}
 		info, err := ent.Info()
 		if err != nil {
-			if !errors.Is(err, fs.ErrNotExist) {
-				readErr = true
+			if !errors.Is(err, fs.ErrNotExist) && readErr == "" {
+				readErr = filepath.Join(dir, ent.Name())
 			}
 			continue
 		}

@@ -251,3 +251,17 @@ func collectFamily(
 	}
 	return companions, missingParent
 }
+
+// familyReadError returns the first transcript or directory discovery could not read for
+// f or any member of its spawn family, empty when every one was read.
+func familyReadError(f agents.HistoryFile, companions []agents.HistoryFile) string {
+	if f.CompanionReadError != "" {
+		return f.CompanionReadError
+	}
+	for _, c := range companions {
+		if c.CompanionReadError != "" {
+			return c.CompanionReadError
+		}
+	}
+	return ""
+}
