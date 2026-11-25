@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "harness": "t3",
+  "version": "0.1.12",
+  "platform": "",
+  "captured_at": "2026-11-25T07:43:08.450450844Z",
+  "capture": {
+    "partial": true,
+    "notes": [
+      "Part of this build's capture did not finish; the frequent check tries it again, up to four attempts."
+    ],
+    "attempted_at": "2026-11-25T07:43:08.450450844Z",
+    "attempts": 1,
+    "announced_at": "2026-11-25T07:43:08.450450844Z"
+  },
+  "side_requests": null
+}

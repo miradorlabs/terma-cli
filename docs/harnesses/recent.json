@@ -1,7 +1,31 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-25T03:37:09.560390555Z",
+  "generated_at": "2026-11-25T07:43:08.450450844Z",
   "versions": [
+    {
+      "harness": "t3",
+      "name": "T3 Code",
+      "version": "0.1.12",
+      "released_at": "2026-11-25T07:37:43.095Z",
+      "captured_at": "2026-11-25T07:43:08.450450844Z",
+      "platforms": [],
+      "support": "untested",
+      "previous": "0.1.11",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-25T07:43:08.450450844Z",
+      "attempts": 1
+    },
     {
       "harness": "claude",
       "name": "Claude Code",
@@ -6189,40 +6213,6 @@
         "New setting: policyHelpers",
         "Header x-stainless-package-version: 0.94.0 → 0.112.1",
         "ConfigChange hook environment variable CLAUDE_CODE_MESSAGING_TOKEN added"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.227",
-      "released_at": "2026-08-10T20:56:57.591Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.226",
-      "changes": 19,
-      "categories": {
-        "cli": 3,
-        "config": 10,
-        "filesystem": 1,
-        "prompt": 2,
-        "tools": 3
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 14,
-        "notable": 5
-      },
-      "undocumented": 19,
-      "highlights": [
-        "Interactive system prompt changed (+839 −862 chars)",
-        "System prompt changed (+839 −862 chars)",
-        "Agent tool description changed (+193 −97 chars)"
       ],
       "signing": "valid"
     }
