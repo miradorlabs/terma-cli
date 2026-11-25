@@ -210,16 +210,28 @@ func TestStatusNeverAsksForTheCampaign(t *testing.T) {
 func TestSetupUnderAServerKeyAsksForAUserSession(t *testing.T) {
 	userSandbox(t)
 	t.Setenv("TERMA_REMEDIATION_STUB", strings.Replace(campaignStub, `"require_user_session":false`, `"require_user_session":true`, 1))
+	t.Setenv("TERMA_API_KEY", "set-for-the-test")
 	cfg, err := testApp.loadConfig()
-	if err != nil {
-		t.Fatal(err)
+	if err != nil || cfg.APIKey == "" {
+		t.Fatalf("config = %+v, %v", cfg, err)
 	}
-	cfg.APIKey = "set-for-the-test"
 	ui := newSetupUI(io.Discard, false)
 	var b strings.Builder
 	ui.out = &b
 	testApp.cautionRemediation(t.Context(), ui, cfg)
 	if !strings.Contains(b.String(), "run `terma setup` with TERMA_API_KEY unset") {
 		t.Fatalf("setup under a server key:\n%s", b.String())
+	}
+}
+
+// A configuration that does not load still names TERMA_API_KEY in the advice: setup would
+// sign in with it once the configuration is fixed.
+func TestTheNoticeNamesTheKeyWithoutAConfiguration(t *testing.T) {
+	userSandbox(t)
+	t.Setenv("TERMA_REMEDIATION_STUB", strings.Replace(campaignStub, `"require_user_session":false`, `"require_user_session":true`, 1))
+	t.Setenv("TERMA_API_KEY", "set-for-the-test")
+	n := testApp.doctorRemediation(t.Context(), nil)
+	if !n.NeedsUserSession || !strings.HasSuffix(n.Summary(), "run `terma setup` with TERMA_API_KEY unset") {
+		t.Fatalf("without a configuration: %+v %q", n, n.Summary())
 	}
 }

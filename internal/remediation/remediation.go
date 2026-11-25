@@ -46,6 +46,7 @@ func Stub() string { return os.Getenv("TERMA_REMEDIATION_STUB") }
 // is nil when there is none. Any failure (offline, a timeout, an older platform without
 // the route, a malformed answer) is an error the caller only logs.
 func Fetch(ctx context.Context, authURL, version string) (*Campaign, error) {
+	// The stub reaches nothing, so it needs no timeout.
 	if stub := Stub(); stub != "" {
 		return decode(strings.NewReader(stub))
 	}
@@ -80,7 +81,9 @@ func decode(r io.Reader) (*Campaign, error) {
 	if c == nil {
 		return nil, nil
 	}
-	// The text comes from the network and goes to a terminal: no control characters.
+	// The text comes from the network and goes to a terminal: nothing that is not printable,
+	// neither control characters nor the format ones (bidi overrides, zero widths) that
+	// would let it show an instruction other than the one it holds.
 	c.Title, c.Message = printable(c.Title), printable(c.Message)
 	steps := c.Steps[:0]
 	for _, s := range c.Steps {
@@ -93,10 +96,10 @@ func decode(r io.Reader) (*Campaign, error) {
 	return c, nil
 }
 
-// printable is s on one line, without control characters.
+// printable is s on one line, each rune that is not printable a space.
 func printable(s string) string {
 	return strings.TrimSpace(strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) {
+		if !unicode.IsPrint(r) {
 			return ' '
 		}
 		return r

@@ -29,7 +29,9 @@ func (app *App) remediationNotice(ctx context.Context, cfg *config.Config, userS
 		return remediation.Notice{}
 	}
 	n := remediation.Evaluate(c, app.version, userSession)
-	n.KeyInEnv = cfg != nil && cfg.APIKey != ""
+	// Read from the environment, where config.Config.APIKey comes from too, so that a
+	// configuration that did not load still names it.
+	n.KeyInEnv = strings.TrimSpace(os.Getenv("TERMA_API_KEY")) != ""
 	return n
 }
 
@@ -70,6 +72,7 @@ func hasUserSession(cfg *config.Config) bool {
 // cautionRemediation prints, before setup asks anything, what the platform's active
 // remediation campaign asks of this machine; setup then carries on. The sign-in judged is
 // the one setup leaves: a server key's under TERMA_API_KEY, else the person's.
+// cfg is never nil here: runSetup returns before this when the configuration fails to load.
 func (app *App) cautionRemediation(ctx context.Context, ui *setupUI, cfg *config.Config) {
 	n := app.remediationNotice(ctx, cfg, cfg.APIKey == "")
 	if !n.Warn() {

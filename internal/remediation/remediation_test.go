@@ -69,7 +69,7 @@ func TestSummaryAndLines(t *testing.T) {
 func TestFetch(t *testing.T) {
 	t.Setenv("TERMA_REMEDIATION_STUB", "")
 	var got *http.Request
-	body := `{"campaign":{"id":"c1","title":"Update\u001b[2J terma","message":"m","steps":["one","\u0007",""],"minimum_client_version":" 0.43.0 ","require_user_session":true,"updated_at":"2026-11-20T10:00:00Z"}}`
+	body := `{"campaign":{"id":"c1","title":"Update\u001b[2J terma","message":"m","steps":["one","\u0007","","run \u202eetadpu amret\u2066x\u200b"],"minimum_client_version":" 0.43.0 ","require_user_session":true,"updated_at":"2026-11-20T10:00:00Z"}}`
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got = r
 		_, _ = w.Write([]byte(body))
@@ -85,7 +85,7 @@ func TestFetch(t *testing.T) {
 	if got.Header.Get("User-Agent") != "terma-cli/0.41.2" || got.Header.Get("Authorization") != "" {
 		t.Errorf("headers = %v", got.Header)
 	}
-	if c.ID != "c1" || c.Title != "Update [2J terma" || len(c.Steps) != 1 || c.Steps[0] != "one" ||
+	if c.ID != "c1" || c.Title != "Update [2J terma" || len(c.Steps) != 2 || c.Steps[0] != "one" || c.Steps[1] != "run  etadpu amret x" ||
 		c.MinimumClientVersion != "0.43.0" || !c.RequireUserSession || c.UpdatedAt.IsZero() {
 		t.Errorf("campaign = %+v", c)
 	}
