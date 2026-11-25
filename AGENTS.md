@@ -7,6 +7,8 @@ with code in this repository.
 Antigravity, Grok Build) to Terma and stamps the commits they produce with the agent session that
 wrote them.
 
+**SOC 2:** read [SOC2.md](SOC2.md) before changing access, secrets, data handling, logging, infrastructure, CI or releases. Never weaken a control it lists.
+
 ## Commands
 
 ```bash
