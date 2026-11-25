@@ -30,7 +30,7 @@ func (p *claudeHistoryParser) flushPendingCall() error {
 	}
 	p.pending = nil
 	if c.hasUsage || c.isAPIError {
-		if err := p.appendToSegment(c.cwd, c.subagent, p.makeAPIRequestRecord(c)); err != nil {
+		if err := p.appendToSegment(c.cwd, c.branch, c.subagent, p.makeAPIRequestRecord(c)); err != nil {
 			return err
 		}
 	}
@@ -40,14 +40,14 @@ func (p *claudeHistoryParser) flushPendingCall() error {
 		if ts.IsZero() {
 			ts = c.at
 		}
-		if err := p.appendToSegment(c.cwd, c.subagent, p.makeAssistantResponseRecord(c, text, ts)); err != nil {
+		if err := p.appendToSegment(c.cwd, c.branch, c.subagent, p.makeAssistantResponseRecord(c, text, ts)); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (p *claudeHistoryParser) appendToSegment(cwd string, subagent bool, lr *logspb.LogRecord) error {
+func (p *claudeHistoryParser) appendToSegment(cwd, branch string, subagent bool, lr *logspb.LogRecord) error {
 	if p.segStarted && (cwd != p.segCwd || subagent != p.segSubagent) {
 		if err := p.flushSegment(); err != nil {
 			return err
@@ -55,12 +55,13 @@ func (p *claudeHistoryParser) appendToSegment(cwd string, subagent bool, lr *log
 	}
 	p.segStarted = true
 	p.segCwd = cwd
+	p.segBranch = cmp.Or(p.segBranch, branch)
 	p.segSubagent = subagent
 	p.segRecords = append(p.segRecords, lr)
 	return nil
 }
 
-func (p *claudeHistoryParser) addReach(cwd string, subagent bool, at time.Time, paths []string) error {
+func (p *claudeHistoryParser) addReach(cwd, branch string, subagent bool, at time.Time, paths []string) error {
 	if p.segStarted && (cwd != p.segCwd || subagent != p.segSubagent) {
 		if err := p.flushSegment(); err != nil {
 			return err
@@ -68,49 +69,57 @@ func (p *claudeHistoryParser) addReach(cwd string, subagent bool, at time.Time, 
 	}
 	p.segStarted = true
 	p.segCwd = cwd
+	p.segBranch = cmp.Or(p.segBranch, branch)
 	p.segSubagent = subagent
 	p.segReaches = append(p.segReaches, agents.HistoryToolReach{At: at, Cwd: cwd, Paths: paths})
 	return nil
 }
 
 func (p *claudeHistoryParser) flushSegment() error {
-	if len(p.segRecords) == 0 {
+	if len(p.segRecords) == 0 && len(p.segReaches) == 0 {
 		p.segStarted = false
+		p.segBranch = ""
 		p.segReaches = nil
 		return nil
 	}
 	recs := p.segRecords
 	reaches := p.segReaches
 	cwd := p.segCwd
+	branch := p.segBranch
 	subagent := p.segSubagent
 	p.segRecords = nil
 	p.segReaches = nil
 	p.segStarted = false
+	p.segBranch = ""
 	p.segSubagent = false
-	resAttrs := []*commonpb.KeyValue{
-		strKV("service.name", p.serviceName),
-		boolKV(semconv.TermaSessionHistoricalKey, true),
-	}
-	if p.serviceVersion != "" {
-		resAttrs = append(resAttrs, strKV("service.version", p.serviceVersion))
-	}
-	logs := &logspb.LogsData{
-		ResourceLogs: []*logspb.ResourceLogs{{
-			Resource: &resourcepb.Resource{Attributes: resAttrs},
-			ScopeLogs: []*logspb.ScopeLogs{{
-				Scope:      &commonpb.InstrumentationScope{Name: claudeOTLPScope, Version: p.serviceVersion},
-				LogRecords: recs,
+	var logs *logspb.LogsData
+	if len(recs) > 0 {
+		resAttrs := []*commonpb.KeyValue{
+			strKV("service.name", p.serviceName),
+			boolKV(semconv.TermaSessionHistoricalKey, true),
+		}
+		if p.serviceVersion != "" {
+			resAttrs = append(resAttrs, strKV("service.version", p.serviceVersion))
+		}
+		logs = &logspb.LogsData{
+			ResourceLogs: []*logspb.ResourceLogs{{
+				Resource: &resourcepb.Resource{Attributes: resAttrs},
+				ScopeLogs: []*logspb.ScopeLogs{{
+					Scope:      &commonpb.InstrumentationScope{Name: claudeOTLPScope, Version: p.serviceVersion},
+					LogRecords: recs,
+				}},
 			}},
-		}},
+		}
 	}
 	return p.emit(agents.HistorySegment{
-		SourceSystem: claudeSourceSystem,
-		SessionID:    p.sessionID,
-		Cwd:          cwd,
-		NativeLogs:   logs,
-		ToolReaches:  reaches,
-		Subagent:     subagent,
-		RecordCount:  len(recs),
+		SourceSystem:   claudeSourceSystem,
+		SessionID:      p.sessionID,
+		Cwd:            cwd,
+		FallbackBranch: branch,
+		NativeLogs:     logs,
+		ToolReaches:    reaches,
+		Subagent:       subagent,
+		RecordCount:    len(recs),
 	})
 }
 

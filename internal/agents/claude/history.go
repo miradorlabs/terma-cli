@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
@@ -92,7 +93,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 			active := now.Sub(modTime) < activeWindow
 			outside := !opts.Since.IsZero() && modTime.Before(opts.Since)
 			sid := stem
-			if !outside && !active {
+			if !session.ValidID(sid) && !outside && !active {
 				if parsed := peekClaudeSessionID(mainPath); parsed != "" {
 					sid = parsed
 				}
@@ -240,7 +241,7 @@ func readJSONLLines(ctx context.Context, path string, handle func(line []byte) e
 }
 
 // claudeToolReachPaths extracts the filesystem paths a historical Claude tool_use call
-// reached, using the same rules as live reachedPaths in handlers.go.
+// reached without consulting the uploader's live shell environment.
 func claudeToolReachPaths(toolName string, rawInput json.RawMessage, cwd string) []string {
 	if len(rawInput) == 0 {
 		return nil
@@ -250,7 +251,19 @@ func claudeToolReachPaths(toolName string, rawInput json.RawMessage, cwd string)
 	if json.Unmarshal(rawInput, &in.ToolInput) != nil {
 		return nil
 	}
-	paths := reachedPaths(&in, cwd)
+	var paths []string
+	switch in.ToolName {
+	case "Bash":
+		paths = hookrun.Alone(hookrun.ShellPathsHistorical(in.ToolInput.Command, cwd)...)
+	case "Grep":
+		paths = hookrun.SearchHistorical(cmp.Or(in.ToolInput.Path, cwd), in.ToolInput.Glob)
+	case "Glob":
+		paths = hookrun.SearchHistorical(cmp.Or(in.ToolInput.Path, cwd), in.ToolInput.Pattern)
+	case "LS":
+		paths = hookrun.Alone(in.ToolInput.Path)
+	default:
+		paths = append(editedPaths(&in), in.ToolInput.Path)
+	}
 	var out []string
 	for _, p := range paths {
 		if p != "" {

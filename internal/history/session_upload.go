@@ -7,13 +7,10 @@ import (
 	"io/fs"
 	"time"
 
-	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
-
 	"github.com/miradorlabs/terma-cli/internal/account/api"
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 )
 
 type preAttemptStopError struct {
@@ -46,9 +43,9 @@ func uploadOneSession(
 	}
 	remaining := max(1, total-idx+1) + max(0, extraRemaining)
 
-	// Re-stat transcript files right before reading so a session resumed while earlier
-	// routes were draining is never uploaded mid-write or marked done prematurely.
-	preSnap, exists := statHistoryFile(sp.file)
+	// Re-stat transcript and spawned child files right before reading so a session resumed
+	// while earlier routes were draining is never uploaded mid-write or marked done early.
+	preSnap, exists := statSessionFiles(sp.file, sp.descendants)
 	if !exists {
 		sum.addSkippedSession(SkipMissingFile, 1)
 		return false, nil
@@ -77,26 +74,21 @@ func uploadOneSession(
 		Total:        total,
 	})
 
-	runSnap := runs.Read(opts.StateDir, sp.file.SessionID)
-	subSnaps := map[string]runs.Snapshot{}
-	lookupSnap := func(id string) runs.Snapshot {
-		if id == sp.file.SessionID {
-			return runSnap
-		}
-		if s, hit := subSnaps[id]; hit {
-			return s
-		}
-		s := runs.Read(opts.StateDir, id)
-		subSnaps[id] = s
-		return s
-	}
+	runSnap, lookupSnap := newRunSnapLookup(opts.StateDir, sp.file.SessionID)
 
-	// Re-read this session from disk, resolve every segment, then compute one
-	// session-wide historical tool-reach Mixed cutoff across all segments and subagents.
-	var resolvedSegs []resolvedSegment
-	readErr := sp.source.ReadHistory(ctx, sp.file, agents.HistoryReadOptions{IncludeSupplemental: true}, func(seg agents.HistorySegment) error {
-		target, ok, skipReason := sessionResolver.resolve(ctx, seg.Cwd, seg.FallbackRepoURL, seg.FallbackBranch)
-		resolvedSegs = append(resolvedSegs, resolvedSegment{seg: seg, target: target, ok: ok, skipReason: skipReason})
+	// Pass 1 (lightweight): collect routing and tool-reach metadata across the session and
+	// any spawned child transcripts without retaining protobuf log records in memory.
+	var reachSegs []segReachInfo
+	readErr := sp.source.ReadHistory(ctx, sp.file, agents.HistoryReadOptions{IncludeSupplemental: false}, func(seg agents.HistorySegment) error {
+		target, ok, _ := sessionResolver.resolve(ctx, seg.Cwd, seg.FallbackRepoURL, seg.FallbackBranch)
+		reachSegs = append(reachSegs, segReachInfo{
+			cwd:      seg.Cwd,
+			subagent: seg.Subagent,
+			reaches:  seg.ToolReaches,
+			earliest: earliestSegmentTime(seg),
+			target:   target,
+			ok:       ok,
+		})
 		return nil
 	})
 	if readErr != nil {
@@ -112,8 +104,20 @@ func uploadOneSession(
 		return false, nil
 	}
 
-	// Re-stat immediately after ReadHistory so a turn appended while reading never leaves.
-	afterReadSnap, stillExists := statHistoryFile(sp.file)
+	var reachMixedAt time.Time
+	var hasReachMixed bool
+	if len(sp.descendants) > 0 {
+		descSegs, descCutoff, hasDescCutoff, derr := collectDescendantReach(ctx, opts.StateDir, sp.source, sessionResolver, sp.descendants)
+		if derr != nil {
+			sum.Interrupted = true
+			return true, derr
+		}
+		reachSegs = append(reachSegs, descSegs...)
+		reachMixedAt, hasReachMixed = mergeMixedCutoff(reachMixedAt, hasReachMixed, descCutoff, hasDescCutoff)
+	}
+
+	// Re-stat immediately after Pass 1 so a turn appended while reading never leaves.
+	afterReadSnap, stillExists := statSessionFiles(sp.file, sp.descendants)
 	if !stillExists {
 		sum.addSkippedSession(SkipMissingFile, 1)
 		return false, nil
@@ -128,22 +132,124 @@ func uploadOneSession(
 		resumeMax = prev.SourceModTime
 	}
 
-	reachMixedAt, hasReachMixed := sessionReachMixedAt(sessionResolver, resolvedSegs)
-	var batches []*logspb.LogsData
-	var keptSegs []agents.HistorySegment
+	rAt, hasR := sessionReachMixedAt(sessionResolver, reachSegs)
+	reachMixedAt, hasReachMixed = mergeMixedCutoff(reachMixedAt, hasReachMixed, rAt, hasR)
+
+	lastCheckTeam := freshTeam
+	lastOrgEpochs := orgEpochSnapshot(freshState.Teams, freshTeam.OrganizationID, freshTeam.AuthURL)
+	beforeAttempt := func(context.Context) error {
+		curNow := nowFn()
+		snap, existsNow := statSessionFiles(sp.file, sp.descendants)
+		if !existsNow {
+			return &preAttemptStopError{skipReason: SkipMissingFile, reason: "session transcript removed during upload", active: true}
+		}
+		if snap != preSnap || curNow.Sub(snap.modTime) < activeWindow {
+			return &preAttemptStopError{skipReason: SkipActive, reason: "session transcript modified during upload", active: true}
+		}
+		checkState, checkTeam, checkSkip, checkReason, ok := recheckRouteTeam(opts, b.team.EnrollmentID, curNow)
+		if !ok {
+			return &preAttemptStopError{skipReason: checkSkip, reason: checkReason}
+		}
+		if checkState.StateID != freshState.StateID || checkState.ConsentGeneration != freshState.ConsentGeneration {
+			return &preAttemptStopError{skipReason: SkipDeselected, reason: "routing selections or repository bindings changed during upload; re-run to apply"}
+		}
+		if !routing.SameGeneration(freshState, checkState) || !policyContentMatches(preparedPolicy, checkTeam.Policy) {
+			return &preAttemptStopError{skipReason: SkipPolicyChanged, reason: "routing or content policy changed during upload; re-run to apply updated policy"}
+		}
+		lastCheckTeam = checkTeam
+		lastOrgEpochs = orgEpochSnapshot(checkState.Teams, checkTeam.OrganizationID, checkTeam.AuthURL)
+		return nil
+	}
+
+	// Pass 2 (bounded memory): stream segments into one bounded <= maxReqBytes OTLP chunk
+	// at a time, recording in_progress immediately before the first POST.
+	markedInProgress := false
+	var stateSaveErr error
 	totalRecs := 0
+	var totalBytes int64
 	mixedDropped := 0
-	for _, rs := range resolvedSegs {
-		if !rs.ok || rs.target.Team.EnrollmentID != b.team.EnrollmentID {
-			continue
+	chunker := NewChunkWriter(maxReqBytes, func(ch Chunk) error {
+		if !markedInProgress {
+			st.MarkInProgress(sp.file.SourceSystem, sp.file.SessionID, nowFn(), sp.records, sp.estimatedBytes, preSnap.modTime)
+			if err := SaveState(opts.StateDir, *st); err != nil {
+				stateSaveErr = fmt.Errorf("save history state: %w", err)
+				return stateSaveErr
+			}
+			markedInProgress = true
 		}
-		prepared, n, dropped := prepareSegmentFiltered(rs.seg, opts.Filter, preparedPolicy, buildStampOptions(opts, rs.target, userIDFor), runSnap, lookupSnap, reachMixedAt, hasReachMixed, resumeMax)
+		if err := pacer.Send(ctx, SendRequest{
+			Endpoint:      endpoint,
+			TeamID:        b.team.TeamID,
+			Account:       opts.Account,
+			ServerKey:     serverKey,
+			Body:          ch.Body,
+			BeforeAttempt: beforeAttempt,
+		}); err != nil {
+			return err
+		}
+		totalBytes += int64(len(ch.Body))
+		return nil
+	})
+
+	streamErr := sp.source.ReadHistory(ctx, sp.file, agents.HistoryReadOptions{IncludeSupplemental: true}, func(seg agents.HistorySegment) error {
+		if seg.RecordCount == 0 {
+			return nil
+		}
+		target, ok, _ := sessionResolver.resolve(ctx, seg.Cwd, seg.FallbackRepoURL, seg.FallbackBranch)
+		if !ok || target.Team.EnrollmentID != b.team.EnrollmentID {
+			return nil
+		}
+		prepared, n, dropped := prepareSegmentFiltered(seg, opts.Filter, preparedPolicy, buildStampOptions(opts, target, userIDFor), runSnap, lookupSnap, reachMixedAt, hasReachMixed, resumeMax)
 		mixedDropped += dropped
-		if n > 0 && prepared != nil {
-			batches = append(batches, prepared)
-			keptSegs = append(keptSegs, rs.seg)
-			totalRecs += n
+		if n == 0 || prepared == nil {
+			return nil
 		}
+		totalRecs += n
+		return chunker.Add(prepared)
+	})
+	if streamErr == nil {
+		streamErr = chunker.Flush()
+	}
+	if streamErr != nil {
+		if stateSaveErr != nil {
+			return true, stateSaveErr
+		}
+		if errors.Is(streamErr, context.Canceled) {
+			sum.Interrupted = true
+			return true, streamErr
+		}
+		if preStop, ok := errors.AsType[*preAttemptStopError](streamErr); ok {
+			if preStop.active {
+				sum.addSkippedSession(preStop.skipReason, 1)
+				return false, nil
+			}
+			return stopRouteWithIssue(b, remaining, preStop.skipReason, preStop.reason, report, sum), nil
+		}
+		if retired, ok := errors.AsType[*SignInRetiredError](streamErr); ok {
+			return true, retired
+		}
+		if lost, ok := errors.AsType[*OrgAccessLostError](streamErr); ok {
+			orgBlocked[b.team.OrganizationID] = lost.Error()
+			if opts.OnOrgAccessLost != nil {
+				opts.OnOrgAccessLost(lastCheckTeam.OrganizationID, lastCheckTeam.AuthURL, lastOrgEpochs, nowFn().UTC())
+			}
+			return stopRouteWithIssue(b, remaining, SkipOrgAccessLost, lost.Error(), report, sum), nil
+		}
+		if routeErr, ok := errors.AsType[*RouteError](streamErr); ok {
+			return stopRouteWithIssue(b, remaining, SkipSendFailed, routeErr.Error(), report, sum), nil
+		}
+		if perm, ok := errors.AsType[*PermanentError](streamErr); ok {
+			return false, markSessionFailed(opts.StateDir, st, b, sp, perm, nowFn(), report, sum)
+		}
+		if !markedInProgress {
+			if errors.Is(streamErr, fs.ErrNotExist) {
+				sum.addSkippedSession(SkipMissingFile, 1)
+			} else {
+				sum.addSkippedSession(SkipUnreadable, 1)
+			}
+			return false, nil
+		}
+		return stopRouteWithIssue(b, remaining, SkipSendFailed, streamErr.Error(), report, sum), nil
 	}
 
 	if totalRecs == 0 {
@@ -161,112 +267,9 @@ func uploadOneSession(
 		return false, nil
 	}
 
-	chunks, chunkErr := ChunkLogs(batches, maxReqBytes)
-	if chunkErr != nil {
-		if perm, ok := errors.AsType[*PermanentError](chunkErr); ok {
-			return false, markSessionFailed(opts.StateDir, st, b, sp, perm, nowFn(), report, sum)
-		}
-		return false, chunkErr
-	}
-	var totalBytes int64
-	for _, ch := range chunks {
-		totalBytes += int64(len(ch.Body))
-	}
-
-	// Record in_progress BEFORE the first request for this session.
-	st.MarkInProgress(sp.file.SourceSystem, sp.file.SessionID, nowFn(), totalRecs, totalBytes, preSnap.modTime)
-	if err := SaveState(opts.StateDir, *st); err != nil {
-		return true, fmt.Errorf("save history state: %w", err)
-	}
-
-	lastCheckTeam := freshTeam
-	lastOrgEpochs := orgEpochSnapshot(freshState.Teams, freshTeam.OrganizationID, freshTeam.AuthURL)
-	beforeAttempt := func(attemptCtx context.Context) error {
-		curNow := nowFn()
-		snap, existsNow := statHistoryFile(sp.file)
-		if !existsNow {
-			return &preAttemptStopError{skipReason: SkipMissingFile, reason: "session transcript removed during upload", active: true}
-		}
-		if snap != preSnap || curNow.Sub(snap.modTime) < activeWindow {
-			return &preAttemptStopError{skipReason: SkipActive, reason: "session transcript modified during upload", active: true}
-		}
-		checkState, checkTeam, checkSkip, checkReason, ok := recheckRouteTeam(opts, b.team.EnrollmentID, curNow)
-		if !ok {
-			return &preAttemptStopError{skipReason: checkSkip, reason: checkReason}
-		}
-		if checkState.StateID != freshState.StateID || checkState.ConsentGeneration != freshState.ConsentGeneration {
-			return &preAttemptStopError{skipReason: SkipDeselected, reason: "routing selections or repository bindings changed during upload; re-run to apply"}
-		}
-		if !policyContentMatches(preparedPolicy, checkTeam.Policy) {
-			return &preAttemptStopError{skipReason: SkipPolicyChanged, reason: "team content policy changed during upload; re-run to apply updated policy"}
-		}
-		// If any team's policy refreshed (Generation changed), re-verify that every kept
-		// segment still routes to this enrollment (e.g. another org didn't just claim an
-		// unbound repo that previously fell through to Personal).
-		if !routing.SameGeneration(freshState, checkState) {
-			recheckResolver := newCwdResolver(checkState, opts.AuthURL, opts.ServerKey, opts.ServerKeyTeam, opts.ServerKeyAuthURL, curNow)
-			for _, seg := range keptSegs {
-				target, stillOK, why := recheckResolver.resolve(attemptCtx, seg.Cwd, seg.FallbackRepoURL, seg.FallbackBranch)
-				if !stillOK || target.Team.EnrollmentID != b.team.EnrollmentID {
-					if why == "" {
-						why = SkipPolicyChanged
-					}
-					return &preAttemptStopError{skipReason: why, reason: "routing policy changed during upload; re-run to apply"}
-				}
-			}
-		}
-		lastCheckTeam = checkTeam
-		lastOrgEpochs = orgEpochSnapshot(checkState.Teams, checkTeam.OrganizationID, checkTeam.AuthURL)
-		return nil
-	}
-
-	for _, ch := range chunks {
-		sendErr := pacer.Send(ctx, SendRequest{
-			Endpoint:      endpoint,
-			TeamID:        b.team.TeamID,
-			Account:       opts.Account,
-			ServerKey:     serverKey,
-			Body:          ch.Body,
-			BeforeAttempt: beforeAttempt,
-		})
-		if sendErr == nil {
-			continue
-		}
-		if errors.Is(sendErr, context.Canceled) {
-			sum.Interrupted = true
-			return true, sendErr
-		}
-		if preStop, ok := errors.AsType[*preAttemptStopError](sendErr); ok {
-			if preStop.active {
-				sum.addSkippedSession(preStop.skipReason, 1)
-				return false, nil
-			}
-			return stopRouteWithIssue(b, remaining, preStop.skipReason, preStop.reason, report, sum), nil
-		}
-		if retired, ok := errors.AsType[*SignInRetiredError](sendErr); ok {
-			return true, retired
-		}
-		if lost, ok := errors.AsType[*OrgAccessLostError](sendErr); ok {
-			orgBlocked[b.team.OrganizationID] = lost.Error()
-			if opts.OnOrgAccessLost != nil {
-				opts.OnOrgAccessLost(lastCheckTeam.OrganizationID, lastCheckTeam.AuthURL, lastOrgEpochs, nowFn().UTC())
-			}
-			return stopRouteWithIssue(b, remaining, SkipOrgAccessLost, lost.Error(), report, sum), nil
-		}
-		if routeErr, ok := errors.AsType[*RouteError](sendErr); ok {
-			// Leave in_progress so fixing credentials or configuration lets the next run resume.
-			return stopRouteWithIssue(b, remaining, SkipSendFailed, routeErr.Error(), report, sum), nil
-		}
-		if perm, ok := errors.AsType[*PermanentError](sendErr); ok {
-			return false, markSessionFailed(opts.StateDir, st, b, sp, perm, nowFn(), report, sum)
-		}
-		// Transient error after retries: leave in_progress so resume retries it first.
-		return stopRouteWithIssue(b, remaining, SkipSendFailed, sendErr.Error(), report, sum), nil
-	}
-
 	// Re-stat right before marking done: if the user resumed the session while we were
 	// uploading it, keep it in_progress so later turns are never skipped.
-	postSnap, stillHere := statHistoryFile(sp.file)
+	postSnap, stillHere := statSessionFiles(sp.file, sp.descendants)
 	if !stillHere {
 		sum.addSkippedSession(SkipMissingFile, 1)
 		return false, nil

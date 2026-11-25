@@ -1,10 +1,11 @@
 package history
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"time"
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
@@ -18,143 +19,13 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/runs"
 )
 
-type fileSnapshot struct {
-	modTime time.Time
-	size    int64
-	count   int
-}
-
-func statHistoryFile(f agents.HistoryFile) (fileSnapshot, bool) {
-	if f.Path == "" {
-		return fileSnapshot{modTime: f.ModTime}, true
-	}
-	info, err := os.Lstat(f.Path)
-	if err != nil || !info.Mode().IsRegular() {
-		return fileSnapshot{}, false
-	}
-	snap := fileSnapshot{
-		modTime: info.ModTime(),
-		size:    info.Size(),
-		count:   1,
-	}
-	seen := map[string]bool{filepath.Clean(f.Path): true}
-	addFile := func(path string, required bool) bool {
-		clean := filepath.Clean(path)
-		if seen[clean] {
-			return true
-		}
-		seen[clean] = true
-		fi, err := os.Lstat(clean)
-		if err != nil || !fi.Mode().IsRegular() {
-			return !required
-		}
-		if fi.ModTime().After(snap.modTime) {
-			snap.modTime = fi.ModTime()
-		}
-		snap.size += fi.Size()
-		snap.count++
-		return true
-	}
-	for _, p := range f.ExtraPaths {
-		if !addFile(p, true) {
-			return fileSnapshot{}, false
-		}
-	}
-	for _, dir := range f.WatchDirs {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			continue
-		}
-		for _, ent := range entries {
-			if ent.IsDir() || ent.Type()&os.ModeSymlink != 0 || !strings.HasSuffix(ent.Name(), ".jsonl") {
-				continue
-			}
-			addFile(filepath.Join(dir, ent.Name()), false)
-		}
-	}
-	return snap, true
-}
-
-func policyContentMatches(a, b config.Policy) bool {
-	ap, at := a.Content()
-	bp, bt := b.Content()
-	return ap == bp && at == bt &&
-		a.CollectsNothing == b.CollectsNothing &&
-		a.Unset == b.Unset &&
-		a.Mode == b.Mode &&
-		a.Wildcards == b.Wildcards &&
-		slices.Equal(a.Repositories, b.Repositories)
-}
-
-func recheckRouteTeam(opts Options, enrollmentID string, now time.Time) (routing.State, routing.Team, string, string, bool) {
-	st := opts.State
-	if opts.ReloadState != nil {
-		fresh, err := opts.ReloadState()
-		if err != nil {
-			return routing.State{}, routing.Team{}, SkipDeselected, err.Error(), false
-		}
-		st = fresh
-	}
-	if st.Account != opts.Account {
-		return routing.State{}, routing.Team{}, SkipDeselected, "active sign-in account changed during upload", false
-	}
-	team, ok := st.Team(enrollmentID)
-	if !ok {
-		return routing.State{}, routing.Team{}, SkipDeselected, "team is no longer selected", false
-	}
-	if state := team.StateAt(now); state != routing.Active {
-		reason := string(state)
-		return routing.State{}, routing.Team{}, SkipTeamBlockedPrefix + reason, "team is currently blocked (" + reason + ")", false
-	}
-	if team.Policy.CollectsNothing || team.Policy.Unset {
-		return routing.State{}, routing.Team{}, SkipNotCollected, "team policy no longer collects telemetry", false
-	}
-	if opts.AuthURL != "" && team.AuthURL != "" && !sameHost(team.AuthURL, opts.AuthURL) {
-		return routing.State{}, routing.Team{}, SkipWrongEnvironment, "team belongs to another environment", false
-	}
-	if opts.ServerKey {
-		if opts.AuthURL != "" && !sameHost(opts.ServerKeyAuthURL, opts.AuthURL) {
-			return routing.State{}, routing.Team{}, SkipWrongEnvironment, "server key belongs to another environment", false
-		}
-		if opts.ServerKeyTeam == "" || team.TeamID != opts.ServerKeyTeam {
-			return routing.State{}, routing.Team{}, SkipNotCollected, "team does not match configured server-key team", false
-		}
-	}
-	return st, team, "", "", true
-}
-
-func orgEpochSnapshot(teams []routing.Team, orgID, authURL string) map[string]int64 {
-	out := map[string]int64{}
-	for _, t := range teams {
-		if t.OrganizationID == orgID && t.AuthURL == authURL {
-			out[t.EnrollmentID] = t.Epoch
-		}
-	}
-	return out
-}
-
-func buildStampOptions(opts Options, target RouteTarget, userIDFor func(routing.Team, string) string) relay.StampOptions {
-	endpoint := ""
-	if opts.EndpointFor != nil {
-		endpoint = opts.EndpointFor(target.Team.TeamID)
-	}
-	userID := ""
-	if userIDFor != nil {
-		userID = userIDFor(target.Team, endpoint)
-	}
-	return relay.StampOptions{
-		ProjectID: target.Team.TeamID,
-		Version:   opts.Version,
-		UserID:    userID,
-		Checkout:  target.Checkout,
-	}
-}
-
-type resolvedSegment struct {
-	seg        agents.HistorySegment
-	target     RouteTarget
-	ok         bool
-	skipReason string
+type segReachInfo struct {
+	cwd      string
+	subagent bool
+	reaches  []agents.HistoryToolReach
+	earliest time.Time
+	target   RouteTarget
+	ok       bool
 }
 
 type reachedClass struct {
@@ -163,21 +34,70 @@ type reachedClass struct {
 	unknown bool
 }
 
-// sessionReachMixedAt inspects tool reaches across every segment of a session (including
-// companion subagents) using the same static expansion, nobodys filter, and
-// routing.Router.OrganizationOf check that live reach hooks apply. Returning one earliest
-// cutoff for the session ensures a cross-org reach is not reset by a later cwd change
-// (such as a subdirectory or worktree switch) or hidden by out-of-order subagent entries.
-func sessionReachMixedAt(resolver *cwdResolver, segs []resolvedSegment) (time.Time, bool) {
+func mergeMixedCutoff(cur time.Time, hasCur bool, at time.Time, hasAt bool) (time.Time, bool) {
+	if !hasAt {
+		return cur, hasCur
+	}
+	if !hasCur || at.IsZero() || (!cur.IsZero() && at.Before(cur)) {
+		return at, true
+	}
+	return cur, true
+}
+
+func collectDescendantReach(
+	ctx context.Context,
+	stateDir string,
+	src agents.HistorySource,
+	resolver *cwdResolver,
+	descendants []agents.HistoryFile,
+) ([]segReachInfo, time.Time, bool, error) {
+	var out []segReachInfo
+	var ledgerCutoff time.Time
+	hasLedgerCutoff := false
+	farPast := time.Unix(1, 0).UTC()
+	farFuture := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
+	for _, desc := range descendants {
+		if err := ctx.Err(); err != nil {
+			return nil, time.Time{}, false, err
+		}
+		if mAt, mixed := runs.Read(stateDir, desc.SessionID).MixedInterval(farPast, farFuture); mixed {
+			ledgerCutoff, hasLedgerCutoff = mergeMixedCutoff(ledgerCutoff, hasLedgerCutoff, mAt, true)
+		}
+		err := src.ReadHistory(ctx, desc, agents.HistoryReadOptions{IncludeSupplemental: false}, func(seg agents.HistorySegment) error {
+			target, ok, _ := resolver.resolve(ctx, seg.Cwd, seg.FallbackRepoURL, seg.FallbackBranch)
+			out = append(out, segReachInfo{
+				cwd:      seg.Cwd,
+				subagent: true,
+				reaches:  seg.ToolReaches,
+				earliest: earliestSegmentTime(seg),
+				target:   target,
+				ok:       ok,
+			})
+			return nil
+		})
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return nil, time.Time{}, false, err
+			}
+			// Fail closed when a spawned child transcript cannot be read.
+			ledgerCutoff, hasLedgerCutoff = time.Time{}, true
+		}
+	}
+	return out, ledgerCutoff, hasLedgerCutoff, nil
+}
+
+// sessionReachMixedAt inspects every segment of a session (including unrouted/blocked
+// segments and companion/spawned subagents) using historical static expansion, the nobodys
+// filter, and routing.Router.OrganizationOf. Returning one earliest cutoff ensures cross-org
+// reach is never reset by a later cwd change or hidden by held/uncollected subagents.
+func sessionReachMixedAt(resolver *cwdResolver, segs []segReachInfo) (time.Time, bool) {
 	if resolver == nil || len(segs) == 0 {
 		return time.Time{}, false
 	}
 	var earliest time.Time
 	found := false
 	mark := func(at time.Time) {
-		if !found || at.IsZero() || (!earliest.IsZero() && at.Before(earliest)) {
-			earliest, found = at, true
-		}
+		earliest, found = mergeMixedCutoff(earliest, found, at, true)
 	}
 
 	type orgClass struct {
@@ -185,6 +105,9 @@ func sessionReachMixedAt(resolver *cwdResolver, segs []resolvedSegment) (time.Ti
 		pending, ok bool
 	}
 	orgOf := func(loc routing.Location) orgClass {
+		if loc.Kind == "" {
+			return orgClass{}
+		}
 		org, pending, ok := resolver.router.OrganizationOf(loc, resolver.now)
 		repo := ""
 		if loc.Kind == routing.Repository {
@@ -202,22 +125,30 @@ func sessionReachMixedAt(resolver *cwdResolver, segs []resolvedSegment) (time.Ti
 		return a.pending || b.pending || a.org != b.org
 	}
 
-	// If a companion subagent ran in a different organization than the main session,
-	// mark the shared session Mixed at the subagent segment's earliest record timestamp.
+	// Collect known organizations across main segments (including blocked/bound-not-collected
+	// checkouts) so subagents and unrouted segments compare against them.
 	var mainClasses []orgClass
 	for _, rs := range segs {
-		if rs.ok && !rs.seg.Subagent {
-			mainClasses = append(mainClasses, orgOf(rs.target.Location))
+		if !rs.subagent {
+			if oc := orgOf(rs.target.Location); oc.ok {
+				mainClasses = append(mainClasses, oc)
+			}
 		}
 	}
 	for _, rs := range segs {
-		if !rs.ok || !rs.seg.Subagent {
+		if !rs.subagent {
+			continue
+		}
+		if rs.target.Location.Kind == "" {
+			if rs.cwd != "" && len(mainClasses) > 0 {
+				mark(rs.earliest)
+			}
 			continue
 		}
 		subClass := orgOf(rs.target.Location)
 		for _, mc := range mainClasses {
 			if crosses(mc, subClass) {
-				mark(earliestSegmentTime(rs.seg))
+				mark(rs.earliest)
 				break
 			}
 		}
@@ -237,19 +168,32 @@ func sessionReachMixedAt(resolver *cwdResolver, segs []resolvedSegment) (time.Ti
 	}
 
 	for _, rs := range segs {
-		if !rs.ok || len(rs.seg.ToolReaches) == 0 {
+		if len(rs.reaches) == 0 {
 			continue
 		}
-		base := orgOf(rs.target.Location)
-		if !base.ok {
+		segOrg := orgOf(rs.target.Location)
+		var bases []orgClass
+		if rs.subagent {
+			bases = mainClasses
+			if segOrg.ok {
+				bases = append(slices.Clone(mainClasses), segOrg)
+			}
+		} else if segOrg.ok {
+			bases = []orgClass{segOrg}
+		} else {
+			// Unrouted main segment (e.g. OutsideGit without Personal, or missing_cwd):
+			// compare its tool reaches against every known main org in the session.
+			bases = mainClasses
+		}
+		if len(bases) == 0 {
 			continue
 		}
 		baseRoot := rs.target.Checkout.Root
-		for _, tr := range rs.seg.ToolReaches {
+		for _, tr := range rs.reaches {
 			if found && !earliest.IsZero() && !tr.At.IsZero() && !tr.At.Before(earliest) {
 				continue
 			}
-			expanded, unknown := hookrun.ExpandReach(tr.Paths, tr.Cwd)
+			expanded, unknown := hookrun.ExpandReachHistorical(tr.Paths, tr.Cwd)
 			if unknown {
 				mark(tr.At)
 				continue
@@ -272,9 +216,20 @@ func sessionReachMixedAt(resolver *cwdResolver, segs []resolvedSegment) (time.Ti
 					if cls.nobody {
 						continue
 					}
-					if cls.unknown || crosses(base, orgOf(cls.loc)) {
+					if cls.unknown {
 						mark(tr.At)
 						crossed = true
+						break
+					}
+					reachedOrg := orgOf(cls.loc)
+					for _, b := range bases {
+						if crosses(b, reachedOrg) {
+							mark(tr.At)
+							crossed = true
+							break
+						}
+					}
+					if crossed {
 						break
 					}
 				}
@@ -352,6 +307,11 @@ func earliestSegmentTime(seg agents.HistorySegment) time.Time {
 	}
 	scan(seg.NativeLogs)
 	scan(seg.SupplementalLogs)
+	for _, tr := range seg.ToolReaches {
+		if !tr.At.IsZero() && (best.IsZero() || tr.At.Before(best)) {
+			best = tr.At
+		}
+	}
 	return best
 }
 

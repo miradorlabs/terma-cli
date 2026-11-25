@@ -351,6 +351,95 @@ func TestCodexCrossCwdToolArgsDroppedAndResumedStartUsesSegmentTimestamp(t *test
 	}
 }
 
+func TestCodexLegacyShellArgvPatchWrapperSubagentParentAndBareReach(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("CODEX_HOME", home)
+	t.Setenv("WORKSPACE", "/work/repo-a")
+
+	sessDir := filepath.Join(home, "sessions", "2026", "10", "03")
+	if err := os.MkdirAll(sessDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	parentID := "019d2b54-7a10-7000-8000-000000000101"
+	childID := "019d2b54-7a10-7000-8000-000000000102"
+	parentPath := filepath.Join(sessDir, "rollout-2026-10-03T10-00-00-"+parentID+".jsonl")
+	childPath := filepath.Join(sessDir, "rollout-2026-10-03T10-01-00-"+childID+".jsonl")
+
+	parentLines := []string{
+		`{"timestamp":"2026-10-03T10:00:00Z","type":"session_meta","payload":{"id":"` + parentID + `","cwd":"/work/repo-a","git":{"branch":"feature-a"}}}`,
+		`{"timestamp":"2026-10-03T10:00:01Z","type":"response_item","payload":{"type":"function_call","call_id":"c-argv","name":"shell","arguments":"{\"command\":[\"/bin/sh\",\"-c\",\"cat /work/repo-b/secret.go\"],\"workdir\":\"/work/repo-b\"}"}}`,
+		`{"timestamp":"2026-10-03T10:00:02Z","type":"response_item","payload":{"type":"function_call","call_id":"c-patch","name":"apply_patch","arguments":"{\"input\":\"*** Begin Patch\\n*** Update File: /work/repo-c/patch.go\\n@@\\n-a\\n+b\\n*** End Patch\\n\"}"}}`,
+		`{"timestamp":"2026-10-03T10:00:03Z","type":"response_item","payload":{"type":"function_call","call_id":"c-env","name":"exec_command","arguments":"{\"cmd\":\"cat $WORKSPACE/notes\"}"}}`,
+		`{"timestamp":"2026-10-03T10:00:04Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"FileChange","id":"fc-bare","path":"/work/repo-d/bare.go"}}}`,
+	}
+	childLines := []string{
+		`{"timestamp":"2026-10-03T10:01:00Z","type":"session_meta","payload":{"id":"` + childID + `","cwd":"/work/repo-a","source":{"subagent":{"thread_spawn":{"parent_thread_id":"` + parentID + `","depth":1}}}}}`,
+		`{"timestamp":"2026-10-03T10:01:05Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"FileChange","id":"fc-child","path":"/work/repo-b/from-child.go"}}}`,
+	}
+	for p, lines := range map[string][]string{parentPath: parentLines, childPath: childLines} {
+		if err := os.WriteFile(p, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		old := time.Now().Add(-3 * time.Hour)
+		if err := os.Chtimes(p, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	files, err := (Agent{}).DiscoverHistory(context.Background(), agents.HistoryDiscoverOptions{Now: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gotParent, gotChild agents.HistoryFile
+	for _, f := range files {
+		if f.SessionID == parentID {
+			gotParent = f
+		}
+		if f.SessionID == childID {
+			gotChild = f
+		}
+	}
+	if gotChild.ParentSessionID != parentID {
+		t.Fatalf("child ParentSessionID = %q, want %q", gotChild.ParentSessionID, parentID)
+	}
+
+	var segs []agents.HistorySegment
+	if err := (Agent{}).ReadHistory(context.Background(), gotParent, agents.HistoryReadOptions{}, func(seg agents.HistorySegment) error {
+		segs = append(segs, seg)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(segs) != 1 || segs[0].RecordCount != 0 {
+		t.Fatalf("expected 1 reach-only segment (RecordCount=0), got %d segments (first RecordCount=%d)", len(segs), func() int {
+			if len(segs) == 0 {
+				return -1
+			}
+			return segs[0].RecordCount
+		}())
+	}
+	var sawB, sawC, sawD, sawUnknown bool
+	for _, r := range segs[0].ToolReaches {
+		for _, p := range r.Paths {
+			if strings.Contains(p, "/work/repo-b") {
+				sawB = true
+			}
+			if strings.Contains(p, "/work/repo-c/patch.go") {
+				sawC = true
+			}
+			if strings.Contains(p, "/work/repo-d/bare.go") {
+				sawD = true
+			}
+			if strings.Contains(p, "\x00unknown") {
+				sawUnknown = true
+			}
+		}
+	}
+	if !sawB || !sawC || !sawD || !sawUnknown {
+		t.Errorf("missing expected reaches: sawB=%v sawC=%v sawD=%v sawUnknown=%v reaches=%+v", sawB, sawC, sawD, sawUnknown, segs[0].ToolReaches)
+	}
+}
+
 func cxStr(attrs []*commonpb.KeyValue, key string) string {
 	for _, kv := range attrs {
 		if kv.GetKey() == key {

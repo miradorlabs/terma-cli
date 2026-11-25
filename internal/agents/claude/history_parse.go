@@ -32,6 +32,7 @@ type claudePendingTool struct {
 type claudePendingCall struct {
 	key           string
 	cwd           string
+	branch        string
 	subagent      bool
 	sessionID     string
 	agentID       string
@@ -74,6 +75,7 @@ type claudeHistoryParser struct {
 
 	segStarted  bool
 	segCwd      string
+	segBranch   string
 	segSubagent bool
 	segRecords  []*logspb.LogRecord
 	segReaches  []agents.HistoryToolReach
@@ -95,6 +97,7 @@ type claudeTranscriptLine struct {
 	SessionID          string          `json:"sessionId"`
 	AgentID            string          `json:"agentId"`
 	Cwd                string          `json:"cwd"`
+	GitBranch          string          `json:"gitBranch"`
 	Version            string          `json:"version"`
 	Entrypoint         string          `json:"entrypoint"`
 	Timestamp          string          `json:"timestamp"`
@@ -231,7 +234,7 @@ func (p *claudeHistoryParser) handleUser(rec *claudeTranscriptLine, defaultAgent
 		return nil
 	}
 	ts := parseClaudeTime(rec.Timestamp)
-	sid := cmp.Or(rec.SessionID, p.sessionID)
+	sid := cmp.Or(p.sessionID, rec.SessionID)
 	agentID := cmp.Or(rec.AgentID, defaultAgentID)
 	if rec.PromptID != "" {
 		p.promptID = rec.PromptID
@@ -246,7 +249,7 @@ func (p *claudeHistoryParser) handleUser(rec *claudeTranscriptLine, defaultAgent
 		if json.Unmarshal(raw, &text) != nil || strings.TrimSpace(text) == "" {
 			return nil
 		}
-		return p.appendToSegment(rec.Cwd, defaultAgentID != "", p.makeUserPromptRecord(sid, agentID, rec.UUID, p.promptID, text, ts))
+		return p.appendToSegment(rec.Cwd, rec.GitBranch, defaultAgentID != "", p.makeUserPromptRecord(sid, agentID, rec.UUID, p.promptID, text, ts))
 	}
 	if raw[0] != '[' {
 		return nil
@@ -276,19 +279,19 @@ func (p *claudeHistoryParser) handleUser(rec *claudeTranscriptLine, defaultAgent
 			tAgent := cmp.Or(agentID, tool.AgentID)
 			if rec.PermissionDecision != nil && rec.PermissionDecision.Decision != "" {
 				decRec := p.makeToolDecisionRecord(sid, tAgent, promptID, blk.ToolUseID, tool.Name, rec.PermissionDecision.Decision, rec.PermissionDecision.Source, ts)
-				if err := p.appendToSegment(rec.Cwd, defaultAgentID != "", decRec); err != nil {
+				if err := p.appendToSegment(rec.Cwd, rec.GitBranch, defaultAgentID != "", decRec); err != nil {
 					return err
 				}
 			}
 			trRec := p.makeToolResultRecord(sid, tAgent, promptID, blk.ToolUseID, tool, blk, ts)
-			if err := p.appendToSegment(rec.Cwd, defaultAgentID != "", trRec); err != nil {
+			if err := p.appendToSegment(rec.Cwd, rec.GitBranch, defaultAgentID != "", trRec); err != nil {
 				return err
 			}
 		}
 	}
 	if len(promptTexts) > 0 {
 		text := strings.Join(promptTexts, "\n")
-		return p.appendToSegment(rec.Cwd, defaultAgentID != "", p.makeUserPromptRecord(sid, agentID, rec.UUID, p.promptID, text, ts))
+		return p.appendToSegment(rec.Cwd, rec.GitBranch, defaultAgentID != "", p.makeUserPromptRecord(sid, agentID, rec.UUID, p.promptID, text, ts))
 	}
 	return nil
 }
@@ -305,7 +308,7 @@ func (p *claudeHistoryParser) handleAssistant(rec *claudeTranscriptLine, default
 		return nil
 	}
 	ts := parseClaudeTime(rec.Timestamp)
-	sid := cmp.Or(rec.SessionID, p.sessionID)
+	sid := cmp.Or(p.sessionID, rec.SessionID)
 	agentID := cmp.Or(rec.AgentID, defaultAgentID)
 	callKey := cmp.Or(rec.RequestID, rec.RequestRef, msg.ID, rec.UUID)
 	if callKey == "" {
@@ -321,6 +324,7 @@ func (p *claudeHistoryParser) handleAssistant(rec *claudeTranscriptLine, default
 		p.pending = &claudePendingCall{
 			key:         callKey,
 			cwd:         rec.Cwd,
+			branch:      rec.GitBranch,
 			subagent:    defaultAgentID != "",
 			sessionID:   sid,
 			agentID:     agentID,
@@ -342,6 +346,7 @@ func (p *claudeHistoryParser) handleAssistant(rec *claudeTranscriptLine, default
 
 func (p *claudeHistoryParser) mergeAssistantChunk(c *claudePendingCall, rec *claudeTranscriptLine, msg *claudeMessageEnvelope, ts time.Time) error {
 	c.requestID = cmp.Or(c.requestID, rec.RequestID)
+	c.branch = cmp.Or(c.branch, rec.GitBranch)
 	c.requestRef = cmp.Or(c.requestRef, rec.RequestRef)
 	c.messageID = cmp.Or(c.messageID, msg.ID)
 	c.model = cmp.Or(msg.Model, c.model)
@@ -407,7 +412,7 @@ func (p *claudeHistoryParser) mergeAssistantChunk(c *claudePendingCall, rec *cla
 				}
 			}
 			if paths := claudeToolReachPaths(blk.Name, blk.Input, c.cwd); len(paths) > 0 {
-				if err := p.addReach(c.cwd, c.subagent, ts, paths); err != nil {
+				if err := p.addReach(c.cwd, c.branch, c.subagent, ts, paths); err != nil {
 					return err
 				}
 			}

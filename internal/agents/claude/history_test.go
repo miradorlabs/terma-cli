@@ -291,6 +291,64 @@ func TestClaudeCrossCwdToolArgsDroppedAndToolReachesCaptured(t *testing.T) {
 	}
 }
 
+func TestClaudeForkSessionIDBranchHistoricalEnvAndBareReach(t *testing.T) {
+	cfgDir := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", cfgDir)
+	repoA := t.TempDir()
+	if err := os.WriteFile(filepath.Join(repoA, "notes"), []byte("a"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// Uploader's live shell has WORKSPACE=repoA, which must NOT be trusted for historical Bash reach.
+	t.Setenv("WORKSPACE", repoA)
+
+	projDir := filepath.Join(cfgDir, "projects", "-work-repo-a")
+	if err := os.MkdirAll(projDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	forkID := "11111111-2222-3333-4444-555555555555"
+	origID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	forkPath := filepath.Join(projDir, forkID+".jsonl")
+	lines := []string{
+		`{"type":"assistant","uuid":"a1","sessionId":"` + origID + `","cwd":"` + repoA + `","gitBranch":"feature-branch","timestamp":"2026-11-20T10:00:00Z","requestId":"r1","message":{"id":"m1","role":"assistant","model":"claude-opus-5-5","content":[{"type":"tool_use","id":"tu-env","name":"Bash","input":{"command":"cat \"$WORKSPACE/notes\""}}]}}`,
+	}
+	if err := os.WriteFile(forkPath, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-3 * time.Hour)
+	if err := os.Chtimes(forkPath, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	files, err := (Agent{}).DiscoverHistory(context.Background(), agents.HistoryDiscoverOptions{Now: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || files[0].SessionID != forkID {
+		t.Fatalf("got files=%+v, want single file with filename SessionID %q", files, forkID)
+	}
+	var segs []agents.HistorySegment
+	if err := (Agent{}).ReadHistory(context.Background(), files[0], agents.HistoryReadOptions{}, func(seg agents.HistorySegment) error {
+		segs = append(segs, seg)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(segs) != 1 || segs[0].RecordCount != 0 || segs[0].FallbackBranch != "feature-branch" {
+		t.Fatalf("got segs=%+v, want 1 reach-only segment with FallbackBranch=feature-branch", segs)
+	}
+	sawUnknown := false
+	for _, r := range segs[0].ToolReaches {
+		for _, p := range r.Paths {
+			if strings.Contains(p, "\x00unknown") {
+				sawUnknown = true
+			}
+		}
+	}
+	if !sawUnknown {
+		t.Fatalf("expected UnknownReach for historical $WORKSPACE env var, got %+v", segs[0].ToolReaches)
+	}
+}
+
 func kvStr(attrs []*commonpb.KeyValue, key string) string {
 	for _, kv := range attrs {
 		if kv.GetKey() == key {

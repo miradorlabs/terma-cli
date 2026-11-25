@@ -216,99 +216,128 @@ func logRecordAttrString(lr *logspb.LogRecord, key string) string {
 	return ""
 }
 
+// ChunkWriter streams prepared OTLP log batches into bounded protobuf chunks (<= maxBytes),
+// emitting each completed chunk via onChunk so peak memory stays bounded to one chunk at a time.
+type ChunkWriter struct {
+	maxBytes   int
+	onChunk    func(Chunk) error
+	cur        *logspb.LogsData
+	curRecords int
+	estBytes   int
+}
+
+// NewChunkWriter constructs a streaming OTLP chunk writer bounded by maxBytes.
+func NewChunkWriter(maxBytes int, onChunk func(Chunk) error) *ChunkWriter {
+	if maxBytes <= 0 {
+		maxBytes = MaxRequestBytes
+	}
+	return &ChunkWriter{
+		maxBytes: maxBytes,
+		onChunk:  onChunk,
+		cur:      &logspb.LogsData{},
+	}
+}
+
+// Add appends one prepared LogsData batch, flushing completed chunks whenever adding a
+// record would exceed maxBytes. Returns *PermanentError if a single record cannot fit.
+func (w *ChunkWriter) Add(batch *logspb.LogsData) error {
+	for _, rl := range batch.GetResourceLogs() {
+		resOverhead := proto.Size(rl.Resource) + len(rl.SchemaUrl) + 32
+		for _, sl := range rl.GetScopeLogs() {
+			if len(sl.GetLogRecords()) == 0 {
+				continue
+			}
+			scopeOverhead := resOverhead + proto.Size(sl.Scope) + len(sl.SchemaUrl) + 32
+			var activeSL *logspb.ScopeLogs
+			openScope := func() {
+				activeSL = &logspb.ScopeLogs{Scope: proto.CloneOf(sl.Scope), SchemaUrl: sl.SchemaUrl}
+				w.cur.ResourceLogs = append(w.cur.ResourceLogs, &logspb.ResourceLogs{
+					Resource:  proto.CloneOf(rl.Resource),
+					ScopeLogs: []*logspb.ScopeLogs{activeSL},
+					SchemaUrl: rl.SchemaUrl,
+				})
+				w.estBytes += scopeOverhead
+			}
+			for _, lr := range sl.GetLogRecords() {
+				if activeSL == nil {
+					openScope()
+				}
+				recSize := proto.Size(lr) + 16
+				activeSL.LogRecords = append(activeSL.LogRecords, lr)
+				w.estBytes += recSize
+				// Only run exact proto.Size(w.cur) when our conservative upper-bound
+				// estimate crosses maxBytes, resyncing estBytes when w.cur still fits.
+				if w.estBytes <= w.maxBytes {
+					w.curRecords++
+					continue
+				}
+				if exact := proto.Size(w.cur); exact <= w.maxBytes {
+					w.estBytes = exact
+					w.curRecords++
+					continue
+				}
+				// Undo append and flush current batch if it already has records.
+				activeSL.LogRecords = activeSL.LogRecords[:len(activeSL.LogRecords)-1]
+				if len(activeSL.LogRecords) == 0 {
+					w.cur.ResourceLogs = w.cur.ResourceLogs[:len(w.cur.ResourceLogs)-1]
+				}
+				if w.curRecords == 0 {
+					return &PermanentError{
+						Reason: fmt.Sprintf("single log record exceeds %d-byte request limit", w.maxBytes),
+					}
+				}
+				if err := w.Flush(); err != nil {
+					return err
+				}
+				openScope()
+				activeSL.LogRecords = append(activeSL.LogRecords, lr)
+				w.estBytes += recSize
+				if w.estBytes > w.maxBytes && proto.Size(w.cur) > w.maxBytes {
+					return &PermanentError{
+						Reason: fmt.Sprintf("single log record exceeds %d-byte request limit", w.maxBytes),
+					}
+				}
+				w.curRecords++
+			}
+		}
+	}
+	return nil
+}
+
+// Flush marshals and emits any remaining buffered records.
+func (w *ChunkWriter) Flush() error {
+	if w.curRecords == 0 {
+		return nil
+	}
+	wire, err := proto.Marshal(w.cur)
+	if err != nil {
+		return fmt.Errorf("marshal OTLP logs: %w", err)
+	}
+	if len(wire) > w.maxBytes {
+		return &PermanentError{Reason: fmt.Sprintf("marshaled batch (%d bytes) exceeds %d-byte limit", len(wire), w.maxBytes)}
+	}
+	ch := Chunk{Body: wire, Records: w.curRecords}
+	w.cur = &logspb.LogsData{}
+	w.curRecords = 0
+	w.estBytes = 0
+	return w.onChunk(ch)
+}
+
 // ChunkLogs marshals prepared OTLP log batches into one or more protobuf request bodies,
 // each strictly at most maxBytes bytes. If a single log record cannot fit within maxBytes
 // it returns a *PermanentError so the session is recorded as failed rather than sent oversized.
 func ChunkLogs(batches []*logspb.LogsData, maxBytes int) ([]Chunk, error) {
-	if maxBytes <= 0 {
-		maxBytes = MaxRequestBytes
-	}
 	var chunks []Chunk
-	cur := &logspb.LogsData{}
-	curRecords := 0
-	estBytes := 0
-
-	flush := func() error {
-		if curRecords == 0 {
-			return nil
-		}
-		wire, err := proto.Marshal(cur)
-		if err != nil {
-			return fmt.Errorf("marshal OTLP logs: %w", err)
-		}
-		if len(wire) > maxBytes {
-			return &PermanentError{Reason: fmt.Sprintf("marshaled batch (%d bytes) exceeds %d-byte limit", len(wire), maxBytes)}
-		}
-		chunks = append(chunks, Chunk{Body: wire, Records: curRecords})
-		cur = &logspb.LogsData{}
-		curRecords = 0
-		estBytes = 0
+	w := NewChunkWriter(maxBytes, func(ch Chunk) error {
+		chunks = append(chunks, ch)
 		return nil
-	}
-
+	})
 	for _, batch := range batches {
-		for _, rl := range batch.GetResourceLogs() {
-			resOverhead := proto.Size(rl.Resource) + len(rl.SchemaUrl) + 32
-			for _, sl := range rl.GetScopeLogs() {
-				if len(sl.GetLogRecords()) == 0 {
-					continue
-				}
-				scopeOverhead := resOverhead + proto.Size(sl.Scope) + len(sl.SchemaUrl) + 32
-				var activeSL *logspb.ScopeLogs
-				openScope := func() {
-					activeSL = &logspb.ScopeLogs{Scope: proto.CloneOf(sl.Scope), SchemaUrl: sl.SchemaUrl}
-					cur.ResourceLogs = append(cur.ResourceLogs, &logspb.ResourceLogs{
-						Resource:  proto.CloneOf(rl.Resource),
-						ScopeLogs: []*logspb.ScopeLogs{activeSL},
-						SchemaUrl: rl.SchemaUrl,
-					})
-					estBytes += scopeOverhead
-				}
-				for _, lr := range sl.GetLogRecords() {
-					if activeSL == nil {
-						openScope()
-					}
-					recSize := proto.Size(lr) + 16
-					activeSL.LogRecords = append(activeSL.LogRecords, lr)
-					estBytes += recSize
-					// Only run exact proto.Size(cur) when our conservative upper-bound
-					// estimate crosses maxBytes, resyncing estBytes when cur still fits.
-					if estBytes <= maxBytes {
-						curRecords++
-						continue
-					}
-					if exact := proto.Size(cur); exact <= maxBytes {
-						estBytes = exact
-						curRecords++
-						continue
-					}
-					// Undo append and flush current batch if it already has records.
-					activeSL.LogRecords = activeSL.LogRecords[:len(activeSL.LogRecords)-1]
-					if len(activeSL.LogRecords) == 0 {
-						cur.ResourceLogs = cur.ResourceLogs[:len(cur.ResourceLogs)-1]
-					}
-					if curRecords == 0 {
-						return nil, &PermanentError{
-							Reason: fmt.Sprintf("single log record exceeds %d-byte request limit", maxBytes),
-						}
-					}
-					if err := flush(); err != nil {
-						return nil, err
-					}
-					openScope()
-					activeSL.LogRecords = append(activeSL.LogRecords, lr)
-					estBytes += recSize
-					if estBytes > maxBytes && proto.Size(cur) > maxBytes {
-						return nil, &PermanentError{
-							Reason: fmt.Sprintf("single log record exceeds %d-byte request limit", maxBytes),
-						}
-					}
-					curRecords++
-				}
-			}
+		if err := w.Add(batch); err != nil {
+			return nil, err
 		}
 	}
-	if err := flush(); err != nil {
+	if err := w.Flush(); err != nil {
 		return nil, err
 	}
 	return chunks, nil

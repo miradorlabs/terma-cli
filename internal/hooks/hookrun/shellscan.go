@@ -42,6 +42,7 @@ type work struct {
 	lookups, stats, bytes, words int
 	deadline                     time.Time
 	noRecover                    bool
+	historical                   bool
 }
 type candidate struct {
 	word, dir string
@@ -72,8 +73,21 @@ func pick[T any](c bool, a, b T) T {
 	}
 	return b
 }
+func historicalEnv(name string) (string, bool) {
+	if name == "HOME" || (os.PathSeparator == '\\' && name == "USERPROFILE") {
+		return os.LookupEnv(name)
+	}
+	return "", false
+}
+func (sc *scan) isHistoricalUnknownVar(name string) bool {
+	if !sc.historical || !isName(name) || name == "_" || name == "PWD" || name == "OLDPWD" || name == "HOME" || (os.PathSeparator == '\\' && name == "USERPROFILE") {
+		return false
+	}
+	v, set := sc.vars[name]
+	return !set || v == nil
+}
 func (sc *scan) Get(name string) expand.Variable {
-	if strings.HasPrefix(name, "HOME ") || sc.isUnresolvedVar(name) || !isName(name) || name == "_" {
+	if strings.HasPrefix(name, "HOME ") || sc.isUnresolvedVar(name) || sc.isHistoricalUnknownVar(name) || !isName(name) || name == "_" {
 		sc.opaque = true
 		return expand.Variable{Set: true, Kind: expand.String}
 	}

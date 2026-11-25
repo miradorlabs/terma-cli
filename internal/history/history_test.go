@@ -1585,3 +1585,121 @@ func TestOtherTeamPolicyRefreshClaimingPersonalRepoAbortsRetry(t *testing.T) {
 		t.Fatalf("expected retry abort after org-a claimed repo: posts=%d sum=%+v", posts, sum)
 	}
 }
+
+func TestHeldSubagentUnroutedReachSpawnedChildAndHistoricalBranch(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	repoA := initTestGitRepo(t, "https://github.com/org-a/app.git")
+	repoB := initTestGitRepo(t, "https://github.com/org-b/secret.git")
+	scratchDir := t.TempDir()
+	secretB := filepath.Join(repoB, "secret.go")
+	if err := os.WriteFile(secretB, []byte("package secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	t0 := now.Add(-4 * time.Hour)
+
+	// Org A is active; Org B is blocked (TeamRefused); no Personal team selected.
+	st := routing.State{
+		StateID: "st-1", Generation: 1, ConsentGeneration: 1, Account: "acc1",
+		Teams: []routing.Team{
+			{
+				EnrollmentID: "enr-a", TeamID: "team-a", OrganizationID: "org-a", AuthURL: "https://auth.example.com",
+				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-a/app"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-a", TeamID: "team-a", AuthURL: "https://auth.example.com", FetchedAt: now},
+			},
+			{
+				EnrollmentID: "enr-b", TeamID: "team-b", OrganizationID: "org-b", AuthURL: "https://auth.example.com",
+				Refusals: 2, LastError: routing.OrgAccessLost, RefusedAt: now.Add(-time.Hour),
+				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-b/secret"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-b", TeamID: "team-b", AuthURL: "https://auth.example.com", FetchedAt: now},
+			},
+		},
+		Bindings: map[string]routing.Binding{
+			"github.com/org-a/app":    {Organization: "org-a"},
+			"github.com/org-b/secret": {Organization: "org-b"},
+		},
+	}
+
+	var mu sync.Mutex
+	var received []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		received = append(received, string(body))
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	// 1. Held/blocked companion subagent in Org B must taint parent session in Org A.
+	segMainBefore := makeNativeSegment("claude", "s-held-sub", repoA, "HELD_SUB_BEFORE_OK", t0.Add(30*time.Second))
+	segMainBefore.FallbackBranch = "historical-feature-branch"
+	segSubInBlockedB := makeNativeSegment("claude", "s-held-sub", repoB, "SUB_IN_B", t0.Add(time.Minute))
+	segSubInBlockedB.Subagent = true
+	segMainAfterSub := makeNativeSegment("claude", "s-held-sub", repoA, "HELD_SUB_AFTER_LEAK", t0.Add(2*time.Minute))
+
+	// 2. Unrouted main segment (scratch outside git, no Personal team) reading Org B must taint later Org A segment.
+	segUnrouted1 := makeNativeSegment("claude", "s-unrouted-reach", repoA, "UNROUTED_BEFORE_OK", t0.Add(30*time.Second))
+	segUnroutedMid := makeNativeSegment("claude", "s-unrouted-reach", scratchDir, "IN_SCRATCH", t0.Add(time.Minute))
+	segUnroutedMid.ToolReaches = []agents.HistoryToolReach{{At: t0.Add(time.Minute), Cwd: scratchDir, Paths: []string{secretB}}}
+	segUnroutedAfter := makeNativeSegment("claude", "s-unrouted-reach", repoA, "UNROUTED_AFTER_LEAK", t0.Add(2*time.Minute))
+
+	// 3. Spawned child rollout reading Org B must taint parent rollout's summary at T+2m.
+	segParent1 := makeNativeSegment("codex", "s-parent", repoA, "PARENT_BEFORE_OK", t0.Add(30*time.Second))
+	segParent2 := makeNativeSegment("codex", "s-parent", repoA, "PARENT_AFTER_CHILD_LEAK", t0.Add(2*time.Minute))
+	segChild := makeNativeSegment("codex", "s-child", repoA, "CHILD_WORK", t0.Add(time.Minute))
+	segChild.ToolReaches = []agents.HistoryToolReach{{At: t0.Add(time.Minute), Cwd: repoA, Paths: []string{secretB}}}
+
+	// 4. Parent with an active spawned child rollout must skip as SkipActive.
+	segActiveParent := makeNativeSegment("codex", "s-parent-active-child", repoA, "ACTIVE_CHILD_PARENT_LEAK", t0)
+
+	srcClaude := &stubHistorySource{
+		source: "claude",
+		files: []agents.HistoryFile{
+			{SourceSystem: "claude", SessionID: "s-held-sub", ModTime: now.Add(-3 * time.Hour)},
+			{SourceSystem: "claude", SessionID: "s-unrouted-reach", ModTime: now.Add(-3 * time.Hour)},
+		},
+		segments: map[string][]agents.HistorySegment{
+			"s-held-sub":       {segMainBefore, segSubInBlockedB, segMainAfterSub},
+			"s-unrouted-reach": {segUnrouted1, segUnroutedMid, segUnroutedAfter},
+		},
+	}
+	srcCodex := &stubHistorySource{
+		source: "codex",
+		files: []agents.HistoryFile{
+			{SourceSystem: "codex", SessionID: "s-parent", ModTime: now.Add(-3 * time.Hour)},
+			{SourceSystem: "codex", SessionID: "s-child", ParentSessionID: "s-parent", ModTime: now.Add(-3 * time.Hour)},
+			{SourceSystem: "codex", SessionID: "s-parent-active-child", ModTime: now.Add(-3 * time.Hour)},
+			{SourceSystem: "codex", SessionID: "s-active-child", ParentSessionID: "s-parent-active-child", ModTime: now.Add(-5 * time.Minute), Active: true},
+		},
+		segments: map[string][]agents.HistorySegment{
+			"s-parent":              {segParent1, segParent2},
+			"s-child":               {segChild},
+			"s-parent-active-child": {segActiveParent},
+		},
+	}
+
+	sum, err := Upload(context.Background(), Options{
+		StateDir: stateDir, Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
+		State: st, Sources: []agents.HistorySource{srcClaude, srcCodex}, Filter: relay.NewContentFilter(nil), Holdings: stubHoldings{},
+		Transport:   &Transport{Version: "test", HTTP: srv.Client(), SignIn: &fakeSignIn{account: "acc1", tokens: []string{"tok"}}, BytesPerSec: 1 << 30},
+		EndpointFor: func(string) string { return srv.URL },
+		Now:         func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	all := strings.Join(received, "\n")
+	for _, want := range []string{"HELD_SUB_BEFORE_OK", "UNROUTED_BEFORE_OK", "PARENT_BEFORE_OK", "historical-feature-branch"} {
+		if !strings.Contains(all, want) {
+			t.Errorf("expected %q in uploaded payloads", want)
+		}
+	}
+	for _, leak := range []string{"HELD_SUB_AFTER_LEAK", "UNROUTED_AFTER_LEAK", "PARENT_AFTER_CHILD_LEAK", "ACTIVE_CHILD_PARENT_LEAK"} {
+		if strings.Contains(all, leak) {
+			t.Fatalf("leaked %q upstream!", leak)
+		}
+	}
+	if sum.SkippedSessions[SkipActive] < 2 {
+		t.Errorf("expected both active child and its parent skipped as active, got SkippedSessions=%+v", sum.SkippedSessions)
+	}
+}

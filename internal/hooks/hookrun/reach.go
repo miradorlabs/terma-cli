@@ -121,10 +121,20 @@ func IsNobodyDir(dir string) bool { return nobodys(dir) }
 // to cwd using the same static scan live reach hooks run, returning concrete paths and
 // whether any path or command had statically unknown reach.
 func ExpandReach(paths []string, cwd string) (expanded []string, unknown bool) {
+	return expandReachWith(paths, cwd, os.LookupEnv, false)
+}
+
+// ExpandReachHistorical expands historical tool-reach paths without consulting the current
+// process's environment (aside from HOME/USERPROFILE).
+func ExpandReachHistorical(paths []string, cwd string) (expanded []string, unknown bool) {
+	return expandReachWith(paths, cwd, historicalEnv, true)
+}
+
+func expandReachWith(paths []string, cwd string, env func(string) (string, bool), historical bool) (expanded []string, unknown bool) {
 	if len(paths) == 0 {
 		return nil, false
 	}
-	scanned := searchedBy(paths, cwd, os.LookupEnv, time.Now().Add(maxShellTime))
+	scanned := searchedByWork(paths, cwd, env, work{deadline: time.Now().Add(maxShellTime), historical: historical})
 	out := make([]string, 0, len(scanned))
 	for _, p := range scanned {
 		if isUnknownReach(p) {
@@ -159,6 +169,11 @@ func Alone(paths ...string) []string {
 
 // Search returns dir and the base folder each glob names before its first wildcard.
 func Search(dir string, globs ...string) []string { return searchEnv(dir, os.LookupEnv, globs...) }
+
+// SearchHistorical is Search scoped to historicalEnv (HOME/USERPROFILE only).
+func SearchHistorical(dir string, globs ...string) []string {
+	return searchEnv(dir, historicalEnv, globs...)
+}
 func searchEnv(dir string, env func(string) (string, bool), globs ...string) []string {
 	out := []string{dir}
 	for _, g := range globs {
@@ -231,7 +246,10 @@ func appendUnique(out []string, items ...string) []string {
 	return out
 }
 func searchedBy(paths []string, cwd string, env func(string) (string, bool), deadline time.Time) []string {
-	sc, unknownDir, out := newScan(cwd, env, work{deadline: deadline}), "", make([]string, 0, len(paths))
+	return searchedByWork(paths, cwd, env, work{deadline: deadline})
+}
+func searchedByWork(paths []string, cwd string, env func(string) (string, bool), done work) []string {
+	sc, unknownDir, out := newScan(cwd, env, done), "", make([]string, 0, len(paths))
 	for _, p := range paths {
 		dir, alone := strings.CutPrefix(p, aloneMark)
 		dir = pick(remote(dir, cwd), unknownReach(dir), dir)

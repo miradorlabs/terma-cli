@@ -1,6 +1,7 @@
 package history
 
 import (
+	"cmp"
 	"context"
 	"net/url"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	termaproject "github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/relay"
@@ -77,41 +79,42 @@ func (r *cwdResolver) resolveUncached(ctx context.Context, cwd, fallbackRepoURL,
 	if skipReason != "" {
 		return RouteTarget{}, false, skipReason
 	}
+	baseTarget := RouteTarget{Location: loc, Checkout: checkout}
 	d := r.router.Route(loc, r.now)
 	switch d.Outcome {
 	case routing.Send:
 		team, ok := r.state.Team(d.EnrollmentID)
 		if !ok {
-			return RouteTarget{}, false, SkipNotCollected
+			return baseTarget, false, SkipNotCollected
 		}
 		if team.Policy.CollectsNothing || team.Policy.Unset {
-			return RouteTarget{}, false, SkipNotCollected
+			return baseTarget, false, SkipNotCollected
 		}
 		if r.authURL != "" && team.AuthURL != "" && !sameHost(team.AuthURL, r.authURL) {
-			return RouteTarget{}, false, SkipWrongEnvironment
+			return baseTarget, false, SkipWrongEnvironment
 		}
 		if r.serverKey {
 			if r.authURL != "" && !sameHost(r.serverKeyAuthURL, r.authURL) {
-				return RouteTarget{}, false, SkipWrongEnvironment
+				return baseTarget, false, SkipWrongEnvironment
 			}
 			if r.serverKeyTeam == "" || team.TeamID != r.serverKeyTeam {
-				return RouteTarget{}, false, SkipNotCollected
+				return baseTarget, false, SkipNotCollected
 			}
 		}
 		return RouteTarget{Team: team, Location: loc, Checkout: checkout}, true, ""
 	case routing.Hold:
 		if d.Reason == routing.ReasonPending {
-			return RouteTarget{}, false, SkipPendingBinding
+			return baseTarget, false, SkipPendingBinding
 		}
 		if d.Blocked != "" {
-			return RouteTarget{}, false, SkipTeamBlockedPrefix + string(d.Blocked)
+			return baseTarget, false, SkipTeamBlockedPrefix + string(d.Blocked)
 		}
-		return RouteTarget{}, false, SkipTeamBlockedPrefix + string(d.Reason)
+		return baseTarget, false, SkipTeamBlockedPrefix + string(d.Reason)
 	default:
 		if d.Reason == routing.ReasonBoundNotCollected {
-			return RouteTarget{}, false, SkipBoundNotCollected
+			return baseTarget, false, SkipBoundNotCollected
 		}
-		return RouteTarget{}, false, SkipNotCollected
+		return baseTarget, false, SkipNotCollected
 	}
 }
 
@@ -150,7 +153,7 @@ func locateSegmentCheckout(ctx context.Context, cwd, fallbackRepoURL, fallbackBr
 	if gitDir != "" {
 		checkout.Root = root
 		origin, remoteURL := gitx.OriginFS(gitDir)
-		checkout.Branch = gitx.BranchFS(gitDir)
+		checkout.Branch = cmp.Or(fallbackBranch, gitx.BranchFS(gitDir))
 		if wtName, _, linked := gitx.LinkedWorktreeFS(gitDir); linked {
 			checkout.Worktree = wtName
 		}
@@ -184,4 +187,35 @@ func sameHost(a, b string) bool {
 		return strings.EqualFold(strings.TrimRight(a, "/"), strings.TrimRight(b, "/"))
 	}
 	return strings.EqualFold(ua.Host, ub.Host)
+}
+
+func buildChildrenMap(files []agents.HistoryFile) map[string][]agents.HistoryFile {
+	out := map[string][]agents.HistoryFile{}
+	for _, f := range files {
+		if f.ParentSessionID != "" && f.ParentSessionID != f.SessionID {
+			out[f.ParentSessionID] = append(out[f.ParentSessionID], f)
+		}
+	}
+	return out
+}
+
+func collectDescendants(rootSessionID string, childrenByParent map[string][]agents.HistoryFile) []agents.HistoryFile {
+	direct := childrenByParent[rootSessionID]
+	if len(direct) == 0 {
+		return nil
+	}
+	seen := map[string]bool{rootSessionID: true}
+	queue := append([]agents.HistoryFile(nil), direct...)
+	var out []agents.HistoryFile
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		if seen[cur.SessionID] {
+			continue
+		}
+		seen[cur.SessionID] = true
+		out = append(out, cur)
+		queue = append(queue, childrenByParent[cur.SessionID]...)
+	}
+	return out
 }

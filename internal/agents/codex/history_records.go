@@ -252,7 +252,7 @@ func (p *codexHistoryParser) commonNativeAttrs(eventName string, ts time.Time) [
 }
 
 func (p *codexHistoryParser) flushSegment() error {
-	if len(p.segNative) == 0 && len(p.segSupplements) == 0 {
+	if len(p.segNative) == 0 && len(p.segSupplements) == 0 && len(p.segReaches) == 0 {
 		p.segStarted = false
 		p.segReaches = nil
 		return nil

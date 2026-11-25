@@ -1,13 +1,11 @@
 package history
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io/fs"
 	"slices"
-	"strings"
 	"time"
 
 	"google.golang.org/protobuf/proto"
@@ -50,6 +48,7 @@ type Options struct {
 type routeSessionPlan struct {
 	key            string
 	file           agents.HistoryFile
+	descendants    []agents.HistoryFile
 	source         agents.HistorySource
 	records        int
 	estimatedBytes int64
@@ -175,6 +174,7 @@ func discoverAndPlan(
 		if err != nil {
 			return nil, fmt.Errorf("discover %s history: %w", src.SourceSystem(), err)
 		}
+		childrenByParent := buildChildrenMap(files)
 		for _, f := range files {
 			if err := ctx.Err(); err != nil {
 				sum.Interrupted = true
@@ -182,7 +182,8 @@ func discoverAndPlan(
 			}
 			sum.DiscoveredFiles++
 			key := SessionKey(f.SourceSystem, f.SessionID)
-			if f.Active {
+			descendants := collectDescendants(f.SessionID, childrenByParent)
+			if f.Active || slices.ContainsFunc(descendants, func(d agents.HistoryFile) bool { return d.Active }) {
 				sum.addSkippedSession(SkipActive, 1)
 				continue
 			}
@@ -191,33 +192,37 @@ func discoverAndPlan(
 				continue
 			}
 			var runSnap runs.Snapshot
-			var subSnaps map[string]runs.Snapshot
-			runSnapLoaded := false
+			var lookupSnap func(string) runs.Snapshot
 			getRunSnap := func() (runs.Snapshot, func(string) runs.Snapshot) {
-				if !runSnapLoaded {
-					runSnapLoaded = true
-					runSnap = runs.Read(opts.StateDir, f.SessionID)
-					subSnaps = map[string]runs.Snapshot{}
+				if lookupSnap == nil {
+					runSnap, lookupSnap = newRunSnapLookup(opts.StateDir, f.SessionID)
 				}
-				return runSnap, func(id string) runs.Snapshot {
-					if id == f.SessionID {
-						return runSnap
-					}
-					if s, ok := subSnaps[id]; ok {
-						return s
-					}
-					s := runs.Read(opts.StateDir, id)
-					subSnaps[id] = s
-					return s
-				}
+				return runSnap, lookupSnap
 			}
-			var resolvedSegs []resolvedSegment
-			err := src.ReadHistory(ctx, f, agents.HistoryReadOptions{IncludeSupplemental: true}, func(seg agents.HistorySegment) error {
+			type planSeg struct {
+				seg        agents.HistorySegment
+				target     RouteTarget
+				ok         bool
+				skipReason string
+			}
+			var planSegs []planSeg
+			var reachSegs []segReachInfo
+			err := src.ReadHistory(ctx, f, agents.HistoryReadOptions{IncludeSupplemental: opts.DryRun}, func(seg agents.HistorySegment) error {
 				if err := ctx.Err(); err != nil {
 					return err
 				}
 				target, ok, skipReason := resolver.resolve(ctx, seg.Cwd, seg.FallbackRepoURL, seg.FallbackBranch)
-				resolvedSegs = append(resolvedSegs, resolvedSegment{seg: seg, target: target, ok: ok, skipReason: skipReason})
+				if opts.DryRun {
+					reachSegs = append(reachSegs, segReachInfo{
+						cwd: seg.Cwd, subagent: seg.Subagent, reaches: seg.ToolReaches,
+						earliest: earliestSegmentTime(seg), target: target, ok: ok,
+					})
+				} else {
+					seg.NativeLogs, seg.SupplementalLogs, seg.ToolReaches = nil, nil, nil
+				}
+				if seg.RecordCount > 0 {
+					planSegs = append(planSegs, planSeg{seg: seg, target: target, ok: ok, skipReason: skipReason})
+				}
 				return nil
 			})
 			if err != nil {
@@ -235,9 +240,19 @@ func discoverAndPlan(
 			var reachMixedAt time.Time
 			var hasReachMixed bool
 			if opts.DryRun {
-				reachMixedAt, hasReachMixed = sessionReachMixedAt(resolver, resolvedSegs)
+				if len(descendants) > 0 {
+					descSegs, descCutoff, hasDescCutoff, derr := collectDescendantReach(ctx, opts.StateDir, src, resolver, descendants)
+					if derr != nil {
+						sum.Interrupted = true
+						return nil, derr
+					}
+					reachSegs = append(reachSegs, descSegs...)
+					reachMixedAt, hasReachMixed = mergeMixedCutoff(reachMixedAt, hasReachMixed, descCutoff, hasDescCutoff)
+				}
+				rAt, hasR := sessionReachMixedAt(resolver, reachSegs)
+				reachMixedAt, hasReachMixed = mergeMixedCutoff(reachMixedAt, hasReachMixed, rAt, hasR)
 			}
-			for _, rs := range resolvedSegs {
+			for _, rs := range planSegs {
 				if !rs.ok {
 					if !f.OutsideSince {
 						sum.addSkippedSegment(rs.skipReason, 1)
@@ -282,7 +297,7 @@ func discoverAndPlan(
 				}
 				sp := b.sessions[key]
 				if sp == nil {
-					sp = &routeSessionPlan{key: key, file: f, source: src}
+					sp = &routeSessionPlan{key: key, file: f, descendants: descendants, source: src}
 					b.sessions[key] = sp
 				}
 				sp.records += recCount
@@ -419,15 +434,4 @@ func processRoute(
 		}
 	}
 	return nil
-}
-
-func sortedPlans(m map[string]*routeSessionPlan) []*routeSessionPlan {
-	out := make([]*routeSessionPlan, 0, len(m))
-	for _, sp := range m {
-		out = append(out, sp)
-	}
-	slices.SortFunc(out, func(a, b *routeSessionPlan) int {
-		return cmp.Or(a.file.ModTime.Compare(b.file.ModTime), strings.Compare(a.key, b.key))
-	})
-	return out
 }

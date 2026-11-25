@@ -13,6 +13,9 @@ type HistoryFile struct {
 	SourceSystem string
 	// SessionID is the agent's native session identifier.
 	SessionID string
+	// ParentSessionID is the optional parent session identifier for spawned subagent
+	// transcripts stored as separate files (so cross-org reach in a child taints its parent).
+	ParentSessionID string
 	// Path is the main transcript file path on disk.
 	Path string
 	// ExtraPaths lists companion transcript files belonging to the same session, such as

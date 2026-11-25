@@ -79,21 +79,21 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 			active := now.Sub(modTime) < activeWindow
 			outside := !opts.Since.IsZero() && modTime.Before(opts.Since)
 			sid := codexSessionIDFromFilename(base)
-			if !outside && !active {
-				if metaID := peekCodexSessionID(path); metaID != "" {
-					sid = metaID
-				}
+			metaID, parentID := peekCodexRolloutMeta(path)
+			if metaID != "" {
+				sid = metaID
 			}
 			if !session.ValidID(sid) {
 				return nil
 			}
 			hf := agents.HistoryFile{
-				SourceSystem: codexSourceSystem,
-				SessionID:    sid,
-				Path:         path,
-				ModTime:      modTime,
-				Active:       active,
-				OutsideSince: outside,
+				SourceSystem:    codexSourceSystem,
+				SessionID:       sid,
+				ParentSessionID: parentID,
+				Path:            path,
+				ModTime:         modTime,
+				Active:          active,
+				OutsideSince:    outside,
 			}
 			if prev, exists := bySession[sid]; !exists || hf.ModTime.After(prev.ModTime) {
 				bySession[sid] = hf
@@ -126,11 +126,12 @@ func codexSessionIDFromFilename(base string) string {
 	return stem
 }
 
-// peekCodexSessionID reads the rollout's first lines for session_meta's session id.
-func peekCodexSessionID(path string) string {
+// peekCodexRolloutMeta reads the rollout's first lines for session_meta's session id and
+// optional spawned subagent parent_thread_id.
+func peekCodexRolloutMeta(path string) (sessionID, parentID string) {
 	f, err := os.Open(path)
 	if err != nil {
-		return ""
+		return "", ""
 	}
 	defer func() { _ = f.Close() }()
 	br := bufio.NewReader(f)
@@ -140,21 +141,36 @@ func peekCodexSessionID(path string) string {
 			var rec struct {
 				Type    string `json:"type"`
 				Payload struct {
-					ID        string `json:"id"`
-					SessionID string `json:"session_id"`
+					ID        string          `json:"id"`
+					SessionID string          `json:"session_id"`
+					Source    json.RawMessage `json:"source"`
 				} `json:"payload"`
 			}
 			if json.Unmarshal(line, &rec) == nil && rec.Type == "session_meta" {
 				if id := cmp.Or(rec.Payload.ID, rec.Payload.SessionID); session.ValidID(id) {
-					return id
+					sessionID = id
 				}
+				var source struct {
+					Subagent json.RawMessage `json:"subagent"`
+				}
+				if json.Unmarshal(rec.Payload.Source, &source) == nil && len(source.Subagent) > 0 {
+					var sub struct {
+						ThreadSpawn *struct {
+							ParentThreadID string `json:"parent_thread_id"`
+						} `json:"thread_spawn"`
+					}
+					if json.Unmarshal(source.Subagent, &sub) == nil && sub.ThreadSpawn != nil && session.ValidID(sub.ThreadSpawn.ParentThreadID) {
+						parentID = sub.ThreadSpawn.ParentThreadID
+					}
+				}
+				return sessionID, parentID
 			}
 		}
 		if err != nil {
 			break
 		}
 	}
-	return ""
+	return "", ""
 }
 
 // ReadHistory converts a Codex rollout file into contiguous OTLP log segments grouped by
@@ -225,7 +241,7 @@ func codexCommandReachPaths(cmd []string, itemCwd, sessionCwd string) []string {
 	if len(cmd) >= 3 && (cmd[1] == "-c" || cmd[1] == "-lc" || cmd[1] == "-cl") {
 		shellCmd = cmd[2]
 	}
-	return append(out, hookrun.Alone(hookrun.ShellPaths(shellCmd, dir)...)...)
+	return append(out, hookrun.Alone(hookrun.ShellPathsHistorical(shellCmd, dir)...)...)
 }
 
 func codexToolReachPaths(name, args, cwd string) []string {
@@ -242,33 +258,62 @@ func codexToolReachPaths(name, args, cwd string) []string {
 		return nil
 	}
 	if name == codexPatchTool {
-		return hookrun.Alone(applypatch.Paths(args)...)
+		patchText := args
+		var wrapped struct {
+			Input string `json:"input"`
+			Patch string `json:"patch"`
+		}
+		if json.Unmarshal([]byte(args), &wrapped) == nil {
+			if p := cmp.Or(wrapped.Input, wrapped.Patch); p != "" {
+				patchText = p
+			}
+		}
+		return hookrun.Alone(applypatch.Paths(patchText)...)
 	}
-	var in struct {
-		Cmd      string `json:"cmd"`
-		Command  string `json:"command"`
-		Workdir  string `json:"workdir"`
-		Cwd      string `json:"cwd"`
-		FilePath string `json:"file_path"`
-		Path     string `json:"path"`
-	}
-	if json.Unmarshal([]byte(args), &in) != nil {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal([]byte(args), &fields) != nil {
 		return nil
+	}
+	strField := func(k string) string {
+		var s string
+		if raw, ok := fields[k]; ok && json.Unmarshal(raw, &s) == nil {
+			return s
+		}
+		return ""
 	}
 	var out []string
 	dir := cwd
-	if wd := cmp.Or(in.Workdir, in.Cwd); wd != "" {
+	if wd := codexNormalizeCwd(cmp.Or(strField("workdir"), strField("cwd")), ""); wd != "" {
 		if !filepath.IsAbs(wd) && cwd != "" {
 			wd = filepath.Join(cwd, wd)
 		}
 		dir = wd
 		out = append(out, hookrun.Alone(wd)...)
 	}
-	if c := cmp.Or(in.Cmd, in.Command); c != "" {
-		out = append(out, hookrun.Alone(hookrun.ShellPaths(c, dir)...)...)
+	scanCmd := func(raw json.RawMessage) {
+		if len(raw) == 0 {
+			return
+		}
+		var s string
+		if json.Unmarshal(raw, &s) == nil {
+			if s != "" {
+				out = append(out, hookrun.Alone(hookrun.ShellPathsHistorical(s, dir)...)...)
+			}
+			return
+		}
+		var argv []string
+		if json.Unmarshal(raw, &argv) == nil && len(argv) > 0 {
+			out = append(out, codexCommandReachPaths(argv, dir, cwd)...)
+		}
 	}
-	for _, p := range []string{in.FilePath, in.Path} {
-		if p != "" {
+	if raw, ok := fields["cmd"]; ok {
+		scanCmd(raw)
+	}
+	if raw, ok := fields["command"]; ok {
+		scanCmd(raw)
+	}
+	for _, k := range []string{"file_path", "path"} {
+		if p := strField(k); p != "" {
 			out = append(out, hookrun.Alone(p)...)
 		}
 	}
