@@ -7,12 +7,17 @@ import (
 )
 
 // A sign-in as a person makes the login the profile's credential again, not the server key
-// an earlier setup stored, and keeps the organization and team chosen.
+// an earlier setup stored, and keeps the organization and team its own account chose.
 func TestApplyLoginClearsTheServerKeySignIn(t *testing.T) {
 	p := &config.Profile{OrganizationID: "org", Team: "team", ServerKeySignIn: true}
 	applyLogin(p, &config.Config{Environment: config.EnvProd}, "")
-	if p.ServerKeySignIn || p.Team != "team" || p.OrganizationID != "org" {
+	if p.ServerKeySignIn {
 		t.Fatalf("profile after a sign-in = %+v", p)
+	}
+	p.OrganizationID, p.Team = "org", "team"
+	applyLogin(p, &config.Config{Environment: config.EnvProd}, "")
+	if p.Team != "team" || p.OrganizationID != "org" {
+		t.Fatalf("a sign-in as the same person dropped their own choice: %+v", p)
 	}
 }
 
@@ -39,6 +44,18 @@ func TestALoginAfterAServerKeyDropsTheKeysTeam(t *testing.T) {
 	if p.Account != "" {
 		t.Fatalf("a server key setup kept the person's account %q", p.Account)
 	}
+	applyLogin(p, &config.Config{Environment: config.EnvProd}, account)
+	if p.ServerKeySignIn || p.OrganizationID != "" || p.Team != "" || p.Account != account {
+		t.Fatalf("profile after signing in again = %+v; want the key's organization and team cleared", p)
+	}
+}
+
+// A server-key profile saved before applyServerKey unpaired it still names the person
+// signed in before the key: signing in again as that person keeps neither the key's
+// organization nor its team (#163).
+func TestALoginOverAServerKeyProfileSavedPairedDropsTheKeysTeam(t *testing.T) {
+	const account = "aaaaaaaaaaaaaaaa"
+	p := &config.Profile{Account: account, OrganizationID: "org-x", Team: "team-x", ServerKeySignIn: true}
 	applyLogin(p, &config.Config{Environment: config.EnvProd}, account)
 	if p.ServerKeySignIn || p.OrganizationID != "" || p.Team != "" || p.Account != account {
 		t.Fatalf("profile after signing in again = %+v; want the key's organization and team cleared", p)
