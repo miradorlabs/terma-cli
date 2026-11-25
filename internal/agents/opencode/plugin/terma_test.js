@@ -1775,14 +1775,23 @@ test("tool.execute.after holds the tool until its check is done; a part that end
 test("nothing the session sends after a check made after its tool ran ends before that check", async () => {
   const { r, hooks } = await start({}, { terma: { delayed: { "opencode-tool-reach": 0.3 } } })
   await hooks.event(sessionCreated("ses_fl"))
+  await globalThis[KEY].sessions.get("ses_fl").queue // claimed: a title is no longer the first sight's
   // A shell command the person ran: no hook saw it, so it is checked when its part arrives.
   await hooks.event(toolPart("ses_fl", "msg_1", "c1", "bash", done({ command: "ls" }, "a\n")))
-  // A model call that overlapped the check, and one that ended after it.
+  // A title and a prompt that came in during the check, a model call that overlapped it,
+  // and one that ended after it.
+  await hooks.event(ev("session.updated", { info: { id: "ses_fl", directory: "/repo", version: "1.19.6", title: "A real title", time: { created: 1000 } } }))
+  const asked = hooks["chat.message"]({ sessionID: "ses_fl" }, { message: { id: "msg_u", time: { created: 1000 } }, parts: [{ type: "text", text: "hi" }] })
   await hooks.event(assistantDone("ses_fl", "msg_2", { time: { created: 2000, completed: 3000 } }))
   const later = Date.now() + 60_000
   await hooks.event(assistantDone("ses_fl", "msg_3", { time: { created: 2000, completed: later } }))
+  await asked
   await hooks.dispose()
   const finished = finishedAt(r.dir, "opencode-tool-reach")
+  for (const name of ["opencode.session.title", "opencode.user_prompt"]) {
+    const [rec] = named(r.logs(), name)
+    expect(Number(BigInt(rec.timeUnixNano) / 1000000n)).toBeGreaterThan(finished)
+  }
   const calls = Object.fromEntries(chats(r.spans()).map((s) => [A(s)["opencode.call.id"], s]))
   expect(endOf(calls.msg_2)).toBeGreaterThan(finished)
   expect(calls.msg_2.startTimeUnixNano).toBe(nanosOf(2000))

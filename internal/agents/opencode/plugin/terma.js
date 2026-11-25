@@ -42,9 +42,9 @@ import { fileURLToPath } from "node:url"
 //   running HOOK_TIMEOUT_MS, the flush EXIT_FLUSH_MS, OpenCode 1's log LOG_SETTLE_MS.
 // - update() stamps what follows a move 1 ms after its claim, so none of it sorts before the claim.
 // - A reach check made after its tool ran sets checkedAt 1 ms after it finished, and no model or
-//   tool call the session sends afterwards ends earlier. A patch is checked in tool.execute.after,
-//   which OpenCode waits for, so it keeps its own end; a call no hook saw is checked when its part
-//   arrives and ends at that check.
+//   tool call the session sends afterwards ends earlier, nor is a prompt or title stamped
+//   earlier. A patch is checked in tool.execute.after, which OpenCode waits for, so it keeps
+//   its own end; a call no hook saw is checked when its part arrives and ends at that check.
 
 // Bodies are bounded so a single reply or tool result cannot make an export enormous.
 const MAX_TEXT = 64 * 1024
@@ -583,7 +583,7 @@ function newSession(id, owner) {
     directory: "",
     askedDirectory: "", // the directory most recently moved to, applied or still queued
     movedAt: 0, // when the last move's claim finished; nothing after it is stamped earlier
-    checkedAt: 0, // when the last reach check made after its tool ran finished; nothing after it ends earlier
+    checkedAt: 0, // when the last reach check made after its tool ran finished; nothing after it ends or is stamped earlier
     version: "",
     created: 0,
     title: "",
@@ -947,7 +947,10 @@ function endAfterCheck(s, end) {
 // prompt text ever goes to a hook.
 function prompt(s, pr) {
   const text = str(pr.text)
-  const time = s.movedAt ? Math.max(num(pr.time) ?? 0, s.movedAt) : pr.time
+  // No earlier than the session's last move or its last check made after a tool ran: the
+  // relay files a record by its time, under the claim and the Mixed cutoff in force then.
+  const floor = Math.max(s.movedAt, s.checkedAt)
+  const time = floor ? Math.max(num(pr.time) ?? 0, floor) : pr.time
   emitRecord(s, "opencode.user_prompt", policyOf(s).includePrompts ? truncate(text, MAX_TEXT) : "", {
     "opencode.message.id": pr.messageID,
     "opencode.prompt.length": text.length,
@@ -967,9 +970,10 @@ function title(s, t) {
 }
 
 // emitTitle stamps the moment the plugin saw the title, made strictly later than the
-// session's previous title, so two titles of a session never share an identity.
+// session's previous title, so two titles of a session never share an identity, and no
+// earlier than its last move or its last check made after a tool ran, as a prompt is.
 function emitTitle(s, text, time) {
-  const at = Math.max(num(time) ?? Date.now(), s.lastTitleTime + 1)
+  const at = Math.max(num(time) ?? Date.now(), s.lastTitleTime + 1, s.movedAt, s.checkedAt)
   s.lastTitleTime = at
   emitRecord(s, "opencode.session.title", policyOf(s).includePrompts ? text : "", {}, at)
 }
