@@ -1,0 +1,297 @@
+{
+  "schema_version": 1,
+  "harness": "copilot",
+  "from": "1.0.115",
+  "to": "1.0.116",
+  "generated_at": "2026-11-25T17:19:59.407980579Z",
+  "source": null,
+  "changelog": {
+    "url": "https://github.com/github/copilot-cli/blob/main/changelog.md",
+    "text": "- Add a build-time JSON Schema for extension manifests\n- Click \"Jump to latest\" in the fullscreen timeline to return to the newest output and resume following it.\n- Choose the context size for supported models in ACP-compatible editors without changing your saved defaults.\n- Set environment variables for every process Copilot starts (shell commands, local LSP and MCP servers, hooks and extensions) with the env setting, with or without the sandbox\n- Warn when a plugin and a standalone MCP server connect to the same endpoint, and show how to disable one in /mcp\n- Warn when a plugin and a standalone MCP server connect to the same endpoint, and show how to disable one in /mcp\n- `copilot help parallel-work` no longer says approving a plan can offer to continue in Autopilot with /fleet; plan approval no longer offers that choice\n- Shell approval prompts in ACP clients show the command you're authorizing instead of its description.\n- Configured HTTP hooks still run when TERM_PROGRAM contains invalid characters, so an invalid terminal name no longer blocks tool calls.\n- /rewind reports files it cannot restore because a turn exceeded the file capture limit\n- Keep Incoming connections settings in /environments on one line per row in narrow terminals, including in screen-reader mode\n- PowerShell commands with digits in a parameter name, such as -n1 or -ExpectedSha256, honor allow rules again instead of requiring full-script approval.\n- Choosing \"Yes\" in the folder trust prompt closes it without waiting for MCP servers to finish reconnecting\n- Allow Swift tools in the Copilot CLI sandbox to write to the compiler module cache and SwiftPM shared cache on macOS and Linux.\n- A prompt passed with -i, a repository startup prompt or a restored schedule now waits for the MCP servers that trusting the folder starts, for up to 30 seconds, so its first request includes their tools\n- Show the selected preview model's name in /model switch notices and /exit print when settings.json is empty.\n- Sub-agent events in a session's event log now record when they happened (`occurredAt`), not only when they reached the main session.\n- Search falls back to ripgrep when another Copilot profile owns the repository's active index. On Windows, search helpers no longer use profile folders as their working directory.\n- Switching models before your first prompt now skips compaction and completes successfully\n- Assisted Permissions honors later chat approvals or withdrawals of earlier permission decisions, including session approvals\n- Keep your place when reading older output in the terminal while a large reply arrives.\n- Open the link when clicking anywhere on linked inline code or color swatches, including their shaded edges.\n- Keep the selected MCP servers or Skills view visible in /config on very narrow terminals.\n- Gemini reasoning summaries honor your saved visibility preference, and Ctrl+T shows or hides them and saves your choice.\n- Built-in search keeps full filenames and correct line numbers when compacting matches from files with numeric suffixes.\n- `/worktree` and `/move` preserve Git diagnostics when branch names, paths, or hook output contain HTML-like text.\n- Cancel pending prompts without waiting for activity to refresh, and avoid showing idle sessions as busy after reconnecting to a host.\n- On Unix, canceled foreground shell commands can finish cleanup even if they write to stdout or stderr during shutdown.\n- Prevent repeated sign-in prompts when multiple CLI sessions refresh access to the same MCP server.\n- The Ctrl+Y hint no longer stays hidden when a research report is created while the CLI starts watching for reports.\n- Reduce memory growth in long sessions: text measurement caches kept a full copy of each streamed reply, which could exhaust the JavaScript heap.\n- Keep the highlighted theme and its description readable in narrow terminals when screen-reader mode is on.\n- Cancel pending prompts without waiting for activity to refresh, and avoid showing idle sessions as busy after reconnecting to a host.\n- On Unix, canceled foreground shell commands can finish cleanup even if they write to stdout or stderr during shutdown.\n- Reduce memory growth in long sessions: text measurement caches kept a full copy of each streamed reply, which could exhaust the JavaScript heap.\n- Keep the highlighted theme and its description readable in narrow terminals when screen-reader mode is on.\n- `copilot help billing` no longer says `--usage-output-file` writes an `agentMetrics` entry for each subagent; entries are per agent name, summed over its runs with `invocationCount`\n- `/restart` keeps the custom agent chosen with `/agent`, or no agent after deselecting one, instead of switching back to the agent given with `--agent` at launch.\n- Load workspace MCP servers from `.mcp.json` and `.github/mcp.json` even when those files contain comments or trailing commas\n- Reduce delays before the final answer on long Copilot Fusion turns when progress updates pile up.\n- Sandboxed shell commands can read the session plan without prompting you to bypass the sandbox.\n- Preserve text styling such as bold, italics, and underlines after /restart when NO_COLOR is set, without re-enabling color.\n- Keep the Home tab bar visible when a draft wraps in a short terminal.\n- Copilot CLI starts normally when settings contain large integers, and `/settings show` displays their exact values without rounding.\n- Keep /mcp search usable when a registry result has a missing or invalid description\n- Pressing Escape cancels push-to-talk without restarting the microphone or inserting a transcript afterward\n- `/diff` shows the patch for a small file or symlink that replaces a directory with many tracked files instead of incorrectly reporting it as too large.\n- Prevent editor shortcuts pressed while submitting /exit or /quit from opening an editor when the CLI quits\n- `--log-dir` puts extension process logs in the same directory as the CLI process log.\n- Closed background sessions appear as saved in the Sessions tab and reopen with their conversation history when you press Enter.\n- Pressing Ctrl+C to cancel a running queued extension command shows a cancellation notice without a misleading failure message.\n- Keep shell output on separate lines in the interactive CLI when it contains an unterminated terminal control sequence\n- `/init suppress` keeps init suggestions hidden in repositories where you suppressed them from another CLI session using the same profile.\n- The Sessions browser now lists cloud sessions beyond the first page.\n- Bun commands can use their caches and read their configuration in the CLI sandbox when developer tool access is enabled.\n- Honor `--effort none` on the first request with GPT-5.4 instead of falling back to medium reasoning effort.\n- Resuming a session no longer attributes an automatic Assisted Permissions denial to you.\n- Skip individual slow-connection and sign-in warnings for organization-managed MCP servers (except Connectors) and flag their sign-in needs in the startup summary.\n- Summarize MCP server status at startup when attention is needed, and wait for /mcp auth <name> before opening a browser for initial sign-in.\n- Experimental extensions use Enabled/Disabled controls. Existing Load Only settings migrate to disabled with a one-time notice.\n- When the sandbox blocks a command, Copilot now stops and, if your policy allows it, says you could disable the sandbox for the session, instead of asking you to hand execution back\n- Assisted Permissions resolves routine requests faster on eligible plans and gives more specific reasons when it asks for approval\n- Plan approval no longer offers the fleet option. You can still start fleet mode with /fleet."
+  },
+  "summary": {
+    "changes": 12,
+    "categories": {
+      "binary": 1,
+      "cli": 4,
+      "config": 6,
+      "storage": 1
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 12,
+      "notable": 0
+    },
+    "undocumented": 6
+  },
+  "changes": [
+    {
+      "id": "cli.commands.copilot.options.--choice",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "copilot",
+        "options",
+        "--choice"
+      ],
+      "title": "New flag `copilot --choice`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Allowed answer for --decision choice (repeat at least twice)",
+        "names": [
+          "--choice"
+        ],
+        "value": "<value>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.commands.copilot.options.--decision",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "copilot",
+        "options",
+        "--decision"
+      ],
+      "title": "New flag `copilot --decision`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "choices": [
+          "boolean",
+          "choice"
+        ],
+        "description": "Use one-shot decision inference instead of the agent loop (requires -p/--prompt and DECISIONS_API opt-in via COPILOT_CLI_ENABLED_FEATURE_FLAGS; piped stdin is context). Refusals exit with a nonzero status.",
+        "names": [
+          "--decision"
+        ],
+        "value": "<kind>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+826 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -102,6 +102,8 @@\n           Enable BASH_ENV support for bash shells (on|off)\n   -C <directory>\n           Change working directory before doing anything else\n+      --choice <value>\n+          Allowed answer for --decision choice (repeat at least twice)\n       --connect [<sessionId>]\n           Connect directly to a remote session (optionally specify\n           session ID or task ID)\n@@ -109,6 +111,11 @@\n           Set the context window tier (overrides persisted setting) [possible values: default, long_context]\n       --continue\n           Resume the most recent session\n+      --decision <kind>\n+          Use one-shot decision inference instead of the agent loop\n+          (requires -p/--prompt and DECISIONS_API opt-in via\n+          COPILOT_CLI_ENABLED_FEATURE_FLAGS; piped stdin is context).\n+          Refusals exit with a nonzero status. [possible values: boolean, choice]\n       --deny-tool [<tools>...]\n           Tools the CLI does not have permission to use; will not\n           prompt for permission. Takes rules like 'shell(git push)'\n@@ -299,6 +306,12 @@\n \n   # Execute a prompt in non-interactive mode (exits after completion)\n   $ copilot -p \"Fix the bug in main.js\" --allow-all-tools\n+\n+  # Ask a decision model a yes/no question (POSIX shell; API opt-in required)\n+  $ COPILOT_CLI_ENABLED_FEATURE_FLAGS=DECISIONS_API copilot -p \"Is this a bug report?\" --decision boolean --output-format json\n+\n+  # Classify input from stdin using a decision model (POSIX shell; API opt-in required)\n+  $ COPILOT_CLI_ENABLED_FEATURE_FLAGS=DECISIONS_API copilot -p \"Classify this issue\" --decision choice --choice bug --choice feature < issue.txt\n \n   # Trust this checkout's configuration for one prompt-mode session only\n   $ copilot --trust-folder -p \"Summarize this project\"\n",
+      "stats": {
+        "added_chars": 826,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "cli.help.help environment",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "help environment"
+      ],
+      "title": "Full help text of `help environment` changed (+791 −0 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -30,6 +30,11 @@\n An integer from -1000 to 1000, or \"off\" to leave it unchanged; defaults to 300.\n A child never gets a lower score than the CLI itself.\n \n+  `COPILOT_CLI_POLICY_HELPER_FAILURE_MODE`: choose \"ignore\" (default) to continue with other policy channels when a registered Policy Helper fails, or \"failClosed\" to engage fail-closed protection.\n+Device-managed settings take precedence over server-managed settings, and both take precedence over this variable.\n+Unrelated managed settings do not suppress this fallback.\n+Invalid values log a warning and use the default.\n+\n   `COPILOT_CLI_VERSION`: override the CLI version used for update comparisons.\n On standalone development builds, a canonical semantic version also opts into release-style cached-package selection and CLI updates, but does not pin cache selection to that exact version or change the version displayed by `--version`.\n An empty or non-canonical value is treated as unset for package selection and updates.\n@@ -88,6 +93,12 @@\n When active, the CLI skips all network access: GitHub authentication, telemetry, web tools, GitHub MCP server, and auto-update are disabled.\n Requires a local model provider, either one you added in /model or one set with COPILOT_PROVIDER_BASE_URL.\n Refer to `copilot help providers`.\n+\n+  `COPILOT_PAC_EVALUATION_TIMEOUT_MS`: time limit for evaluating an operating-system proxy auto-configuration (PAC) script, including queueing and DNS calls.\n+Defaults to 10000 milliseconds (10 seconds).\n+Set before starting Copilot.\n+Accepts whole milliseconds from 1 to 4294967295; invalid values use the default.\n+Does not change the separate PAC download or per-DNS-call limits.\n \n   `COPILOT_PLUGIN_DIR_ONLY`: set to \"true\" to turn off automatic plugin discovery, so that only plugins passed with --plugin-dir are loaded.\n \n",
+      "stats": {
+        "added_chars": 791,
+        "removed_chars": 0
+      },
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.env",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "env"
+      ],
+      "title": "New setting: env",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Environment variables added to every process Copilot starts for you: shell tool commands, your own ! shell commands, local stdio MCP servers, local LSP servers, hooks and extensions. Works with or without the sandbox. Keyed by exact name; values are literal, with no $VAR or ~ expansion. A value replaces the inherited one of the same name. The own env block of an MCP server, LSP server, hook or extension wins over this setting. Variables Copilot manages itself win too, and in a sandbox so do the proxy, certificate, temp and cache variables the sandbox sets. Copilot's own OpenTelemetry variables (OTEL_*, COPILOT_OTEL_*), Git config count variables and variables Copilot strips from child processes cannot be set. Applies to processes started after the setting is next loaded. Values are stored as plain text; use sandbox.credentials.envVars for secrets.",
+        "type": "record-of-string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.extensions.enabled",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "extensions.enabled"
+      ],
+      "title": "New setting: extensions.enabled",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Load extensions and allow the agent to manage them, subject to existing activation, trust, and permission requirements.",
+        "type": "boolean"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "config.options.extensions.mode.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "extensions.mode",
+        "description"
+      ],
+      "title": "extensions.mode description changed (+58 −63 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,1 +1,1 @@\n-Extension loading mode (disabled, load_only, load_and_augment).\n+Legacy extension preference input. Use extensions.enabled.\n",
+      "stats": {
+        "added_chars": 58,
+        "removed_chars": 63
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.showTimelineTimestamps.description",
+      "category": "config",
+      "op": "changed",
+      "path": [
+        "config",
+        "options",
+        "showTimelineTimestamps",
+        "description"
+      ],
+      "title": "showTimelineTimestamps description changed (+331 −263 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,4 +1,5 @@\n-Show timestamps on the timeline's assistant replies, tool calls and sub-agents: the start time, plus the end time and how long it took once an item finishes, and a live elapsed time while it runs.\n-Times follow your locale and include the date when the day changes.\n+In the timeline, show the start time of assistant replies, tool calls and sub-agents, plus the end time and duration when they finish or a live elapsed time while they run.\n+Your messages show only their send time, even with showTimestamps off.\n+Times follow your locale and include the date on the first item and when the day changes.\n They show only when the timeline is at least 120 columns wide.\n Off by default.\n",
+      "stats": {
+        "added_chars": 331,
+        "removed_chars": 263
+      },
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.options.timelineExpansion",
+      "category": "config",
+      "op": "added",
+      "path": [
+        "config",
+        "options",
+        "timelineExpansion"
+      ],
+      "title": "New setting: timelineExpansion",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "How much of the concise timeline ctrl+o has opened, saved on every press and used when the CLI starts: collapsed, groups (each run of tool calls opens to its calls) or details (each call opens to its output).",
+        "enum": [
+          "collapsed",
+          "groups",
+          "details"
+        ],
+        "type": "string"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "config.env_vars.COPILOT_CLI_SANDBOX_MANAGED_EMPTY_ALLOWLIST",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "COPILOT_CLI_SANDBOX_MANAGED_EMPTY_ALLOWLIST"
+      ],
+      "title": "Environment variable no longer read: COPILOT_CLI_SANDBOX_MANAGED_EMPTY_ALLOWLIST",
+      "impact": "informational",
+      "before": "COPILOT_CLI_SANDBOX_MANAGED_EMPTY_ALLOWLIST",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    },
+    {
+      "id": "storage.logs.path",
+      "category": "storage",
+      "op": "changed",
+      "path": [
+        "storage",
+        "logs",
+        "path"
+      ],
+      "title": "On-disk logs path changed",
+      "impact": "informational",
+      "before": "<home>/.copilot/logs/process-<n>-4600.log",
+      "after": "<home>/.copilot/logs/process-<n>-4365.log",
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": true
+    },
+    {
+      "id": "binary.size_bytes",
+      "category": "binary",
+      "op": "changed",
+      "path": [
+        "binary",
+        "size_bytes"
+      ],
+      "title": "Binary size: 239,265,088 → 214,444,096 bytes (239.3 MB → 214.4 MB)",
+      "impact": "informational",
+      "before": 239265088,
+      "after": 214444096,
+      "text_diff": null,
+      "terma": null,
+      "source": null,
+      "documented": false
+    }
+  ]
+}

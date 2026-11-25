@@ -1,7 +1,42 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-25T16:01:29.678046718Z",
+  "generated_at": "2026-11-25T17:19:59.407980579Z",
   "versions": [
+    {
+      "harness": "copilot",
+      "name": "GitHub Copilot CLI",
+      "version": "1.0.116",
+      "released_at": "2026-11-25T17:02:41.755Z",
+      "captured_at": "2026-11-25T17:19:59.407980579Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.0.115",
+      "changes": 12,
+      "categories": {
+        "binary": 1,
+        "cli": 4,
+        "config": 6,
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 12,
+        "notable": 0
+      },
+      "undocumented": 6,
+      "highlights": [
+        "New flag `copilot --choice`",
+        "New flag `copilot --decision`",
+        "Full help text of `--help` changed (+826 −0 chars)"
+      ],
+      "signing": "valid",
+      "partial": true,
+      "attempted_at": "2026-11-25T17:19:59.407980579Z",
+      "attempts": 1
+    },
     {
       "harness": "pi",
       "name": "Pi",
@@ -6184,39 +6219,6 @@
       },
       "undocumented": 0,
       "highlights": [],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.229",
-      "released_at": "2026-08-12T19:28:48.616Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.228",
-      "changes": 16,
-      "categories": {
-        "config": 11,
-        "filesystem": 2,
-        "hooks": 2,
-        "tools": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 13,
-        "notable": 3
-      },
-      "undocumented": 14,
-      "highlights": [
-        "Workflow tool description changed (+128 −123 chars)",
-        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET removed",
-        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_TOKEN removed"
-      ],
       "signing": "valid"
     }
   ]

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-25T16:01:29.678046718Z",
+  "generated_at": "2026-11-25T17:19:59.407980579Z",
   "harnesses": [
     {
       "id": "claude",
@@ -111,21 +111,20 @@
       "homepage": "https://github.com/github/copilot-cli",
       "source": null,
       "changelog": "https://github.com/github/copilot-cli/blob/main/changelog.md",
-      "latest": "1.0.115",
+      "latest": "1.0.116",
       "support": "supported",
-      "versions_tracked": 11,
+      "versions_tracked": 12,
       "first_tracked": "2026-10-28",
       "last_change": {
-        "from": "1.0.114",
-        "to": "1.0.115",
-        "at": "2026-11-25T08:02:07.263349308Z",
-        "released_at": "2026-11-24T13:03:39.111Z",
-        "changes": 31,
+        "from": "1.0.115",
+        "to": "1.0.116",
+        "at": "2026-11-25T17:19:59.407980579Z",
+        "released_at": "2026-11-25T17:02:41.755Z",
+        "changes": 12,
         "categories": {
-          "binary": 2,
-          "cli": 9,
-          "config": 18,
-          "prompt": 1,
+          "binary": 1,
+          "cli": 4,
+          "config": 6,
           "storage": 1
         }
       }

@@ -3,8 +3,8 @@
   "harness": "copilot",
   "window": {
     "oldest": "1.0.105",
-    "newest": "1.0.115",
-    "builds": 11
+    "newest": "1.0.116",
+    "builds": 12
   },
   "items": {
     "cli.commands.copilot app": {
@@ -986,6 +986,17 @@
       ],
       "since_bounded": false
     },
+    "cli.commands.copilot.options.--choice": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.0.116",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "cli.commands.copilot.options.--connect": {
       "kind": "option",
       "ranges": [
@@ -1018,6 +1029,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "cli.commands.copilot.options.--decision": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.0.116",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "cli.commands.copilot.options.--deny-tool": {
       "kind": "option",
@@ -2003,8 +2025,8 @@
       "ranges": [
         {
           "since": "1.0.115",
-          "until": null,
-          "removed": null
+          "until": "1.0.115",
+          "removed": "1.0.116"
         }
       ],
       "since_bounded": true
@@ -4616,6 +4638,17 @@
       ],
       "since_bounded": false
     },
+    "config.options.env": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.0.116",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.options.experimental": {
       "kind": "setting",
       "ranges": [
@@ -4637,6 +4670,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.extensions.enabled": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.0.116",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.extensions.mode": {
       "kind": "setting",
@@ -6309,6 +6353,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.timelineExpansion": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.0.116",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.toolSearch": {
       "kind": "setting",

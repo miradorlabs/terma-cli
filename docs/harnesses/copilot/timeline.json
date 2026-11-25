@@ -3,6 +3,108 @@
   "harness": "copilot",
   "steps": [
     {
+      "version": "1.0.116",
+      "previous": "1.0.115",
+      "changes": [
+        {
+          "id": "cli.commands.copilot.options.--choice",
+          "category": "cli",
+          "op": "added",
+          "title": "New flag `copilot --choice`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.copilot.options.--decision",
+          "category": "cli",
+          "op": "added",
+          "title": "New flag `copilot --decision`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.--help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `--help` changed (+826 −0 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.help environment",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `help environment` changed (+791 −0 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.env",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: env",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.extensions.enabled",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: extensions.enabled",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.extensions.mode.description",
+          "category": "config",
+          "op": "changed",
+          "title": "extensions.mode description changed (+58 −63 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.showTimelineTimestamps.description",
+          "category": "config",
+          "op": "changed",
+          "title": "showTimelineTimestamps description changed (+331 −263 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.timelineExpansion",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: timelineExpansion",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.COPILOT_CLI_SANDBOX_MANAGED_EMPTY_ALLOWLIST",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: COPILOT_CLI_SANDBOX_MANAGED_EMPTY_ALLOWLIST",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "storage.logs.path",
+          "category": "storage",
+          "op": "changed",
+          "title": "On-disk logs path changed",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "binary.size_bytes",
+          "category": "binary",
+          "op": "changed",
+          "title": "Binary size: 239,265,088 → 214,444,096 bytes (239.3 MB → 214.4 MB)",
+          "impact": "informational",
+          "documented": false
+        }
+      ]
+    },
+    {
       "version": "1.0.115",
       "previous": "1.0.114",
       "changes": [
