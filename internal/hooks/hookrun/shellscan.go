@@ -16,6 +16,15 @@ const plain, program, target, folder, creates, data, part, slashedOnly, globbed,
 
 var maxShellTime, errOpaque, unsetVar = shellTime, errors.New("an expansion ShellPaths cannot resolve"), new(string)
 
+// historicalShellTime bounds the scan of one past command. `terma history upload` is a
+// batch command with no latency budget, and a scan that ran out of a hook's time would
+// cut a session on a slow disk that a fast one keeps; this only stops a scan that hangs.
+const historicalShellTime = 2 * time.Second
+
+func historicalWork() work {
+	return work{deadline: time.Now().Add(historicalShellTime), historical: true}
+}
+
 type role uint8
 
 // scan holds the state of one bounded shell reach scan.

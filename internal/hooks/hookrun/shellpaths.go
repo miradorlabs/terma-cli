@@ -32,7 +32,7 @@ func ShellPaths(command, cwd string) []string {
 // environment (aside from HOME/USERPROFILE), failing closed on external shell variables
 // whose historical values are unknown.
 func ShellPathsHistorical(command, cwd string) []string {
-	return readShellWith(command, shellReadings(command, filepath.Separator == '\\'), cwd, historicalEnv, work{deadline: time.Now().Add(maxShellTime), historical: true})
+	return readShellWith(command, shellReadings(command, filepath.Separator == '\\'), cwd, historicalEnv, historicalWork())
 }
 func shellPathsBy(cmd, cwd string, env func(string) (string, bool), d time.Time) []string {
 	return readShellWith(cmd, shellReadings(cmd, filepath.Separator == '\\'), cwd, env, work{deadline: d})

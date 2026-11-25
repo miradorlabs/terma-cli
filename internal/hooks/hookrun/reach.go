@@ -125,7 +125,7 @@ func ExpandReachHistorical(paths []string, cwd string) (expanded []string, unkno
 	if len(paths) == 0 {
 		return nil, false
 	}
-	scanned := searchedByWork(paths, cwd, historicalEnv, work{deadline: time.Now().Add(maxShellTime), historical: true})
+	scanned := searchedByWork(paths, cwd, historicalEnv, historicalWork())
 	out := make([]string, 0, len(scanned))
 	for _, p := range scanned {
 		if isUnknownReach(p) {
