@@ -358,7 +358,9 @@ func (app *App) revokeSession(ctx context.Context, cfg *config.Config, cred *aut
 // It pairs the profile with account, the login's: an organization and team chosen under any
 // other account, or under none, are cleared in the same write.
 func applyLogin(p *config.Profile, cfg *config.Config, account string) {
-	if p.Account != account {
+	// A server key's organization and team were chosen under no person's sign-in, even on a
+	// profile saved before applyServerKey unpaired it, so a login never keeps them (#163).
+	if p.Account != account || p.ServerKeySignIn {
 		p.OrganizationID, p.OrganizationName, p.Team, p.TeamName = "", "", "", ""
 	}
 	p.Account = account

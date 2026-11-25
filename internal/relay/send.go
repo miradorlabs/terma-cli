@@ -27,8 +27,6 @@ func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte,
 	if s.team != nil {
 		account, project, enrollment = s.team.account, first.q.Project, s.team.enrollment
 	}
-	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
-	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(pol.Endpoint, "/")+"/v1/"+string(sig), bytes.NewReader(body))
 	if err != nil {
 		return refused, 0, "bad_endpoint", 0
@@ -55,7 +53,11 @@ func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte,
 			return out, wait, detail, 0
 		}
 	}
-	resp, err := s.r.opts.HTTP.Do(req)
+	// sendTimeout bounds the request alone: the sign-in's Token and Refused take the parent
+	// ctx, since a refresh may wait out another's lock and RefreshBudget well past it.
+	doCtx, cancel := context.WithTimeout(ctx, sendTimeout)
+	defer cancel()
+	resp, err := s.r.opts.HTTP.Do(req.WithContext(doCtx))
 	if err != nil {
 		return retry, 0, err.Error(), 0
 	}
@@ -114,53 +116,12 @@ const signInErrPrefix = "the sign-in: "
 // partialSuccess reads the rejected count (field 1 of field 1) by hand, since the collector
 // packages that define the response pull gRPC into every hook.
 func partialSuccess(body []byte) int64 {
-	ps := protoField(body, 1, protowire.BytesType)
-	if ps == nil {
-		return 0
-	}
-	for b := ps; len(b) > 0; {
-		num, typ, n := protowire.ConsumeTag(b)
-		if n < 0 {
-			return 0
+	for f := range sendas.WireFields(sendas.WireBytes(body, 1)) {
+		if f.Num == 1 && f.Type == protowire.VarintType {
+			return max(0, int64(f.Varint))
 		}
-		b = b[n:]
-		if num == 1 && typ == protowire.VarintType {
-			v, m := protowire.ConsumeVarint(b)
-			if m < 0 {
-				return 0
-			}
-			return max(0, int64(v))
-		}
-		m := protowire.ConsumeFieldValue(num, typ, b)
-		if m < 0 {
-			return 0
-		}
-		b = b[m:]
 	}
 	return 0
-}
-
-func protoField(b []byte, num protowire.Number, typ protowire.Type) []byte {
-	for len(b) > 0 {
-		n, t, l := protowire.ConsumeTag(b)
-		if l < 0 {
-			return nil
-		}
-		b = b[l:]
-		if n == num && t == typ {
-			v, m := protowire.ConsumeBytes(b)
-			if m < 0 {
-				return nil
-			}
-			return v
-		}
-		m := protowire.ConsumeFieldValue(n, t, b)
-		if m < 0 {
-			return nil
-		}
-		b = b[m:]
-	}
-	return nil
 }
 
 func retryAfter(v string) time.Duration {

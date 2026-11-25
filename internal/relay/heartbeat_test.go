@@ -452,3 +452,22 @@ func TestOverlappingBeatsTakeHookLossesOneAtATime(t *testing.T) {
 		t.Fatal("two beats took hook losses at once")
 	}
 }
+
+// The relay hands HeartbeatSend the caller's ctx, never sendTimeout's: the sign-in's token,
+// had inside it, may wait on a refresh well past it, and HeartbeatSend bounds its own
+// request (#165).
+func TestHeartbeatSendGetsTheCallersContext(t *testing.T) {
+	t.Parallel()
+	bounded := true
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, HeartbeatEvery: time.Hour,
+		HeartbeatSend: func(ctx context.Context, _ *logspb.LogsData) error {
+			_, bounded = ctx.Deadline()
+			return nil
+		}})
+	if err := r.StopHeartbeat(context.Background(), semconv.TermaRelayExitReasonAsked); err != nil {
+		t.Fatal(err)
+	}
+	if bounded {
+		t.Fatal("HeartbeatSend was given sendTimeout's deadline; want the caller's ctx")
+	}
+}

@@ -519,3 +519,51 @@ func TestARetiredRefusalLeavesTheRelayIdle(t *testing.T) {
 		t.Fatalf("counters %v; want the route waiting for a sign-in, not retried", c)
 	}
 }
+
+// boundedSignIn is testSignIn recording which of its calls were given a deadline.
+type boundedSignIn struct {
+	testSignIn
+	bounded []string
+}
+
+func (s *boundedSignIn) Token(ctx context.Context, account string) (string, error) {
+	if _, ok := ctx.Deadline(); ok {
+		s.bounded = append(s.bounded, "Token")
+	}
+	return s.testSignIn.Token(ctx, account)
+}
+
+func (s *boundedSignIn) Refused(ctx context.Context, token string) {
+	if _, ok := ctx.Deadline(); ok {
+		s.bounded = append(s.bounded, "Refused")
+	}
+	s.testSignIn.Refused(ctx, token)
+}
+
+type roundTripper func(*http.Request) (*http.Response, error)
+
+func (f roundTripper) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
+
+// sendTimeout bounds the request alone: a refresh in Token or Refused may wait out another
+// process's lock and its own budget well past it, and must not leave the send expired (#165).
+func TestSendTimeoutBoundsOnlyTheRequest(t *testing.T) {
+	u := newSignInUpstream(t, http.StatusUnauthorized)
+	sig := &boundedSignIn{testSignIn: testSignIn{account: accountA}}
+	requestBounded := false
+	client := &http.Client{Transport: roundTripper(func(req *http.Request) (*http.Response, error) {
+		_, requestBounded = req.Context().Deadline()
+		return http.DefaultTransport.RoundTrip(req)
+	})}
+	r := newRelay(Options{Dir: t.TempDir(), Token: token, SignIn: sig, HTTP: client})
+	s := &sender{r: r, route: routeOf(accountA, claim.Claim{ProjectID: "p1"})}
+	out, _, detail, _ := s.send(context.Background(), Policy{Endpoint: u.srv.URL}, entry{signal: Logs}, oneLog("s"), nil)
+	if out != retry || len(sig.refused) != 1 {
+		t.Fatalf("send = %v %q, refused %v; want a retry after one refusal", out, detail, sig.refused)
+	}
+	if !requestBounded {
+		t.Fatal("the request was sent with no deadline")
+	}
+	if len(sig.bounded) != 0 {
+		t.Fatalf("%v given sendTimeout's deadline; want only the request bounded", sig.bounded)
+	}
+}

@@ -31,3 +31,61 @@ func TestStatusReason(t *testing.T) {
 		t.Fatalf("no reason: %q", got)
 	}
 }
+
+// WireFields reads each field in order with its value, and stops at the first it can't
+// read; WireBytes is the first length-delimited field of a number.
+func TestWireFields(t *testing.T) {
+	t.Parallel()
+	msg := protowire.AppendTag(nil, 1, protowire.VarintType)
+	msg = protowire.AppendVarint(msg, 300)
+	msg = protowire.AppendTag(msg, 2, protowire.Fixed32Type)
+	msg = protowire.AppendFixed32(msg, 9)
+	msg = protowire.AppendTag(msg, 3, protowire.BytesType)
+	msg = protowire.AppendString(msg, "first")
+	msg = protowire.AppendTag(msg, 3, protowire.BytesType)
+	msg = protowire.AppendString(msg, "second")
+	var got []WireField
+	for f := range WireFields(msg) {
+		got = append(got, f)
+	}
+	if len(got) != 4 || got[0].Varint != 300 || got[1].Type != protowire.Fixed32Type || string(got[2].Bytes) != "first" || string(got[3].Bytes) != "second" {
+		t.Fatalf("fields = %+v", got)
+	}
+	if b := WireBytes(msg, 3); string(b) != "first" {
+		t.Fatalf("WireBytes(3) = %q, want the first", b)
+	}
+	if b := WireBytes(msg, 4); b != nil {
+		t.Fatalf("WireBytes(4) = %q, want none", b)
+	}
+	// A field cut short ends the walk: the fields before it are read, it and what follows not.
+	cut := msg[:len(msg)-1]
+	n := 0
+	for range WireFields(cut) {
+		n++
+	}
+	if n != 3 {
+		t.Fatalf("read %d fields of a message cut short in its fourth, want 3", n)
+	}
+	short := protowire.AppendTag(nil, 3, protowire.BytesType)
+	short = protowire.AppendString(short, "second")
+	if b := WireBytes(short[:len(short)-1], 3); b != nil {
+		t.Fatalf("WireBytes read %q from a field cut short", b)
+	}
+	// A walk stopped early stops, and the same sequence walked again starts over.
+	seq := WireFields(msg)
+	for f := range seq {
+		if f.Num != 1 {
+			t.Fatalf("walked on to field %d after a break", f.Num)
+		}
+		break
+	}
+	for range 2 {
+		var again []WireField
+		for f := range seq {
+			again = append(again, f)
+		}
+		if len(again) != 4 || again[0].Varint != 300 || string(again[3].Bytes) != "second" {
+			t.Fatalf("a sequence walked again read %+v, want the four fields from the start", again)
+		}
+	}
+}

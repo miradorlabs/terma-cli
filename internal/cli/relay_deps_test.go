@@ -262,6 +262,14 @@ func TestAHeartbeatFollowsNoRedirect(t *testing.T) {
 	}
 }
 
+// A heartbeat's request is bounded on its own, since the relay leaves the sign-in's token
+// refresh before it unbounded by sendTimeout (#165).
+func TestAHeartbeatRequestIsBounded(t *testing.T) {
+	if heartbeatClient.Timeout <= 0 {
+		t.Fatal("a heartbeat's request has no timeout")
+	}
+}
+
 // What a person's token sends names that token's own user only: asked for another account
 // (one signed in, or out, since the token was had), it names no one.
 func TestAccountUserNamesOnlyTheTokensOwnUser(t *testing.T) {
