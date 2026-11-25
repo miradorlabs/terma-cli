@@ -6,7 +6,7 @@
 // OpenCode 1.19.6 sessions (testdata/PROVENANCE.md), through the OpenCode 1 entry.
 //
 // `bun test` in this folder.
-import { test, expect, beforeAll, afterAll, describe } from "bun:test"
+import { test, expect, beforeAll, afterAll, describe, setSystemTime } from "bun:test"
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, chmodSync, existsSync, rmSync, renameSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -203,19 +203,26 @@ async function replayProcess(r, records, items, { mcp }) {
   }
   let configs = 0
   const before = r.terma.calls().length
-  for (const { index, rec } of items) {
-    cursor = index
-    if (rec.kind === "event") {
-      await route(eventSession(rec)).event({ event: structuredClone(rec.data) })
-    } else if (rec.kind === "hook" && rec.name === "config") {
-      const cfg = mcp ? { mcp: Object.fromEntries(mcp.map((n) => [n, { type: "local", command: ["mcp"] }])) } : {}
-      await instances[Math.min(configs++, instances.length - 1)].hooks.config(cfg)
-    } else if (rec.kind === "hook" && rec.name !== "dispose") {
-      // tool.execute.after is not registered any more: calling nothing proves it.
-      await route(eventSession(rec))[rec.name]?.(structuredClone(rec.data.input), structuredClone(rec.data.output))
+  // The clock reads each record's own time while it is delivered: what the plugin stamps
+  // itself (a reach check made in a hook, a title) falls among the times OpenCode recorded,
+  // not hours after them.
+  try {
+    for (const { index, rec } of items) {
+      cursor = index
+      setSystemTime(new Date(rec.at))
+      if (rec.kind === "event") {
+        await route(eventSession(rec)).event({ event: structuredClone(rec.data) })
+      } else if (rec.kind === "hook" && rec.name === "config") {
+        const cfg = mcp ? { mcp: Object.fromEntries(mcp.map((n) => [n, { type: "local", command: ["mcp"] }])) } : {}
+        await instances[Math.min(configs++, instances.length - 1)].hooks.config(cfg)
+      } else if (rec.kind === "hook" && rec.name !== "dispose") {
+        await route(eventSession(rec))[rec.name]?.(structuredClone(rec.data.input), structuredClone(rec.data.output))
+      }
     }
+    for (const inst of instances) await inst.hooks.dispose()
+  } finally {
+    setSystemTime()
   }
-  for (const inst of instances) await inst.hooks.dispose()
   return { pid: items[0].rec.pid, warnings, hooks: r.terma.calls().slice(before) }
 }
 
@@ -444,6 +451,16 @@ test("07-patch: apply_patch names its files from the metadata", async () => {
   const edits = res.hooks.filter((c) => c.event === "opencode-file-edit")
   expect(edits.length).toBe(1)
   expect(edits[0].payload).toMatchObject({ tool: "apply_patch", tool_call_id: A(patch)["gen_ai.tool.call.id"], files: ["/home/user/work/oc-patch/notes.txt"] })
+  // Checked in tool.execute.after, once: the span ends when OpenCode said, but for the
+  // millisecond the check takes on the replay's clock, and nothing after it moves.
+  const checks = res.hooks.filter((c) => c.event === "opencode-tool-reach" && c.payload.tool === "apply_patch")
+  expect(checks.map((c) => c.payload.paths)).toEqual([["/home/user/work/oc-patch/notes.txt"]])
+  const part = endedToolParts(res.records).find((p) => p.tool === "apply_patch")
+  expect(endOf(patch) - part.state.time.end).toBeWithin(0, 2)
+  for (const m of completedAssistants(res.records)) {
+    const span = chats(res.spans).find((s) => A(s)["opencode.call.id"] === m.id)
+    if (span && m.time.completed) expect(endOf(span)).toBe(m.time.completed)
+  }
 }, REPLAY_TIMEOUT)
 
 test("09-subagent: the child names its parent everywhere", async () => {
@@ -1642,6 +1659,107 @@ test("a call checked only when its part arrives ends after its check; one checke
   await hooks.event(toolPart("ses_early", "msg_1", "c1", "read", done({ filePath: "/repo/a" }, "ok")))
   await hooks.dispose()
   expect(tools(r.spans()).map((s) => s.endTimeUnixNano)).toEqual([nanosOf(2200)])
+}, 15_000)
+
+const PATCH = { patchText: "*** Begin Patch" }
+const patchFiles = (...paths) => paths.map((filePath) => ({ filePath, relativePath: filePath, type: "update" }))
+const afterPatch = (hooks, sessionID, callID, files) =>
+  hooks["tool.execute.after"]({ tool: "apply_patch", sessionID, callID, args: PATCH }, { title: "Success", output: "Success", metadata: { files } })
+const reaches = (r) => r.terma.calls().filter((c) => c.event === "opencode-tool-reach" && c.payload.command !== FENCE)
+
+test("a patch is checked in tool.execute.after, once, and keeps its own end", async () => {
+  // A resumed session: its directory is known only once OpenCode answered for its record,
+  // and the patch's file is relative, so the check must wait for it.
+  const record = (id) => ({ id, directory: "/repo", version: "1.19.6", title: "A title", time: { created: 1000 } })
+  const { r, hooks } = await start({}, { client: fakeClient(record) })
+  const files = patchFiles("notes.txt")
+  await hooks["tool.execute.before"]({ tool: "apply_patch", sessionID: "ses_pa", callID: "c1" }, { args: PATCH })
+  await afterPatch(hooks, "ses_pa", "c1", files)
+  const checked = reaches(r).map((c) => c.payload)
+  // OpenCode sets the end once the hook returned.
+  const end = Date.now() + 50
+  await hooks.event(toolPart("ses_pa", "msg_1", "c1", "apply_patch", done(PATCH, "Success", { metadata: { files }, time: { start: 2100, end } })))
+  await hooks.dispose()
+  expect(checked).toEqual([{ session_id: "ses_pa", cwd: "/repo", tool: "apply_patch", paths: ["/repo/notes.txt"] }])
+  expect(reaches(r).length).toBe(1)
+  const [span] = tools(r.spans())
+  expect(span.endTimeUnixNano).toBe(nanosOf(end))
+  expect(span.startTimeUnixNano).toBe(nanosOf(2100))
+  expect(A(span)["opencode.tool.files"]).toEqual(["/repo/notes.txt"])
+})
+
+test("tool.execute.after holds the tool until its check is done; a part that ends earlier ends at the check", async () => {
+  const { r, hooks } = await start({}, { terma: { delayed: { "opencode-tool-reach": 0.3 } } })
+  await hooks.event(sessionCreated("ses_pw"))
+  const files = patchFiles("/repo/notes.txt")
+  await afterPatch(hooks, "ses_pw", "c1", files)
+  const finished = finishedAt(r.dir, "opencode-tool-reach")
+  expect(finished).toBeNumber()
+  // A build that set the end before the hook returned: the span ends after the check.
+  await hooks.event(toolPart("ses_pw", "msg_1", "c1", "apply_patch", done(PATCH, "Success", { metadata: { files } })))
+  await hooks.dispose()
+  expect(reaches(r).length).toBe(1)
+  const [span] = tools(r.spans())
+  expect(endOf(span)).toBeGreaterThan(finished)
+  expect(span.startTimeUnixNano).toBe(nanosOf(2100))
+}, 15_000)
+
+test("nothing the session sends after a check made after its tool ran ends before that check", async () => {
+  const { r, hooks } = await start({}, { terma: { delayed: { "opencode-tool-reach": 0.3 } } })
+  await hooks.event(sessionCreated("ses_fl"))
+  // A shell command the person ran: no hook saw it, so it is checked when its part arrives.
+  await hooks.event(toolPart("ses_fl", "msg_1", "c1", "bash", done({ command: "ls" }, "a\n")))
+  // A model call that overlapped the check, and one that ended after it.
+  await hooks.event(assistantDone("ses_fl", "msg_2", { time: { created: 2000, completed: 3000 } }))
+  const later = Date.now() + 60_000
+  await hooks.event(assistantDone("ses_fl", "msg_3", { time: { created: 2000, completed: later } }))
+  await hooks.dispose()
+  const finished = finishedAt(r.dir, "opencode-tool-reach")
+  const calls = Object.fromEntries(chats(r.spans()).map((s) => [A(s)["opencode.call.id"], s]))
+  expect(endOf(calls.msg_2)).toBeGreaterThan(finished)
+  expect(calls.msg_2.startTimeUnixNano).toBe(nanosOf(2000))
+  expect(endOf(calls.msg_3)).toBe(later)
+}, 15_000)
+
+test("a patch whose check fails in tool.execute.after exports nothing of it", async () => {
+  const { r, hooks } = await start({}, { terma: { fail: ["opencode-tool-reach"] } })
+  await hooks.event(sessionCreated("ses_pe"))
+  const files = patchFiles("/other/b.txt")
+  await afterPatch(hooks, "ses_pe", "c1", files)
+  expect(globalThis[KEY].tainted.has("ses_pe")).toBe(true)
+  await hooks.event(toolPart("ses_pe", "msg_1", "c1", "apply_patch", done(PATCH, "Success", { metadata: { files } })))
+  await hooks.event(assistantDone("ses_pe", "msg_1"))
+  await hooks.dispose()
+  expect(r.spans()).toEqual([])
+  expect(reaches(r).map((c) => c.payload.paths)).toEqual([["/other/b.txt"]])
+  expect(r.terma.calls().filter((c) => c.event === "opencode-file-edit")).toEqual([])
+})
+
+test("a call checked before it ran is not checked again in tool.execute.after", async () => {
+  const { r, hooks } = await start()
+  await hooks.event(sessionCreated("ses_ab"))
+  const calls = [
+    ["write", { filePath: "/repo/new.txt", content: "x" }],
+    ["edit", { filePath: "/repo/a.txt", oldString: "a", newString: "b" }],
+    ["read", { filePath: "/repo/a.txt" }],
+    ["bash", { command: "ls" }],
+  ]
+  for (const [i, [tool, args]] of calls.entries()) {
+    await hooks["tool.execute.before"]({ tool, sessionID: "ses_ab", callID: "c" + i }, { args })
+    await hooks["tool.execute.after"]({ tool, sessionID: "ses_ab", callID: "c" + i, args }, { title: "t", output: "ok", metadata: {} })
+  }
+  await hooks.dispose()
+  expect(reaches(r).map((c) => c.payload.tool)).toEqual(["write", "edit", "read", "bash"])
+})
+
+test("a call that reaches nothing does not wait in tool.execute.after", async () => {
+  const { r, hooks } = await start({}, { terma: { delayed: { "opencode-session-start": 0.5 } } })
+  await hooks.event(sessionCreated("ses_nw"))
+  const began = Date.now()
+  await hooks["tool.execute.after"]({ tool: "capture_echo", sessionID: "ses_nw", callID: "c1", args: { text: "x" } }, { title: "", output: "x", metadata: {} })
+  expect(Date.now() - began).toBeLessThan(250)
+  await hooks.dispose()
+  expect(reaches(r)).toEqual([])
 }, 15_000)
 
 test("an edit whose reach check fails exports nothing of it", async () => {

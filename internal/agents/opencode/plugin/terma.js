@@ -37,8 +37,11 @@ import { fileURLToPath } from "node:url"
 // - MISSING_RETRY_MS: a terma that could not be run is not tried again on every hook.
 // - RECORD_WAIT_MS: a session with no record is given up on (fails closed), not held forever.
 // - At exit: the hooks get HOOK_TIMEOUT_MS, the flush EXIT_FLUSH_MS, OpenCode 1's log LOG_SETTLE_MS.
-// - update() stamps what follows a move 1 ms after its claim, so none of it sorts before the claim;
-//   onToolPart1 ends a call checked only after it ran 1 ms after that check, for the same reason.
+// - update() stamps what follows a move 1 ms after its claim, so none of it sorts before the claim.
+// - A reach check made after its tool ran sets checkedAt 1 ms after it finished, and no model or
+//   tool call the session sends afterwards ends earlier. A patch is checked in tool.execute.after,
+//   which OpenCode waits for, so it keeps its own end; a call no hook saw is checked when its part
+//   arrives and ends at that check.
 
 // Bodies are bounded so a single reply or tool result cannot make an export enormous.
 const MAX_TEXT = 64 * 1024
@@ -94,6 +97,10 @@ const READ_ATTACHMENT = "Called the Read tool with the following input: "
 // The path an attached file is reach-checked under when its marker names no path terma can
 // use: two leading separators make it a reach terma cannot place.
 const UNPLACED_ATTACHMENT = "//attached-file/unplaced"
+// The shell command a session that failed closed sends as its reach: one terma cannot
+// follow, so the hook marks the run Mixed. OMP's extension (internal/agents/omp/terma-omp.ts)
+// sends the same one, and a test holds the two together.
+const REACH_FAILED_COMMAND = "eval $TERMA_REACH_FAILED"
 
 // --- state --------------------------------------------------------------------------
 
@@ -562,6 +569,7 @@ function newSession(id, owner) {
     directory: "",
     askedDirectory: "", // the directory most recently moved to, applied or still queued
     movedAt: 0, // when the last move's claim finished; nothing after it is stamped earlier
+    checkedAt: 0, // when the last reach check made after its tool ran finished; nothing after it ends earlier
     version: "",
     created: 0,
     title: "",
@@ -865,7 +873,7 @@ function call(s, c) {
     name: "chat " + str(c.model),
     kind: 3,
     startTimeUnixNano: nanos(c.start),
-    endTimeUnixNano: nanos(c.end),
+    endTimeUnixNano: nanos(endAfterCheck(s, c.end)),
     attributes: attrs({ ...a, ...common(s) }),
     status: c.error ? { code: 2 } : { code: 1 },
   })
@@ -903,7 +911,7 @@ function tool(s, t) {
     name: "execute_tool " + str(t.name),
     kind: 1,
     startTimeUnixNano: nanos(t.start),
-    endTimeUnixNano: nanos(t.end),
+    endTimeUnixNano: nanos(endAfterCheck(s, t.end)),
     attributes: attrs({ ...a, ...common(s) }),
     status: t.status === "completed" ? { code: 1 } : { code: 2 },
   })
@@ -912,6 +920,14 @@ function tool(s, t) {
   if (EDIT_TOOLS.has(t.name) && t.status === "completed" && files.length > 0) {
     runHook(s, "opencode-file-edit", { ...base(s), tool: t.name, tool_call_id: id, files })
   }
+}
+
+// endAfterCheck is a model or tool call's end, no earlier than the session's last reach
+// check made after its tool ran. The relay forwards a record that ends before the run went
+// Mixed, and a call that overlapped that check may carry what the checked call read or
+// wrote. When OpenCode waits for the check nothing overlaps it, and no time changes.
+function endAfterCheck(s, end) {
+  return s.checkedAt && num(end) !== undefined && end < s.checkedAt ? s.checkedAt : end
 }
 
 // prompt is one prompt: p = { messageID, text, agent?, model?, provider?, time? }. No
@@ -993,6 +1009,11 @@ async function shutdown(owner) {
 }
 
 // --- reach --------------------------------------------------------------------------
+//
+// A read, search, list, shell command, write or edit is checked before it runs, in
+// tool.execute.before, which the tool waits for. A patch is checked in tool.execute.after,
+// which OpenCode waits for before it hands the result on. Only a call no hook saw is
+// checked when its part arrives.
 
 // Each major's name for a tool that reads, changes or runs something, mapped to one
 // vocabulary. An edit is checked on the file it changes, as a read is on the file it reads.
@@ -1061,7 +1082,7 @@ async function guardReach(s, reach) {
 function fence(s) {
   if (s.fenced || s.fencing || termaMissing()) return
   s.fencing = true
-  runHook(s, "opencode-tool-reach", { ...base(s), tool: "bash", command: "eval $TERMA_REACH_FAILED" }).then((ok) => {
+  runHook(s, "opencode-tool-reach", { ...base(s), tool: "bash", command: REACH_FAILED_COMMAND }).then((ok) => {
     s.fencing = false
     if (ok) s.fenced = true
   })
@@ -1079,6 +1100,15 @@ function recordOf(info) {
     created: num(info.time?.created) ?? 0,
     title: str(info.title),
   }
+}
+
+// reachOf1 is what a completed OpenCode 1 call reached: what its arguments name, or for
+// an edit, the files it changed (a patch's are known only once it ran). Null if nothing.
+function reachOf1(s, tool, input, metadata) {
+  const reach = toolReach(tool, input)
+  if (reach || !EDIT_TOOLS.has(tool)) return reach
+  const files = filesOf1(s, tool, { input, metadata })
+  return files.length > 0 ? { tool, paths: files } : null
 }
 
 // The files a file tool read or changed, absolute.
@@ -1205,13 +1235,9 @@ async function onToolPart1(s, part, servers) {
   if (st.time?.compacted) return
   if (s.messages.get(part.messageID)?.copied) return
   if (num(st.time?.end) !== undefined && st.time.end < s.created) return
-  // The call may have reached something the guard before it did not see; check again. A
-  // patch's files are only known once it ran.
-  let reach = toolReach(part.tool, st.input)
-  if (!reach && EDIT_TOOLS.has(part.tool)) {
-    const files = filesOf1(s, part.tool, st)
-    if (files.length > 0) reach = { tool: part.tool, paths: files }
-  }
+  // A call no hook saw (a shell command the person runs, a call finished in an earlier
+  // process) is checked now; one checked before or after it ran is not checked again.
+  const reach = reachOf1(s, part.tool, st.input, st.metadata)
   const guarded = s.guarded.get(part.callID)
   s.guarded.delete(part.callID)
   let end = num(st.time?.end)
@@ -1219,7 +1245,8 @@ async function onToolPart1(s, part, servers) {
     if (!(await guardReach(s, reach))) return
     // The relay judges a record by its time: a call checked only after it ran must not end
     // before its check. A millisecond later, since terma's clock has a finer grain.
-    end = Math.max(end ?? 0, Date.now() + 1)
+    s.checkedAt = Date.now() + 1
+    end = Math.max(end ?? 0, s.checkedAt)
   }
   if (isTainted(s)) return
   let status = "completed"
@@ -1454,6 +1481,29 @@ async function server(input) {
       if (!reach) return
       remember(s.guarded, inp.callID, { reachKey: JSON.stringify(reach) }, MAX_SMALL)
       await run(s, () => guardReach(s, reach))
+    }),
+
+    // The guard for what a call is known to reach only once it ran (a patch's files):
+    // OpenCode waits for this hook before it hands the result on, sets the call's end and
+    // starts the next model step, so nothing that saw the result ends before the check.
+    "tool.execute.after": guard(async (inp, out) => {
+      const s = see(inp?.sessionID)
+      if (!s || typeof inp?.callID !== "string") return
+      const callID = inp.callID
+      // A call that reaches nothing, or that was checked before it ran, does not wait.
+      const before = toolReach(inp.tool, inp.args)
+      if (before ? s.guarded.get(callID)?.reachKey === JSON.stringify(before) : !EDIT_TOOLS.has(inp.tool)) return
+      // In the queue: a relative path resolves against the session's directory, known once
+      // its first sight has run.
+      await run(s, async () => {
+        const reach = reachOf1(s, inp.tool, inp.args, out?.metadata)
+        if (!reach) return
+        const reachKey = JSON.stringify(reach)
+        if (s.guarded.get(callID)?.reachKey === reachKey) return
+        if (!(await guardReach(s, reach))) return
+        s.checkedAt = Date.now() + 1 // strictly after the check, never the same millisecond
+        remember(s.guarded, callID, { reachKey }, MAX_SMALL)
+      })
     }),
 
     dispose: guard(async () => {

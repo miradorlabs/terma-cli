@@ -211,6 +211,20 @@ func TestOpenCodeUnplacedAttachmentMarksTheRunMixed(t *testing.T) {
 	if why := runs.Read(stateDir, sid).Why(now.Add(time.Minute)); why.Reason != runs.UnknownReach {
 		t.Fatalf("Mixed reason = %q (%+v); want %q", why.Reason, why, runs.UnknownReach)
 	}
+
+	// What the plugin sends for a session it dropped after a failed reach check: a shell
+	// reach terma cannot follow, which marks that run Mixed too, so doctor names it.
+	const dropped = "ses_dropped_oc"
+	if err := events["opencode-session-start"](ctx, env(`{"session_id":"`+dropped+`","cwd":`+strconv.Quote(repo)+`}`)); err != nil {
+		t.Fatal(err)
+	}
+	body, _ = json.Marshal(map[string]any{"session_id": dropped, "cwd": repo, "tool": "bash", "command": "eval $TERMA_REACH_FAILED"})
+	if err := events["opencode-tool-reach"](ctx, env(string(body))); err != nil {
+		t.Fatal(err)
+	}
+	if why := runs.Read(stateDir, dropped).Why(now.Add(time.Minute)); why.Reason != runs.UnknownReach {
+		t.Fatalf("a dropped session's run: Mixed reason = %q (%+v); want %q", why.Reason, why, runs.UnknownReach)
+	}
 }
 
 func TestOpenCodeRefreshConnectDisconnectConcurrentLockSafety(t *testing.T) {
