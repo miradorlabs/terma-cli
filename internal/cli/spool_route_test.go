@@ -81,7 +81,7 @@ func serverKeyProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
-		p.ServerKeySignIn, p.ServerKeyAuthURL = true, cfg.AuthURL
+		p.SetServerKeySignIn(true, cfg.AuthURL)
 	}); err != nil {
 		t.Fatal(err)
 	}

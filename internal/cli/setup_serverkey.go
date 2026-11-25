@@ -225,5 +225,5 @@ func applyServerKey(p *config.Profile, cfg *config.Config) {
 		p.TeamName = ""
 	}
 	p.Team = cfg.Team
-	p.ServerKeySignIn, p.ServerKeyAuthURL = true, cfg.AuthURL
+	p.SetServerKeySignIn(true, cfg.AuthURL)
 }

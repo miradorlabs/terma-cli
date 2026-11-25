@@ -118,12 +118,13 @@ func sameFiles(was, now [2]os.FileInfo) bool {
 	return unchanged(was[0], now[0]) && unchanged(was[1], now[1])
 }
 
-// readAccount reads the profile's mode and pairing, then its sign-in, with the sign-in's
-// generation. A profile whose mode can't be read may be a server key's, which keeps an
-// earlier person's sign-in on disk, or a person's: neither's, so the unreadable account. A
-// server key's lane carries the generation of the sign-in kept behind it, which a switch
-// between the key and a person leaves as it is: there the lane itself tells the change. A
-// sign-in or sign-out behind the key bumps it all the same, so an export's retry that
+// readAccount reads the profile's mode and pairing, then its sign-in, with the generation
+// of the lane: the sign-in's (auth.Credential.Generation) plus the profile's switches
+// between the server key and a person (config.Profile.ServerKeyGeneration). Each only
+// grows, so the sum moves whenever either does: a switch to another person, to the key or
+// back. A profile whose mode can't be read may be a server key's, which keeps an earlier
+// person's sign-in on disk, or a person's: neither's, so the unreadable account. A sign-in
+// or sign-out behind the key moves the generation all the same, so an export's retry that
 // meets one is lost, though its lane is the key's throughout.
 func (s *signInSource) readAccount() (string, uint64) {
 	file, err := config.LoadFile(s.cfg.Dir)
@@ -136,13 +137,13 @@ func (s *signInSource) readAccount() (string, uint64) {
 	}
 	if p.ServerKeySignIn {
 		_, gen := auth.AccountAt(s.cfg.Dir, s.cfg.ProfileName)
-		return sendas.NoPersonLane, gen
+		return sendas.NoPersonLane, gen + p.ServerKeyGeneration
 	}
 	if s.betweenReads != nil {
 		s.betweenReads()
 	}
 	account, gen := auth.AccountAt(s.cfg.Dir, s.cfg.ProfileName)
-	return pairedLane(account, p.Account), gen
+	return pairedLane(account, p.Account), gen + p.ServerKeyGeneration
 }
 
 func statOrNil(path string) os.FileInfo {

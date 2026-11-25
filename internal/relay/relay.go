@@ -69,10 +69,10 @@ var ErrNoKey = errors.New("no key for this team on this machine")
 // whose what arrives is (arrivalLane).
 type SignIn interface {
 	sendas.SignIn
-	// Lane is Account with the generation of the sign-in it read
-	// (auth.Credential.Generation), both from one read: each change of whose sign-in it is
-	// bumps the generation, so one account read at two generations may have been another's
-	// in between.
+	// Lane is Account with the generation of the lane it read (auth.Credential.Generation
+	// with config.Profile.ServerKeyGeneration), both from one read: each change of whose
+	// lane it is, to another person or between a person and a server key, bumps the
+	// generation, so one account read at two generations may have been another's in between.
 	Lane() (account string, generation uint64)
 }
 

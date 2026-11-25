@@ -33,10 +33,10 @@ const (
 // rotation rewrites it, so it may end only on the lane last read when the export arrived,
 // at the same generation of the sign-in, and only if no read since changed either
 // (laneState: taken together at the start). A rotation leaves the generation; any change of
-// whose sign-in it is bumps it, in the same write, so a switch to B and back to A that no
-// export read still reads as A at another generation. One that reads as another lane or
-// generation, or the same once another export read another meanwhile (a switch between a
-// person and a server key, which leaves the generation), was a switch, and what arrived
+// whose lane it is bumps it, in the same write, so a switch to B and back to A, or to a
+// server key and back to A, that no export read still reads as A at another generation.
+// One that reads as another lane or generation, or the same once another export read
+// another meanwhile, was a switch, and what arrived
 // during it may be either's, so it is lost, as unreadable. A relay that has read no lane
 // yet (none was readable when it started, nor since) has nothing to tell a switch by, and
 // takes what the retry reads, unless a read meanwhile found one: losing every export a
@@ -89,8 +89,8 @@ func (r *Relay) arrivalLane(ctx context.Context) (lane, lost string) {
 // it waited, even back to what they were (arrivalLane). The sign-in is read outside mu, so
 // reads finish in any order: each takes a ticket before it reads, and only one newer than
 // every read applied so far moves the lane, so a stale read never moves it back. Reads are
-// ordered by ticket, not by generation: a switch between a person and a server key leaves
-// the generation, and a terma that drops it from the file starts it again at 0.
+// ordered by ticket, not by generation: a terma that drops the generation from its file
+// starts it again at 0.
 type laneState struct {
 	mu      sync.Mutex
 	last    string

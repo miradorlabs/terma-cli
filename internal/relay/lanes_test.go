@@ -600,6 +600,25 @@ func TestASwitchAndBackNoExportReadLosesTheExport(t *testing.T) {
 	}
 }
 
+// A switch from A to a server key and back to A that no export reads, written as an export
+// arrives, reads at the retry as A at another generation: the export may be the key's, so it
+// is lost, never credited to A.
+func TestAServerKeyRoundTripNoExportReadLosesTheExport(t *testing.T) {
+	t.Parallel()
+	signIn := &rewrittenSignIn{testSignIn: testSignIn{}}
+	signIn.set(accountA)
+	r, srv := rewriteRelay(t, signIn)
+	postProto(t, srv, "/v1/logs", logsOf("first", 1))
+	signIn.rewrite(sendas.NoPersonLane, 0)
+	signIn.rewrite(accountA, 2*unreadablePoll)
+	postProto(t, srv, "/v1/logs", logsOf("second", 1))
+	inA, unreadable := laneParts(t, r, accountA)
+	inKey, _ := laneParts(t, r, sendas.NoPersonLane)
+	if inA != 1 || inKey != 0 || unreadable != 1 {
+		t.Fatalf("A's lane holds %d parts, the key's %d, %d lost unreadable; want the first A's and the second lost", inA, inKey, unreadable)
+	}
+}
+
 // exportAsync posts m to srv's logs endpoint in the background, sending on the channel
 // returned its error, or nil once it is answered 200.
 func exportAsync(srv *httptest.Server, m proto.Message) <-chan error {

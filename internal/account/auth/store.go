@@ -70,9 +70,8 @@ type Credential struct {
 	// so a profile signed in again under the same name carries on from it. A reader takes it
 	// with the account, from one read of the file (AccountAt), so the relay can tell a
 	// sign-in that changed and changed back from one that never changed (relay's
-	// arrivalLane). A switch between a server key and a person writes config.json alone, so
-	// it leaves the generation: the lane tells that change, but not a switch to the key and
-	// back to the same person that no read saw.
+	// arrivalLane). A switch between a server key and a person writes config.json alone and
+	// leaves it: config.Profile.ServerKeyGeneration counts those.
 	Generation uint64 `json:"generation,omitempty"`
 }
 

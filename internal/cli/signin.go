@@ -363,7 +363,7 @@ func applyLogin(p *config.Profile, cfg *config.Config, account string) {
 	}
 	p.Account = account
 	p.PinEnvironment(cfg.Environment)
-	p.ServerKeySignIn, p.ServerKeyAuthURL = false, ""
+	p.SetServerKeySignIn(false, "")
 }
 
 func waitForBrowserEnter(cmd *cobra.Command) error {

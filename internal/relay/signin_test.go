@@ -44,15 +44,14 @@ func (s *testSignIn) set(account string) {
 }
 
 // setLocked makes the sign-in read as account, bumping the generation when it is another
-// person's sign-in written than the last, or none: a sign-in that can't be read writes
-// nothing, and a switch to or from a server key writes config.json, not the sign-in. s.mu
-// is held.
+// lane written than the last: another person's, none, or a server key's (whose switches
+// config.json counts). A sign-in that can't be read writes nothing. s.mu is held.
 func (s *testSignIn) setLocked(account string) {
-	if s.gen == 0 && s.account != sendas.AccountUnreadable && s.account != sendas.NoPersonLane {
-		s.written = s.account // the sign-in it was made with
+	if s.gen == 0 && s.account != sendas.AccountUnreadable {
+		s.written = s.account // the lane it was made with
 	}
 	s.account = account
-	if account != sendas.AccountUnreadable && account != sendas.NoPersonLane && account != s.written {
+	if account != sendas.AccountUnreadable && account != s.written {
 		s.written = account
 		s.gen++
 	}
