@@ -62,7 +62,7 @@
     },
     "knowledge_cutoff": {
       "anthropic-docs": "2025-01",
-      "models.dev": "2025-07-31",
+      "models.dev": "2025-01-31",
       "openrouter": "2025-01-31"
     },
     "max_output": {
@@ -129,7 +129,6 @@
     }
   },
   "disagreements": [
-    "knowledge_cutoff",
     "context_window"
   ],
   "sources": {
@@ -411,8 +410,8 @@
       "name": "GitHub Copilot CLI",
       "role": "default",
       "first": "1.0.105",
-      "last": "1.0.115",
-      "builds": 11,
+      "last": "1.0.116",
+      "builds": 12,
       "current": true,
       "params": {
         "temperature": 1,

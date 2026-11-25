@@ -133,7 +133,7 @@
     },
     "released_at": {
       "google-docs": "2025-07-22",
-      "models.dev": "2025-06-17"
+      "models.dev": "2025-07-22"
     },
     "sampling_parameters": {
       "models.dev": true
@@ -165,7 +165,6 @@
   },
   "disagreements": [
     "name",
-    "released_at",
     "max_output"
   ],
   "sources": {
