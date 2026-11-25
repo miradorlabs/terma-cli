@@ -178,19 +178,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [claude, codex-a, codex-b, copilot, others]
+        shard: [claude, codex-a, codex-b, copilot, opencode, others]
     env:
       # TestRelay* is the local relay: the same harnesses exporting globally through
       # `terma relay run`, and nothing but the claimed session reaching the receiver.
       # TestMachineHooks* is where setup's machine-wide hooks record: beside a
       # repository's own, in the repositories the team admits. TestDesktopGrant is Terma
       # Desktop signing the CLI in over its stdin.
-      E2E_TESTS: '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestMachineHooks.*|TestPi.*|TestOmp.*|TestGrok.*|TestGemini.*|TestDsh.*|TestHermes.*|TestCopilot.*|TestDesktopGrant)$'
+      E2E_TESTS: '^(TestClaudeTelemetry|TestCodexTelemetry|TestClaudeStopFailureDelivery|TestRelay.*|TestMachineHooks.*|TestPi.*|TestOmp.*|TestOpenCode.*|TestGrok.*|TestGemini.*|TestDsh.*|TestHermes.*|TestCopilot.*|TestDesktopGrant)$'
       TERMA_ENV: dev
       TERMA_E2E: "1"
       TERMA_E2E_CLAUDE_VERSIONS: "2.1.283"
       TERMA_E2E_CODEX_VERSIONS: "0.158.0"
-      TERMA_E2E_OPENCODE_VERSIONS: "1.18.33"
+      # OpenCode's oldest supported build (internal/agents/opencode/minimum_version.go) and its latest 1.x.
+      TERMA_E2E_OPENCODE_VERSIONS: "1.16.0,1.19.6"
       TERMA_E2E_GEMINI_VERSIONS: "0.62.0"
       TERMA_E2E_DSH_VERSIONS: "0.2.0-rc.2"
       TERMA_E2E_COPILOT_VERSIONS: "1.0.96"
@@ -244,9 +245,10 @@ jobs:
             cat test/e2e/report/latest.md >> "$GITHUB_STEP_SUMMARY"
           fi
 
-  # The OpenCode plugin is ~450 lines of JavaScript that writes into a user's
-  # plugin directory and ships in the release archives. `make test-plugin` skips it
-  # wherever bun is absent, so CI is where it is actually run.
+  # The OpenCode plugin is about 1,200 lines of JavaScript, one file for OpenCode 1 and 2,
+  # that setup writes into the user's plugins directory and that ships in the release
+  # archives. `make test-plugin` skips it wherever bun is absent, so CI is where it is
+  # actually run.
   opencode-plugin:
     runs-on: blacksmith-2vcpu-ubuntu-2404
     defaults:
