@@ -208,26 +208,23 @@ func (h highlighter) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
-// logoLines renders Terma's 2x2 mark inside a compact rounded frame: each square occupies a
-// single row (2 columns wide, ~1:1 in monospace cells) so terminal line-height never stripes
-// a tile, and plain output uses shaded blocks so the diagonal mark stays legible without colour.
+// logoLines renders the logo's four rounded squares; a cell is twice as tall as wide,
+// so each six-column tile takes three rows.
 func logoLines(p Palette) (lines []string, width int) {
-	solid := p.Brand("██")
-	faded := p.BrandMuted("██")
-	if !p.enabled {
-		faded = "▒▒"
+	tile := []string{"▄████▄", "██████", "▀████▀"}
+	const gap = "  "
+	for _, row := range tile {
+		lines = append(lines, p.Brand(row)+gap+p.Dim(p.Brand(row)))
 	}
-	bar := p.Dim("│")
-	lines = []string{
-		p.Dim("╭───────╮"),
-		bar + " " + solid + " " + faded + " " + bar,
-		bar + " " + faded + " " + solid + " " + bar,
-		p.Dim("╰───────╯"),
+	width = 2*utf8.RuneCountInString(tile[0]) + len(gap)
+	lines = append(lines, strings.Repeat(" ", width))
+	for _, row := range tile {
+		lines = append(lines, p.Dim(p.Brand(row))+gap+p.Brand(row))
 	}
-	return lines, 9
+	return lines, width
 }
 
-// Header draws the logo with info aligned to its right, or beneath it on a narrow terminal.
+// Header draws the logo with info centred to its right, or beneath it on a narrow terminal.
 func Header(p Palette, info []string) string {
 	lines, w := logoLines(p)
 	widest := 0
@@ -242,7 +239,7 @@ func Header(p Palette, info []string) string {
 	var b strings.Builder
 	b.WriteByte('\n')
 	if sideBySide {
-		start := max((len(lines)-len(info)+1)/2, 0)
+		start := max((len(lines)-len(info))/2, 0)
 		for r, l := range lines {
 			b.WriteString("  ")
 			b.WriteString(l)
