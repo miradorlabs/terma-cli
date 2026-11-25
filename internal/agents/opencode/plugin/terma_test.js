@@ -10,6 +10,7 @@ import { test, expect, beforeAll, afterAll, describe } from "bun:test"
 import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, chmodSync, existsSync, rmSync, renameSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { execFileSync } from "node:child_process"
 
 const KEY = Symbol.for("terma.opencode.state/1")
 const SOURCE = readFileSync(join(import.meta.dir, "terma.js"), "utf8")
@@ -1453,3 +1454,47 @@ test("a reach check that finds terma gone gives only the cannot-run warning", as
   expect(globalThis[KEY].tainted.has("ses_gone")).toBe(true)
   expect(warnings.map((w) => w.message)).toEqual([`terma: cannot run ${r.terma.argv[0]} (ENOENT). OpenCode sessions are not recorded until "terma setup" is run again.`])
 })
+
+test("terma's hooks run in a process group of their own: OpenCode 2 signals a tool step's group when the step ends", async () => {
+  // Seen on OpenCode 2.0.0 and 2.4.1: when a tool step ends, OpenCode sends SIGTERM to the
+  // process group it ran in, and a hook the plugin had just started for that step (the
+  // file edit, the idle hook that starts the flush) died with it unless it was quick.
+  const dir = mkdtempSync(join(root, "pgid-"))
+  const hook = join(dir, "terma")
+  writeFileSync(hook, `#!/bin/sh\ncat > /dev/null\nps -o pgid= -p $$ | tr -d ' ' > '${dir}/'"$2".pgid\n`)
+  chmodSync(hook, 0o700)
+  const { hooks } = await start({ hookCommand: [hook, "hook"] })
+  await hooks.event(sessionCreated("ses_pg"))
+  await hooks["chat.message"]({ sessionID: "ses_pg" }, { message: { id: "msg_u" }, parts: [{ type: "text", text: "hi" }] })
+  await hooks.dispose()
+  const mine = execFileSync("ps", ["-o", "pgid=", "-p", String(process.pid)]).toString().trim()
+  for (const event of ["opencode-session-start", "opencode-prompt"]) {
+    const theirs = readFileSync(join(dir, event + ".pgid"), "utf8").trim()
+    expect(theirs).not.toBe("")
+    expect(theirs).not.toBe(mine)
+  }
+})
+
+test("a hook that runs past its limit is ended with the processes it started", async () => {
+  // The hook starts a child and waits for it: ending the hook alone would leave the child.
+  const dir = mkdtempSync(join(root, "kill-"))
+  const hook = join(dir, "terma")
+  writeFileSync(hook, `#!/bin/sh\ncat > /dev/null\nsleep 30 &\necho $! > '${dir}/child.pid'\nwait\n`)
+  chmodSync(hook, 0o700)
+  const alive = (pid) => {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch {
+      return false
+    }
+  }
+  const { hooks } = await start({ hookCommand: [hook, "hook"] })
+  await hooks.event(sessionCreated("ses_kill"))
+  await Promise.all([...globalThis[KEY].sessions.values()].map((s) => s.queue))
+  const pid = Number(readFileSync(join(dir, "child.pid"), "utf8"))
+  expect(pid).toBeGreaterThan(1)
+  for (let i = 0; i < 100 && alive(pid); i++) await Bun.sleep(10)
+  expect(alive(pid)).toBe(false)
+  await hooks.dispose()
+}, 15_000)

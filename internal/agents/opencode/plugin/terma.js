@@ -448,7 +448,14 @@ function spawnHook(argv, event, payload) {
         resolveExit()
       }
     }
+    // The hook leads a process group of its own, so the group is signalled: a child of the
+    // hook (git) ends with it. Where a group cannot be signalled, the hook alone is.
     const sendKill = (sig) => {
+      try {
+        if (child.pid > 1) return void process.kill(-child.pid, sig)
+      } catch (err) {
+        if (err?.code === "ESRCH") return markExited()
+      }
       try {
         child.kill(sig)
       } catch (err) {
@@ -470,7 +477,10 @@ function spawnHook(argv, event, payload) {
     }, HOOK_TIMEOUT_MS)
     timer.unref?.()
     try {
-      child = spawn(argv[0], [...argv.slice(1), event], { stdio: ["pipe", "ignore", "ignore"] })
+      // In a process group of its own: OpenCode 2 signals the group a tool step ran in when
+      // the step ends, which killed a hook started for that step (a file edit, the idle
+      // hook that starts the flush) wherever terma took longer than that to start.
+      child = spawn(argv[0], [...argv.slice(1), event], { stdio: ["pipe", "ignore", "ignore"], detached: true })
       child.on("spawn", termaFound)
       child.on("error", (err) => {
         if (err?.code === "ENOENT" || err?.code === "EACCES") termaLost(argv[0], err.code)
