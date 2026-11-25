@@ -686,18 +686,21 @@ function call(s, c) {
     "opencode.agent": c.agent,
     "opencode.compaction.reason": c.compactionReason,
   }
+  // A failed call reports what it was billed, and nothing where it was billed nothing:
+  // OpenCode gives a call that never reached the model zeros, which are not a usage.
+  const used = c.error ? (v) => (num(v) > 0 ? v : undefined) : num
+  const t = c.tokens ?? {}
+  a["gen_ai.usage.input_tokens"] = used(t.input)
+  a["gen_ai.usage.output_tokens"] = used(t.output)
+  a["opencode.usage.reasoning_tokens"] = used(t.reasoning)
+  a["gen_ai.usage.cache_read.input_tokens"] = used(t.cacheRead)
+  a["gen_ai.usage.cache_write.input_tokens"] = used(t.cacheWrite)
+  a["gen_ai.usage.total_cost"] = used(c.cost)
   if (c.error) {
     a["error.type"] = c.error.type
     // A provider's error can quote a prompt or a tool's arguments.
     if (p.includePrompts && p.includeToolContent) a["opencode.error.message"] = truncate(str(c.error.message), MAX_ERROR)
   } else {
-    const t = c.tokens ?? {}
-    a["gen_ai.usage.input_tokens"] = num(t.input)
-    a["gen_ai.usage.output_tokens"] = num(t.output)
-    a["opencode.usage.reasoning_tokens"] = num(t.reasoning)
-    a["gen_ai.usage.cache_read.input_tokens"] = num(t.cacheRead)
-    a["gen_ai.usage.cache_write.input_tokens"] = num(t.cacheWrite)
-    a["gen_ai.usage.total_cost"] = num(c.cost)
     a["gen_ai.response.finish_reasons"] = typeof c.finish === "string" ? c.finish : undefined
     const text = str(c.text)
     if (text) {

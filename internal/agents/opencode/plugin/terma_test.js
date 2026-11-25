@@ -637,6 +637,28 @@ test("a reply in two text parts is both, joined by a blank line", async () => {
   expect(A(calls[0])["opencode.completion.length"]).toBe(13)
 })
 
+test("a failed call keeps what it was billed, and sends no usage when it was billed nothing", async () => {
+  const { r, hooks } = await start()
+  await hooks.event(sessionCreated("ses_t"))
+  const error = { name: "APIError", data: { message: "stopped" } }
+  await hooks.event(assistantDone("ses_t", "msg_billed", { error, finish: undefined }))
+  await hooks.event(
+    assistantDone("ses_t", "msg_free", { error, finish: undefined, cost: 0, tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } } }),
+  )
+  await hooks.dispose()
+  const byID = Object.fromEntries(chats(r.spans()).map((s) => [A(s)["opencode.call.id"], s]))
+  const billed = A(byID.msg_billed)
+  expect(byID.msg_billed.status).toEqual({ code: 2 })
+  expect(billed["gen_ai.usage.input_tokens"]).toBe(1)
+  expect(billed["gen_ai.usage.output_tokens"]).toBe(2)
+  expect(billed["opencode.usage.reasoning_tokens"]).toBe(3)
+  expect(billed["gen_ai.usage.cache_read.input_tokens"]).toBe(4)
+  expect(billed["gen_ai.usage.cache_write.input_tokens"]).toBe(5)
+  expect(billed["gen_ai.usage.total_cost"]).toBe(0.01)
+  expect(billed["gen_ai.response.finish_reasons"]).toBeUndefined()
+  expect(Object.keys(A(byID.msg_free)).filter((k) => k.includes("usage"))).toEqual([])
+})
+
 test("a provider that reuses a call id in two messages gives two tool spans", async () => {
   const { r, hooks } = await start()
   await hooks.event(sessionCreated("ses_d"))
