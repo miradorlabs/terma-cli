@@ -57,12 +57,6 @@ type opencodeConfig struct {
 	IncludeToolContent bool              `json:"includeToolContent"`
 	ResourceAttributes map[string]string `json:"resourceAttributes,omitempty"`
 	HookCommand        []string          `json:"hookCommand,omitempty"`
-	// PerRepo resolves each session's project from its repository's binding and its key
-	// from HelpersDir/<HelperPrefix><projectID>, stamped on ProjectAttribute.
-	PerRepo          bool   `json:"perRepo,omitempty"`
-	HelpersDir       string `json:"helpersDir,omitempty"`
-	HelperPrefix     string `json:"helperPrefix,omitempty"`
-	ProjectAttribute string `json:"projectAttribute,omitempty"`
 }
 
 // opencodePolicy is the repository-scope file: what a repository may decide. Content is not
