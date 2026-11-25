@@ -41,13 +41,21 @@ func (app *App) chooseHarnesses(cmd *cobra.Command, cfg *config.Config, f setupF
 	for _, n := range app.detectedAgents(ctx) {
 		preselect[n] = true
 	}
-	if f.assumeYes || !canPrompt() {
+	canAsk := app.canAsk
+	if canAsk == nil {
+		canAsk = canPrompt
+	}
+	if f.assumeYes || !canAsk() {
 		return app.selectedInRegistryOrder(preselect), nil
 	}
 
 	fmt.Fprintln(cmd.OutOrStdout())
 	form := app.harnessSelectionForm(ctx, preselect)
-	result, err := prompt.Run(form)
+	run := app.runForm
+	if run == nil {
+		run = prompt.Run
+	}
+	result, err := run(form)
 	if errors.Is(err, prompt.ErrCancelled) {
 		return nil, errCancelled
 	}

@@ -172,6 +172,7 @@ func TestSetupWarnsWhenTheTeamListsNoRepositories(t *testing.T) {
 // policy does not exist yet and who sets it up, not that the team lists no repositories.
 func TestSetupAndDoctorSayWhenTheTeamHasNoPolicy(t *testing.T) {
 	gateway := newFakeAuth(t)
+	gateway.orgs = []organization{orgB()}
 	gateway.policyBody = `{}`
 	authSandbox(t, gateway)
 	sandboxMachine(t)
@@ -210,6 +211,7 @@ func TestSetupAndDoctorSayWhenTheTeamHasNoPolicy(t *testing.T) {
 // repository under its owner, and keeps it marked so hooks and the relay admit by it.
 func TestSetupReadsAWildcardPolicy(t *testing.T) {
 	gateway := newFakeAuth(t)
+	gateway.orgs = []organization{orgB()}
 	gateway.policyBody = `{"policy":{"version":"2.0","terma":{"capture":{"exclude_prompts":false,"exclude_tool_content":false},"git_hooks":true,"per_repository":{"repositories":["github.com/Acme/*","github.com/other/api"]}}},"revision":4,"updated_at":"2026-11-19T00:00:00Z"}`
 	authSandbox(t, gateway)
 	sandboxMachine(t)

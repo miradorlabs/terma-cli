@@ -12,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
@@ -89,6 +90,125 @@ func (u *setupUI) policyFetched(team string, pol config.Policy) {
 	if doctor.GitHooksOff(pol, time.Now()) {
 		u.Then(doctor.GitHooksOffStep)
 	}
+}
+
+// teamsConfigured summarizes multiple enrolled teams/organizations and what their
+// policies actively collect across the machine.
+func (u *setupUI) teamsConfigured(orgs []organization, teams []discoveredTeam, state routing.State) {
+	if len(orgs) > 1 {
+		u.Summary("Organizations", strings.Join(orgNamesList(orgs), ", "))
+	}
+	multiOrg := len(orgs) > 1
+	labels := make([]string, 0, len(teams))
+	var repos []string
+	hasPersonal := false
+	anyAdmits := false
+	gitHooksOff := false
+	now := time.Now()
+	for _, dt := range teams {
+		if multiOrg {
+			labels = append(labels, orgTeamLabel(dt.orgName, dt.teamName))
+		} else {
+			labels = append(labels, dt.teamName)
+		}
+		pol := dt.team.Policy
+		if dt.team.Personal && pol.Global() {
+			hasPersonal = true
+			anyAdmits = true
+		} else if !pol.AdmitsNone() {
+			anyAdmits = true
+			for _, r := range pol.Repositories {
+				if entryBoundToOrg(state, r, pol.Wildcards, dt.team.OrganizationID) {
+					repos = appendUnique(repos, r)
+				}
+			}
+		}
+		if !pol.AdmitsNone() && doctor.GitHooksOff(pol, now) {
+			gitHooksOff = true
+		}
+	}
+	u.Summary("Teams", strings.Join(labels, ", "))
+	if !anyAdmits {
+		pol := teams[0].team.Policy
+		u.Warn("Collects", doctor.PolicySummary(pol))
+		u.Then(doctor.NothingCollectedStep(pol))
+		return
+	}
+	var parts []string
+	if len(repos) > 0 {
+		shown := repos
+		extra := 0
+		if len(shown) > 3 {
+			extra = len(shown) - 3
+			shown = shown[:3]
+		}
+		s := strings.Join(shown, ", ")
+		if extra > 0 {
+			s += fmt.Sprintf(", and %d more", extra)
+		}
+		parts = append(parts, s)
+	}
+	if hasPersonal {
+		if len(parts) > 0 {
+			parts = append(parts, "plus Personal (everything else)")
+		} else {
+			parts = append(parts, personalCollects)
+		}
+	}
+	if len(parts) == 0 {
+		u.Warn("Collects", "nothing yet — resolve pending bindings with `terma teams`")
+		return
+	}
+	u.Summary("Collects", strings.Join(parts, "; "))
+	if gitHooksOff {
+		u.Then(doctor.GitHooksOffStep)
+	}
+}
+
+// entryBoundToOrg reports whether policy entry raw is actively bound to org in state
+// (not pending and not refused).
+func entryBoundToOrg(state routing.State, raw string, wildcards bool, orgID string) bool {
+	if orgID == "" {
+		return true
+	}
+	e, ok := routing.ParseEntry(raw, wildcards)
+	if !ok {
+		return false
+	}
+	if b, ok := state.Bindings[e.Key()]; ok {
+		return !b.Refused && b.Organization == orgID
+	}
+	if !e.Wildcard() {
+		if ob, ok := state.Bindings[routing.Owner(e.Key())]; ok {
+			return !ob.Refused && ob.Organization == orgID
+		}
+	}
+	return false
+}
+
+// reportConflicts notifies the developer of every policy conflict found during setup.
+func (u *setupUI) reportConflicts(conflicts []policyConflict) {
+	for _, c := range conflicts {
+		if c.severity == conflictPending {
+			u.Warn("Conflict", c.summary)
+		} else {
+			u.Caution("Conflict", c.summary)
+		}
+		if c.nextStep != "" {
+			u.Then(c.nextStep)
+		}
+	}
+}
+
+func orgNamesList(orgs []organization) []string {
+	out := make([]string, 0, len(orgs))
+	for _, o := range orgs {
+		name := cmp.Or(o.Name, o.ID)
+		if !slices.Contains(out, name) {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 // printLines prints the checklist so far.

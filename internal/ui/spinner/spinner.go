@@ -25,6 +25,7 @@ type Spinner struct {
 	text   string
 	stop   chan struct{}
 	done   chan struct{}
+	redraw chan struct{}
 	active bool
 }
 
@@ -45,12 +46,17 @@ func (s *Spinner) Start(text string) {
 	defer s.mu.Unlock()
 	s.text = text
 	if s.active {
+		select {
+		case s.redraw <- struct{}{}:
+		default:
+		}
 		return
 	}
 	s.active = true
 	s.stop = make(chan struct{})
 	s.done = make(chan struct{})
-	go s.run(s.stop, s.done)
+	s.redraw = make(chan struct{}, 1)
+	go s.run(s.stop, s.done, s.redraw)
 }
 
 // Stop ends the animation and clears its line, returning once the last frame is gone.
@@ -71,7 +77,7 @@ func (s *Spinner) Stop() {
 	fmt.Fprint(s.w, "\r\x1b[2K")
 }
 
-func (s *Spinner) run(stop, done chan struct{}) {
+func (s *Spinner) run(stop, done, redraw chan struct{}) {
 	defer close(done)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -81,6 +87,8 @@ func (s *Spinner) run(stop, done chan struct{}) {
 		select {
 		case <-stop:
 			return
+		case <-redraw:
+			s.draw(i)
 		case <-ticker.C:
 			i++
 			s.draw(i)

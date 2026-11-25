@@ -76,10 +76,7 @@ func (app *App) useServerKey(s *setup.Steps, ui *setupUI, org orgRef, team *stri
 		if baseline.sameAccount && sameSingleTeam(baseline.state, target) {
 			existingBindings = baseline.state.Bindings
 		}
-		bindings, err := decideSetupBindings(target, cmp.Or(cfg.OrganizationName, cfg.OrganizationID), existingBindings, false)
-		if err != nil {
-			return config.Policy{}, err
-		}
+		bindings := autoSetupBindings(target, existingBindings)
 		var committed routing.State
 		var switched bool
 		err = daemon.WithRoutingRelayGate(app.stateDir, app.version, func() error {
@@ -92,7 +89,7 @@ func (app *App) useServerKey(s *setup.Steps, ui *setupUI, org orgRef, team *stri
 				return err
 			}
 			var cerr error
-			committed, switched, cerr = app.commitRoutingStateLocked(cfg.ProfileName, sendas.NoPersonLane, baseline, target, nil, bindings, true)
+			committed, switched, cerr = app.commitRoutingStateLocked(cfg.ProfileName, sendas.NoPersonLane, baseline, []routing.Team{target}, nil, bindings, true)
 			return cerr
 		})
 		if err != nil {

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -45,44 +44,10 @@ func (r orgRef) empty() bool { return r.ID == "" && r.Name == "" }
 func (r orgRef) String() string { return cmp.Or(r.Name, r.ID) }
 
 type signInOptions struct {
-	// org is --org: the organization to set up; empty keeps the one chosen before, or asks.
+	// org is --org: the organization to narrow setup to; empty discovers all organizations.
 	org                orgRef
 	noBrowser          bool
 	pauseBeforeBrowser bool
-}
-
-// orgAsker picks one of orgs, current marked; nil keeps the current one without asking.
-type orgAsker func(orgs []organization, current string) (*organization, error)
-
-// setupSignIn signs this machine in, reusing its stored sign-in when it still works, then
-// chooses the organization setup works in: --org, else the one chosen before, asking
-// first when the person belongs to several. The count is how many organizations the
-// current one was kept among without asking.
-func (app *App) setupSignIn(cmd *cobra.Command, cfg *config.Config, opts signInOptions, ask orgAsker) (*config.Config, *organization, int, error) {
-	cred, err := app.signIn(cmd, cfg, opts)
-	if err != nil {
-		return nil, nil, 0, err
-	}
-	cfg, err = app.loadConfig()
-	if err != nil {
-		return nil, nil, 0, err
-	}
-	org, kept, err := app.chooseOrganization(cmd.Context(), cfg, cred, opts.org, ask)
-	if err != nil {
-		return nil, nil, 0, err
-	}
-	cfg, err = app.loadConfig()
-	return cfg, org, kept, err
-}
-
-// askOrganization is setup's orgAsker: a picker on a terminal a person watches, else nil.
-func askOrganization(cmd *cobra.Command, assumeYes bool) orgAsker {
-	if assumeYes || !canPrompt() {
-		return nil
-	}
-	return func(orgs []organization, current string) (*organization, error) {
-		return pickOrganization(cmd, orgs, current)
-	}
 }
 
 // signIn is the one way a command obtains a credential: the stored sign-in verified
@@ -274,45 +239,6 @@ func (app *App) verifyCredential(ctx context.Context, cfg *config.Config, cred *
 // errNoOrganization is a sign-in of someone who belongs to no organization yet.
 var errNoOrganization = errors.New("you belong to no Terma organization yet: create or join one in the Terma app, then run `terma setup` again")
 
-// chooseOrganization records the organization setup works in, among the person's: want
-// (--org), else the profile's current one when ask is nil or it is their only one, else
-// their only one, else ask's pick. kept is how many the current one was kept among without
-// asking. Only an organization the person's sign-in lists is ever recorded.
-func (app *App) chooseOrganization(ctx context.Context, cfg *config.Config, cred *auth.Credential, want orgRef, ask orgAsker) (*organization, int, error) {
-	client, err := api.New(cfg, api.Options{Version: app.version, Credential: cred})
-	if err != nil {
-		return nil, 0, err
-	}
-	orgs, err := fetchOrganizations(ctx, client)
-	if err != nil {
-		return nil, 0, fmt.Errorf("list your organizations: %w", err)
-	}
-	if len(orgs) == 0 {
-		return nil, 0, errNoOrganization
-	}
-	current := slices.IndexFunc(orgs, func(o organization) bool { return o.ID == cfg.OrganizationID })
-	var org *organization
-	kept := 0
-	switch {
-	case !want.empty():
-		if org, err = matchOrganization(orgs, want.String()); errors.As(err, new(noMatchError)) {
-			err = fmt.Errorf("%w: %w", errNotYourOrganization, err)
-		}
-	case len(orgs) == 1:
-		org = &orgs[0]
-	case ask != nil:
-		org, err = ask(orgs, cfg.OrganizationID)
-	case current >= 0:
-		org, kept = &orgs[current], len(orgs)
-	default:
-		return nil, 0, fmt.Errorf("you belong to %d organizations: pass --org to choose one", len(orgs))
-	}
-	if err != nil {
-		return nil, 0, err
-	}
-	return org, kept, recordOrganization(app.dir, cfg.ProfileName, cred, org)
-}
-
 // errNotYourOrganization is an --org the person's organizations, as the account service
 // lists them, do not include.
 var errNotYourOrganization = errors.New("not one of your organizations")
@@ -437,6 +363,24 @@ func signedInAs(cfg *config.Config) string {
 	}
 	if org := cmp.Or(cfg.OrganizationName, cfg.OrganizationID); org != "" {
 		who += " (" + org + ")"
+	}
+	return who
+}
+
+// signedInSummary formats the Signed in summary line: email plus organization when scoped
+// to a single organization, or email alone when setup covers multiple organizations.
+func signedInSummary(cfg *config.Config, disc *setupDiscovery) string {
+	if disc == nil {
+		return signedInAs(cfg)
+	}
+	who := "signed in"
+	if cred, err := auth.LoadIdentity(cfg.Dir, cfg.ProfileName); err == nil && cred.UserEmail != "" {
+		who = cred.UserEmail
+	}
+	if len(disc.orgs) == 1 {
+		if org := cmp.Or(disc.orgs[0].Name, disc.orgs[0].ID); org != "" {
+			who += " (" + org + ")"
+		}
 	}
 	return who
 }

@@ -49,27 +49,27 @@ func (app *App) newSetupCommand() *cobra.Command {
 		Use: "setup",
 		// login was its own command; onboarding emails already sent say `terma login`.
 		Aliases: []string{"login"},
-		Short:   "Sign in, choose your team and coding agents, and write machine-wide hooks",
+		Short:   "Sign in, load your organizations and teams, choose coding agents, and write hooks",
 		Long: `Gets this machine ready to use terma, once per developer:
 
-  1. Signs you in (a browser handoff; --no-browser prints the URL instead) and, when
-     you belong to several organizations, asks which one (--org names it).
-  2. Records which coding agents you work with.
-  3. Chooses your team (--team names it), activates its routing state, and fetches
-     its collection policy, which lists the repositories it collects.
-  4. Points those agents' telemetry at terma's local relay, and runs the relay in
+  1. Signs you in (a browser handoff; --no-browser prints the URL instead).
+  2. Fetches your organizations, teams, and collection policies (--org or --team
+     narrows setup to a specific organization or team).
+  3. Records which coding agents you work with.
+  4. Activates your teams and binds their repositories automatically, notifying you
+     of any policy conflicts to resolve with ` + "`terma teams`" + `.
+  5. Points those agents' telemetry at terma's local relay, and runs the relay in
      the background (--relay-service off: started on demand instead).
-  5. Writes the agents' machine-wide hooks, so a session in a repository the
-     policy lists is collected for your team, and nothing anywhere else. git's
-     configuration is not touched: where the policy asks for commit stamping, the
+  6. Writes the agents' machine-wide hooks, so a session in a repository a policy
+     lists is collected for its team, and nothing anywhere else. git's
+     configuration is not touched: where a policy asks for commit stamping, the
      first agent session in such a repository installs three hooks in its own
      .git/hooks, chaining to any hook already there. Nothing is written into a
      repository's working tree or committed files.
 
-Run it again any time: it reuses a working sign-in, refreshes enrolled teams, offers
-the team chosen before as the default when the organization has several, --team
-selects a team, --org selects an organization, and --relay-addr moves the relay off a
-port another program holds.
+Run it again any time: it reuses a working sign-in, refreshes your organizations and
+teams, preserves existing repository binding choices, and --relay-addr moves the relay
+off a port another program holds.
 
 With TERMA_API_KEY set to a team server key (Ingest permission), setup signs in with
 the key instead, with no browser: it sets up the key's own team, so --org and --team
@@ -80,9 +80,9 @@ rotate it.`,
 		RunE: func(cmd *cobra.Command, _ []string) error { return app.runSetup(cmd, f) },
 	}
 	cmd.Flags().StringVar(&f.harnesses, "harness", "", "comma-separated agents to record ("+strings.Join(app.availableAgentNames(), ", ")+"); default: a picker")
-	cmd.Flags().StringVar(&f.org, "org", "", "organization to sign into, by name or id (default: asks when you belong to several)")
+	cmd.Flags().StringVar(&f.org, "org", "", "limit setup to one organization, by name or id (default: all of your organizations)")
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
-	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip the browser prompt and picker; record every available installed agent")
+	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip the browser prompt and agent picker; record every available installed agent")
 	cmd.Flags().StringVar(&f.relayService, "relay-service", "", "run the local relay as a background service: on or off (default: on, or your last choice)")
 	cmd.Flags().StringVar(&f.relayAddr, "relay-addr", "", "move the local relay to this loopback address (default "+claim.DefaultAddr+", or the one recorded)")
 	cmd.Flags().BoolVarP(&f.verbose, "verbose", "v", false, "show each step and what it wrote")
@@ -152,23 +152,29 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	recorded := false
 	team := ""
 	var chosenOrg *organization
+	var disc *setupDiscovery
 	steps := setup.Steps{
-		SignIn: func(_ context.Context, cfg *config.Config) (*config.Config, error) {
-			var kept int
+		SignIn: func(ctx context.Context, cfg *config.Config) (*config.Config, error) {
 			var err error
 			if f.desktopGrant {
 				cfg, chosenOrg, err = app.signInWithGrant(cmd, cfg, parseOrgRef(f.org).ID)
 			} else {
 				opts := signInOptions{org: parseOrgRef(f.org), noBrowser: f.noBrowser, pauseBeforeBrowser: !f.assumeYes}
-				cfg, chosenOrg, kept, err = app.setupSignIn(cmd, cfg, opts, askOrganization(cmd, f.assumeYes))
+				var cred *auth.Credential
+				cred, err = app.signIn(cmd, cfg, opts)
+				if err == nil {
+					cfg, err = app.loadConfig()
+				}
+				if err == nil {
+					disc, err = app.discoverSetup(ctx, cmd, cfg, cred, opts.org, cfg.ProjectID)
+				}
+				if err == nil {
+					cfg, err = app.loadConfig()
+				}
 			}
 			if err == nil {
 				fmt.Fprintln(out)
-				ui.Summary("Signed in", signedInAs(cfg))
-				if kept > 1 {
-					ui.Caution("Organization", fmt.Sprintf("kept %s, one of your %d: `terma setup --org <name>` sets up another",
-						cmp.Or(cfg.OrganizationName, cfg.OrganizationID), kept))
-				}
+				ui.Summary("Signed in", signedInSummary(cfg, disc))
 				reportCredentialStore(ui, cfg, f.insecureStorage)
 				app.settleSecrets(ui, cfg, f.insecureStorage)
 			} else {
@@ -192,7 +198,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			}
 		},
 		SetupTeams: func(_ context.Context, cfg *config.Config) (config.Policy, error) {
-			pol, name, err := app.setupTeams(cmd, cfg, chosenOrg, f, ui)
+			pol, name, err := app.setupTeams(cmd, cfg, chosenOrg, disc, f, ui)
 			team = name
 			return pol, err
 		},

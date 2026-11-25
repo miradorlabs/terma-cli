@@ -25,7 +25,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
-	"github.com/miradorlabs/terma-cli/internal/ui/prompt"
 )
 
 // Missing, corrupt, or wrong-account routing.State fails closed across hooks, relay,
@@ -1065,7 +1064,7 @@ func TestLiveAccountCheckUnderRoutingLockPreventsStaleReplace(t *testing.T) {
 	}
 	aliceDone := make(chan error, 1)
 	go func() {
-		_, _, cerr := cloneTestApp().commitRoutingStateLocked(config.DefaultProfile, aliceAcct, baseline, target, nil, nil, false)
+		_, _, cerr := cloneTestApp().commitRoutingStateLocked(config.DefaultProfile, aliceAcct, baseline, []routing.Team{target}, nil, nil, false)
 		aliceDone <- cerr
 	}()
 
@@ -1086,15 +1085,8 @@ func TestLiveAccountCheckUnderRoutingLockPreventsStaleReplace(t *testing.T) {
 	}
 }
 
-func TestDecideSetupBindingsWildcardPrompt(t *testing.T) {
-	var captured []prompt.Item
-	choose := func(_ string, items []prompt.Item) (int, error) {
-		captured = slices.Clone(items)
-		return 0, nil
-	}
-
-	t.Run("pure wildcard shows owner key directly", func(t *testing.T) {
-		captured = nil
+func TestAutoSetupBindingsWildcardScope(t *testing.T) {
+	t.Run("pure wildcard binds owner key directly without prompting", func(t *testing.T) {
 		target := routing.Team{
 			OrganizationID: "org_acme",
 			Policy: config.Policy{
@@ -1103,36 +1095,22 @@ func TestDecideSetupBindingsWildcardPrompt(t *testing.T) {
 				Repositories: []string{"github.com/acme/*"},
 			},
 		}
-		choices, err := decideSetupBindingsWith(target, "Acme", nil, true, choose)
-		if err != nil {
-			t.Fatalf("decideSetupBindings: %v", err)
-		}
-		if len(captured) == 0 || captured[0].Label != "Bind github.com/acme to Acme" {
-			t.Fatalf("prompt label = %q, want %q", captured[0].Label, "Bind github.com/acme to Acme")
-		}
+		choices := autoSetupBindings(target, nil)
 		if len(choices) != 1 || choices[0].key != "github.com/acme" || choices[0].org != "org_acme" {
 			t.Fatalf("choices = %+v, want [{key:github.com/acme org:org_acme}]", choices)
 		}
 	})
 
-	t.Run("mixed wildcard and exact lists exact binding scope", func(t *testing.T) {
-		captured = nil
+	t.Run("mixed wildcard and exact binds owner and non-covered repo without prompting", func(t *testing.T) {
 		target := routing.Team{
 			OrganizationID: "org_acme",
 			Policy: config.Policy{
 				Mode:         config.ModeRepo,
 				Wildcards:    true,
-				Repositories: []string{"github.com/acme/*", "github.com/other/repo"},
+				Repositories: []string{"github.com/acme/*", "github.com/acme/web", "github.com/other/repo"},
 			},
 		}
-		choices, err := decideSetupBindingsWith(target, "Acme", nil, true, choose)
-		if err != nil {
-			t.Fatalf("decideSetupBindings: %v", err)
-		}
-		wantLabel := "Bind github.com/acme, github.com/other/repo to Acme"
-		if len(captured) == 0 || captured[0].Label != wantLabel {
-			t.Fatalf("prompt label = %q, want %q", captured[0].Label, wantLabel)
-		}
+		choices := autoSetupBindings(target, nil)
 		if len(choices) != 2 || choices[0].key != "github.com/acme" || choices[1].key != "github.com/other/repo" {
 			t.Fatalf("choices = %+v, want [github.com/acme github.com/other/repo]", choices)
 		}

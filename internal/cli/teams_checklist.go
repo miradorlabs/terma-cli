@@ -3,8 +3,6 @@ package cli
 import (
 	"cmp"
 	"errors"
-	"slices"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -71,52 +69,4 @@ func (app *App) runTeamsChecklist(cmd *cobra.Command, cfg *config.Config, st rou
 		return app.applyTeamsWithView(cmd, cfg, st, v, true, ff)
 	}
 	return v, nil
-}
-
-func (app *App) setupMultiTeamChecklist(cmd *cobra.Command, cfg *config.Config, st routing.State, primary routing.Team, orgName, primaryName string, ui *setupUI) (routing.Team, string, string, bool, error) {
-	v, count := app.listTeams(cmd.Context(), cfg, st), 0
-	for _, o := range v.Organizations {
-		count += len(o.Teams)
-	}
-	if count <= 1 {
-		return primary, orgName, primaryName, false, nil
-	}
-	v, err := app.runTeamsChecklist(cmd, cfg, st, v, teamsFlags{})
-	if err != nil || len(v.Changes) == 0 {
-		return primary, orgName, primaryName, false, err
-	}
-	var ticked []string
-	for _, o := range v.Organizations {
-		for _, t := range o.Teams {
-			if t.Selected {
-				ticked = append(ticked, orgTeamLabel(o.Name, cmp.Or(t.Name, t.ID)))
-			}
-		}
-	}
-	if len(ticked) == 0 {
-		ui.Warn("Teams", "none ticked, so nothing is collected")
-		ui.Then("Run `terma teams` to choose the teams this machine sends telemetry to.")
-	} else {
-		ui.Summary("Teams", strings.Join(ticked, ", "))
-	}
-	for _, w := range v.Warnings {
-		ui.Caution("Teams", w)
-	}
-	if len(v.Pending) > 0 {
-		ui.Then("Run `terma teams` to decide pending repository bindings.")
-	}
-	if len(v.state.Teams) == 0 {
-		return routing.Team{}, "", "", true, nil
-	}
-	if i := slices.IndexFunc(v.state.Teams, func(tm routing.Team) bool {
-		return tm.TeamID == primary.TeamID && tm.OrganizationID == primary.OrganizationID
-	}); i >= 0 {
-		return v.state.Teams[i], cmp.Or(v.orgName(primary.OrganizationID), orgName), primaryName, true, nil
-	}
-	chosen := v.state.Teams[0]
-	name := chosen.TeamID
-	if r := v.findTeam(chosen.OrganizationID, chosen.TeamID); r != nil {
-		name = cmp.Or(r.Name, name)
-	}
-	return chosen, v.orgName(chosen.OrganizationID), name, true, nil
 }

@@ -1022,182 +1022,53 @@ func TestTeamsSignInNeededMessageAndInvalidStateFailure(t *testing.T) {
 	})
 }
 
-func TestSetupInteractiveChecklistHookup(t *testing.T) {
-	runSetup := func(t *testing.T, f *fakeAuth, account string, sf setupFlags) (*setupUI, error) {
-		t.Helper()
-		cfg, err := testApp.loadConfig()
-		if err != nil {
-			t.Fatal(err)
-		}
-		cfg.Account = account
-		cfg.OrganizationID = orgA().ID
-		cfg.OrganizationName = orgA().Name
-		cfg.ProjectID = teamsAcmeWeb
-		cmd := &cobra.Command{}
-		var out strings.Builder
-		cmd.SetOut(&out)
-		cmd.SetErr(&out)
-		cmd.SetContext(t.Context())
-		ui := newSetupUI(&out, false)
-		org := orgA()
-		_, _, err = testApp.setupTeams(cmd, cfg, &org, sf, ui)
-		return ui, err
+func TestSetupAutomaticMultiOrgEnrollsWithoutChecklist(t *testing.T) {
+	f, account := routedMachine(t, "alice", nil)
+	f.orgs = []organization{orgPersonal(), orgA(), orgB()}
+	f.projects = map[string][]project{
+		teamsPersonalOrg: {{ID: teamsPersonalTeam, Name: "Personal", OrganizationID: teamsPersonalOrg}},
+		orgA().ID:        projectsIn(orgA().ID),
+		orgB().ID:        projectsIn(orgB().ID),
+	}
+	prevAsk, prevForm, prevPick := testApp.canAsk, testApp.runForm, testApp.pickOne
+	t.Cleanup(func() { testApp.canAsk, testApp.runForm, testApp.pickOne = prevAsk, prevForm, prevPick })
+	testApp.canAsk = func() bool { return true }
+	testApp.runForm = func(*prompt.Form) ([]prompt.Item, error) {
+		t.Fatal("setup must not open a team checklist prompt")
+		return nil, nil
+	}
+	testApp.pickOne = func(*cobra.Command, string, []pickRow, func(string) (int, error)) (int, error) {
+		t.Fatal("setup must not open a team or org picker")
+		return 0, nil
 	}
 
-	t.Run("interactive setup ticks second org team via checklist", func(t *testing.T) {
-		f, account := routedMachine(t, "alice", nil)
-		prevAsk, prevForm, prevPick := testApp.canAsk, testApp.runForm, testApp.pickOne
-		t.Cleanup(func() { testApp.canAsk, testApp.runForm, testApp.pickOne = prevAsk, prevForm, prevPick })
-		testApp.canAsk = func() bool { return true }
-		testApp.pickOne = func(*cobra.Command, string, []pickRow, func(string) (int, error)) (int, error) { return 0, nil }
-		formCalled := false
-		testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
-			formCalled = true
-			items := slices.Clone(form.Items)
-			for i := range items {
-				if items[i].Label == "Beta Core" {
-					items[i].Selected = true
-				}
-			}
-			return items, nil
+	out, err := runTerma(t, "setup", "--harness", "codex")
+	if err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	st, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+	if err != nil || !found {
+		t.Fatalf("routing.Load = %v, found=%v", err, found)
+	}
+	if st.Account != account {
+		t.Fatalf("account = %q, want %q", st.Account, account)
+	}
+	var ids []string
+	for _, tm := range st.Teams {
+		ids = append(ids, tm.TeamID)
+	}
+	for _, want := range []string{teamsAcmeWeb, betaCore, teamsPersonalTeam} {
+		if !slices.Contains(ids, want) {
+			t.Fatalf("teams = %v, missing %s", ids, want)
 		}
-		if _, err := runSetup(t, f, account, setupFlags{}); err != nil {
-			t.Fatalf("setupTeams: %v", err)
-		}
-		if !formCalled {
-			t.Fatal("expected interactive setup to invoke multi-team checklist")
-		}
-		st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var ids []string
-		for _, tm := range st.Teams {
-			ids = append(ids, tm.TeamID)
-		}
-		if !slices.Contains(ids, teamsAcmeWeb) || !slices.Contains(ids, betaCore) {
-			t.Fatalf("teams = %v, want both %s and %s", ids, teamsAcmeWeb, betaCore)
-		}
-		if st.Bindings["github.com/beta/core"].Organization != orgB().ID {
-			t.Fatalf("beta binding = %+v, want %s", st.Bindings["github.com/beta/core"], orgB().ID)
-		}
-	})
-
-	t.Run("stale generation during setup checklist fails closed without replaying consent", func(t *testing.T) {
-		f, account := routedMachine(t, "alice", nil)
-		prevAsk, prevForm, prevPick := testApp.canAsk, testApp.runForm, testApp.pickOne
-		t.Cleanup(func() { testApp.canAsk, testApp.runForm, testApp.pickOne = prevAsk, prevForm, prevPick })
-		testApp.canAsk = func() bool { return true }
-		testApp.pickOne = func(*cobra.Command, string, []pickRow, func(string) (int, error)) (int, error) { return 0, nil }
-		testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
-			// Concurrent write bumps Generation while the setup checklist is open.
-			if _, err := routing.Update(testApp.stateDir, config.DefaultProfile, routing.Expect{Account: account}, func(s *routing.State) error {
-				return s.Refuse("github.com/concurrent/repo")
-			}); err != nil {
-				t.Fatalf("concurrent update: %v", err)
-			}
-			items := slices.Clone(form.Items)
-			for i := range items {
-				if items[i].Label == "Beta Core" {
-					items[i].Selected = true
-				}
-			}
-			return items, nil
-		}
-		_, err := runSetup(t, f, account, setupFlags{})
-		if !errors.Is(err, routing.ErrStaleGeneration) {
-			t.Fatalf("err = %v, want ErrStaleGeneration", err)
-		}
-		st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if slices.ContainsFunc(st.Teams, func(tm routing.Team) bool { return tm.TeamID == betaCore }) {
-			t.Fatal("stale checklist consent must not tick Beta Core")
-		}
-	})
-
-	t.Run("assumeYes skips interactive checklist", func(t *testing.T) {
-		f, account := routedMachine(t, "alice", nil)
-		prevAsk, prevForm := testApp.canAsk, testApp.runForm
-		t.Cleanup(func() { testApp.canAsk, testApp.runForm = prevAsk, prevForm })
-		testApp.canAsk = func() bool { return true }
-		testApp.runForm = func(*prompt.Form) ([]prompt.Item, error) {
-			t.Fatal("runForm must not be called under --yes")
-			return nil, nil
-		}
-		if _, err := runSetup(t, f, account, setupFlags{assumeYes: true}); err != nil {
-			t.Fatalf("setupTeams -y: %v", err)
-		}
-	})
-
-	t.Run("checklist cancellation propagates errCancelled to stop setup", func(t *testing.T) {
-		f, account := routedMachine(t, "alice", nil)
-		prevAsk, prevForm := testApp.canAsk, testApp.runForm
-		t.Cleanup(func() { testApp.canAsk, testApp.runForm = prevAsk, prevForm })
-		testApp.canAsk = func() bool { return true }
-		testApp.runForm = func(*prompt.Form) ([]prompt.Item, error) { return nil, prompt.ErrCancelled }
-		_, err := runSetup(t, f, account, setupFlags{})
-		if !errors.Is(err, errCancelled) {
-			t.Fatalf("err = %v, want errCancelled", err)
-		}
-	})
-
-	t.Run("deselecting initial Personal team returns final org policy and updates recorded team", func(t *testing.T) {
-		f, account := routedMachine(t, "alice", nil)
-		f.orgs = []organization{orgPersonal(), orgA(), orgB()}
-		f.projects = map[string][]project{
-			teamsPersonalOrg: {{ID: teamsPersonalTeam, Name: "Personal", OrganizationID: teamsPersonalOrg}},
-			orgA().ID:        projectsIn(orgA().ID),
-			orgB().ID:        projectsIn(orgB().ID),
-		}
-		prevAsk, prevForm, prevPick := testApp.canAsk, testApp.runForm, testApp.pickOne
-		t.Cleanup(func() { testApp.canAsk, testApp.runForm, testApp.pickOne = prevAsk, prevForm, prevPick })
-		testApp.canAsk = func() bool { return true }
-		testApp.pickOne = func(*cobra.Command, string, []pickRow, func(string) (int, error)) (int, error) { return 0, nil }
-		testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
-			items := slices.Clone(form.Items)
-			for i := range items {
-				items[i].Selected = items[i].Label == "Beta Core"
-			}
-			return items, nil
-		}
-		cfg, err := testApp.loadConfig()
-		if err != nil {
-			t.Fatal(err)
-		}
-		cfg.Account = account
-		cfg.OrganizationID = orgPersonal().ID
-		cfg.OrganizationName = orgPersonal().Name
-		cfg.ProjectID = teamsPersonalTeam
-		cmd := &cobra.Command{}
-		var out strings.Builder
-		cmd.SetOut(&out)
-		cmd.SetErr(&out)
-		cmd.SetContext(t.Context())
-		ui := newSetupUI(&out, false)
-		org := orgPersonal()
-		pol, name, err := testApp.setupTeams(cmd, cfg, &org, setupFlags{}, ui)
-		if err != nil {
-			t.Fatalf("setupTeams: %v", err)
-		}
-		if pol.Global() || pol.TeamID != betaCore || name != "Beta Core" {
-			t.Fatalf("returned (%+v, %q), want non-global Beta Core (%s)", pol, name, betaCore)
-		}
-		updated, err := testApp.loadConfig()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if updated.Team != betaCore || updated.TeamName != "Beta Core" {
-			t.Fatalf("recorded team = (%q, %q), want (%q, %q)", updated.Team, updated.TeamName, betaCore, "Beta Core")
-		}
-		if updated.OrganizationID != orgB().ID || updated.OrganizationName != orgB().Name {
-			t.Fatalf("recorded org = (%q, %q), want (%q, %q)", updated.OrganizationID, updated.OrganizationName, orgB().ID, orgB().Name)
-		}
-		if updated.Policy.TeamID != betaCore || updated.Policy.OrganizationID != orgB().ID || updated.Policy.Global() {
-			t.Fatalf("reloaded policy = %+v, want Beta Core (%s) in %s", updated.Policy, betaCore, orgB().ID)
-		}
-	})
+	}
+	// Personal team must always be last, and shared org repos must be auto-bound.
+	if !st.Teams[len(st.Teams)-1].Personal {
+		t.Fatalf("last team = %+v, want Personal last", st.Teams[len(st.Teams)-1])
+	}
+	if st.Bindings["github.com/acme/web"].Organization != orgA().ID || st.Bindings["github.com/beta/core"].Organization != orgB().ID {
+		t.Fatalf("bindings = %+v, want both shared org repos auto-bound", st.Bindings)
+	}
 }
 
 func TestTeamsSelectFailsWhenPolicyCannotBePersisted(t *testing.T) {

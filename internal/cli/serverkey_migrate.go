@@ -129,10 +129,7 @@ func (app *App) migrateServerKeyProfile(name string) (string, bool, error) {
 	if _, found, err := routing.Load(app.stateDir, name); found || err != nil {
 		return "", false, nil
 	}
-	bindings, err := decideSetupBindings(target, target.OrganizationID, nil, false)
-	if err != nil {
-		return "", false, err
-	}
+	bindings := autoSetupBindings(target, nil)
 	st, err := routing.Create(app.stateDir, name, sendas.NoPersonLane, func(s *routing.State) error {
 		if now, ok := app.serverKeyTeam(name); !ok || now.TeamID != target.TeamID || now.OrganizationID != target.OrganizationID || now.AuthURL != target.AuthURL {
 			return errServerKeyProfileMoved
@@ -140,7 +137,7 @@ func (app *App) migrateServerKeyProfile(name string) (string, bool, error) {
 		if _, err := s.Select(target); err != nil {
 			return err
 		}
-		return applySetupBindings(s, target, bindings)
+		return applySetupBindingsAll(s, bindings)
 	})
 	switch {
 	case errors.Is(err, routing.ErrStateExists), errors.Is(err, errServerKeyProfileMoved):
