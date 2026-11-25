@@ -277,6 +277,8 @@ const (
 	TermaResponseServiceTierKey = "terma.response.service_tier"
 	// TermaSchemaVersionKey is terma.schema.version: The version of this registry the record follows.
 	TermaSchemaVersionKey = "terma.schema.version"
+	// TermaSessionHistoricalKey is terma.session.historical: Whether the record was uploaded from a session's history rather than collected live.
+	TermaSessionHistoricalKey = "terma.session.historical"
 	// TermaSessionParentIDKey is terma.session.parent.id: The session that opened this one for a subagent.
 	TermaSessionParentIDKey = "terma.session.parent.id"
 	// TermaSessionTitleKey is terma.session.title: The name the agent gave the session.

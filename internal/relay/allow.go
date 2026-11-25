@@ -17,6 +17,8 @@ var genericSafeKeys = setOf(
 	"tool_use_id", "gen_ai.tool.call.id", "gen_ai.response.id",
 	"event.name", "event.timestamp",
 	semconv.MiradorProjectIDKey, semconv.TermaVersionKey, semconv.TermaRelayAttributionKey, semconv.TermaRelaySessionIDKey, semconv.TermaAccountSeatIDKey,
+	// Operational metadata marking historical uploads (non-content, safe on resource and record).
+	semconv.TermaSessionHistoricalKey,
 	// The session that opened a subagent's, which the relay stamps (stampParent).
 	semconv.TermaSessionParentIDKey,
 	// Models, providers and settings.

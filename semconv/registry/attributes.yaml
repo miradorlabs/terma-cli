@@ -37,6 +37,13 @@ attributes:
     type: string
     stability: development
     brief: The name the agent gave a subagent.
+  - key: terma.session.historical
+    type: boolean
+    stability: development
+    brief: Whether the record was uploaded from a session's history rather than collected live.
+    note: >
+      Operational metadata set to true on the resource or log record when uploading past
+      sessions; non-content, so it leaves under every policy. Omitted for live sessions.
   - key: terma.session.parent.id
     type: string
     stability: development
