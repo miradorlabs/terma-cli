@@ -959,6 +959,14 @@ function mcpOf1(name, servers) {
   return best ? { server: best.server, tool: name.slice(best.prefix.length + 1) } : undefined
 }
 
+// The turn a message belongs to is the prompt that opened it. OpenCode also starts turns
+// itself, under a user message no person sent (the call after a command's subagent returns,
+// a shell command the person ran): those join the last prompt's turn, when there is one.
+function turnOf1(s, parentID) {
+  if (!parentID || s.entry.prompts?.has(parentID)) return parentID || undefined
+  return s.entry.lastPrompt || parentID
+}
+
 function onAssistant1(s, info) {
   let m = s.messages.get(info.id)
   if (!m) {
@@ -988,7 +996,7 @@ function onAssistant1(s, info) {
     id: info.id,
     kind: compaction ? "compaction" : undefined,
     messageID: info.id,
-    turn: m.parentID || undefined,
+    turn: turnOf1(s, m.parentID),
     model: str(info.modelID),
     provider: str(info.providerID),
     agent: info.mode ?? info.agent,
@@ -1051,7 +1059,7 @@ async function onToolPart1(s, part, servers) {
     messageID: part.messageID,
     callID: part.callID,
     name: part.tool,
-    turn: s.messages.get(part.messageID)?.parentID || undefined,
+    turn: turnOf1(s, s.messages.get(part.messageID)?.parentID),
     start: num(st.time?.start),
     end: num(st.time?.end),
     status,
@@ -1234,7 +1242,12 @@ async function server(input) {
         // A reach that crosses organizations marks the run from the moment its hook did; the
         // prompt is stamped after it, and OpenCode goes on only once the checks are done.
         if (reaches.length > 0) pr.time = Math.max(pr.time ?? 0, Date.now() + 1)
-        if (!isTainted(s)) prompt(s, pr)
+        if (isTainted(s)) return
+        if (pr.messageID) {
+          remember((s.entry.prompts ??= new Set()), pr.messageID)
+          s.entry.lastPrompt = pr.messageID
+        }
+        prompt(s, pr)
       })
       if (reaches.length > 0) await sent
     }),

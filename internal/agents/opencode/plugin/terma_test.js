@@ -1215,6 +1215,28 @@ test("an assistant message no model answered is not a call; its tool part still 
   expect(tools(r.spans()).map((s) => A(s)["gen_ai.tool.call.id"])).toEqual(["msg_sh:c1"])
 })
 
+test("a turn OpenCode starts itself joins the last prompt's turn, when the session has one", async () => {
+  const { r, hooks } = await start()
+  const created = (messageID, parentID) =>
+    ev("message.updated", { info: { id: messageID, sessionID: "ses_turn", role: "assistant", parentID, modelID: "m1", providerID: "p1", mode: "build", time: { created: 2000 } } })
+  await hooks.event(sessionCreated("ses_turn"))
+  // Before any prompt: a shell command the person ran. Its turn stays the message OpenCode made.
+  await hooks.event(created("msg_sh0", "msg_auto0"))
+  await hooks.event(toolPart("ses_turn", "msg_sh0", "c0", "bash", done({ command: "pwd" }, "/repo\n")))
+  // A prompt, and a call that answers it.
+  await hooks["chat.message"]({ sessionID: "ses_turn" }, { message: { id: "msg_p1" }, parts: [{ type: "text", text: "go" }] })
+  await hooks.event(assistantDone("ses_turn", "msg_a1", { parentID: "msg_p1" }))
+  // Then OpenCode goes on by itself: a call and a tool call under a user message nobody sent.
+  await hooks.event(created("msg_a2", "msg_auto1"))
+  await hooks.event(toolPart("ses_turn", "msg_a2", "c2", "bash", done({ command: "ls" }, "a\n")))
+  await hooks.event(assistantDone("ses_turn", "msg_a2", { parentID: "msg_auto1" }))
+  await hooks.dispose()
+  const turns = Object.fromEntries(chats(r.spans()).map((s) => [A(s)["opencode.call.id"], A(s)["opencode.parent_message.id"]]))
+  expect(turns).toEqual({ msg_a1: "msg_p1", msg_a2: "msg_p1" })
+  const toolTurns = Object.fromEntries(tools(r.spans()).map((s) => [A(s)["gen_ai.tool.call.id"], A(s)["opencode.parent_message.id"]]))
+  expect(toolTurns).toEqual({ "msg_sh0:c0": "msg_auto0", "msg_a2:c2": "msg_p1" })
+})
+
 test("a model call is a message with step parts, not one with a finish", async () => {
   const { r, hooks } = await start()
   await hooks.event(sessionCreated("ses_cmd"))
