@@ -65,8 +65,16 @@ func (pol Policy) resolvedFor(lane string) bool {
 // ErrNoKey is Resolve's answer for a project this machine holds no key for; its parts wait, then drop.
 var ErrNoKey = errors.New("no key for this team on this machine")
 
-// SignIn is the person's sign-in the relay sends with (sendas.SignIn).
-type SignIn = sendas.SignIn
+// SignIn is the person's sign-in the relay sends with (sendas.SignIn), which also says
+// whose what arrives is (arrivalLane).
+type SignIn interface {
+	sendas.SignIn
+	// Lane is Account with the generation of the sign-in it read
+	// (auth.Credential.Generation), both from one read: each change of whose sign-in it is
+	// bumps the generation, so one account read at two generations may have been another's
+	// in between.
+	Lane() (account string, generation uint64)
+}
 
 // ProjectHeader names the team a part sent with a user token goes to.
 const ProjectHeader = sendas.ProjectHeader

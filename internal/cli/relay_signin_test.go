@@ -100,6 +100,36 @@ func TestTheSignInSourceFollowsASwitchAtOnce(t *testing.T) {
 	}
 }
 
+// Lane reads the sign-in's generation with its account: a switch to another person and back
+// that no read saw reads as the same account at a generation two on, so the relay never
+// takes it for the sign-in it read before (relay's arrivalLane).
+func TestTheSignInSourceReadsASwitchAndBackAtAnotherGeneration(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	src := testApp.signInSource(cfg)
+	mine := auth.AccountKey(f.srv.URL, "u-1")
+	account, gen := src.Lane()
+	if account != mine || gen == 0 {
+		t.Fatalf("Lane = %q at %d, want u-1's at a generation", account, gen)
+	}
+	if err := saveSignIn(testApp.dir, storedSessionOf(f, "u-2")); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	if again, at := src.Lane(); again != mine || at != gen+2 {
+		t.Fatalf("after a switch and back, Lane = %q at %d, want u-1's at %d", again, at, gen+2)
+	}
+}
+
 // Account reads config.json and the sign-in as one snapshot: a switch to a server key that
 // lands between the two reads is read again, never bound to the person signed in before.
 func TestAccountReadsTheProfileAndTheSignInAsOne(t *testing.T) {

@@ -10,6 +10,7 @@
 package auth
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // ErrNotLoggedIn is returned when there is no usable credential.
@@ -61,6 +63,13 @@ type Credential struct {
 	// StaleKeychainItem marks a credential kept in the file while its earlier tokens may
 	// still sit in the keychain, which could not remove them then; sign-out tries again.
 	StaleKeychainItem bool `json:"stale_keychain_item,omitempty"`
+	// Generation counts the changes of whose sign-in the profile holds: every write that
+	// stores another account (Account) than the one before, or none, bumps it, in the same
+	// write (stampGenerations); a token's rotation or a mark leaves it. A sign-out keeps it
+	// in an entry with no session, which reads as signed out. A reader takes it with the
+	// account, from one read of the file (AccountAt), so the relay can tell a sign-in that
+	// changed and changed back from one that never changed (relay's arrivalLane).
+	Generation uint64 `json:"generation,omitempty"`
 }
 
 // dropForeignMark forgets a refresh mark recorded for another refresh token than c's.
@@ -111,6 +120,53 @@ func (c *Credential) present() bool { return c != nil && c.SessionID != "" }
 // credentialFile is user-credentials.json: each profile's sign-in.
 type credentialFile map[string]*Credential
 
+// signedInAs is whose sign-in each profile in f holds ("" for none) and its generation.
+type signedInAs map[string]struct {
+	account    string
+	generation uint64
+}
+
+func (f credentialFile) signedInAs() signedInAs {
+	out := signedInAs{}
+	for profile, c := range f {
+		if c == nil {
+			continue
+		}
+		e := out[profile]
+		e.generation, e.account = c.Generation, c.lane()
+		out[profile] = e
+	}
+	return out
+}
+
+// stampGenerations gives each profile in f, as a write leaves it, the generation it had in
+// was, the file as that write read it, bumped where the account it holds changed. A profile
+// left with no sign-in keeps its generation in an entry with no session, which every reader
+// takes for signed out, so a sign-in after it carries on from it and never repeats one an
+// earlier reader holds.
+func (f credentialFile) stampGenerations(was signedInAs) {
+	for profile, c := range f {
+		if c == nil {
+			delete(f, profile)
+		}
+	}
+	for profile := range was {
+		if _, ok := f[profile]; !ok {
+			f[profile] = &Credential{}
+		}
+	}
+	for profile, c := range f {
+		before := was[profile]
+		c.Generation = before.generation
+		if c.lane() != before.account {
+			c.Generation++
+		}
+		if !c.present() && c.Generation == 0 {
+			delete(f, profile)
+		}
+	}
+}
+
 func (f credentialFile) get(profile string) *Credential {
 	c := f[profile]
 	if !c.present() {
@@ -133,6 +189,29 @@ func LoadCredential(dir, profile string) (*Credential, error) {
 		return nil, err
 	}
 	return cred, nil
+}
+
+// AccountAt is Account with the generation of the profile's sign-in (Credential.Generation),
+// both from one read of user-credentials.json: 0 when it can't be read.
+func AccountAt(dir, profile string) (account string, generation uint64) {
+	file, err := loadCredentialFile(dir)
+	if err != nil {
+		return sendas.AccountUnreadable, 0
+	}
+	if c := file[profile]; c != nil {
+		generation = c.Generation
+	}
+	return file[profile].lane(), generation
+}
+
+// lane is whose sign-in c is, as Account answers: "" for none, and the unreadable account for
+// one with no account to key it by (no user id), someone's, never the "" of a signed-out
+// profile.
+func (c *Credential) lane() string {
+	if !c.present() {
+		return ""
+	}
+	return cmp.Or(c.Account(), sendas.AccountUnreadable)
 }
 
 // LoadIdentity returns the profile's sign-in without its tokens: who signed in, to which
