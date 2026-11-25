@@ -102,6 +102,58 @@ func TestOpenCodeStartRunAndToolReachCrossOrgMixed(t *testing.T) {
 	}
 }
 
+// An attached file OpenCode gives no path for is told to terma as a read it cannot place,
+// under a path that starts with two separators. That must stay an unknown reach: the run
+// goes Mixed, as for a shell command terma cannot follow.
+func TestOpenCodeUnplacedAttachmentMarksTheRunMixed(t *testing.T) {
+	stateDir := t.TempDir()
+	parent, _ := filepath.EvalSymlinks(t.TempDir())
+	repo := filepath.Join(parent, "alpha")
+	_, _ = gitx.Git(context.Background(), parent, "init", "-q", "-b", "main", repo)
+	_, _ = gitx.Git(context.Background(), repo, "remote", "add", "origin", "git@github.com:orgA/alpha.git")
+	const acct = "1111111111111111"
+	now := time.Now().UTC().Truncate(time.Second)
+	st, err := routing.Create(stateDir, "default", acct, func(s *routing.State) error {
+		if _, err := s.Select(routing.Team{OrganizationID: "orgA", AuthURL: "https://api.example.com", TeamID: "team-a",
+			Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/orgA/alpha"}, Revision: 1, FetchedAt: now, TeamID: "team-a", OrganizationID: "orgA", AuthURL: "https://api.example.com"}}); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp, err := spool.Open(filepath.Join(stateDir, spool.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp.Bind(acct)
+	rt := hookrun.NewRouting("default", &st)
+	env := func(stdin string) hookrun.Env {
+		return hookrun.Env{StateDir: stateDir, Cwd: repo, Spool: sp, Account: acct, Routing: rt, Now: now, Stdin: strings.NewReader(stdin)}
+	}
+	events := Agent{}.Events()
+	ctx := context.Background()
+
+	const sid = "ses_attached_oc"
+	if err := events["opencode-session-start"](ctx, env(`{"session_id":"`+sid+`","cwd":`+strconv.Quote(repo)+`}`)); err != nil {
+		t.Fatal(err)
+	}
+	if why := runs.Read(stateDir, sid).Why(now.Add(time.Minute)); why.Reason != "" {
+		t.Fatalf("run is Mixed before any reach: %+v", why)
+	}
+	body, _ := json.Marshal(map[string]any{"session_id": sid, "cwd": repo, "tool": "read", "paths": []string{"//attached-file/unplaced"}})
+	if err := events["opencode-tool-reach"](ctx, env(string(body))); err != nil {
+		t.Fatal(err)
+	}
+	if c, ok := claim.Read(stateDir, sid, now); !ok || c.Kind != claim.KindMixed {
+		t.Fatalf("claim = %+v (ok=%v); want KindMixed", c, ok)
+	}
+	if why := runs.Read(stateDir, sid).Why(now.Add(time.Minute)); why.Reason != runs.UnknownReach {
+		t.Fatalf("Mixed reason = %q (%+v); want %q", why.Reason, why, runs.UnknownReach)
+	}
+}
+
 func TestOpenCodeRefreshConnectDisconnectConcurrentLockSafety(t *testing.T) {
 	h, path := opencodeIn(t)
 	e := opencodeExporter(t, h, true)

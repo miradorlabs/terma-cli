@@ -64,6 +64,9 @@ const PLACEHOLDER_TITLE = /^New session - \d{4}-\d{2}-\d{2}T/
 const RULE_REFUSAL = "The user has specified a rule which prevents"
 // How OpenCode 1 opens the synthetic part for a file attached to a prompt.
 const READ_ATTACHMENT = "Called the Read tool with the following input: "
+// The path an attached file is reach-checked under when its marker names no path terma can
+// use: two leading separators make it a reach terma cannot place.
+const UNPLACED_ATTACHMENT = "//attached-file/unplaced"
 
 // --- state --------------------------------------------------------------------------
 
@@ -447,6 +450,8 @@ function newSession(id, owner) {
     latest: null, // a record that arrived before the first one was applied
     parentID: "",
     directory: "",
+    askedDirectory: "", // the directory most recently moved to, applied or still queued
+    movedAt: 0, // when the last move's claim finished; nothing after it is stamped earlier
     version: "",
     created: 0,
     title: "",
@@ -529,6 +534,7 @@ async function firstSight(s, lookup) {
   s.known = true
   s.parentID = str(rec.parentID)
   s.directory = str(rec.directory)
+  s.askedDirectory = s.directory
   s.version = str(rec.version)
   s.created = num(rec.created) ?? 0
   s.title = str(rec.title)
@@ -549,13 +555,20 @@ async function firstSight(s, lookup) {
 }
 
 function update(s, rec) {
-  if (rec.directory && rec.directory !== s.directory) {
+  // Compared with the last move asked for, not the last one applied: a move back while an
+  // earlier move still waits in the queue is a move too.
+  if (rec.directory && rec.directory !== (s.askedDirectory || s.directory)) {
     // A session that moved is under the policy of the repository it is in now. The move
     // takes its place in the queue: what was said before it leaves under the old one.
     const directory = rec.directory
-    run(s, () => {
+    s.askedDirectory = directory
+    run(s, async () => {
       s.directory = directory
       s.policy = repoPolicy(directory)
+      // The relay files a record under the claim in force at its time: claim the session
+      // in its new directory before anything more of it leaves, and stamp nothing earlier.
+      await guardReach(s, { tool: "list", lists: [directory] })
+      s.movedAt = Date.now() + 1
     })
   }
   if (rec.parentID) s.parentID = rec.parentID
@@ -782,13 +795,14 @@ function tool(s, t) {
 // prompt text ever goes to a hook.
 function prompt(s, pr) {
   const text = str(pr.text)
+  const time = s.movedAt ? Math.max(num(pr.time) ?? 0, s.movedAt) : pr.time
   emitRecord(s, "opencode.user_prompt", policyOf(s).includePrompts ? truncate(text, MAX_TEXT) : "", {
     "opencode.message.id": pr.messageID,
     "opencode.prompt.length": text.length,
     "opencode.agent": pr.agent,
     "gen_ai.request.model": pr.model,
     "gen_ai.provider.name": pr.provider,
-  }, pr.time)
+  }, time)
   runHook(s, "opencode-prompt", base(s))
 }
 
@@ -1185,19 +1199,27 @@ async function server(input) {
         taken.add(path)
       }
       // An attached image or PDF arrives as a data: URL; where it came from is only in the
-      // synthetic part that says OpenCode read it.
+      // synthetic part that says OpenCode read it. OpenCode may write that path unescaped
+      // (a Windows path), so a marker that is not JSON is read for the path as written, and
+      // one that names no path at all is a reach no one can place.
+      let unplaced = false
       for (const x of parts) {
         if (x?.type !== "text" || x.synthetic !== true || !str(x.text).startsWith(READ_ATTACHMENT)) continue
+        const raw = x.text.slice(READ_ATTACHMENT.length)
         let path
         try {
-          path = JSON.parse(x.text.slice(READ_ATTACHMENT.length))?.filePath
-        } catch {
+          path = JSON.parse(raw)?.filePath
+        } catch {}
+        if (typeof path !== "string" || !path) path = /^\{"filePath":"([\s\S]*)"\}$/.exec(raw)?.[1]
+        if (!path) {
+          unplaced = true
           continue
         }
-        if (typeof path !== "string" || !path || taken.has(path)) continue
+        if (taken.has(path)) continue
         reaches.push({ tool: "read", paths: [path] })
         taken.add(path)
       }
+      if (unplaced) reaches.push({ tool: "read", paths: [UNPLACED_ATTACHMENT] })
       // Under `opencode run` the hook's own input names no agent or model; the message does.
       const pr = {
         messageID: msg.id ?? inp?.messageID,

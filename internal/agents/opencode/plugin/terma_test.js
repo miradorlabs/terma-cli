@@ -903,6 +903,63 @@ test("a session that moves takes the policy of the repository it moved into", as
   expect(prompts).toEqual([open, private_])
 })
 
+function repos() {
+  const open = mkdtempSync(join(root, "open-"))
+  mkdirSync(join(open, ".git"))
+  const private_ = mkdtempSync(join(root, "private-"))
+  mkdirSync(join(private_, ".git"))
+  mkdirSync(join(private_, ".opencode"))
+  writeFileSync(join(private_, ".opencode", "terma.json"), JSON.stringify({ includePrompts: false }))
+  return { open, private_ }
+}
+const moved = (id, directory) => ev("session.updated", { info: { id, directory, version: "1.19.6", title: "New session - 2026-11-25T00:00:00.000Z", time: { created: 1000, updated: 2000 } } })
+
+test("a session moved away and straight back while its queue is busy ends where it is", async () => {
+  const { open, private_ } = repos()
+  const { r, hooks } = await start({}, { terma: { delayed: { "opencode-session-start": 0.5 } } })
+  await hooks.event(sessionCreated("ses_back", { directory: private_ }))
+  // Both moves arrive while the claim still holds the queue.
+  for (let i = 0; i < 100 && !r.terma.calls().some((c) => c.event === "opencode-session-start"); i++) await Bun.sleep(10)
+  await hooks.event(moved("ses_back", open))
+  await hooks.event(moved("ses_back", private_))
+  await hooks["chat.message"]({ sessionID: "ses_back" }, { message: { id: "msg_u" }, parts: [{ type: "text", text: "secret prompt" }] })
+  await hooks.dispose()
+  expect(named(r.logs(), "opencode.user_prompt").map((x) => x.body.stringValue)).toEqual([""])
+  expect(r.terma.calls().filter((c) => c.event === "opencode-prompt").map((c) => c.payload.cwd)).toEqual([private_])
+}, 15_000)
+
+test("a move claims the session in its new directory before its next prompt, which is stamped after it", async () => {
+  const { open, private_ } = repos()
+  const { r, hooks } = await start({}, { terma: { delayed: { "opencode-tool-reach": 0.3 } } })
+  await hooks.event(sessionCreated("ses_mv", { directory: open }))
+  await hooks.event(moved("ses_mv", private_))
+  await hooks["chat.message"]({ sessionID: "ses_mv" }, { message: { id: "msg_u", time: { created: 1500 } }, parts: [{ type: "text", text: "hi" }] })
+  await hooks.dispose()
+  expect(r.terma.calls()).toEqual([
+    { event: "opencode-session-start", payload: { session_id: "ses_mv", cwd: open } },
+    { event: "opencode-tool-reach", payload: { session_id: "ses_mv", cwd: private_, tool: "list", lists: [private_] } },
+    { event: "opencode-prompt", payload: { session_id: "ses_mv", cwd: private_ } },
+  ])
+  const finished = Number(readFileSync(join(r.dir, "opencode-tool-reach.done"), "utf8"))
+  const [p] = named(r.logs(), "opencode.user_prompt")
+  expect(Number(BigInt(p.timeUnixNano) / 1000000n)).toBeGreaterThan(finished)
+}, 15_000)
+
+test("a move whose claim fails sends nothing more of the session", async () => {
+  const { open, private_ } = repos()
+  const { r, hooks } = await start({}, { terma: { fail: ["opencode-tool-reach"] } })
+  await hooks.event(sessionCreated("ses_mf", { directory: open }))
+  await hooks["chat.message"]({ sessionID: "ses_mf" }, { message: { id: "msg_before" }, parts: [{ type: "text", text: "before" }] })
+  await hooks.event(moved("ses_mf", private_))
+  await hooks["chat.message"]({ sessionID: "ses_mf" }, { message: { id: "msg_after" }, parts: [{ type: "text", text: "after" }] })
+  await hooks.event(assistantDone("ses_mf", "msg_a"))
+  await hooks.event(toolPart("ses_mf", "msg_a", "c1", "bash", done({ command: "true" }, "")))
+  await hooks.dispose()
+  expect(r.spans()).toEqual([])
+  expect(named(r.logs(), "opencode.user_prompt").map((x) => A(x)["opencode.message.id"])).toEqual(["msg_before"])
+  expect(r.terma.calls().map((c) => c.event)).toEqual(["opencode-session-start", "opencode-prompt", "opencode-tool-reach"])
+})
+
 test("a null CONFIG makes the plugin inert", async () => {
   const mod = await load(null)
   expect(await mod.default.server({ client: fakeClient(null), directory: root, worktree: root })).toEqual({})
@@ -1087,6 +1144,22 @@ test("an attached image is reach-checked by the path OpenCode read it from", asy
     { event: "opencode-prompt", payload: { session_id: "ses_img", cwd: "/repo" } },
   ])
   expect(named(r.logs(), "opencode.user_prompt")[0].body.stringValue).toBe("what is this")
+})
+
+test("an attachment marker that is not JSON is reach-checked by its path as written, or as unplaced", async () => {
+  const reachOf = async (marker) => {
+    const { r, hooks } = await start()
+    await hooks.event(sessionCreated("ses_mk"))
+    const parts = [
+      { type: "text", synthetic: true, text: "Called the Read tool with the following input: " + marker },
+      { type: "text", text: "what is this" },
+    ]
+    await hooks["chat.message"]({ sessionID: "ses_mk" }, { message: { id: "msg_u" }, parts })
+    await hooks.dispose()
+    return r.terma.calls().filter((c) => c.event === "opencode-tool-reach").map((c) => c.payload.paths)
+  }
+  expect(await reachOf(String.raw`{"filePath":"C:\Users\a\dot.png"}`)).toEqual([[String.raw`C:\Users\a\dot.png`]])
+  expect(await reachOf("not json")).toEqual([["//attached-file/unplaced"]])
 })
 
 test("a prompt with an attachment waits for its reach check and is stamped after it", async () => {
