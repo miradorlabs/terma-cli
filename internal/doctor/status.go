@@ -49,7 +49,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 			add("Account", "not signed in — terma was updated and now signs in once per person: run `terma setup`")
 		} else if err == nil && cred.Retired {
 			authOK = false
-			add("Account", "this sign-in is retired — run `%s`", RetiredFix)
+			add("Account", "this sign-in is retired — run %s", RetiredFix)
 		} else if err == nil && cred.Locked {
 			authOK = false
 			add("Account", "credentials unreadable: the system keychain is locked or unavailable")
@@ -180,7 +180,7 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 				if key := keyOf(p.Keys, projectID); key != "" {
 					line += ", sent with " + key
 				} else {
-					line += ", no sign-in or team key (run `" + p.signInFix() + "`)"
+					line += ", no sign-in or team key (run " + Quoted(p.signInFix()) + ")"
 					backendOK = false
 				}
 			}
@@ -223,12 +223,14 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 
 // Context is what `terma doctor` prints above its checks, which do not cover it: what this
 // machine collects, which backend it reports to, how it gets new releases (Env.Updates),
-// and the repository's work in progress.
+// and the repository's work in progress. A remediation campaign's notice (Env.Remediation)
+// leads, even when the configuration could not be loaded.
 func Context(env Env) []Row {
+	notice := RemediationRows(env.Remediation)
 	if env.Config == nil {
-		return nil
+		return notice
 	}
-	rows := append([]Row{{"Config", output.TildePath(env.ConfigDir)}, {"State", output.TildePath(env.StateDir)}},
+	rows := append(append(notice, Row{"Config", output.TildePath(env.ConfigDir)}, Row{"State", output.TildePath(env.StateDir)}),
 		machineRows(env.Config, env.Routing != nil)...)
 	if env.Routing != nil {
 		rows = append(rows, TeamRows(*env.Routing, time.Now())...)

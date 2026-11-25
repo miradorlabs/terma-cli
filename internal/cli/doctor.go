@@ -25,6 +25,7 @@ Every failure names the command that fixes it, and the report ends with the
 remaining steps to complete setup.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			env := app.doctorEnv(cmd.Context())
+			env.Remediation = app.doctorRemediation(cmd.Context(), env.Config)
 			printContext(cmd.OutOrStdout(), doctor.Context(env))
 			if app.executeDoctor(cmd, env).Failed() {
 				return errors.New("some checks failed")

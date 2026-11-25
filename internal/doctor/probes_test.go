@@ -469,7 +469,7 @@ func TestCaptureOffWarnsTheCollectionChecks(t *testing.T) {
 func TestDoctorFailsARetiredSignIn(t *testing.T) {
 	retired := func() (Credential, error) { return Credential{Email: "dev@example.com", Retired: true}, nil }
 	c := check(Run(t.Context(), env(t, Probes{Credential: retired, Spool: func() SpoolState { return SpoolState{} }}), Progress{}), KeyAuth)
-	if c.Status != Fail || c.Fix != RetiredFix || !strings.Contains(c.Detail, "update terma and run `terma login`") {
+	if c.Status != Fail || c.Fix != RetiredFix || !strings.Contains(c.Detail, "update terma, then run `terma setup`") {
 		t.Fatalf("check = %+v", c)
 	}
 }

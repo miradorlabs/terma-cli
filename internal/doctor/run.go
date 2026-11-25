@@ -12,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
+	"github.com/miradorlabs/terma-cli/internal/remediation"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
@@ -36,6 +37,9 @@ type Env struct {
 	Updates []Row
 	// Routing is the profile's multi-org routing state and runtime observations.
 	Routing *Routing
+	// Remediation is what the platform's active remediation campaign asks of this machine,
+	// read whether or not the configuration loaded; a caution, never a failed check.
+	Remediation remediation.Notice
 }
 
 // Probes reach the event spool and the platform's APIs for a run.
@@ -83,7 +87,16 @@ type Credential struct {
 }
 
 // RetiredFix is what makes a retired sign-in send again.
-const RetiredFix = "terma update && terma login"
+const RetiredFix = "`terma update`, then `terma setup`"
+
+// Quoted is a fix to run as prose names it: one command in backticks, as is a fix that
+// already quotes its commands (RetiredFix).
+func Quoted(fix string) string {
+	if strings.Contains(fix, "`") {
+		return fix
+	}
+	return "`" + fix + "`"
+}
 
 // Origin says how a developer's login was made: ", signed in through Terma Desktop" for
 // one the desktop delegated, "" for a browser sign-in or a server key.
@@ -300,7 +313,7 @@ func (d *run) signedIn() Check {
 		return Check{Status: Fail, Detail: "signed in against a different environment", Fix: "terma setup"}
 	}
 	if cred.Retired {
-		return Check{Status: Fail, Detail: "Terma no longer accepts this sign-in: update terma and run `terma login`; until then nothing is sent, and what is queued waits",
+		return Check{Status: Fail, Detail: "Terma no longer accepts this sign-in: update terma, then run `terma setup`; until then nothing is sent, and what is queued waits",
 			Fix: RetiredFix}
 	}
 	who, storage := cmp.Or(cred.Email, "your account"), cred.Origin()+", credentials "+cred.Storage()
