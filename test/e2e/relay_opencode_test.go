@@ -269,9 +269,11 @@ func TestOpenCodeToolsAndEdit(t *testing.T) {
 						len(openCodeSpans(e, sid, "execute_tool ")) >= 2 && len(openCodeRecords(e, sid, "opencode.user_prompt")) > 0
 				})
 				if !arrived {
-					t.Fatalf("the session did not arrive whole: %d calls, %d tool spans, %d prompts, %d touches; relay %v",
+					// Doctor says why the relay holds what it received (an unread policy or key, a
+					// sender its claim does not cover).
+					t.Fatalf("the session did not arrive whole: %d calls, %d tool spans, %d prompts, %d touches; relay %v\ndoctor:\n%s",
 						len(openCodeCalls(e, sid)), len(openCodeSpans(e, sid, "execute_tool ")), len(openCodeRecords(e, sid, "opencode.user_prompt")),
-						len(termaDelivered(e, "terma.files.touched", sid)), sb.RelayStats())
+						len(termaDelivered(e, "terma.files.touched", sid)), sb.RelayStats(), sb.doctor())
 				}
 				ids := map[string]bool{}
 				for _, s := range openCodeSpans(e, sid, "chat ") {
