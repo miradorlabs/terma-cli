@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -144,13 +145,14 @@ type scriptedSignIn struct {
 	asked    int
 }
 
-func (s *scriptedSignIn) Account() string {
+func (s *scriptedSignIn) Account() string { a, _ := s.Lane(); return a }
+
+func (s *scriptedSignIn) Lane() (string, uint64) {
 	s.smu.Lock()
 	defer s.smu.Unlock()
 	s.asked++
-	a := s.accounts[min(s.asked, len(s.accounts))-1]
-	s.set(a)
-	return a
+	s.set(s.accounts[min(s.asked, len(s.accounts))-1])
+	return s.testSignIn.Lane()
 }
 
 func (s *scriptedSignIn) asks() int {
@@ -292,28 +294,47 @@ func TestALostPartIsNeverHeld(t *testing.T) {
 
 // A sign-in that stayed unreadable through a retry is not waited out again at the next
 // export, which waits a couple of polls and is lost; once it reads, the retry is back.
+//
+// The second export's wait is told by how often it read the sign-in, not by the clock: a
+// slow machine (a loaded Windows runner) makes the export's own handling take longer, but
+// can only make it read less often, so a couple of polls never reads as the whole retry.
 func TestAStillUnreadableSignInIsNotWaitedOutAgain(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t)
-	signIn := &testSignIn{account: sendas.AccountUnreadable}
+	signIn := &countedSignIn{testSignIn: testSignIn{account: sendas.AccountUnreadable}}
 	const retry = time.Second
 	r, srv := laneRelay(t, u, signIn, "", retry)
 	post(t, srv, "/v1/logs", oneLog("first"), "application/x-protobuf", token, false)
-	start := time.Now()
+	before := signIn.reads()
 	post(t, srv, "/v1/logs", oneLog("second"), "application/x-protobuf", token, false)
-	if waited := time.Since(start); waited >= retry/2 {
-		t.Fatalf("the second export waited %v; want only a couple of polls", waited)
+	// unreadableBrief is two polls: a read at arrival, then one at each poll.
+	if n := signIn.reads() - before; n > int(unreadableBrief/unreadablePoll)+1 {
+		t.Fatalf("the second export read the sign-in %d times; want only a couple of polls, not the retry's %d", n, int(retry/unreadablePoll)+1)
 	}
 	waitForCounters(t, r, func(c map[string]int) bool { return c["dropped.unreadable.logs"] == 2 })
 	signIn.set(accountA)
 	post(t, srv, "/v1/logs", oneLog("readable"), "application/x-protobuf", token, false)
 	signIn.set(sendas.AccountUnreadable)
-	start = time.Now()
+	start := time.Now()
 	post(t, srv, "/v1/logs", oneLog("unreadable again"), "application/x-protobuf", token, false)
 	if waited := time.Since(start); waited < retry {
 		t.Fatalf("after a readable sign-in, an export waited only %v; want the retry again", waited)
 	}
 }
+
+// countedSignIn is testSignIn counting the reads of its lane, which only an export's
+// arrival and the relay's start make.
+type countedSignIn struct {
+	testSignIn
+	n atomic.Int64
+}
+
+func (s *countedSignIn) Lane() (string, uint64) {
+	s.n.Add(1)
+	return s.testSignIn.Lane()
+}
+
+func (s *countedSignIn) reads() int { return int(s.n.Load()) }
 
 // readsAgainSignIn is a sign-in that can't be read until armed, then reads as accountA from
 // the read after the next: one written as an export arrives.
@@ -328,14 +349,17 @@ func (s *readsAgainSignIn) arm() {
 	s.mu.Unlock()
 }
 
-func (s *readsAgainSignIn) Account() string {
+func (s *readsAgainSignIn) Account() string { a, _ := s.Lane(); return a }
+
+func (s *readsAgainSignIn) Lane() (string, uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	a := s.account
+	a, gen := s.account, s.gen
 	if s.armed {
-		s.armed, s.account = false, accountA
+		s.armed = false
+		s.setLocked(accountA)
 	}
-	return a
+	return a, gen
 }
 
 // After a failed retry, an export whose sign-in reads again a poll after it arrives is
@@ -364,7 +388,8 @@ type rewrittenSignIn struct {
 
 func (s *rewrittenSignIn) rewrite(account string, takes time.Duration) {
 	s.mu.Lock()
-	s.account, s.until = account, time.Now().Add(takes)
+	s.setLocked(account)
+	s.until = time.Now().Add(takes)
 	s.mu.Unlock()
 }
 
@@ -374,14 +399,16 @@ func (s *rewrittenSignIn) missed() int {
 	return s.misses
 }
 
-func (s *rewrittenSignIn) Account() string {
+func (s *rewrittenSignIn) Account() string { a, _ := s.Lane(); return a }
+
+func (s *rewrittenSignIn) Lane() (string, uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if time.Now().Before(s.until) {
 		s.misses++
-		return sendas.AccountUnreadable
+		return sendas.AccountUnreadable, 0
 	}
-	return s.account
+	return s.account, s.gen
 }
 
 // A retry ends only on the lane read last: the same person's sign-in rewritten as an
@@ -534,15 +561,81 @@ func TestASwitchAndBackSeenByTwoExportsLosesTheWaitingOne(t *testing.T) {
 }
 
 // Reads of the sign-in that finish out of order never move the lane back: a read that
-// started before one already applied is stale, and leaves the lane and its version alone.
+// started before one already applied is stale, and leaves the lane, its generation and the
+// changes alone, at an older generation or the same one (a switch to a server key leaves it).
 func TestAStaleReadNeverMovesTheLaneBack(t *testing.T) {
 	t.Parallel()
+	for _, c := range []struct {
+		name               string
+		olderGen, newerGen uint64
+		newer              string
+	}{
+		{"another person", 1, 2, accountB},
+		{"a server key", 1, 1, sendas.NoPersonLane},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			var l laneState
+			older, newer := l.take(), l.take()
+			l.apply(newer, c.newer, c.newerGen)
+			if before := l.apply(older, accountA, c.olderGen); before != 1 {
+				t.Fatalf("the stale read saw %d changes before it, want 1", before)
+			}
+			if last, gen, changes := l.snapshot(); last != c.newer || gen != c.newerGen || changes != 1 {
+				t.Fatalf("lane %q at generation %d after %d changes; want %q at %d, changed once", last, gen, changes, c.newer, c.newerGen)
+			}
+		})
+	}
+}
+
+// A sign-in read at generation 0 after a later one, as a terma that drops the generation
+// writes it, is a change like any other, and the lane follows it from then on.
+func TestAGenerationStartedAgainIsFollowed(t *testing.T) {
+	t.Parallel()
 	var l laneState
-	older, newer := l.take(), l.take()
-	l.apply(newer, accountB)
-	l.apply(older, accountA)
-	if last, gen := l.snapshot(); last != accountB || gen != 1 {
-		t.Fatalf("lane %q at version %d; want B's, changed once", last, gen)
+	l.apply(l.take(), accountA, 5)
+	l.apply(l.take(), accountA, 0)
+	l.apply(l.take(), accountA, 0)
+	if last, gen, changes := l.snapshot(); last != accountA || gen != 0 || changes != 2 {
+		t.Fatalf("lane %q at generation %d after %d changes; want A's at 0, changed twice", last, gen, changes)
+	}
+}
+
+// A switch from A to B and back to A that no export reads, written as an export arrives,
+// reads at the retry as A again, but at another generation of the sign-in: the export may
+// be B's, so it is lost, never kept as A's.
+func TestASwitchAndBackNoExportReadLosesTheExport(t *testing.T) {
+	t.Parallel()
+	signIn := &rewrittenSignIn{testSignIn: testSignIn{}}
+	signIn.set(accountA)
+	r, srv := rewriteRelay(t, signIn)
+	postProto(t, srv, "/v1/logs", logsOf("first", 1))
+	// To B and back to A, with no export between; A is still being written as the next arrives.
+	signIn.rewrite(accountB, 0)
+	signIn.rewrite(accountA, 2*unreadablePoll)
+	postProto(t, srv, "/v1/logs", logsOf("second", 1))
+	inA, unreadable := laneParts(t, r, accountA)
+	if inA != 1 || unreadable != 1 {
+		t.Fatalf("A's lane holds %d parts, %d lost unreadable; want the first A's and the second lost", inA, unreadable)
+	}
+}
+
+// A switch from A to a server key and back to A that no export reads, written as an export
+// arrives, reads at the retry as A at another generation: the export may be the key's, so it
+// is lost, never credited to A.
+func TestAServerKeyRoundTripNoExportReadLosesTheExport(t *testing.T) {
+	t.Parallel()
+	signIn := &rewrittenSignIn{testSignIn: testSignIn{}}
+	signIn.set(accountA)
+	r, srv := rewriteRelay(t, signIn)
+	postProto(t, srv, "/v1/logs", logsOf("first", 1))
+	signIn.rewrite(sendas.NoPersonLane, 0)
+	signIn.rewrite(accountA, 2*unreadablePoll)
+	postProto(t, srv, "/v1/logs", logsOf("second", 1))
+	inA, unreadable := laneParts(t, r, accountA)
+	inKey, _ := laneParts(t, r, sendas.NoPersonLane)
+	if inA != 1 || inKey != 0 || unreadable != 1 {
+		t.Fatalf("A's lane holds %d parts, the key's %d, %d lost unreadable; want the first A's and the second lost", inA, inKey, unreadable)
 	}
 }
 

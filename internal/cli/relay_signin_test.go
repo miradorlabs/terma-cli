@@ -86,7 +86,7 @@ func TestTheSignInSourceFollowsASwitchAtOnce(t *testing.T) {
 	if got := src.Account(); got != sendas.NoPersonLane {
 		t.Fatalf("after a switch to a server key, account = %q, want no person's lane", got)
 	}
-	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.ServerKeySignIn = false }); err != nil {
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.SetServerKeySignIn(false, "") }); err != nil {
 		t.Fatal(err)
 	}
 	if got := src.Account(); got != auth.AccountKey(f.srv.URL, "u-2") {
@@ -97,6 +97,64 @@ func TestTheSignInSourceFollowsASwitchAtOnce(t *testing.T) {
 	}
 	if got := src.Account(); got != "" {
 		t.Fatalf("after a sign-out, account = %q", got)
+	}
+}
+
+// Lane reads the sign-in's generation with its account: a switch to another person and back
+// that no read saw reads as the same account at a generation two on, so the relay never
+// takes it for the sign-in it read before (relay's arrivalLane).
+func TestTheSignInSourceReadsASwitchAndBackAtAnotherGeneration(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	src := testApp.signInSource(cfg)
+	mine := auth.AccountKey(f.srv.URL, "u-1")
+	account, gen := src.Lane()
+	if account != mine || gen == 0 {
+		t.Fatalf("Lane = %q at %d, want u-1's at a generation", account, gen)
+	}
+	if err := saveSignIn(testApp.dir, storedSessionOf(f, "u-2")); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	if again, at := src.Lane(); again != mine || at != gen+2 {
+		t.Fatalf("after a switch and back, Lane = %q at %d, want u-1's at %d", again, at, gen+2)
+	}
+}
+
+// A switch to the server key and back to the same person, with no read between, moves the
+// lane's generation by the two switches config.json counts, so the relay never takes the
+// person's lane read after it for the one read before.
+func TestTheSignInSourceReadsAServerKeyRoundTripAtAnotherGeneration(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	src := testApp.signInSource(cfg)
+	mine := auth.AccountKey(f.srv.URL, "u-1")
+	account, gen := src.Lane()
+	if account != mine {
+		t.Fatalf("Lane = %q, want u-1's", account)
+	}
+	serverKeyProfile(t)
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { applyLogin(p, cfg, mine) }); err != nil {
+		t.Fatal(err)
+	}
+	if again, at := src.Lane(); again != mine || at != gen+2 {
+		t.Fatalf("after a server key and back, Lane = %q at %d, want u-1's at %d", again, at, gen+2)
 	}
 }
 

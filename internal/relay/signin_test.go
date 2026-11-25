@@ -27,23 +27,45 @@ const (
 )
 
 // testSignIn is a sign-in that can be switched to another account while the relay runs.
+// Its generation counts the changes of whose sign-in it is, as user-credentials.json's does.
 type testSignIn struct {
 	mu      sync.Mutex
 	account string
+	written string // the account last written, readable or not
+	gen     uint64
 	refused []string
 	retired bool
 }
 
 func (s *testSignIn) set(account string) {
 	s.mu.Lock()
-	s.account = account
+	s.setLocked(account)
 	s.mu.Unlock()
 }
 
+// setLocked makes the sign-in read as account, bumping the generation when it is another
+// lane written than the last: another person's, none, or a server key's (whose switches
+// config.json counts). A sign-in that can't be read writes nothing. s.mu is held.
+func (s *testSignIn) setLocked(account string) {
+	if s.gen == 0 && s.account != sendas.AccountUnreadable {
+		s.written = s.account // the lane it was made with
+	}
+	s.account = account
+	if account != sendas.AccountUnreadable && account != s.written {
+		s.written = account
+		s.gen++
+	}
+}
+
 func (s *testSignIn) Account() string {
+	account, _ := s.Lane()
+	return account
+}
+
+func (s *testSignIn) Lane() (string, uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.account
+	return s.account, s.gen
 }
 
 func (s *testSignIn) Token(_ context.Context, account string) (string, error) {
