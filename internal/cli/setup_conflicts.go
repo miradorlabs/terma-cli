@@ -25,8 +25,10 @@ const (
 
 type policyConflict struct {
 	severity conflictSeverity
+	subject  string
 	summary  string
 	nextStep string
+	options  []conflictOption
 }
 
 type parsedClaim struct {
@@ -126,8 +128,10 @@ func planSetupBindings(targets []discoveredTeam, existingTeams []routing.Team, e
 			}
 			conflicts = append(conflicts, policyConflict{
 				severity: conflictPending,
+				subject:  owner + "/*",
 				summary:  fmt.Sprintf("%s/* is claimed by multiple organizations (%s); left pending", owner, joinOrgLabels(wOrgs, orgLabel)),
 				nextStep: fmt.Sprintf("Run `terma teams --bind %s=<org>` or `terma teams --refuse %s` to resolve.", owner, owner),
+				options:  wildcardConflictOptions(owner, wOrgs, orgLabel),
 			})
 			continue
 		}
@@ -146,9 +150,11 @@ func planSetupBindings(targets []discoveredTeam, existingTeams []routing.Team, e
 		if len(otherOrgs) > 0 {
 			conflicts = append(conflicts, policyConflict{
 				severity: conflictPending,
+				subject:  owner + "/*",
 				summary: fmt.Sprintf("%s/* (%s) conflicts with %s (%s); left pending",
 					owner, orgLabel(wildOrg), strings.Join(otherRepos, ", "), joinOrgLabels(otherOrgs, orgLabel)),
 				nextStep: fmt.Sprintf("Run `terma teams --bind %s=<org>` or `terma teams --bind <repo>=<org>` to resolve.", owner),
+				options:  wildcardVsExactOptions(owner, wildOrg, otherRepos, exactOrgs, orgLabel),
 			})
 		}
 	}
@@ -162,8 +168,10 @@ func planSetupBindings(targets []discoveredTeam, existingTeams []routing.Team, e
 			conflictedExact[repoKey] = true
 			conflicts = append(conflicts, policyConflict{
 				severity: conflictPending,
+				subject:  repoKey,
 				summary:  fmt.Sprintf("%s is claimed by multiple organizations (%s); left pending", repoKey, joinOrgLabels(orgs, orgLabel)),
 				nextStep: fmt.Sprintf("Run `terma teams --bind %s=<org>` or `terma teams --refuse %s` to resolve.", repoKey, repoKey),
+				options:  exactConflictOptions(repoKey, orgs, orgLabel),
 			})
 		}
 	}
@@ -344,9 +352,11 @@ func checkExistingDecisionConflict(c parsedClaim, existing map[string]routing.Bi
 	if len(conflictingChildren) > 0 {
 		return &policyConflict{
 			severity: conflictPending,
+			subject:  c.owner + "/*",
 			summary: fmt.Sprintf("%s/* (%s) conflicts with existing decisions under %s (%s); left pending",
 				c.owner, orgLabel(c.orgID), c.owner, strings.Join(conflictingChildren, ", ")),
 			nextStep: fmt.Sprintf("Run `terma teams --bind %s=<org>` or `terma teams --refuse %s` to resolve.", c.owner, c.owner),
+			options:  wildcardVsExistingOptions(c.owner, c.orgID, conflictingChildren, orgLabel),
 		}, true
 	}
 	return nil, false

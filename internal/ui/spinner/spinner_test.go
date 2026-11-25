@@ -68,17 +68,20 @@ func TestSpinnerUpdatesTextWithoutStopping(t *testing.T) {
 	}
 }
 
-// The mark is the eight quadrant glyphs sweeping around one cell.
+// The mark sweeps clockwise across the two half-block cells without repeating a frame.
 func TestFramesSweepTheFourSquares(t *testing.T) {
 	t.Parallel()
 	if len(frames) != 8 {
 		t.Fatalf("want 8 frames, got %d", len(frames))
 	}
-	seen := map[string]bool{}
+	seen := map[frame]bool{}
 	for _, f := range frames {
 		if seen[f] {
-			t.Fatalf("frame %q repeats", f)
+			t.Fatalf("frame %+v repeats", f)
 		}
 		seen[f] = true
+	}
+	if frames[0].left != "▀" || frames[0].right != "▄" {
+		t.Fatalf("first frame should show Terma's diagonal mark (▀▄), got %q%q", frames[0].left, frames[0].right)
 	}
 }

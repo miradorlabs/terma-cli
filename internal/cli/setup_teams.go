@@ -57,7 +57,7 @@ func (app *App) setupTeams(cmd *cobra.Command, cfg *config.Config, org *organiza
 		return config.Policy{}, "", fmt.Errorf("invalid account %q for routing state", account)
 	}
 	if disc != nil && !disc.stub {
-		return app.commitDiscoveredTeams(ctx, cfg, account, disc, ui)
+		return app.commitDiscoveredTeams(ctx, cfg, account, disc, f, ui)
 	}
 	// Single-target path for --desktop-grant and TERMA_POLICY_STUB.
 	baseline := app.loadSetupBaseline(cfg.ProfileName, account)
@@ -88,6 +88,11 @@ func (app *App) setupTeams(cmd *cobra.Command, cfg *config.Config, org *organiza
 	names := loadTeamNames(app.stateDir, cfg.ProfileName)
 	dt := discoveredTeam{team: target, orgName: orgLabel, teamName: cmp.Or(teamName, target.TeamID)}
 	bindings, conflicts := planSetupBindings([]discoveredTeam{dt}, existingTeams, existingBindings, names)
+	extraBindings, conflicts, resolved, err := app.resolveSetupConflicts(f, conflicts)
+	if err != nil {
+		return config.Policy{}, "", err
+	}
+	bindings = append(bindings, extraBindings...)
 
 	var refreshes []setupRefresh
 	if baseline.sameAccount {
@@ -116,11 +121,12 @@ func (app *App) setupTeams(cmd *cobra.Command, cfg *config.Config, org *organiza
 		}
 	}
 	ui.policyFetched(teamName, primary.Policy)
+	ui.reportResolvedConflicts(resolved)
 	ui.reportConflicts(conflicts)
 	return primary.Policy, teamName, nil
 }
 
-func (app *App) commitDiscoveredTeams(ctx context.Context, cfg *config.Config, account string, disc *setupDiscovery, ui *setupUI) (config.Policy, string, error) {
+func (app *App) commitDiscoveredTeams(ctx context.Context, cfg *config.Config, account string, disc *setupDiscovery, f setupFlags, ui *setupUI) (config.Policy, string, error) {
 	baseline := disc.baseline
 	var existingTeams []routing.Team
 	var existingBindings map[string]routing.Binding
@@ -137,6 +143,11 @@ func (app *App) commitDiscoveredTeams(ctx context.Context, cfg *config.Config, a
 	}
 
 	bindings, conflicts := planSetupBindings(disc.teams, existingTeams, existingBindings, disc.names)
+	extraBindings, conflicts, resolved, err := app.resolveSetupConflicts(f, conflicts)
+	if err != nil {
+		return config.Policy{}, "", err
+	}
+	bindings = append(bindings, extraBindings...)
 
 	var refreshes []setupRefresh
 	if baseline.sameAccount {
@@ -158,7 +169,7 @@ func (app *App) commitDiscoveredTeams(ctx context.Context, cfg *config.Config, a
 
 	var committed routing.State
 	var accountSwitched bool
-	err := daemon.WithRoutingRelayGate(app.stateDir, app.version, func() error {
+	err = daemon.WithRoutingRelayGate(app.stateDir, app.version, func() error {
 		var cerr error
 		committed, accountSwitched, cerr = app.commitRoutingStateLocked(cfg.ProfileName, account, baseline, targetTeams, refreshes, bindings, false)
 		return cerr
@@ -197,6 +208,7 @@ func (app *App) commitDiscoveredTeams(ctx context.Context, cfg *config.Config, a
 	for _, w := range disc.warnings {
 		ui.Caution("Teams", w)
 	}
+	ui.reportResolvedConflicts(resolved)
 	ui.reportConflicts(conflicts)
 	return primary.Policy, primaryDisc.teamName, nil
 }

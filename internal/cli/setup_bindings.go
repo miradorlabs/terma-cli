@@ -9,9 +9,10 @@ import (
 )
 
 type bindingChoice struct {
-	key    string
-	org    string
-	refuse bool
+	key      string
+	org      string
+	refuse   bool
+	override bool
 }
 
 // autoSetupBindings computes non-prompting bindings for a single team (used by server-key
@@ -23,10 +24,10 @@ func autoSetupBindings(target routing.Team, existing map[string]routing.Binding)
 
 func applySetupBindingsAll(s *routing.State, choices []bindingChoice) error {
 	for _, c := range choices {
-		if _, decided := s.Bindings[c.key]; decided {
+		if _, decided := s.Bindings[c.key]; decided && !c.override {
 			continue
 		}
-		if config.IsRepositoryKey(c.key) {
+		if config.IsRepositoryKey(c.key) && !c.override {
 			if _, ownerDecided := s.Bindings[routing.Owner(c.key)]; ownerDecided {
 				continue
 			}
@@ -35,7 +36,7 @@ func applySetupBindingsAll(s *routing.State, choices []bindingChoice) error {
 			if err := s.Refuse(c.key); err != nil {
 				return err
 			}
-		} else if err := s.Bind(c.key, c.org, false); err != nil {
+		} else if err := s.Bind(c.key, c.org, c.override); err != nil {
 			return err
 		}
 	}

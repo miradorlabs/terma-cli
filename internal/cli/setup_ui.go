@@ -186,6 +186,13 @@ func entryBoundToOrg(state routing.State, raw string, wildcards bool, orgID stri
 	return false
 }
 
+// reportResolvedConflicts confirms each conflict the developer resolved interactively during setup.
+func (u *setupUI) reportResolvedConflicts(resolved []string) {
+	for _, r := range resolved {
+		u.Summary("Resolved", r)
+	}
+}
+
 // reportConflicts notifies the developer of every policy conflict found during setup.
 func (u *setupUI) reportConflicts(conflicts []policyConflict) {
 	for _, c := range conflicts {

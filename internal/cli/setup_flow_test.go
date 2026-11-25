@@ -416,3 +416,160 @@ func TestSetupPolicyConflictsNotified(t *testing.T) {
 		}
 	})
 }
+
+func TestSetupInteractiveConflictResolution(t *testing.T) {
+	policyJSON := func(version string, repos ...string) string {
+		quoted := make([]string, len(repos))
+		for i, r := range repos {
+			quoted[i] = fmt.Sprintf("%q", r)
+		}
+		return fmt.Sprintf(`{"policy":{"version":%q,"terma":{"per_repository":{"repositories":[%s]},"git_hooks":true,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
+			version, strings.Join(quoted, ","))
+	}
+	stubPrompts := func(t *testing.T, fn func(*prompt.Form) ([]prompt.Item, error)) {
+		t.Helper()
+		origAsk, origForm := testApp.canAsk, testApp.runForm
+		t.Cleanup(func() {
+			testApp.canAsk, testApp.runForm = origAsk, origForm
+		})
+		testApp.canAsk = func() bool { return true }
+		testApp.runForm = fn
+	}
+
+	acmeWeb := projectsIn(orgA().ID)[0].ID
+	acmeAPI := projectsIn(orgA().ID)[1].ID
+	betaCoreID := projectsIn(orgB().ID)[0].ID
+
+	t.Run("resolves exact and wildcard-vs-exact conflicts interactively inside setup", func(t *testing.T) {
+		gateway := newFakeAuth(t)
+		gateway.policyBodies = map[string]string{
+			acmeWeb:    policyJSON("1.1", "github.com/acme/web", "github.com/shared/app"),
+			acmeAPI:    policyJSON("1.1", "github.com/shared-org/api"),
+			betaCoreID: policyJSON("2.0", "github.com/beta/core", "github.com/shared/app", "github.com/shared-org/*"),
+		}
+		authSandbox(t, gateway)
+		sandboxMachine(t)
+		t.Setenv("CODEX_HOME", t.TempDir())
+		t.Setenv("TERMA_POLICY_STUB", "")
+		if err := saveSignIn(testApp.dir, storedSession(gateway)); err != nil {
+			t.Fatal(err)
+		}
+
+		var titles []string
+		stubPrompts(t, func(f *prompt.Form) ([]prompt.Item, error) {
+			titles = append(titles, f.Title)
+			if strings.Contains(f.Title, "coding agents") {
+				for i := range f.Items {
+					f.Items[i].Selected = strings.Contains(f.Items[i].Label, "Codex")
+				}
+				return f.Items, nil
+			}
+			// Keep default selection (split exception for wildcard-vs-exact, Acme for exact repo).
+			return f.Items, nil
+		})
+
+		out, err := runTerma(t, "setup")
+		if err != nil {
+			t.Fatalf("setup: %v\n%s", err, out)
+		}
+		if len(titles) != 3 {
+			t.Fatalf("expected harness form + 2 conflict resolution prompts, got %v", titles)
+		}
+		if !strings.Contains(titles[1], "github.com/shared-org/*") || !strings.Contains(titles[2], "github.com/shared/app") {
+			t.Fatalf("unexpected conflict prompt titles: %v", titles)
+		}
+		for _, want := range []string{
+			"✓ Resolved",
+			"github.com/shared-org/* → Beta Labs (except github.com/shared-org/api → Acme)",
+			"github.com/shared/app → Acme",
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("output missing %q:\n%s", want, out)
+			}
+		}
+		if strings.Contains(out, "! Conflict") || strings.Contains(out, "terma teams --bind") {
+			t.Errorf("resolved conflicts should not leave pending warnings or extra bind commands:\n%s", out)
+		}
+
+		st, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+		if err != nil || !found {
+			t.Fatalf("routing.Load = %v, found=%v", err, found)
+		}
+		if st.Bindings["github.com/shared-org"].Organization != orgB().ID {
+			t.Fatalf("expected github.com/shared-org bound to Beta Labs, got %+v", st.Bindings["github.com/shared-org"])
+		}
+		if st.Bindings["github.com/shared-org/api"].Organization != orgA().ID {
+			t.Fatalf("expected github.com/shared-org/api overridden to Acme, got %+v", st.Bindings["github.com/shared-org/api"])
+		}
+		if st.Bindings["github.com/shared/app"].Organization != orgA().ID {
+			t.Fatalf("expected github.com/shared/app bound to Acme, got %+v", st.Bindings["github.com/shared/app"])
+		}
+	})
+
+	t.Run("choosing Decide later leaves conflict pending with terma teams guidance", func(t *testing.T) {
+		gateway := newFakeAuth(t)
+		gateway.policyBodies = map[string]string{
+			acmeWeb:    policyJSON("1.1", "github.com/acme/web", "github.com/shared/app"),
+			acmeAPI:    policyJSON("1.1", "github.com/acme/api"),
+			betaCoreID: policyJSON("1.1", "github.com/beta/core", "github.com/shared/app"),
+		}
+		authSandbox(t, gateway)
+		sandboxMachine(t)
+		t.Setenv("CODEX_HOME", t.TempDir())
+		t.Setenv("TERMA_POLICY_STUB", "")
+		if err := saveSignIn(testApp.dir, storedSession(gateway)); err != nil {
+			t.Fatal(err)
+		}
+
+		stubPrompts(t, func(f *prompt.Form) ([]prompt.Item, error) {
+			for i := range f.Items {
+				f.Items[i].Selected = strings.Contains(f.Items[i].Label, "Decide later")
+			}
+			return f.Items, nil
+		})
+
+		out, err := runTerma(t, "setup", "--harness", "codex")
+		if err != nil {
+			t.Fatalf("setup: %v\n%s", err, out)
+		}
+		if !strings.Contains(out, "! Conflict") || !strings.Contains(out, "terma teams --bind github.com/shared/app=<org>") {
+			t.Errorf("expected deferred conflict warning + terma teams next step:\n%s", out)
+		}
+		st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, bound := st.Bindings["github.com/shared/app"]; bound {
+			t.Fatalf("deferred repo must remain pending, got %+v", st.Bindings["github.com/shared/app"])
+		}
+	})
+
+	t.Run("cancelling conflict resolution commits nothing", func(t *testing.T) {
+		gateway := newFakeAuth(t)
+		gateway.policyBodies = map[string]string{
+			acmeWeb:    policyJSON("1.1", "github.com/shared/app"),
+			acmeAPI:    policyJSON("1.1", "github.com/acme/api"),
+			betaCoreID: policyJSON("1.1", "github.com/shared/app"),
+		}
+		authSandbox(t, gateway)
+		sandboxMachine(t)
+		t.Setenv("CODEX_HOME", t.TempDir())
+		t.Setenv("TERMA_POLICY_STUB", "")
+		if err := saveSignIn(testApp.dir, storedSession(gateway)); err != nil {
+			t.Fatal(err)
+		}
+
+		stubPrompts(t, func(f *prompt.Form) ([]prompt.Item, error) {
+			return nil, prompt.ErrCancelled
+		})
+
+		_, err := runTerma(t, "setup", "--harness", "codex")
+		if err == nil {
+			t.Fatal("expected cancellation error")
+		}
+		if _, found, err := routing.Load(testApp.stateDir, config.DefaultProfile); err != nil || found {
+			t.Fatalf("routing state must not be committed on conflict cancellation (found=%v, err=%v)", found, err)
+		}
+	})
+}
+
