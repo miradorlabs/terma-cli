@@ -66,9 +66,13 @@ type Credential struct {
 	// Generation counts the changes of whose sign-in the profile holds: every write that
 	// stores another account (Account) than the one before, or none, bumps it, in the same
 	// write (stampGenerations); a token's rotation or a mark leaves it. A sign-out keeps it
-	// in an entry with no session, which reads as signed out. A reader takes it with the
-	// account, from one read of the file (AccountAt), so the relay can tell a sign-in that
-	// changed and changed back from one that never changed (relay's arrivalLane).
+	// in an entry with no session, which reads as signed out; that entry stays, a few bytes,
+	// so a profile signed in again under the same name carries on from it. A reader takes it
+	// with the account, from one read of the file (AccountAt), so the relay can tell a
+	// sign-in that changed and changed back from one that never changed (relay's
+	// arrivalLane). A switch between a server key and a person writes config.json alone, so
+	// it leaves the generation: the lane tells that change, but not a switch to the key and
+	// back to the same person that no read saw.
 	Generation uint64 `json:"generation,omitempty"`
 }
 

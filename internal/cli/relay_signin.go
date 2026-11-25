@@ -122,7 +122,9 @@ func sameFiles(was, now [2]os.FileInfo) bool {
 // generation. A profile whose mode can't be read may be a server key's, which keeps an
 // earlier person's sign-in on disk, or a person's: neither's, so the unreadable account. A
 // server key's lane carries the generation of the sign-in kept behind it, which a switch
-// between the key and a person leaves as it is: there the lane itself tells the change.
+// between the key and a person leaves as it is: there the lane itself tells the change. A
+// sign-in or sign-out behind the key bumps it all the same, so an export's retry that
+// meets one is lost, though its lane is the key's throughout.
 func (s *signInSource) readAccount() (string, uint64) {
 	file, err := config.LoadFile(s.cfg.Dir)
 	if err != nil {
