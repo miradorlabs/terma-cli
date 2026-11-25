@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-25T20:00:21.781670662Z",
+  "generated_at": "2026-11-25T20:17:50.242236524Z",
   "versions": [
     {
       "harness": "copilot",
@@ -93,8 +93,8 @@
       "highlights": [],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-25T13:59:43.551736985Z",
-      "attempts": 2
+      "attempted_at": "2026-11-25T20:17:50.242236524Z",
+      "attempts": 3
     },
     {
       "harness": "claude",
