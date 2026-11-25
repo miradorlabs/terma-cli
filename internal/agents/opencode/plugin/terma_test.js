@@ -59,12 +59,17 @@ afterAll(() => {
 // A fake `terma hook`: a session's hooks run one at a time, so one log keeps their order
 // within each session; each hook appends its line in one write. Each line is the event, a
 // tab, and the JSON it got on stdin. A hook naming a session in slow hangs after logging.
-function fakeTerma(dir, { fail = [], slow = [] } = {}) {
+// An event in delayed takes that many seconds, then writes the time it finished, in
+// milliseconds, to <event>.done.
+function fakeTerma(dir, { fail = [], slow = [], delayed = {} } = {}) {
   const log = join(dir, "hooks.log")
   const path = join(dir, "terma")
   const failing = fail.map((e) => `[ "$2" = "${e}" ] && exit 1`).join("\n")
   const hanging = slow.map((id) => `case "$input" in *'"${id}"'*) exec sleep 30;; esac`).join("\n")
-  writeFileSync(path, `#!/bin/sh\ninput=$(cat)\nprintf '%s\\t%s\\n' "$2" "$input" >> '${log}'\n${hanging}\n${failing}\nexit 0\n`)
+  const waiting = Object.entries(delayed)
+    .map(([e, secs]) => `[ "$2" = "${e}" ] && sleep ${secs} && date +%s%3N > '${join(dir, e + ".done")}'`)
+    .join("\n")
+  writeFileSync(path, `#!/bin/sh\ninput=$(cat)\nprintf '%s\\t%s\\n' "$2" "$input" >> '${log}'\n${hanging}\n${waiting}\n${failing}\nexit 0\n`)
   chmodSync(path, 0o700)
   return {
     argv: [path, "hook"],
@@ -1041,6 +1046,57 @@ test("a file attached to a prompt is reach-checked first, and its content is not
   expect(refused.r.terma.calls().map((c) => c.event)).toEqual(["opencode-session-start", "opencode-tool-reach"])
 })
 
+test("an attached image is reach-checked by the path OpenCode read it from", async () => {
+  const message = {
+    message: { id: "msg_u" },
+    parts: [
+      { type: "text", synthetic: true, text: 'Called the Read tool with the following input: {"filePath":"/repo/dot.png"}' },
+      { type: "text", synthetic: true, text: "Image read successfully" },
+      { type: "file", synthetic: true, mime: "image/png", url: "data:image/png;base64,iVBORw0KGgo=", filename: "dot.png" },
+      { type: "text", text: "what is this" },
+    ],
+  }
+  const { r, hooks } = await start()
+  await hooks.event(sessionCreated("ses_img"))
+  await hooks["chat.message"]({ sessionID: "ses_img" }, structuredClone(message))
+  await hooks.dispose()
+  expect(r.terma.calls()).toEqual([
+    { event: "opencode-session-start", payload: { session_id: "ses_img", cwd: "/repo" } },
+    { event: "opencode-tool-reach", payload: { session_id: "ses_img", cwd: "/repo", tool: "read", paths: ["/repo/dot.png"] } },
+    { event: "opencode-prompt", payload: { session_id: "ses_img", cwd: "/repo" } },
+  ])
+  expect(named(r.logs(), "opencode.user_prompt")[0].body.stringValue).toBe("what is this")
+})
+
+test("a prompt with an attachment waits for its reach check and is stamped after it", async () => {
+  const delayed = { "opencode-tool-reach": 0.3, "opencode-session-start": 0.3 }
+  const { r, hooks } = await start({}, { terma: { delayed } })
+  const done = (e) => (existsSync(join(r.dir, e + ".done")) ? Number(readFileSync(join(r.dir, e + ".done"), "utf8")) : undefined)
+  const message = (id, parts) => ({ message: { id, time: { created: 1500 } }, parts })
+
+  // No attachment: OpenCode goes on at once, before the slow claim, at the message's time.
+  await hooks.event(sessionCreated("ses_plain"))
+  const t0 = Date.now()
+  await hooks["chat.message"]({ sessionID: "ses_plain" }, message("msg_plain", [{ type: "text", text: "hi" }]))
+  expect(Date.now() - t0).toBeLessThan(200)
+
+  await hooks.event(sessionCreated("ses_att"))
+  await hooks["chat.message"](
+    { sessionID: "ses_att" },
+    message("msg_att", [
+      { type: "file", mime: "text/plain", url: "file:///repo/notes.txt", filename: "notes.txt" },
+      { type: "text", text: "summarize it" },
+    ]),
+  )
+  const finished = done("opencode-tool-reach")
+  expect(finished).toBeNumber()
+  await hooks.dispose()
+
+  const at = (id) => Number(BigInt(named(r.logs(), "opencode.user_prompt").find((l) => A(l)["opencode.message.id"] === id).timeUnixNano) / 1000000n)
+  expect(at("msg_plain")).toBe(1500)
+  expect(at("msg_att")).toBeGreaterThan(finished)
+}, 15_000)
+
 test("a patch that moves a file names both paths", async () => {
   const { r, hooks } = await start()
   await hooks.event(sessionCreated("ses_mv"))
@@ -1063,6 +1119,25 @@ test("an assistant message no model answered is not a call; its tool part still 
   await hooks.dispose()
   expect(chats(r.spans()).map((s) => [A(s)["opencode.call.id"], s.status.code])).toEqual([["msg_err", 2]])
   expect(tools(r.spans()).map((s) => A(s)["gen_ai.tool.call.id"])).toEqual(["msg_sh:c1"])
+})
+
+test("a model call is a message with step parts, not one with a finish", async () => {
+  const { r, hooks } = await start()
+  await hooks.event(sessionCreated("ses_cmd"))
+  const zero = { cost: 0, tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } } }
+  const step = (messageID, type) => ev("message.part.updated", { part: { id: "prt_" + messageID + "_" + type, sessionID: "ses_cmd", messageID, type } })
+  // A command's subagent is launched by a message no model wrote.
+  await hooks.event(toolPart("ses_cmd", "msg_launch", "c1", "task", done({ prompt: "review" }, "done", { metadata: { sessionId: "ses_child" } })))
+  await hooks.event(assistantDone("ses_cmd", "msg_launch", { ...zero, finish: "tool-calls" }))
+  // A provider that reports no usage still made a call.
+  await hooks.event(step("msg_free", "step-start"))
+  await hooks.event(step("msg_free", "step-finish"))
+  await hooks.event(assistantDone("ses_cmd", "msg_free", { ...zero, finish: "stop" }))
+  await hooks.dispose()
+  expect(chats(r.spans()).map((s) => A(s)["opencode.call.id"])).toEqual(["msg_free"])
+  const [task] = tools(r.spans())
+  expect(A(task)["gen_ai.tool.call.id"]).toBe("msg_launch:c1")
+  expect(A(task)["opencode.tool.subagent_session.id"]).toBe("ses_child")
 })
 
 test("MCP names belong to the directory that configured them", async () => {

@@ -62,6 +62,8 @@ const BUILTIN_UNDERSCORE_TOOLS = new Set(["apply_patch", "plan_enter", "plan_exi
 // OpenCode 1.x names the placeholder this way until the title call answers.
 const PLACEHOLDER_TITLE = /^New session - \d{4}-\d{2}-\d{2}T/
 const RULE_REFUSAL = "The user has specified a rule which prevents"
+// How OpenCode 1 opens the synthetic part for a file attached to a prompt.
+const READ_ATTACHMENT = "Called the Read tool with the following input: "
 
 // --- state --------------------------------------------------------------------------
 
@@ -949,11 +951,14 @@ function onAssistant1(s, info) {
   remember(s.doneCalls, info.id)
   const parts = s.texts.get(info.id)
   s.texts.delete(info.id)
-  // A shell command the person ran makes an assistant message that no model answered: no
-  // finish, no error and no usage. It is not a call.
+  const stepped = s.entry.steps?.has(info.id) === true
+  s.entry.steps?.delete(info.id)
+  // Every model call has step parts. A shell command the person ran, or the message that
+  // launches a command's subagent, has none, no error and no usage: no model answered it,
+  // whatever its finish says. It is not a call.
   const t = info.tokens ?? {}
   const usage = [info.cost, t.input, t.output, t.reasoning, t.cache?.read, t.cache?.write]
-  if (!info.error && !(typeof info.finish === "string" && info.finish) && !usage.some((v) => num(v) > 0)) return
+  if (!info.error && !stepped && !usage.some((v) => num(v) > 0)) return
   const text = parts ? [...parts.values()].filter((t) => t).join("\n\n") : ""
   const tokens = info.tokens && typeof info.tokens === "object" ? info.tokens : null
   const compaction = info.summary === true
@@ -1117,6 +1122,9 @@ async function server(input) {
         } else if (part.type === "tool") {
           const s = see(part.sessionID)
           run(s, () => onToolPart1(s, part, mcpServers))
+        } else if (part.type === "step-start" || part.type === "step-finish") {
+          const s = see(part.sessionID)
+          run(s, () => remember((s.entry.steps ??= new Set()), part.messageID))
         }
         return
       }
@@ -1156,6 +1164,7 @@ async function server(input) {
       // An attached file (or folder) is read into synthetic text parts with no tool call:
       // reach-check it as a read or a list, and keep its content out of the prompt.
       const reaches = []
+      const taken = new Set()
       for (const x of parts) {
         if (x?.type !== "file" || typeof x.url !== "string" || !x.url.startsWith("file:")) continue
         let path
@@ -1165,6 +1174,21 @@ async function server(input) {
           continue
         }
         reaches.push(x.mime === "application/x-directory" ? { tool: "list", lists: [path] } : { tool: "read", paths: [path] })
+        taken.add(path)
+      }
+      // An attached image or PDF arrives as a data: URL; where it came from is only in the
+      // synthetic part that says OpenCode read it.
+      for (const x of parts) {
+        if (x?.type !== "text" || x.synthetic !== true || !str(x.text).startsWith(READ_ATTACHMENT)) continue
+        let path
+        try {
+          path = JSON.parse(x.text.slice(READ_ATTACHMENT.length))?.filePath
+        } catch {
+          continue
+        }
+        if (typeof path !== "string" || !path || taken.has(path)) continue
+        reaches.push({ tool: "read", paths: [path] })
+        taken.add(path)
       }
       // Under `opencode run` the hook's own input names no agent or model; the message does.
       const pr = {
@@ -1175,10 +1199,14 @@ async function server(input) {
         provider: msg.model?.providerID ?? inp?.model?.providerID,
         time: num(msg.time?.created),
       }
-      run(s, async () => {
+      const sent = run(s, async () => {
         for (const reach of reaches) if (!(await guardReach(s, reach))) return
+        // A reach that crosses organizations marks the run from the moment its hook did; the
+        // prompt is stamped after it, and OpenCode goes on only once the checks are done.
+        if (reaches.length > 0) pr.time = Math.max(pr.time ?? 0, Date.now() + 1)
         if (!isTainted(s)) prompt(s, pr)
       })
+      if (reaches.length > 0) await sent
     }),
 
     // Only to see the title call start. It writes nothing to the request.
