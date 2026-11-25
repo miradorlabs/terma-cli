@@ -3,6 +3,54 @@
   "id": "claude-fable-5-2",
   "steps": [
     {
+      "at": "2026-11-25T00:34:16.969764304Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+159 −139 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -97,7 +97,7 @@\n * Adaptive thinking is always on and can’t be turned off. Control thinking depth with the [effort parameter](https://platform.claude.com/docs/en/build-with-claude/effort).\n * Forced tool use (`tool_choice` types `any` and `tool`) returns a 400 error. See [Thinking and tool choice](https://platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2#thinking-and-tool-choice).\n * Omit `temperature`, `top_p`, and `top_k`. See [Sampling parameters](https://platform.claude.com/docs/en/build-with-claude/thinking#sampling-parameters) for the values that return a 400 error.\n-* Claude Fable 5.2 requires 30-day data retention and isn’t available under zero data retention unless expressly authorized by Anthropic.\n+* Claude Fable 5.2 requires 30-day data retention and isn’t available under legacy zero data retention (Legacy ZDR) unless expressly authorized by Anthropic.\n See [Model-specific data retention requirements](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention#model-specific-data-retention-requirements).\n * Query limits and capabilities programmatically with the [Models API](https://platform.claude.com/docs/en/api/models/list).\n \n",
+          "stats": {
+            "added_chars": 159,
+            "removed_chars": 139
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        },
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+179 −159 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -218,7 +218,7 @@\n \n To request access, apply to the program that covers your use case, or contact your account team.\n \n-Claude Fable 5.2 and Claude Mythos 5.2 require 30-day data retention and aren’t available under zero data retention unless expressly authorized by Anthropic.\n+Claude Fable 5.2 and Claude Mythos 5.2 require 30-day data retention and aren’t available under legacy zero data retention (Legacy ZDR) unless expressly authorized by Anthropic.\n Both are [Covered Models](https://support.claude.com/en/articles/15425695).\n See [Model-specific data retention requirements](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention#model-specific-data-retention-requirements).\n \n",
+          "stats": {
+            "added_chars": 179,
+            "removed_chars": 159
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-20T19:23:57.807121456Z",
       "event": "changed",
       "changes": [
