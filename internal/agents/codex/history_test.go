@@ -3,9 +3,11 @@ package codex
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -295,14 +297,14 @@ func TestCodexToolFailureTraceResetAndRepeatedLegacyPrompts(t *testing.T) {
 func TestCodexCrossCwdToolArgsDroppedAndResumedStartUsesSegmentTimestamp(t *testing.T) {
 	t.Parallel()
 	lines := []string{
-		`{"timestamp":"2026-10-03T10:00:00Z","type":"session_meta","payload":{"id":"sess-xorg","timestamp":"2026-10-03T10:00:00Z","cwd":"/work/repo-a"}}`,
+		`{"timestamp":"2026-10-03T10:00:00Z","type":"session_meta","payload":{"id":"sess-xorg","timestamp":"2026-10-03T10:00:00Z","cwd":` + jsonText(workPath("repo-a")) + `}}`,
 		`{"timestamp":"2026-10-03T10:00:01Z","type":"response_item","payload":{"type":"function_call","call_id":"call-1","name":"shell","arguments":"{\"cmd\":\"echo SECRET_ORG_A_ARG\"}"}}`,
-		`{"timestamp":"2026-10-03T10:00:02Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"FileChange","id":"fc-a","changes":[{"path":"/work/repo-a/touched.go"}]}}}`,
-		`{"timestamp":"2026-10-03T11:00:00Z","type":"turn_context","payload":{"turn_id":"t2","cwd":"/work/repo-b"}}`,
+		`{"timestamp":"2026-10-03T10:00:02Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"FileChange","id":"fc-a","changes":[{"path":` + jsonText(workPath("repo-a/touched.go")) + `}]}}}`,
+		`{"timestamp":"2026-10-03T11:00:00Z","type":"turn_context","payload":{"turn_id":"t2","cwd":` + jsonText(workPath("repo-b")) + `}}`,
 		`{"timestamp":"2026-10-03T11:00:01Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call-1","output":"SECRET_ORG_A_OUTPUT"}}`,
 		`{"timestamp":"2026-10-03T11:00:02Z","type":"event_msg","payload":{"type":"user_message","message":"work in repo b"}}`,
-		`{"timestamp":"2026-10-03T11:00:03Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"CommandExecution","id":"exec-b","command":["/bin/sh","-c","cat rel.go"],"cwd":"file:///work/repo-c","status":"completed","exit_code":0}}}`,
-		`{"timestamp":"2026-10-03T11:00:04Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"FileChange","id":"fc-1","changes":[{"path":"/work/repo-d/patched.go"}]}}}`,
+		`{"timestamp":"2026-10-03T11:00:03Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"CommandExecution","id":"exec-b","command":["/bin/sh","-c","cat rel.go"],"cwd":` + jsonText(fileURL(workPath("repo-c"))) + `,"status":"completed","exit_code":0}}}`,
+		`{"timestamp":"2026-10-03T11:00:04Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"FileChange","id":"fc-1","changes":[{"path":` + jsonText(workPath("repo-d/patched.go")) + `}]}}}`,
 	}
 	path := filepath.Join(t.TempDir(), "rollout-xorg.jsonl")
 	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
@@ -317,11 +319,11 @@ func TestCodexCrossCwdToolArgsDroppedAndResumedStartUsesSegmentTimestamp(t *test
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if len(segs) != 2 || segs[0].Cwd != "/work/repo-a" || segs[0].RecordCount != 0 || segs[1].Cwd != "/work/repo-b" {
-		t.Fatalf("got %d segments %+v, want reach-only /work/repo-a then /work/repo-b", len(segs), segs)
+	if len(segs) != 2 || segs[0].Cwd != workPath("repo-a") || segs[0].RecordCount != 0 || segs[1].Cwd != workPath("repo-b") {
+		t.Fatalf("got %d segments %+v, want reach-only %s then %s", len(segs), segs, workPath("repo-a"), workPath("repo-b"))
 	}
 	if len(segs[0].ToolReaches) == 0 {
-		t.Fatalf("expected /work/repo-a reach-only segment to preserve pre-switch ToolReaches")
+		t.Fatalf("expected repo-a reach-only segment to preserve pre-switch ToolReaches")
 	}
 	wire, _ := proto.Marshal(segs[1].NativeLogs)
 	if strings.Contains(string(wire), "SECRET_ORG_A") {
@@ -337,17 +339,18 @@ func TestCodexCrossCwdToolArgsDroppedAndResumedStartUsesSegmentTimestamp(t *test
 	// while repo-a reach stayed isolated in segs[0] and did not contaminate segs[1].
 	var sawC, sawD bool
 	for _, r := range segs[1].ToolReaches {
-		if r.Cwd == "/work/repo-c" {
+		if r.Cwd == workPath("repo-c") {
 			sawC = true
 		}
 		for _, p := range r.Paths {
-			if strings.Contains(p, "/work/repo-c") {
+			p = filepath.ToSlash(p)
+			if strings.Contains(p, "work/repo-c") {
 				sawC = true
 			}
-			if strings.Contains(p, "/work/repo-d/patched.go") {
+			if strings.Contains(p, "work/repo-d/patched.go") {
 				sawD = true
 			}
-			if strings.Contains(p, "/work/repo-a") {
+			if strings.Contains(p, "work/repo-a") {
 				t.Errorf("stale repo-a reach survived into repo-b segment: %+v", r)
 			}
 		}
@@ -399,7 +402,7 @@ func TestCodexBoundedSingleCwdFlushEmitsOneConversationStart(t *testing.T) {
 func TestCodexLegacyShellArgvPatchWrapperSubagentParentAndBareReach(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("CODEX_HOME", home)
-	t.Setenv("WORKSPACE", "/work/repo-a")
+	t.Setenv("WORKSPACE", workPath("repo-a"))
 
 	sessDir := filepath.Join(home, "sessions", "2026", "10", "03")
 	if err := os.MkdirAll(sessDir, 0o755); err != nil {
@@ -410,16 +413,24 @@ func TestCodexLegacyShellArgvPatchWrapperSubagentParentAndBareReach(t *testing.T
 	parentPath := filepath.Join(sessDir, "rollout-2026-10-03T10-00-00-"+parentID+".jsonl")
 	childPath := filepath.Join(sessDir, "rollout-2026-10-03T10-01-00-"+childID+".jsonl")
 
+	// function_call arguments is a JSON string that holds JSON, so it is encoded twice.
+	argvArgs := jsonText(jsonText(map[string]any{
+		"command": []string{"/bin/sh", "-c", "cat " + filepath.ToSlash(workPath("repo-b/secret.go"))},
+		"workdir": workPath("repo-b"),
+	}))
+	patchArgs := jsonText(jsonText(map[string]any{
+		"input": "*** Begin Patch\n*** Update File: " + workPath("repo-c/patch.go") + "\n@@\n-a\n+b\n*** End Patch\n",
+	}))
 	parentLines := []string{
-		`{"timestamp":"2026-10-03T10:00:00Z","type":"session_meta","payload":{"id":"` + parentID + `","cwd":"/work/repo-a","git":{"branch":"feature-a"}}}`,
-		`{"timestamp":"2026-10-03T10:00:01Z","type":"response_item","payload":{"type":"function_call","call_id":"c-argv","name":"shell","arguments":"{\"command\":[\"/bin/sh\",\"-c\",\"cat /work/repo-b/secret.go\"],\"workdir\":\"/work/repo-b\"}"}}`,
-		`{"timestamp":"2026-10-03T10:00:02Z","type":"response_item","payload":{"type":"function_call","call_id":"c-patch","name":"apply_patch","arguments":"{\"input\":\"*** Begin Patch\\n*** Update File: /work/repo-c/patch.go\\n@@\\n-a\\n+b\\n*** End Patch\\n\"}"}}`,
+		`{"timestamp":"2026-10-03T10:00:00Z","type":"session_meta","payload":{"id":"` + parentID + `","cwd":` + jsonText(workPath("repo-a")) + `,"git":{"branch":"feature-a"}}}`,
+		`{"timestamp":"2026-10-03T10:00:01Z","type":"response_item","payload":{"type":"function_call","call_id":"c-argv","name":"shell","arguments":` + argvArgs + `}}`,
+		`{"timestamp":"2026-10-03T10:00:02Z","type":"response_item","payload":{"type":"function_call","call_id":"c-patch","name":"apply_patch","arguments":` + patchArgs + `}}`,
 		`{"timestamp":"2026-10-03T10:00:03Z","type":"response_item","payload":{"type":"function_call","call_id":"c-env","name":"exec_command","arguments":"{\"cmd\":\"cat $WORKSPACE/notes\"}"}}`,
-		`{"timestamp":"2026-10-03T10:00:04Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"FileChange","id":"fc-bare","path":"/work/repo-d/bare.go"}}}`,
+		`{"timestamp":"2026-10-03T10:00:04Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"FileChange","id":"fc-bare","path":` + jsonText(workPath("repo-d/bare.go")) + `}}}`,
 	}
 	childLines := []string{
-		`{"timestamp":"2026-10-03T10:01:00Z","type":"session_meta","payload":{"id":"` + childID + `","cwd":"/work/repo-a","source":{"subagent":{"thread_spawn":{"parent_thread_id":"` + parentID + `","depth":1}}}}}`,
-		`{"timestamp":"2026-10-03T10:01:05Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"FileChange","id":"fc-child","path":"/work/repo-b/from-child.go"}}}`,
+		`{"timestamp":"2026-10-03T10:01:00Z","type":"session_meta","payload":{"id":"` + childID + `","cwd":` + jsonText(workPath("repo-a")) + `,"source":{"subagent":{"thread_spawn":{"parent_thread_id":"` + parentID + `","depth":1}}}}}`,
+		`{"timestamp":"2026-10-03T10:01:05Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"FileChange","id":"fc-child","path":` + jsonText(workPath("repo-b/from-child.go")) + `}}}`,
 	}
 	for p, lines := range map[string][]string{parentPath: parentLines, childPath: childLines} {
 		if err := os.WriteFile(p, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
@@ -466,13 +477,14 @@ func TestCodexLegacyShellArgvPatchWrapperSubagentParentAndBareReach(t *testing.T
 	var sawB, sawC, sawD, sawUnknown bool
 	for _, r := range segs[0].ToolReaches {
 		for _, p := range r.Paths {
-			if strings.Contains(p, "/work/repo-b") {
+			p = filepath.ToSlash(p)
+			if strings.Contains(p, "work/repo-b") {
 				sawB = true
 			}
-			if strings.Contains(p, "/work/repo-c/patch.go") {
+			if strings.Contains(p, "work/repo-c/patch.go") {
 				sawC = true
 			}
-			if strings.Contains(p, "/work/repo-d/bare.go") {
+			if strings.Contains(p, "work/repo-d/bare.go") {
 				sawD = true
 			}
 			if strings.Contains(p, "\x00unknown") {
@@ -488,7 +500,7 @@ func TestCodexLegacyShellArgvPatchWrapperSubagentParentAndBareReach(t *testing.T
 	// containing literal $foo must stay shell-quoted and NOT trigger UnknownReach.
 	workDir := t.TempDir()
 	notesB := filepath.Join(workDir, "B", "notes")
-	headReach := codexCommandReachPaths([]string{"head", "-c", "80", notesB}, "/work/repo-a", "/work/repo-a")
+	headReach := codexCommandReachPaths([]string{"head", "-c", "80", notesB}, workPath("repo-a"), workPath("repo-a"))
 	sawHeadB := false
 	for _, p := range headReach {
 		if strings.Contains(p, notesB) {
@@ -498,7 +510,7 @@ func TestCodexLegacyShellArgvPatchWrapperSubagentParentAndBareReach(t *testing.T
 	if !sawHeadB {
 		t.Errorf("head -c 80 %s lost target argument: %+v", notesB, headReach)
 	}
-	rgReach := codexCommandReachPaths([]string{"rg", "$foo", "main.go"}, "/work/repo-a", "/work/repo-a")
+	rgReach := codexCommandReachPaths([]string{"rg", "$foo", "main.go"}, workPath("repo-a"), workPath("repo-a"))
 	for _, p := range rgReach {
 		if strings.Contains(p, "\x00unknown") {
 			t.Errorf("direct argv rg $foo falsely triggered UnknownReach: %+v", rgReach)
@@ -532,6 +544,57 @@ func cxBoolTrue(attrs []*commonpb.KeyValue, key string) bool {
 		}
 	}
 	return false
+}
+
+// workPath returns rel (written with forward slashes) under a made-up absolute root, as
+// this operating system writes one: /work/<rel> on Unix, C:\work\<rel> on Windows.
+func workPath(rel string) string {
+	if runtime.GOOS == "windows" {
+		return `C:\work\` + filepath.FromSlash(rel)
+	}
+	return "/work/" + rel
+}
+
+// fileURL returns the file:// URL for the absolute path p.
+func fileURL(p string) string {
+	s := filepath.ToSlash(p)
+	if !strings.HasPrefix(s, "/") {
+		s = "/" + s
+	}
+	return "file://" + s
+}
+
+// jsonText returns v encoded as JSON, for splicing into a fixture line.
+func jsonText(v any) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
+}
+
+func TestFileURLPath(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		raw     string
+		windows bool
+		want    string
+	}{
+		{"file:///work/repo-c", false, "/work/repo-c"},
+		{"file:///work/my%20repo", false, "/work/my repo"},
+		{"file:///C:/Users/foo/repo", true, `C:\Users\foo\repo`},
+		{"file:///c%3A/Users/foo/repo", true, `c:\Users\foo\repo`},
+		{"file://localhost/C:/Users/foo", true, `C:\Users\foo`},
+		{"file://server/share/dir", true, `\\server\share\dir`},
+		{"file:///work/repo-c", true, `\work\repo-c`},
+	} {
+		if got := fileURLPath(tc.raw, tc.windows); got != tc.want {
+			t.Errorf("fileURLPath(%q, windows=%v) = %q, want %q", tc.raw, tc.windows, got, tc.want)
+		}
+	}
+	if got := codexNormalizeCwd(fileURL(workPath("repo-c")), workPath("repo-a")); got != workPath("repo-c") {
+		t.Errorf("codexNormalizeCwd(%q) = %q, want %q", fileURL(workPath("repo-c")), got, workPath("repo-c"))
+	}
 }
 
 func hasUnknownReach(paths []string) bool {
@@ -582,8 +645,8 @@ func TestCodexImageViewIsAReach(t *testing.T) {
 		return nil
 	})
 	for _, line := range []string{
-		`{"timestamp":"2026-10-03T10:00:00Z","type":"session_meta","payload":{"id":"019d2b54-7a10-7000-8000-000000000301","cwd":"/work/repo-a"}}`,
-		`{"timestamp":"2026-10-03T10:00:02Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"ImageView","id":"iv-1","path":"file:///work/repo-b/design.png"}}}`,
+		`{"timestamp":"2026-10-03T10:00:00Z","type":"session_meta","payload":{"id":"019d2b54-7a10-7000-8000-000000000301","cwd":` + jsonText(workPath("repo-a")) + `}}`,
+		`{"timestamp":"2026-10-03T10:00:02Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"ImageView","id":"iv-1","path":` + jsonText(fileURL(workPath("repo-b/design.png"))) + `}}}`,
 	} {
 		if err := p.handleLine([]byte(line), 0); err != nil {
 			t.Fatal(err)
@@ -592,7 +655,8 @@ func TestCodexImageViewIsAReach(t *testing.T) {
 	if err := p.finish(); err != nil {
 		t.Fatal(err)
 	}
-	if !slices.ContainsFunc(reached, func(r string) bool { return strings.HasSuffix(r, filepath.FromSlash("/work/repo-b/design.png")) }) {
+	// The whole path, so one joined onto the session's working directory does not pass.
+	if !slices.Contains(reached, "\x00alone\x00"+workPath("repo-b/design.png")) {
 		t.Errorf("ImageView path not recorded as a reach: %q", reached)
 	}
 }

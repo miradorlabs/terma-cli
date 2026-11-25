@@ -9,7 +9,6 @@ import (
 	"errors"
 	"io"
 	"io/fs"
-	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -242,27 +241,6 @@ func (Agent) ReadHistory(ctx context.Context, file agents.HistoryFile, opts agen
 
 var _ agents.HistorySource = Agent{}
 
-// codexNormalizeCwd turns a recorded working directory (possibly a file:// URL) into a
-// path. A relative result is taken against fallback when there is one, since
-// CommandExecution and FileChange items can record a cwd relative to the session's.
-func codexNormalizeCwd(raw, fallback string) string {
-	s := strings.TrimSpace(raw)
-	if s == "" {
-		return fallback
-	}
-	if strings.HasPrefix(s, "file://") {
-		if u, err := url.Parse(s); err == nil && u.Path != "" {
-			s = filepath.FromSlash(u.Path)
-		} else {
-			s = strings.TrimPrefix(s, "file://")
-		}
-	}
-	if !filepath.IsAbs(s) && fallback != "" {
-		return filepath.Join(fallback, s)
-	}
-	return s
-}
-
 // shellReserved lists the words a shell reads as syntax when they start a command.
 const shellReserved = "if then else elif fi for while until do done case esac select function time coproc in"
 
@@ -287,10 +265,10 @@ func shellArgvCommand(argv []string) string {
 }
 
 // codexCommandReachPaths returns what a CommandExecution's argv reaches: its working
-// directory when it differs from the session's, and the paths the shell scan finds in the
-// command, which unwraps `bash -c '<script>'` the same way the live Codex hook does.
-func codexCommandReachPaths(cmd []string, itemCwd, sessionCwd string) []string {
-	dir := codexNormalizeCwd(itemCwd, sessionCwd)
+// directory dir, already resolved against the session's, when it differs from the
+// session's cwd, and the paths the shell scan finds in the command, which unwraps
+// `bash -c '<script>'` the same way the live Codex hook does.
+func codexCommandReachPaths(cmd []string, dir, sessionCwd string) []string {
 	var out []string
 	if dir != "" && dir != sessionCwd {
 		out = append(out, hookrun.Alone(dir)...)
@@ -340,12 +318,9 @@ func codexToolReachPaths(name, args, cwd string) []string {
 	}
 	var out []string
 	dir := cwd
-	if wd := codexNormalizeCwd(cmp.Or(strField("workdir"), strField("cwd")), ""); wd != "" {
-		if !filepath.IsAbs(wd) && cwd != "" {
-			wd = filepath.Join(cwd, wd)
-		}
-		dir = wd
-		out = append(out, hookrun.Alone(wd)...)
+	if raw := cmp.Or(strField("workdir"), strField("cwd")); strings.TrimSpace(raw) != "" {
+		dir = codexNormalizeCwd(raw, cwd)
+		out = append(out, hookrun.Alone(dir)...)
 	}
 	scanCmd := func(raw json.RawMessage) {
 		if len(raw) == 0 {

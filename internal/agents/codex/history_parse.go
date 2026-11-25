@@ -305,7 +305,7 @@ func (p *codexHistoryParser) handleEventMsg(raw json.RawMessage, ts time.Time) e
 			}
 			p.emittedCalls[pl.Item.ID] = true
 			cmdCwd := codexNormalizeCwd(pl.Item.Cwd, p.cwd)
-			if paths := codexCommandReachPaths(pl.Item.Command, pl.Item.Cwd, p.cwd); len(paths) > 0 {
+			if paths := codexCommandReachPaths(pl.Item.Command, cmdCwd, p.cwd); len(paths) > 0 {
 				p.addReach(ts, cmdCwd, paths)
 			}
 			argsJSON, _ := json.Marshal(map[string]any{"cmd": strings.Join(pl.Item.Command, " ")})
