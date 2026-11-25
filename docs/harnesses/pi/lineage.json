@@ -3,8 +3,8 @@
   "harness": "pi",
   "window": {
     "oldest": "1.2.0",
-    "newest": "1.6.0",
-    "builds": 7
+    "newest": "1.6.1",
+    "builds": 8
   },
   "items": {
     "cli.commands.pi auth": {
@@ -2855,6 +2855,61 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.notices": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.6.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.notices.cacheMisses": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.6.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.notices.cacheWarming": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.6.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.notices.compactionCosts": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.6.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
+    "config.options.notices.reasoningDrops": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.6.1",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.npmCommand": {
       "kind": "setting",

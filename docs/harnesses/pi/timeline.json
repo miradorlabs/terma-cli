@@ -3,6 +3,84 @@
   "harness": "pi",
   "steps": [
     {
+      "version": "1.6.1",
+      "previous": "1.6.0",
+      "changes": [
+        {
+          "id": "config.options.notices",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: notices",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.notices.cacheMisses",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: notices.cacheMisses",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.notices.cacheWarming",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: notices.cacheWarming",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.notices.compactionCosts",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: notices.compactionCosts",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.notices.reasoningDrops",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: notices.reasoningDrops",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.showCacheMissNotices.default",
+          "category": "config",
+          "op": "changed",
+          "title": "Default of showCacheMissNotices: false → none",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "config.options.showCacheMissNotices.deprecated",
+          "category": "config",
+          "op": "changed",
+          "title": "Setting showCacheMissNotices deprecated",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "config.options.showCacheMissNotices.description",
+          "category": "config",
+          "op": "changed",
+          "title": "showCacheMissNotices description changed (+35 −46 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "binary.sdk.@google/genai",
+          "category": "binary",
+          "op": "changed",
+          "title": "Binary sdk.@google/genai: 2.32.0 → 3.6.1",
+          "impact": "informational",
+          "documented": false
+        }
+      ]
+    },
+    {
       "version": "1.6.0",
       "previous": "1.5.2",
       "changes": [

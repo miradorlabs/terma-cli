@@ -11,24 +11,54 @@
       "language": "typescript"
     },
     "changelog": "https://github.com/earendil-works/pi/releases",
-    "latest": "1.6.0",
+    "latest": "1.6.1",
     "support": "supported",
-    "versions_tracked": 7,
+    "versions_tracked": 8,
     "first_tracked": "2026-10-12",
     "last_change": {
-      "from": "1.5.2",
-      "to": "1.6.0",
-      "at": "2026-11-21T06:02:42.430396245Z",
-      "released_at": "2026-11-20T11:09:15.529Z",
-      "changes": 7,
+      "from": "1.6.0",
+      "to": "1.6.1",
+      "at": "2026-11-25T13:45:44.81423974Z",
+      "released_at": "2026-11-25T13:41:09.982Z",
+      "changes": 9,
       "categories": {
-        "binary": 3,
-        "cli": 2,
-        "request": 2
+        "binary": 1,
+        "config": 8
       }
     }
   },
   "versions": [
+    {
+      "version": "1.6.1",
+      "released_at": "2026-11-25T13:41:09.982Z",
+      "captured_at": "2026-11-25T13:45:44.81423974Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.6.0",
+      "changes": 9,
+      "categories": {
+        "binary": 1,
+        "config": 8
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 7,
+        "notable": 2
+      },
+      "undocumented": 2,
+      "highlights": [
+        "Default of showCacheMissNotices: false → none",
+        "Setting showCacheMissNotices deprecated",
+        "New setting: notices"
+      ],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-25T13:45:44.81423974Z",
+      "attempts": 1
+    },
     {
       "version": "1.6.0",
       "released_at": "2026-11-20T11:09:15.529Z",
