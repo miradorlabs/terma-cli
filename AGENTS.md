@@ -4,7 +4,7 @@ This file provides guidance to coding agents (Claude Code, Codex and others) whe
 with code in this repository.
 
 `terma` is a Go CLI that connects coding agents (Claude Code, Codex, GitHub Copilot, OMP,
-Antigravity, Grok Build) to Terma and stamps the commits they produce with the agent session that
+Antigravity, Grok Build, OpenCode) to Terma and stamps the commits they produce with the agent session that
 wrote them.
 
 ## Commands
@@ -158,8 +158,12 @@ content too: the prompt and the reply from the transcript, a tool call's argumen
 of the team routing sends the hook's checkout to (`hookrun.Env.PolicyFor`) and only for
 workspaces routing sends to that same team (`hookrun.Env.RoutesWith`). grok's export often
 loses the prompt, so its prompt hook sends it as `terma.user.message` under the routed
-team's policy (`PolicyFor`) and consent (`Consent`). Use `terma teams` to manage ticked
-teams, `terma route explain` to trace `routing.Router.Route` for a path, and
+team's policy (`PolicyFor`) and consent (`Consent`). OpenCode has no export of its own:
+terma's plugin (`internal/agents/opencode/plugin/terma.js`, one file with OpenCode 1's `server`
+entry and OpenCode 2's `setup` feeding one emitter) is its exporter, under scope
+`terma-opencode`, and its hook caller, and claims each session the first time a process sees
+it. Use `terma teams` to manage ticked teams, `terma route explain` to trace
+`routing.Router.Route` for a path, and
 `terma doctor` to inspect routing state, per-enrollment health (including `OrgAccessLost`,
 policy conflicts, and single `terma setup` remediation for `SignInNeeded`), Mixed runs, and
 combined outbox/spool losses.

@@ -23,23 +23,24 @@ import (
 // keep records do so under terma's config directory configDir.
 func Agents(configDir string) *agents.Registry { return AgentsOn(configDir, runtime.GOOS) }
 
-// AgentsOn is Agents on the operating system goos. Antigravity and Grok Build are Coming Soon
-// on Windows: agy runs a hook there with cmd, and its hooks are checked only with the POSIX
-// command; grok's hooks and export are verified on Linux alone.
+// AgentsOn is Agents on the operating system goos. Antigravity, Grok Build and OpenCode are
+// Coming Soon on Windows: agy runs a hook there with cmd, and its hooks are checked only with
+// the POSIX command; grok's hooks and export are verified on Linux alone; nothing of
+// OpenCode's plugin was captured on Windows, and the tests that run it skip there.
 func AgentsOn(configDir, goos string) *agents.Registry {
 	claudeCode, codexCLI := claude.Agent{ConfigDir: configDir}, codex.Agent{ConfigDir: configDir}
 	githubCopilot, ompAgent, agy := copilot.Agent{ConfigDir: configDir}, omp.Agent{ConfigDir: configDir}, antigravity.Agent{ConfigDir: configDir}
-	grokBuild := grok.Agent{ConfigDir: configDir}
+	grokBuild, openCode := grok.Agent{ConfigDir: configDir}, opencode.Agent{ConfigDir: configDir}
 	supported := []agents.Agent{claudeCode, codexCLI, githubCopilot, ompAgent}
 	if goos != "windows" {
-		supported = append(supported, agy, grokBuild)
+		supported = append(supported, agy, grokBuild, openCode)
 	}
 	return agents.New(
 		claudeCode,
 		cursor.Agent{},
 		codexCLI,
 		githubCopilot,
-		opencode.Agent{ConfigDir: configDir},
+		openCode,
 		ompAgent,
 		pi.Agent{},
 		hermes.Agent{},
