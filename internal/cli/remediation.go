@@ -14,10 +14,12 @@ import (
 )
 
 // remediationNotice is what the platform's active remediation campaign asks of this
-// machine, for doctor and setup. cfg may be nil, a configuration that did not load: the
-// auth host then comes from the flags and the environment alone, and there is no user
-// session. Any failure to read the campaign is silent but for TERMA_DEBUG.
-func (app *App) remediationNotice(ctx context.Context, cfg *config.Config, userSession bool) remediation.Notice {
+// machine, for doctor and setup; userSession is asked only of a campaign that requires a
+// user session. cfg may be nil, a configuration that did not load: the auth host then
+// comes from the flags and the environment alone, and the session is not judged, since
+// doctor's failed configuration check is the problem to fix first. Any failure to read
+// the campaign is silent but for TERMA_DEBUG.
+func (app *App) remediationNotice(ctx context.Context, cfg *config.Config, userSession func() bool) remediation.Notice {
 	authURL := app.remediationAuthURL(cfg)
 	if authURL == "" {
 		return remediation.Notice{}
@@ -29,6 +31,9 @@ func (app *App) remediationNotice(ctx context.Context, cfg *config.Config, userS
 		}
 		return remediation.Notice{}
 	}
+	if cfg == nil {
+		userSession = func() bool { return true }
+	}
 	n := remediation.Evaluate(c, app.version, userSession)
 	// config.Config.APIKey is TERMA_API_KEY, trimmed; read here from the environment, the
 	// same way, so that a configuration that did not load still names it.
@@ -39,7 +44,7 @@ func (app *App) remediationNotice(ctx context.Context, cfg *config.Config, userS
 // doctorRemediation is doctor's notice, judged on the sign-in the profile has now. Only
 // doctor reads it: `terma status` stays off the network.
 func (app *App) doctorRemediation(ctx context.Context, cfg *config.Config) remediation.Notice {
-	return app.remediationNotice(ctx, cfg, hasUserSession(cfg))
+	return app.remediationNotice(ctx, cfg, func() bool { return hasUserSession(cfg) })
 }
 
 // remediationAuthURL is cfg's auth host, or without a configuration, the one the flags and
@@ -79,7 +84,7 @@ func hasUserSession(cfg *config.Config) bool {
 // the one setup leaves: a server key's under TERMA_API_KEY, else the person's.
 // cfg is never nil here: runSetup returns before this when the configuration fails to load.
 func (app *App) cautionRemediation(ctx context.Context, ui *setupUI, cfg *config.Config) {
-	n := app.remediationNotice(ctx, cfg, cfg.APIKey == "")
+	n := app.remediationNotice(ctx, cfg, func() bool { return cfg.APIKey == "" })
 	if !n.Warn() {
 		return
 	}

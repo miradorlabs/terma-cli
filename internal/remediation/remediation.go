@@ -122,16 +122,17 @@ type Notice struct {
 	KeyInEnv bool
 }
 
-// Evaluate judges c for a terma at version local whose active sign-in is a person's user
-// session (userSession), or not (a server key, or no sign-in). Source, dirty and snapshot
-// builds are never behind (selfupdate.Newer).
-func Evaluate(c *Campaign, local string, userSession bool) Notice {
+// Evaluate judges c for a terma at version local. userSession reports whether the active
+// sign-in is a person's user session, rather than a server key or none; it is called only
+// for a campaign that requires one, since it may read the keychain. Source, dirty and
+// snapshot builds are never behind (selfupdate.Newer).
+func Evaluate(c *Campaign, local string, userSession func() bool) Notice {
 	if c == nil {
 		return Notice{}
 	}
 	return Notice{Campaign: *c, Local: local,
 		Behind:           selfupdate.Newer(local, c.MinimumClientVersion),
-		NeedsUserSession: c.RequireUserSession && !userSession}
+		NeedsUserSession: c.RequireUserSession && !userSession()}
 }
 
 // Warn reports whether the notice asks anything of this machine.
@@ -146,11 +147,11 @@ func (n Notice) Summary() string {
 	}
 	switch {
 	case n.Behind && n.NeedsUserSession:
-		return fmt.Sprintf("terma %s or later, signed in as you, is required; this is %s, not signed in as you — run `terma update`, then %s", minimum, n.Local, setup)
+		return fmt.Sprintf("terma %s is older than %s, and this machine is not signed in as you. Run `terma update`, then %s.", n.Local, minimum, setup)
 	case n.Behind:
-		return fmt.Sprintf("terma %s or later is required, this is %s — run `terma update`, then %s", minimum, n.Local, setup)
+		return fmt.Sprintf("terma %s is older than %s. Run `terma update`, then %s.", n.Local, minimum, setup)
 	case n.NeedsUserSession:
-		return "terma must be signed in as you, and this machine is not (a server key, or no sign-in) — run " + setup
+		return "This machine is not signed in as you (it uses a server key, or has no sign-in). Run " + setup + "."
 	}
 	return ""
 }

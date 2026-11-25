@@ -26,7 +26,7 @@ func asRelease(t *testing.T, version string) {
 	t.Cleanup(func() { testApp.version = prev })
 }
 
-const required = "terma 0.43.0 or later is required, this is 0.41.2 — run `terma update`, then `terma setup`"
+const required = "terma 0.41.2 is older than 0.43.0. Run `terma update`, then `terma setup`."
 
 // doctor leads with an active campaign's notice, its title and its numbered steps, and the
 // notice is never a failed check.
@@ -92,13 +92,13 @@ func TestDoctorAsksForAUserSession(t *testing.T) {
 	userSandbox(t)
 	t.Setenv("TERMA_REMEDIATION_STUB", strings.Replace(campaignStub, `"require_user_session":false`, `"require_user_session":true`, 1))
 	n := testApp.doctorRemediation(t.Context(), testApp.doctorEnv(t.Context()).Config)
-	if !n.NeedsUserSession || n.Behind || !strings.HasSuffix(n.Summary(), "run `terma setup`") {
+	if !n.NeedsUserSession || n.Behind || !strings.HasSuffix(n.Summary(), "Run `terma setup`.") {
 		t.Fatalf("signed out: %+v %q", n, n.Summary())
 	}
 	// Under TERMA_API_KEY setup signs in with the key: the advice unsets it first.
 	t.Setenv("TERMA_API_KEY", "set-for-the-test")
 	n = testApp.doctorRemediation(t.Context(), testApp.doctorEnv(t.Context()).Config)
-	if !n.NeedsUserSession || !strings.HasSuffix(n.Summary(), "run `terma setup` with TERMA_API_KEY unset") {
+	if !n.NeedsUserSession || !strings.HasSuffix(n.Summary(), "Run `terma setup` with TERMA_API_KEY unset.") {
 		t.Fatalf("under TERMA_API_KEY: %+v %q", n, n.Summary())
 	}
 }
@@ -234,19 +234,45 @@ func TestSetupUnderAServerKeyAsksForAUserSession(t *testing.T) {
 	var b strings.Builder
 	ui.out = &b
 	testApp.cautionRemediation(t.Context(), ui, cfg)
-	if !strings.Contains(b.String(), "run `terma setup` with TERMA_API_KEY unset") {
+	if !strings.Contains(b.String(), "Run `terma setup` with TERMA_API_KEY unset.") {
 		t.Fatalf("setup under a server key:\n%s", b.String())
 	}
 }
 
-// A configuration that does not load still names TERMA_API_KEY in the advice: setup would
-// sign in with it once the configuration is fixed.
-func TestTheNoticeNamesTheKeyWithoutAConfiguration(t *testing.T) {
+// A configuration that does not load is the problem doctor names: the notice never blames
+// the session then, and says only what the version requires, if anything.
+func TestTheNoticeLeavesTheSessionOutWithoutAConfiguration(t *testing.T) {
 	userSandbox(t)
 	t.Setenv("TERMA_REMEDIATION_STUB", strings.Replace(campaignStub, `"require_user_session":false`, `"require_user_session":true`, 1))
 	t.Setenv("TERMA_API_KEY", "set-for-the-test")
-	n := testApp.doctorRemediation(t.Context(), nil)
-	if !n.NeedsUserSession || !strings.HasSuffix(n.Summary(), "run `terma setup` with TERMA_API_KEY unset") {
-		t.Fatalf("without a configuration: %+v %q", n, n.Summary())
+	if n := testApp.doctorRemediation(t.Context(), nil); n.Warn() {
+		t.Fatalf("a current release without a configuration was warned: %+v %q", n, n.Summary())
+	}
+	asRelease(t, "0.41.2")
+	if n := testApp.doctorRemediation(t.Context(), nil); n.NeedsUserSession || n.Summary() != required {
+		t.Fatalf("an older release without a configuration: %+v %q", n, n.Summary())
+	}
+}
+
+// The keychain is read only for a campaign that requires a user session.
+func TestDoctorReadsTheKeychainOnlyWhenTheCampaignAsks(t *testing.T) {
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	signInTo(t, gateway, orgA())
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	reads := secret.ReadsForTest(t, testApp.dir)
+	t.Setenv("TERMA_REMEDIATION_STUB", campaignStub)
+	testApp.doctorRemediation(t.Context(), cfg)
+	t.Setenv("TERMA_REMEDIATION_STUB", `{"campaign":null}`)
+	testApp.doctorRemediation(t.Context(), cfg)
+	if n := reads(); n != 0 {
+		t.Fatalf("%d keychain reads for campaigns that require no session", n)
+	}
+	t.Setenv("TERMA_REMEDIATION_STUB", strings.Replace(campaignStub, `"require_user_session":false`, `"require_user_session":true`, 1))
+	if n := testApp.doctorRemediation(t.Context(), cfg); n.NeedsUserSession || reads() == 0 {
+		t.Fatalf("a campaign requiring a session: %+v after %d keychain reads", n, reads())
 	}
 }

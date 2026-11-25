@@ -40,7 +40,7 @@ func TestEvaluate(t *testing.T) {
 		{"both", "0.41.2", "0.43.0", true, false, true, true},
 		{"not required, not signed in", "0.44.0", "0.43.0", false, false, false, false},
 	} {
-		n := Evaluate(&Campaign{MinimumClientVersion: c.minimum, RequireUserSession: c.requireUser}, c.local, c.signed)
+		n := Evaluate(&Campaign{MinimumClientVersion: c.minimum, RequireUserSession: c.requireUser}, c.local, func() bool { return c.signed })
 		if n.Behind != c.behind || n.NeedsUserSession != c.needsUser || n.Warn() != (c.behind || c.needsUser) {
 			t.Errorf("%s: behind=%v needsUser=%v, want %v %v", c.name, n.Behind, n.NeedsUserSession, c.behind, c.needsUser)
 		}
@@ -48,18 +48,20 @@ func TestEvaluate(t *testing.T) {
 			t.Errorf("%s: warn=%v but summary %q", c.name, n.Warn(), n.Summary())
 		}
 	}
-	if Evaluate(nil, "0.1.0", false).Warn() {
+	if Evaluate(nil, "0.1.0", func() bool { return false }).Warn() {
 		t.Error("no campaign warned")
 	}
 }
 
-// The summary names the required release, this one and the commands, in that order.
+// The summary names this release, the required one and the commands, in that order; the
+// session is judged only for a campaign that requires one.
 func TestSummaryAndLines(t *testing.T) {
 	t.Parallel()
-	n := Evaluate(&Campaign{Title: "Update terma", Message: "Old releases stop sending.", Steps: []string{"Run terma update", "Run terma setup"}, MinimumClientVersion: "0.43.0"}, "0.41.2", true)
-	if got := n.Summary(); got != "terma 0.43.0 or later is required, this is 0.41.2 — run `terma update`, then `terma setup`" {
+	n := Evaluate(&Campaign{Title: "Update terma", Message: "Old releases stop sending.", Steps: []string{"Run terma update", "Run terma setup"}, MinimumClientVersion: "0.43.0"}, "0.41.2", func() bool { return true })
+	if got := n.Summary(); got != "terma 0.41.2 is older than 0.43.0. Run `terma update`, then `terma setup`." {
 		t.Errorf("summary = %q", got)
 	}
+	Evaluate(&Campaign{MinimumClientVersion: "0.43.0"}, "0.41.2", func() bool { t.Fatal("judged the session for a campaign that does not require one"); return false })
 	if got := strings.Join(n.Lines(), "|"); got != "Update terma|Old releases stop sending.|1. Run terma update|2. Run terma setup" {
 		t.Errorf("lines = %q", got)
 	}
