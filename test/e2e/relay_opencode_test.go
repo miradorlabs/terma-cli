@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"fmt"
 	"maps"
 	"net/http/httptest"
 	"os"
@@ -508,10 +509,11 @@ func TestOpenCodeTermaRemoved(t *testing.T) {
 			}
 		}
 
-		var warnings []string
+		var warnings, seen []string
 		logs, _ := filepath.Glob(filepath.Join(sb.Home, ".local", "share", "opencode", "log", "*"))
 		for _, path := range logs {
 			data, _ := os.ReadFile(path)
+			seen = append(seen, fmt.Sprintf("%s (%d bytes, %d lines naming terma)", filepath.Base(path), len(data), strings.Count(string(data), "terma")))
 			for line := range strings.Lines(string(data)) {
 				if strings.Contains(line, "terma: cannot run") {
 					warnings = append(warnings, strings.TrimSpace(line))
@@ -519,7 +521,7 @@ func TestOpenCodeTermaRemoved(t *testing.T) {
 			}
 		}
 		if len(warnings) != 1 || !strings.Contains(warnings[0], moved) {
-			t.Errorf("OpenCode's log holds %d warnings of terma's, want one naming %s: %q", len(warnings), moved, warnings)
+			t.Errorf("OpenCode's log holds %d warnings of terma's, want one naming %s: %q (log files: %q)", len(warnings), moved, warnings, seen)
 		}
 
 		// Doctor looks at OpenCode only where it is on the PATH: the sandbox's own bin folder,

@@ -7,7 +7,7 @@
 //
 // `bun test` in this folder.
 import { test, expect, beforeAll, afterAll, describe } from "bun:test"
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, chmodSync, existsSync, rmSync, renameSync } from "node:fs"
+import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, chmodSync, existsSync, rmSync, renameSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -59,15 +59,16 @@ afterAll(() => {
 // A fake `terma hook`: a session's hooks run one at a time, so one log keeps their order
 // within each session; each hook appends its line in one write. Each line is the event, a
 // tab, and the JSON it got on stdin. A hook naming a session in slow hangs after logging.
-// An event in delayed takes that many seconds, then writes the time it finished, in
-// milliseconds, to <event>.done.
+// An event in delayed takes that many seconds, then touches <event>.done: when it finished
+// is that file's modification time, read with finishedAt (a shell's own clock is not
+// trusted for milliseconds).
 function fakeTerma(dir, { fail = [], slow = [], delayed = {} } = {}) {
   const log = join(dir, "hooks.log")
   const path = join(dir, "terma")
   const failing = fail.map((e) => `[ "$2" = "${e}" ] && exit 1`).join("\n")
   const hanging = slow.map((id) => `case "$input" in *'"${id}"'*) exec sleep 30;; esac`).join("\n")
   const waiting = Object.entries(delayed)
-    .map(([e, secs]) => `[ "$2" = "${e}" ] && sleep ${secs} && date +%s%3N > '${join(dir, e + ".done")}'`)
+    .map(([e, secs]) => `[ "$2" = "${e}" ] && sleep ${secs} && : > '${join(dir, e + ".done")}'`)
     .join("\n")
   writeFileSync(path, `#!/bin/sh\ninput=$(cat)\nprintf '%s\\t%s\\n' "$2" "$input" >> '${log}'\n${hanging}\n${waiting}\n${failing}\nexit 0\n`)
   chmodSync(path, 0o700)
@@ -84,6 +85,12 @@ function fakeTerma(dir, { fail = [], slow = [], delayed = {} } = {}) {
         })
     },
   }
+}
+
+// finishedAt is when a delayed hook finished, in milliseconds, or undefined if it has not.
+function finishedAt(dir, event) {
+  const path = join(dir, event + ".done")
+  return existsSync(path) ? statSync(path).mtimeMs : undefined
 }
 
 function rig(overrides = {}, termaOptions) {
@@ -810,8 +817,15 @@ test("a terma that cannot be run: one warning, nothing exported, no further atte
   await hooks.event(sessionCreated("ses_x"))
   await hooks["chat.message"]({ sessionID: "ses_x" }, { message: { id: "msg_u" }, parts: [{ type: "text", text: "hi" }] })
   await hooks.event(assistantDone("ses_x", "msg_a"))
+  // OpenCode writes its log about once a second: the plugin holds the exit until the
+  // warning has had that long, and not at all when it is older.
+  const before = Date.now()
   await hooks.dispose()
   expect(warnings.length).toBe(1)
+  expect(Date.now() - before).toBeGreaterThan(1000)
+  const again = Date.now()
+  await hooks.dispose()
+  expect(Date.now() - again).toBeLessThan(500)
   expect(warnings[0]).toMatchObject({ service: "terma", level: "warn" })
   expect(warnings[0].message).toBe(`terma: cannot run ${missing} (ENOENT). OpenCode sessions are not recorded until "terma setup" is run again.`)
   expect(r.requests()).toEqual([])
@@ -940,7 +954,7 @@ test("a move claims the session in its new directory before its next prompt, whi
     { event: "opencode-tool-reach", payload: { session_id: "ses_mv", cwd: private_, tool: "list", lists: [private_] } },
     { event: "opencode-prompt", payload: { session_id: "ses_mv", cwd: private_ } },
   ])
-  const finished = Number(readFileSync(join(r.dir, "opencode-tool-reach.done"), "utf8"))
+  const finished = finishedAt(r.dir, "opencode-tool-reach")
   const [p] = named(r.logs(), "opencode.user_prompt")
   expect(Number(BigInt(p.timeUnixNano) / 1000000n)).toBeGreaterThan(finished)
 }, 15_000)
@@ -1165,7 +1179,7 @@ test("an attachment marker that is not JSON is reach-checked by its path as writ
 test("a prompt with an attachment waits for its reach check and is stamped after it", async () => {
   const delayed = { "opencode-tool-reach": 0.3, "opencode-session-start": 0.3 }
   const { r, hooks } = await start({}, { terma: { delayed } })
-  const done = (e) => (existsSync(join(r.dir, e + ".done")) ? Number(readFileSync(join(r.dir, e + ".done"), "utf8")) : undefined)
+  const done = (e) => finishedAt(r.dir, e)
   const message = (id, parts) => ({ message: { id, time: { created: 1500 } }, parts })
 
   // No attachment: OpenCode goes on at once, before the slow claim, at the message's time.

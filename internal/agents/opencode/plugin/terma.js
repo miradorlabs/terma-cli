@@ -45,6 +45,9 @@ const HOOK_KILL_GRACE_MS = 250
 const MAX_HOOK_QUEUE = 64
 // A terma that could not be run is tried again this long after the last attempt.
 const MISSING_RETRY_MS = 60 * 1000
+// OpenCode 1 writes its log about once a second and drops what is unwritten when it exits:
+// a process that ends sooner than this after terma's warning would lose it.
+const LOG_SETTLE_MS = 1500
 // How long a session waits for its record before it is given up on (fail closed).
 const RECORD_WAIT_MS = 5000
 // What the plugin remembers is bounded, so a long-running server cannot grow it forever.
@@ -1081,7 +1084,9 @@ async function server(input) {
   // The MCP servers this directory configured; another directory's names are not its.
   const mcpServers = new Set()
   const client = input?.client
+  let warnedAt = 0
   loggers.push((message) => {
+    warnedAt = Date.now()
     const r = client?.app?.log?.({ body: { service: "terma", level: "warn", message } })
     r?.catch?.(() => {})
   })
@@ -1270,7 +1275,12 @@ async function server(input) {
       await run(s, () => guardReach(s, reach))
     }),
 
-    dispose: guard(() => shutdown(owner)),
+    dispose: guard(async () => {
+      await shutdown(owner)
+      // A short `opencode run` would otherwise end before OpenCode wrote the warning down.
+      const left = warnedAt ? LOG_SETTLE_MS - (Date.now() - warnedAt) : 0
+      if (left > 0) await sleep(left)
+    }),
   }
 }
 
