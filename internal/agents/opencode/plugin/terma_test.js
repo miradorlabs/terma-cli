@@ -1310,3 +1310,146 @@ test("the session left is the one used least recently", async () => {
   expect([...globalThis[KEY].sessions.keys()].sort()).toEqual(["ses_1", "ses_3"])
   await hooks.dispose()
 })
+
+test("a reach check queued behind slow hooks waits for its turn, not from when it was asked", async () => {
+  // Three idle hooks of about a second each: the check waits longer in the queue than a
+  // hook may run (HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS + 500), but each of them finishes.
+  const { r, hooks, warnings } = await start({}, { terma: { delayed: { "opencode-idle": 1.1 } } })
+  await hooks.event(sessionCreated("ses_q"))
+  for (let i = 0; i < 3; i++) await hooks.event(ev("session.idle", { sessionID: "ses_q" }))
+  const began = Date.now()
+  await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_q", callID: "c1" }, { args: { filePath: "/repo/a" } })
+  expect(Date.now() - began).toBeGreaterThan(2000 + 250 + 500)
+  expect(globalThis[KEY].tainted.has("ses_q")).toBe(false)
+  await hooks.event(toolPart("ses_q", "msg_1", "c1", "read", done({ filePath: "/repo/a" }, "ok")))
+  await hooks.dispose()
+  expect(r.terma.calls().map((c) => c.event)).toEqual(["opencode-session-start", "opencode-idle", "opencode-idle", "opencode-idle", "opencode-tool-reach"])
+  expect(tools(r.spans()).map((s) => A(s)["gen_ai.tool.call.id"])).toEqual(["msg_1:c1"])
+  expect(warnings).toEqual([])
+}, 15_000)
+
+test("a failed reach check taints the session and says so once in OpenCode's log", async () => {
+  const { r, hooks, warnings } = await start({}, { terma: { fail: ["opencode-tool-reach"] } })
+  await hooks.event(sessionCreated("ses_rf"))
+  await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_rf", callID: "c1" }, { args: { filePath: "/repo/a" } })
+  await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_rf", callID: "c2" }, { args: { filePath: "/repo/b" } })
+  await hooks.event(toolPart("ses_rf", "msg_1", "c1", "bash", done({ command: "cat /repo/c" }, "")))
+  // Another session's failure is its own line.
+  await hooks.event(sessionCreated("ses_rg"))
+  await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_rg", callID: "c3" }, { args: { filePath: "/repo/d" } })
+  await hooks.dispose()
+  expect(globalThis[KEY].tainted.has("ses_rf")).toBe(true)
+  expect(warnings.map((w) => w.message)).toEqual([
+    "terma: could not check what a tool reaches in session ses_rf; nothing more of this session is recorded.",
+    "terma: could not check what a tool reaches in session ses_rg; nothing more of this session is recorded.",
+  ])
+  expect(warnings[0]).toMatchObject({ service: "terma", level: "warn" })
+  expect(r.spans()).toEqual([])
+})
+
+test("the exit waits a bounded time for a relay that is not there", async () => {
+  // A port nothing listens on: each batch would retry for about 31 s.
+  const closed = Bun.serve({ port: 0, fetch: () => new Response("{}") })
+  const port = closed.port
+  closed.stop(true)
+  const { hooks } = await start({ endpoint: `http://127.0.0.1:${port}/` })
+  await hooks.event(sessionCreated("ses_down"))
+  await hooks.event(assistantDone("ses_down", "msg_1"))
+  const began = Date.now()
+  await hooks.dispose()
+  expect(Date.now() - began).toBeLessThan(5000)
+  expect(globalThis[KEY].exporter.draining).toBe(true)
+}, 15_000)
+
+// stalled loads the plugin with one item per batch and a fetch that answers only when let
+// go, so batches pile up behind the one being sent.
+async function stalled() {
+  const r = rig()
+  const source = SOURCE.replace("const BATCH_SIZE = 64", "const BATCH_SIZE = 1")
+  expect(source).not.toBe(SOURCE)
+  const mod = await load(r.config, { source })
+  const warnings = []
+  const hooks = await mod.default.server({ client: fakeClient(null, warnings), directory: "/repo", worktree: "/repo" })
+  const real = globalThis.fetch
+  const sent = []
+  let release
+  const gate = new Promise((ok) => {
+    release = () => ok(new Response("{}"))
+  })
+  globalThis.fetch = async (url, init) => {
+    sent.push(JSON.parse(init.body).resourceSpans[0].scopeSpans[0].spans.map((s) => A(s)["opencode.call.id"])[0])
+    return gate
+  }
+  const finish = async () => {
+    release()
+    try {
+      await hooks.dispose()
+    } finally {
+      globalThis.fetch = real
+    }
+  }
+  const calls = async (sid, n) => {
+    await hooks.event(sessionCreated(sid))
+    for (let i = 0; i < n; i++) await hooks.event(assistantDone(sid, "msg_" + i))
+    await Promise.all([...globalThis[KEY].sessions.values()].map((s) => s.queue))
+  }
+  return { r, hooks, warnings, sent, finish, calls, ex: globalThis[KEY].exporter }
+}
+
+test("while the relay does not answer, the oldest waiting batches are dropped, and that is said once", async () => {
+  const { warnings, sent, finish, calls, ex } = await stalled()
+  try {
+    await calls("ses_cap", 40)
+    // msg_0 is being sent; 39 wait behind it, and the 7 oldest of them go.
+    expect(sent).toEqual(["msg_0"])
+    expect(ex.batches.length).toBe(32)
+    expect(ex.dropped).toBe(7)
+    expect(ex.batches[0].spans.map((s) => A(s)["opencode.call.id"])).toEqual(["msg_8"])
+    expect(ex.batches.at(-1).spans.map((s) => A(s)["opencode.call.id"])).toEqual(["msg_39"])
+    expect(warnings.map((w) => w.message)).toEqual(["terma: the relay is not answering; some OpenCode telemetry was dropped."])
+  } finally {
+    await finish()
+  }
+  expect(sent).toEqual(["msg_0", ...Array.from({ length: 32 }, (_, i) => "msg_" + (i + 8))])
+  expect(warnings.length).toBe(1)
+}, 15_000)
+
+test("batches waiting for a slow relay leave in order, none dropped below the cap", async () => {
+  const { warnings, sent, finish, calls, ex } = await stalled()
+  try {
+    await calls("ses_ord", 20)
+    expect(ex.batches.length).toBe(19)
+  } finally {
+    await finish()
+  }
+  expect(sent).toEqual(Array.from({ length: 20 }, (_, i) => "msg_" + i))
+  expect(ex.batches).toEqual([])
+  expect(ex.dropped).toBe(0)
+  expect(warnings).toEqual([])
+}, 15_000)
+
+test("a record that arrives while a session waits for one is picked up when it arrives", async () => {
+  const { r, hooks } = await start()
+  // No record and no way to ask OpenCode for one: the session waits.
+  await hooks["chat.message"]({ sessionID: "ses_late" }, { message: { id: "msg_u" }, parts: [{ type: "text", text: "hi" }] })
+  await Bun.sleep(100)
+  const began = Date.now()
+  await hooks.event(sessionCreated("ses_late"))
+  for (let i = 0; i < 200 && !r.terma.calls().some((c) => c.event === "opencode-session-start"); i++) await Bun.sleep(10)
+  expect(Date.now() - began).toBeLessThan(1000)
+  await hooks.dispose()
+  expect(r.terma.calls().map((c) => c.event)).toEqual(["opencode-session-start", "opencode-prompt"])
+  expect(globalThis[KEY].sessions.get("ses_late").recordArrived).toBeNull()
+}, 15_000)
+
+test("a reach check that finds terma gone gives only the cannot-run warning", async () => {
+  const { r, hooks, warnings } = await start()
+  await hooks.event(sessionCreated("ses_gone"))
+  for (let i = 0; i < 100 && !r.terma.calls().some((c) => c.event === "opencode-session-start"); i++) await Bun.sleep(10)
+  await Promise.all([...globalThis[KEY].sessions.values()].map((s) => s.queue))
+  rmSync(r.terma.argv[0])
+  await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_gone", callID: "c1" }, { args: { filePath: "/repo/a" } })
+  await hooks.dispose()
+  expect(globalThis[KEY].tainted.has("ses_gone")).toBe(true)
+  expect(warnings.map((w) => w.message)).toEqual([`terma: cannot run ${r.terma.argv[0]} (ENOENT). OpenCode sessions are not recorded until "terma setup" is run again.`])
+})

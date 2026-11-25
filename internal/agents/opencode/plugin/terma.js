@@ -28,6 +28,16 @@ import { fileURLToPath } from "node:url"
 
 // --- limits -------------------------------------------------------------------------
 
+// Every rule here that runs on the clock, and why:
+// - BATCH_DELAY_MS: a batch leaves this long after its first item, so a quiet session still sends.
+// - post's back-off (1 s, doubling, MAX_RETRIES times) and HEADERS_TTL_MS: a relay may restart.
+// - HOOK_TIMEOUT_MS, HOOK_KILL_GRACE_MS: a hung hook is ended, so its session's queue moves on.
+// - HOOK_QUEUE_WAIT_MS: a tool held for a reach check waits this long at most for its turn.
+// - MISSING_RETRY_MS: a terma that could not be run is not tried again on every hook.
+// - RECORD_WAIT_MS: a session with no record is given up on (fails closed), not held forever.
+// - At exit: the hooks get their run limit, the flush EXIT_FLUSH_MS, OpenCode 1's log LOG_SETTLE_MS.
+// - update() stamps what follows a move 1 ms after its claim, so none of it sorts before the claim.
+
 // Bodies are bounded so a single reply or tool result cannot make an export enormous.
 const MAX_TEXT = 64 * 1024
 const MAX_TOOL_CONTENT = 16 * 1024
@@ -37,17 +47,26 @@ const MAX_ERROR = 1024
 const BATCH_SIZE = 64
 const BATCH_DELAY_MS = 3000
 const MAX_RETRIES = 5
+// Batches waiting while the relay does not answer; the oldest go first, so a long-running
+// server cannot grow the queue forever.
+const MAX_PENDING_BATCHES = 32
 // The headers helper is re-run this often, matching Claude Code's cadence.
 const HEADERS_TTL_MS = 29 * 60 * 1000
 // A session's hooks run one at a time; a hung one is terminated so its queue keeps moving.
 const HOOK_TIMEOUT_MS = 2000
 const HOOK_KILL_GRACE_MS = 250
 const MAX_HOOK_QUEUE = 64
+// How long a hook may wait in its session's queue before its caller stops waiting: a tool
+// is held for its reach check, so the wait is bounded.
+const HOOK_QUEUE_WAIT_MS = 10000
 // A terma that could not be run is tried again this long after the last attempt.
 const MISSING_RETRY_MS = 60 * 1000
 // OpenCode 1 writes its log about once a second and drops what is unwritten when it exits:
 // a process that ends sooner than this after terma's warning would lose it.
 const LOG_SETTLE_MS = 1500
+// How long the exit waits for what is still queued to be sent: a relay that is down must
+// not hold OpenCode open.
+const EXIT_FLUSH_MS = 4000
 // How long a session waits for its record before it is given up on (fail closed).
 const RECORD_WAIT_MS = 5000
 // What the plugin remembers is bounded, so a long-running server cannot grow it forever.
@@ -73,8 +92,9 @@ const UNPLACED_ATTACHMENT = "//attached-file/unplaced"
 
 // --- state --------------------------------------------------------------------------
 
-// The one shared object. Data only: a later copy of this file (OpenCode 2 evaluates one per
-// directory, and again after a rewrite) must be able to work on it with its own functions.
+// The one shared object. Data, promises and the resolvers of those promises only: a later
+// copy of this file (OpenCode 2 evaluates one per directory, and again after a rewrite) must
+// be able to work on it with its own functions, so nothing in it does a copy's work.
 // A change to its shape bumps the number in the key, so a copy never reads another shape.
 const KEY = Symbol.for("terma.opencode.state/1")
 const state = (globalThis[KEY] ??= newState())
@@ -85,7 +105,19 @@ const loggers = []
 function newState() {
   return {
     config: settings(null),
-    exporter: { spans: [], records: [], timer: null, inflight: Promise.resolve(), headers: null, headersAt: 0 },
+    exporter: {
+      spans: [],
+      records: [],
+      timer: null,
+      // Batches waiting to be sent, oldest first: { cfg, spans, records }.
+      batches: [],
+      draining: false,
+      inflight: Promise.resolve(), // resolves once the batches queued so far are sent or given up on
+      dropped: 0, // items in batches dropped while the relay did not answer
+      droppedWarned: false,
+      headers: null,
+      headersAt: 0,
+    },
     hooks: {
       missing: false,
       missingAt: 0,
@@ -134,6 +166,7 @@ function configure(st, raw) {
     st.hooks.missing = false
     st.hooks.missingAt = 0
     st.hooks.warned = false
+    st.exporter.droppedWarned = false
   }
   st.config = next
 }
@@ -231,8 +264,10 @@ function exportItem(kind, item) {
   ex.timer.unref?.()
 }
 
-// flush sends everything queued with the config in force now. Sends are chained so two
-// flushes never race, and a failed batch is retried with the same bytes.
+// flush queues everything collected as one batch, with the config in force now, and returns
+// a promise that resolves once every batch queued so far is sent or given up on. One drain
+// sends them in order, so two sends never race, and a failed batch is retried with the same
+// bytes. While the relay does not answer, the oldest waiting batches are dropped.
 function flush() {
   const ex = state.exporter
   if (ex.timer) {
@@ -244,19 +279,44 @@ function flush() {
   ex.spans = []
   ex.records = []
   if (spans.length === 0 && records.length === 0) return ex.inflight
-  const cfg = state.config
-  ex.inflight = ex.inflight
-    .then(async () => {
-      const resource = { attributes: attrs({ "service.name": "opencode", ...cfg.resourceAttributes }) }
-      if (spans.length > 0) {
-        await post(cfg, "/v1/traces", { resourceSpans: [{ resource, scopeSpans: [{ scope: SCOPE, spans }] }] })
-      }
-      if (records.length > 0) {
-        await post(cfg, "/v1/logs", { resourceLogs: [{ resource, scopeLogs: [{ scope: SCOPE, logRecords: records }] }] })
-      }
-    })
-    .catch(() => {})
+  ex.batches.push({ cfg: state.config, spans, records })
+  while (ex.batches.length > MAX_PENDING_BATCHES) {
+    const old = ex.batches.shift()
+    ex.dropped += old.spans.length + old.records.length
+    if (!ex.droppedWarned) {
+      ex.droppedWarned = true
+      const log = loggers[loggers.length - 1]
+      try {
+        log?.("terma: the relay is not answering; some OpenCode telemetry was dropped.")
+      } catch {}
+    }
+  }
+  if (!ex.draining) {
+    ex.draining = true
+    ex.inflight = drain(ex)
+  }
   return ex.inflight
+}
+
+// drain sends the waiting batches one at a time, front first, until none is left. A batch
+// leaves the queue as it is sent, so the one in flight is never the one dropped.
+async function drain(ex) {
+  try {
+    while (ex.batches.length > 0) {
+      const { cfg, spans, records } = ex.batches.shift()
+      try {
+        const resource = { attributes: attrs({ "service.name": "opencode", ...cfg.resourceAttributes }) }
+        if (spans.length > 0) {
+          await post(cfg, "/v1/traces", { resourceSpans: [{ resource, scopeSpans: [{ scope: SCOPE, spans }] }] })
+        }
+        if (records.length > 0) {
+          await post(cfg, "/v1/logs", { resourceLogs: [{ resource, scopeLogs: [{ scope: SCOPE, logRecords: records }] }] })
+        }
+      } catch {}
+    }
+  } finally {
+    ex.draining = false
+  }
 }
 
 async function post(cfg, path, body) {
@@ -319,30 +379,46 @@ async function authHeaders(cfg) {
 // its claim always finishes before its other hooks) or, for a session this process does
 // not keep, state.hooks.unowned. Queues do not wait for each other. A timed-out child is
 // terminated, and its queue advances only once it is gone. Resolves true iff the hook
-// exited 0.
+// exited 0; the caller stops waiting, with false, once the hook has waited
+// HOOK_QUEUE_WAIT_MS for its turn or run past its limit. A hook given up on still runs in
+// its turn.
 function runHook(lane, event, payload) {
   const h = state.hooks
   if (termaMissing() || lane.hookPending >= MAX_HOOK_QUEUE) return Promise.resolve(false)
   const argv = state.config.hookCommand
+  let done
+  const answer = new Promise((r) => {
+    done = r
+  })
+  let settled = false
+  let running
+  const settle = (ok) => {
+    if (!settled) {
+      settled = true
+      clearTimeout(queued)
+      clearTimeout(running)
+      done(ok)
+    }
+  }
+  const giveUp = (ms) => {
+    const t = setTimeout(() => settle(false), ms)
+    t.unref?.()
+    return t
+  }
+  const queued = giveUp(HOOK_QUEUE_WAIT_MS)
   lane.hookPending++
   h.running.add(lane)
-  const slot = lane.hookQueue.then(() => spawnHook(argv, event, payload))
+  const slot = lane.hookQueue.then(() => {
+    // Its turn: the run limit starts now, not when it was queued.
+    clearTimeout(queued)
+    if (!settled) running = giveUp(HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS + 500)
+    return spawnHook(argv, event, payload)
+  })
   lane.hookQueue = slot.then((s) => s.exit, () => undefined).finally(() => {
     if (--lane.hookPending <= 0) h.running.delete(lane)
   })
-  return new Promise((done) => {
-    let settled = false
-    const settle = (ok) => {
-      if (!settled) {
-        settled = true
-        clearTimeout(wait)
-        done(ok)
-      }
-    }
-    const wait = setTimeout(() => settle(false), HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS + 500)
-    wait.unref?.()
-    slot.then((s) => s.result, () => false).then(settle, () => settle(false))
-  })
+  slot.then((s) => s.result, () => false).then(settle, () => settle(false))
+  return answer
 }
 
 function spawnHook(argv, event, payload) {
@@ -451,6 +527,7 @@ function newSession(id, owner) {
     id,
     known: false,
     latest: null, // a record that arrived before the first one was applied
+    recordArrived: null, // resolves firstSight's wait when a record arrives before the session is known
     parentID: "",
     directory: "",
     askedDirectory: "", // the directory most recently moved to, applied or still queued
@@ -498,7 +575,10 @@ function sight(sessionID, { record, fetch, owner } = {}) {
     state.sessions.set(sessionID, s)
     if (record) {
       if (s.known) update(s, record)
-      else s.latest = record
+      else {
+        s.latest = record
+        s.recordArrived?.()
+      }
     }
   }
   return s
@@ -525,8 +605,14 @@ async function firstSight(s, lookup) {
   }
   // No record yet: wait for an event that carries one. Without it the session's
   // directory and parent are unknown, so it is never claimed and never exported.
-  for (const until = Date.now() + RECORD_WAIT_MS; !rec && Date.now() < until; ) {
-    await sleep(25)
+  if (!rec) {
+    let timer
+    await new Promise((r) => {
+      s.recordArrived = r
+      timer = setTimeout(r, RECORD_WAIT_MS)
+    })
+    clearTimeout(timer)
+    s.recordArrived = null
     rec = s.latest
   }
   if (!rec) {
@@ -571,7 +657,7 @@ function update(s, rec) {
       // The relay files a record under the claim in force at its time: claim the session
       // in its new directory before anything more of it leaves, and stamp nothing earlier.
       await guardReach(s, { tool: "list", lists: [directory] })
-      s.movedAt = Date.now() + 1
+      s.movedAt = Date.now() + 1 // strictly after the claim, never the same millisecond
     })
   }
   if (rec.parentID) s.parentID = rec.parentID
@@ -855,7 +941,8 @@ function endUnknown(rec, reason) {
 }
 
 // shutdown sends the pending title call of every session this entry first saw, waits for
-// the sessions' queues and, briefly, for the hooks they started, then flushes.
+// the sessions' queues and, briefly, for the hooks they started, then flushes, for at most
+// EXIT_FLUSH_MS.
 async function shutdown(owner) {
   const now = Date.now()
   for (const s of state.sessions.values()) {
@@ -868,7 +955,7 @@ async function shutdown(owner) {
   }
   const hooks = [...state.hooks.running].map((lane) => lane.hookQueue)
   await Promise.race([Promise.all(hooks), sleep(HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS, true)])
-  await flush()
+  await Promise.race([flush(), sleep(EXIT_FLUSH_MS, true)])
 }
 
 // --- reach --------------------------------------------------------------------------
@@ -908,11 +995,21 @@ function toolReach(name, args) {
 }
 
 // guardReach runs the reach hook for a call; one that fails taints the session (fails
-// closed). Resolves false when the session may not export the call.
+// closed) and says so once in OpenCode's log, unless terma cannot be run, which has its own
+// warning. Resolves false when the session may not export the call.
 async function guardReach(s, reach) {
   const { tool: name, ...rest } = reach
   const ok = await runHook(s, "opencode-tool-reach", { ...base(s), tool: name, ...rest })
-  if (!ok) taint(s)
+  if (!ok) {
+    const fresh = !isTainted(s)
+    taint(s)
+    if (fresh && !termaMissing()) {
+      const log = loggers[loggers.length - 1]
+      try {
+        log?.(`terma: could not check what a tool reaches in session ${s.id}; nothing more of this session is recorded.`)
+      } catch {}
+    }
+  }
   return ok
 }
 
@@ -962,12 +1059,26 @@ function mcpOf1(name, servers) {
   return best ? { server: best.server, tool: name.slice(best.prefix.length + 1) } : undefined
 }
 
+// entry1 is a session's OpenCode 1 data, made once with its whole shape: steps, the
+// assistant messages a model step was seen for; prompts, the user messages that were real
+// prompts; lastPrompt, the last real prompt's id, the turn a self-started message joins.
+function entry1(s) {
+  const e = s.entry
+  if (!e.steps) {
+    e.steps = new Set()
+    e.prompts = new Set()
+    e.lastPrompt = ""
+  }
+  return e
+}
+
 // The turn a message belongs to is the prompt that opened it. OpenCode also starts turns
 // itself, under a user message no person sent (the call after a command's subagent returns,
 // a shell command the person ran): those join the last prompt's turn, when there is one.
 function turnOf1(s, parentID) {
-  if (!parentID || s.entry.prompts?.has(parentID)) return parentID || undefined
-  return s.entry.lastPrompt || parentID
+  const e = entry1(s)
+  if (!parentID || e.prompts.has(parentID)) return parentID || undefined
+  return e.lastPrompt || parentID
 }
 
 function onAssistant1(s, info) {
@@ -984,8 +1095,9 @@ function onAssistant1(s, info) {
   remember(s.doneCalls, info.id)
   const parts = s.texts.get(info.id)
   s.texts.delete(info.id)
-  const stepped = s.entry.steps?.has(info.id) === true
-  s.entry.steps?.delete(info.id)
+  const { steps } = entry1(s)
+  const stepped = steps.has(info.id)
+  steps.delete(info.id)
   // Every model call has step parts. A shell command the person ran, or the message that
   // launches a command's subagent, has none, no error and no usage: no model answered it,
   // whatever its finish says. It is not a call.
@@ -1159,7 +1271,7 @@ async function server(input) {
           run(s, () => onToolPart1(s, part, mcpServers))
         } else if (part.type === "step-start" || part.type === "step-finish") {
           const s = see(part.sessionID)
-          run(s, () => remember((s.entry.steps ??= new Set()), part.messageID))
+          run(s, () => remember(entry1(s).steps, part.messageID))
         }
         return
       }
@@ -1249,8 +1361,9 @@ async function server(input) {
         if (reaches.length > 0) pr.time = Math.max(pr.time ?? 0, Date.now() + 1)
         if (isTainted(s)) return
         if (pr.messageID) {
-          remember((s.entry.prompts ??= new Set()), pr.messageID)
-          s.entry.lastPrompt = pr.messageID
+          const e = entry1(s)
+          remember(e.prompts, pr.messageID)
+          e.lastPrompt = pr.messageID
         }
         prompt(s, pr)
       })
