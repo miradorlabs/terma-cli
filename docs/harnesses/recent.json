@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-25T20:17:50.242236524Z",
+  "generated_at": "2026-11-25T23:32:16.728629469Z",
   "versions": [
     {
       "harness": "copilot",
       "name": "GitHub Copilot CLI",
       "version": "1.0.116",
       "released_at": "2026-11-25T17:02:41.755Z",
-      "captured_at": "2026-11-25T17:19:59.407980579Z",
+      "captured_at": "2026-11-25T23:32:16.728629469Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -34,8 +34,8 @@
       ],
       "signing": "valid",
       "partial": true,
-      "attempted_at": "2026-11-25T17:19:59.407980579Z",
-      "attempts": 1
+      "attempted_at": "2026-11-25T23:32:16.728629469Z",
+      "attempts": 2
     },
     {
       "harness": "pi",
