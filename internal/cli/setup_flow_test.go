@@ -572,4 +572,3 @@ func TestSetupInteractiveConflictResolution(t *testing.T) {
 		}
 	})
 }
-
