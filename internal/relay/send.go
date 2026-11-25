@@ -27,8 +27,6 @@ func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte,
 	if s.team != nil {
 		account, project, enrollment = s.team.account, first.q.Project, s.team.enrollment
 	}
-	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
-	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(pol.Endpoint, "/")+"/v1/"+string(sig), bytes.NewReader(body))
 	if err != nil {
 		return refused, 0, "bad_endpoint", 0
@@ -55,7 +53,11 @@ func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte,
 			return out, wait, detail, 0
 		}
 	}
-	resp, err := s.r.opts.HTTP.Do(req)
+	// sendTimeout bounds the request alone: the sign-in's Token and Refused take the parent
+	// ctx, since a refresh may wait out another's lock and RefreshBudget well past it.
+	doCtx, cancel := context.WithTimeout(ctx, sendTimeout)
+	defer cancel()
+	resp, err := s.r.opts.HTTP.Do(req.WithContext(doCtx))
 	if err != nil {
 		return retry, 0, err.Error(), 0
 	}
