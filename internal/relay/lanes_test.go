@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -293,28 +294,47 @@ func TestALostPartIsNeverHeld(t *testing.T) {
 
 // A sign-in that stayed unreadable through a retry is not waited out again at the next
 // export, which waits a couple of polls and is lost; once it reads, the retry is back.
+//
+// The second export's wait is told by how often it read the sign-in, not by the clock: a
+// slow machine (a loaded Windows runner) makes the export's own handling take longer, but
+// can only make it read less often, so a couple of polls never reads as the whole retry.
 func TestAStillUnreadableSignInIsNotWaitedOutAgain(t *testing.T) {
 	t.Parallel()
 	u := newSignInUpstream(t)
-	signIn := &testSignIn{account: sendas.AccountUnreadable}
+	signIn := &countedSignIn{testSignIn: testSignIn{account: sendas.AccountUnreadable}}
 	const retry = time.Second
 	r, srv := laneRelay(t, u, signIn, "", retry)
 	post(t, srv, "/v1/logs", oneLog("first"), "application/x-protobuf", token, false)
-	start := time.Now()
+	before := signIn.reads()
 	post(t, srv, "/v1/logs", oneLog("second"), "application/x-protobuf", token, false)
-	if waited := time.Since(start); waited >= retry/2 {
-		t.Fatalf("the second export waited %v; want only a couple of polls", waited)
+	// unreadableBrief is two polls: a read at arrival, then one at each poll.
+	if n := signIn.reads() - before; n > int(unreadableBrief/unreadablePoll)+1 {
+		t.Fatalf("the second export read the sign-in %d times; want only a couple of polls, not the retry's %d", n, int(retry/unreadablePoll)+1)
 	}
 	waitForCounters(t, r, func(c map[string]int) bool { return c["dropped.unreadable.logs"] == 2 })
 	signIn.set(accountA)
 	post(t, srv, "/v1/logs", oneLog("readable"), "application/x-protobuf", token, false)
 	signIn.set(sendas.AccountUnreadable)
-	start = time.Now()
+	start := time.Now()
 	post(t, srv, "/v1/logs", oneLog("unreadable again"), "application/x-protobuf", token, false)
 	if waited := time.Since(start); waited < retry {
 		t.Fatalf("after a readable sign-in, an export waited only %v; want the retry again", waited)
 	}
 }
+
+// countedSignIn is testSignIn counting the reads of its lane, which only an export's
+// arrival and the relay's start make.
+type countedSignIn struct {
+	testSignIn
+	n atomic.Int64
+}
+
+func (s *countedSignIn) Lane() (string, uint64) {
+	s.n.Add(1)
+	return s.testSignIn.Lane()
+}
+
+func (s *countedSignIn) reads() int { return int(s.n.Load()) }
 
 // readsAgainSignIn is a sign-in that can't be read until armed, then reads as accountA from
 // the read after the next: one written as an export arrives.
