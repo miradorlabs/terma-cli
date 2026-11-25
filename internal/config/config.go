@@ -68,7 +68,9 @@ type Profile struct {
 	// (ServerKeySignIn), each bumped in the same write as the switch (SetServerKeySignIn);
 	// missing reads as 0. With the sign-in's own generation it versions whose lane the profile
 	// sends in, so a switch to the key and back to the same person that no read saw reads as
-	// a change (the relay's arrivalLane).
+	// a change (the relay's arrivalLane). A terma that drops it from the file starts it at 0
+	// again, as one that drops the sign-in's generation does: the sum may then repeat a value a
+	// reader holds, which can cost or mis-keep at most the one retry that spans the rewrite.
 	ServerKeyGeneration uint64 `json:"server_key_generation,omitempty"`
 }
 
