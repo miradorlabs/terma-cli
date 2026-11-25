@@ -889,6 +889,25 @@ test("a lookup that never answers leaves the session dark, and its tools do not 
   expect(r.terma.calls()).toEqual([])
 })
 
+test("a subagent that went dark fails the session that opened it closed", async () => {
+  // The child's record never comes, so nothing it read was checked, and its answer is the
+  // task call's result. The task's part arrives while the child still waits for its record.
+  const warnings = []
+  const source = SOURCE.replace("const RECORD_WAIT_MS = 5000", "const RECORD_WAIT_MS = 300")
+  const { r, hooks } = await start({}, { client: fakeClient(() => null, warnings), source })
+  await hooks.event(sessionCreated("ses_par"))
+  const read = hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_kid", callID: "k1" }, { args: { filePath: "/other/secret" } })
+  await hooks.event(toolPart("ses_par", "msg_1", "t1", "task", done({ prompt: "look" }, "the child's answer", { metadata: { sessionId: "ses_kid" } })))
+  await hooks.event(assistantDone("ses_par", "msg_2"))
+  await read
+  await hooks.dispose()
+  expect(globalThis[KEY].sessions.get("ses_kid").dark).toBe(true)
+  expect(r.spans()).toEqual([])
+  expect(globalThis[KEY].tainted.has("ses_par")).toBe(true)
+  expect(warnings.map((w) => w.message)).toEqual(["terma: could not check what a tool reaches in session ses_par; nothing more of this session is recorded."])
+  expect(r.terma.calls().filter((c) => c.payload.command === FENCE).map((c) => c.payload.session_id)).toEqual(["ses_par"])
+})
+
 test("the exit waits a bounded time for its own sessions' queues, and not for another entry's", async () => {
   const { mod, hooks: b } = await start({}, { source: SOURCE.replace("const EXIT_QUEUE_MS = 8000", "const EXIT_QUEUE_MS = 1000") })
   const a = await mod.default.server({ client: fakeClient(null), directory: "/other", worktree: "/other" })
@@ -1497,13 +1516,13 @@ test("waiting batches are dropped by size too, oldest first, and the bytes waiti
   const { sent, finish, calls, ex } = await stalled(SOURCE.replace("const MAX_PENDING_BYTES = 8 * 1024 * 1024", "const MAX_PENDING_BYTES = 8 * 1024"))
   let left
   try {
-    await calls("ses_big", 20)
+    await calls("ses_bïg", 20) // not ASCII: the bound is in bytes
     left = waiting(ex)
     expect(left.length).toBeGreaterThan(1)
     expect(left.length).toBeLessThan(19)
     expect(left).toEqual(Array.from({ length: left.length }, (_, i) => "msg_" + (20 - left.length + i)))
     expect(ex.dropped).toBe(19 - left.length)
-    expect(ex.pendingBytes).toBe(ex.batches.flatMap((b) => b.sends).reduce((n, [, p]) => n + p.length, 0))
+    expect(ex.pendingBytes).toBe(ex.batches.flatMap((b) => b.sends).reduce((n, [, p]) => n + Buffer.byteLength(p), 0))
   } finally {
     await finish()
   }

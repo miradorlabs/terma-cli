@@ -33,11 +33,13 @@ import { fileURLToPath } from "node:url"
 // - post's back-off (1 s, doubling, MAX_RETRIES times) and HEADERS_TTL_MS: a relay may restart.
 // - HOOK_TIMEOUT_MS (REACH_HOOK_TIMEOUT_MS for a reach check), HOOK_KILL_GRACE_MS: a hung hook
 //   is ended, so its session's queue moves on.
-// - HOOK_QUEUE_WAIT_MS: a tool held for a reach check waits this long at most for its turn.
+// - HOOK_QUEUE_WAIT_MS: a hook's caller stops waiting once the hook has waited this long for its
+//   turn in the hook queue. A tool held for a check also waits for its session's earlier work
+//   (the record, the claim), each with its own limit here.
 // - MISSING_RETRY_MS: a terma that could not be run is not tried again on every hook.
 // - RECORD_WAIT_MS: a session with no record is given up on (fails closed), not held forever.
-// - At exit: the entry's session queues get EXIT_QUEUE_MS, the hooks HOOK_TIMEOUT_MS, the flush
-//   EXIT_FLUSH_MS, OpenCode 1's log LOG_SETTLE_MS.
+// - At exit, one after another: the entry's session queues get EXIT_QUEUE_MS, the hooks still
+//   running HOOK_TIMEOUT_MS, the flush EXIT_FLUSH_MS, OpenCode 1's log LOG_SETTLE_MS.
 // - update() stamps what follows a move 1 ms after its claim, so none of it sorts before the claim.
 // - A reach check made after its tool ran sets checkedAt 1 ms after it finished, and no model or
 //   tool call the session sends afterwards ends earlier. A patch is checked in tool.execute.after,
@@ -67,8 +69,8 @@ const HOOK_TIMEOUT_MS = 2000
 const REACH_HOOK_TIMEOUT_MS = 5500
 const HOOK_KILL_GRACE_MS = 250
 const MAX_HOOK_QUEUE = 64
-// How long a hook may wait in its session's queue before its caller stops waiting: a tool
-// is held for its reach check, so the wait is bounded.
+// How long a hook may wait in its session's hook queue before its caller stops waiting: a
+// tool is held for its reach check, so that wait is bounded.
 const HOOK_QUEUE_WAIT_MS = 10000
 // A terma that could not be run is tried again this long after the last attempt.
 const MISSING_RETRY_MS = 60 * 1000
@@ -305,7 +307,7 @@ function flush() {
   const sends = []
   if (spans.length > 0) sends.push(["/v1/traces", JSON.stringify({ resourceSpans: [{ resource, scopeSpans: [{ scope: SCOPE, spans }] }] })])
   if (records.length > 0) sends.push(["/v1/logs", JSON.stringify({ resourceLogs: [{ resource, scopeLogs: [{ scope: SCOPE, logRecords: records }] }] })])
-  const bytes = sends.reduce((n, [, payload]) => n + payload.length, 0)
+  const bytes = sends.reduce((n, [, payload]) => n + Buffer.byteLength(payload), 0)
   ex.batches.push({ cfg, sends, items: spans.length + records.length, bytes })
   ex.pendingBytes += bytes
   while (ex.batches.length > MAX_PENDING_BATCHES || (ex.pendingBytes > MAX_PENDING_BYTES && ex.batches.length > 1)) {
@@ -1001,9 +1003,10 @@ function endUnknown(rec, reason) {
   runHook(state.hooks.unowned, "opencode-session-end", { session_id: rec.id, cwd: rec.directory, reason })
 }
 
-// shutdown sends the pending title call of every session this entry first saw, waits for
-// those sessions' queues, for at most EXIT_QUEUE_MS, and, briefly, for the hooks they
-// started, then flushes, for at most EXIT_FLUSH_MS.
+// shutdown sends the pending title call of every session this entry first saw, then waits
+// in three steps, each with its own limit: for those sessions' queues (EXIT_QUEUE_MS, 8 s),
+// for the hooks still running, any entry's (HOOK_TIMEOUT_MS and the kill grace, 2.25 s),
+// and for the flush (EXIT_FLUSH_MS, 4 s). At worst the exit is held for their sum, about 14 s.
 async function shutdown(owner) {
   const now = Date.now()
   for (const s of state.sessions.values()) {
@@ -1077,25 +1080,41 @@ function toolReach(name, args) {
 }
 
 // guardReach runs the reach hook for a call; one that fails taints the session (fails
-// closed), says so once in OpenCode's log and fences the session's run, unless terma cannot
-// be run, which has its own warning. Resolves false when the session may not export the call.
+// closed, failClosed). Resolves false when the session may not export the call.
 async function guardReach(s, reach) {
   const { tool: name, ...rest } = reach
   const ok = await runHook(s, "opencode-tool-reach", { ...base(s), tool: name, ...rest })
-  if (!ok) {
-    const fresh = !isTainted(s)
-    taint(s)
-    if (!termaMissing()) {
-      if (fresh) {
-        const log = loggers[loggers.length - 1]
-        try {
-          log?.(`terma: could not check what a tool reaches in session ${s.id}; nothing more of this session is recorded.`)
-        } catch {}
-      }
-      fence(s)
-    }
-  }
+  if (!ok) failClosed(s)
   return ok
+}
+
+// failClosed taints a session whose reach could not be checked, says so once in OpenCode's
+// log and fences its run, unless terma cannot be run, which has its own warning.
+function failClosed(s) {
+  const fresh = !isTainted(s)
+  taint(s)
+  if (termaMissing()) return
+  if (fresh) {
+    const log = loggers[loggers.length - 1]
+    try {
+      log?.(`terma: could not check what a tool reaches in session ${s.id}; nothing more of this session is recorded.`)
+    } catch {}
+  }
+  fence(s)
+}
+
+// subagentChecked is whether the session a call opened for a subagent, id, ran under the
+// guard. One that never got its record (dark) or that failed closed ran unchecked, and its
+// answer is the call's result, so the session that opened it, s, fails closed too. A
+// subagent still waiting for its record is judged once that wait is over. An entry calls
+// this before it sends the call that opened a subagent.
+async function subagentChecked(s, id) {
+  const child = typeof id === "string" ? state.sessions.get(id) : undefined
+  if (!child || child === s) return true
+  await child.queue
+  if (!child.dark && !isTainted(child)) return true
+  failClosed(s)
+  return false
 }
 
 // fence asks terma to mark the run of a session that failed closed Mixed, as OMP's
@@ -1272,6 +1291,7 @@ async function onToolPart1(s, part, servers) {
     s.checkedAt = Date.now() + 1
     end = Math.max(end ?? 0, s.checkedAt)
   }
+  if (part.tool === "task" && !(await subagentChecked(s, st.metadata?.sessionId))) return
   if (isTainted(s)) return
   let status = "completed"
   let denial
