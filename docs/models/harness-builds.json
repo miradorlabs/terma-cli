@@ -16696,6 +16696,16 @@
               "role": "default"
             }
           ]
+        },
+        "1.6.1": {
+          "captured_at": "2026-11-25T13:45:44.81423974Z",
+          "captured": true,
+          "uses": [
+            {
+              "model": "m",
+              "role": "default"
+            }
+          ]
         }
       }
     },
