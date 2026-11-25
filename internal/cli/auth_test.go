@@ -29,3 +29,18 @@ func TestApplyLoginPinsEnvironment(t *testing.T) {
 		t.Fatalf("environment = %q after a production sign-in, want none", p.Environment)
 	}
 }
+
+// A server key's team was chosen under no person's sign-in: a login afterwards, even as the
+// person signed in before the key, keeps neither its organization nor its team (#163).
+func TestALoginAfterAServerKeyDropsTheKeysTeam(t *testing.T) {
+	const account = "aaaaaaaaaaaaaaaa"
+	p := &config.Profile{Account: account, OrganizationID: "org-a", Team: "team-t"}
+	applyServerKey(p, &config.Config{Environment: config.EnvProd, OrganizationID: "org-x", Team: "team-x"})
+	if p.Account != "" {
+		t.Fatalf("a server key setup kept the person's account %q", p.Account)
+	}
+	applyLogin(p, &config.Config{Environment: config.EnvProd}, account)
+	if p.ServerKeySignIn || p.OrganizationID != "" || p.Team != "" || p.Account != account {
+		t.Fatalf("profile after signing in again = %+v; want the key's organization and team cleared", p)
+	}
+}
