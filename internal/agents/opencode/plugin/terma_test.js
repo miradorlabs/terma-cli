@@ -917,6 +917,36 @@ test.each(Object.keys(DARK_TASKS))("a subagent that went dark fails the session 
   expect(r.terma.calls().filter((c) => c.payload.command === FENCE).map((c) => c.payload.session_id)).toEqual(["ses_par"])
 })
 
+test("a subagent's late reach check holds the session that opened it to the check's time", async () => {
+  // A parent and its subagents share one run, so one Mixed cutoff: the task's result and
+  // the parent's reply carry what the child read, and must not end before the child's check.
+  const { r, hooks } = await start({}, { terma: { delayed: { "opencode-tool-reach": 0.3 } } })
+  await hooks.event(sessionCreated("ses_up"))
+  await hooks.event(sessionCreated("ses_dn", { parentID: "ses_up" }))
+  await Promise.all([...globalThis[KEY].sessions.values()].map((s) => s.queue))
+  // The child's shell call had no hook, so it is checked when its part arrives; meanwhile
+  // the task returns and the parent replies.
+  await hooks.event(toolPart("ses_dn", "msg_k", "k1", "bash", done({ command: "cat /other/x" }, "x")))
+  await hooks.event(toolPart("ses_up", "msg_1", "t1", "task", done({ prompt: "look" }, "x", { metadata: { sessionId: "ses_dn" } })))
+  await hooks.event(assistantDone("ses_up", "msg_2", { time: { created: 2000, completed: 3000 } }))
+  await hooks.dispose()
+  const finished = finishedAt(r.dir, "opencode-tool-reach")
+  const up = r.spans().filter((sp) => A(sp)["session.id"] === "ses_up")
+  expect(up.map((sp) => sp.name).sort()).toEqual(["chat m1", "execute_tool task"])
+  for (const sp of up) expect(endOf(sp)).toBeGreaterThan(finished)
+})
+
+test("a session under one that went dark is not exported", async () => {
+  const source = SOURCE.replace("const RECORD_WAIT_MS = 5000", "const RECORD_WAIT_MS = 300")
+  const { r, hooks } = await start({}, { client: fakeClient(() => null), source })
+  await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_dk", callID: "c1" }, { args: { filePath: "/repo/a" } })
+  await hooks.event(sessionCreated("ses_under", { parentID: "ses_dk" }))
+  await hooks.event(assistantDone("ses_under", "msg_1"))
+  await hooks.dispose()
+  expect(globalThis[KEY].sessions.get("ses_dk").dark).toBe(true)
+  expect(r.spans()).toEqual([])
+})
+
 test("the exit waits a bounded time for its own sessions' queues, and not for another entry's", async () => {
   const { mod, hooks: b } = await start({}, { source: SOURCE.replace("const EXIT_QUEUE_MS = 8000", "const EXIT_QUEUE_MS = 1000") })
   const a = await mod.default.server({ client: fakeClient(null), directory: "/other", worktree: "/other" })

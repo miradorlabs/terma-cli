@@ -41,10 +41,11 @@ import { fileURLToPath } from "node:url"
 // - At exit, one after another: the entry's session queues get EXIT_QUEUE_MS, the hooks still
 //   running HOOK_TIMEOUT_MS, the flush EXIT_FLUSH_MS, OpenCode 1's log LOG_SETTLE_MS.
 // - update() stamps what follows a move 1 ms after its claim, so none of it sorts before the claim.
-// - A reach check made after its tool ran sets checkedAt 1 ms after it finished, and no model or
-//   tool call the session sends afterwards ends earlier, nor is a prompt or title stamped
-//   earlier. A patch is checked in tool.execute.after, which OpenCode waits for, so it keeps
-//   its own end; a call no hook saw is checked when its part arrives and ends at that check.
+// - A reach check made after its tool ran sets checkedAt, on the root of the session's family,
+//   1 ms after it finished, and no model or tool call the family sends afterwards ends
+//   earlier, nor is a prompt or title stamped earlier. A patch is checked in
+//   tool.execute.after, which OpenCode waits for, so it keeps its own end; a call no hook saw
+//   is checked when its part arrives and ends at that check.
 
 // Bodies are bounded so a single reply or tool result cannot make an export enormous.
 const MAX_TEXT = 64 * 1024
@@ -583,7 +584,9 @@ function newSession(id, owner) {
     directory: "",
     askedDirectory: "", // the directory most recently moved to, applied or still queued
     movedAt: 0, // when the last move's claim finished; nothing after it is stamped earlier
-    checkedAt: 0, // when the last reach check made after its tool ran finished; nothing after it ends or is stamped earlier
+    // When the last reach check made after its tool ran finished, kept on the family's root
+    // (rootOf): nothing the family sends afterwards ends or is stamped earlier.
+    checkedAt: 0,
     version: "",
     created: 0,
     title: "",
@@ -756,10 +759,24 @@ function taint(s) {
     id = parent
   }
 }
+// isTainted is whether a session, or one above it, failed closed: tainted, or never given
+// its record (dark), so nothing it read was checked and what is below it derives from it.
+// rootOf is the session at the top of s's family, as far up as this process knows it. A
+// session and its subagents share one run in terma, and so one Mixed cutoff: a reach check
+// made after its tool ran, anywhere in the family, holds the whole family's times.
+function rootOf(s) {
+  for (let i = 0; i < 16; i++) {
+    const parent = s.parentID ? state.sessions.get(s.parentID) : undefined
+    if (!parent || parent === s) break
+    s = parent
+  }
+  return s
+}
+
 function isTainted(s) {
   let id = s.id
   for (let i = 0; i < 16 && id; i++) {
-    if (state.tainted.has(id)) return true
+    if (state.tainted.has(id) || state.sessions.get(id)?.dark) return true
     const parent = id === s.id ? s.parentID : state.sessions.get(id)?.parentID
     if (!parent || parent === id) break
     id = parent
@@ -935,12 +952,13 @@ function tool(s, t) {
   }
 }
 
-// endAfterCheck is a model or tool call's end, no earlier than the session's last reach
-// check made after its tool ran. The relay forwards a record that ends before the run went
-// Mixed, and a call that overlapped that check may carry what the checked call read or
-// wrote. When OpenCode waits for the check nothing overlaps it, and no time changes.
+// endAfterCheck is a model or tool call's end, no earlier than the last reach check made
+// after its tool ran in the session's family. The relay forwards a record that ends before
+// the run went Mixed, and a call that overlapped that check may carry what the checked call
+// read or wrote. When OpenCode waits for the check nothing overlaps it, and no time changes.
 function endAfterCheck(s, end) {
-  return s.checkedAt && num(end) !== undefined && end < s.checkedAt ? s.checkedAt : end
+  const floor = rootOf(s).checkedAt
+  return floor && num(end) !== undefined && end < floor ? floor : end
 }
 
 // prompt is one prompt: p = { messageID, text, agent?, model?, provider?, time? }. No
@@ -949,7 +967,7 @@ function prompt(s, pr) {
   const text = str(pr.text)
   // No earlier than the session's last move or its last check made after a tool ran: the
   // relay files a record by its time, under the claim and the Mixed cutoff in force then.
-  const floor = Math.max(s.movedAt, s.checkedAt)
+  const floor = Math.max(s.movedAt, rootOf(s).checkedAt)
   const time = floor ? Math.max(num(pr.time) ?? 0, floor) : pr.time
   emitRecord(s, "opencode.user_prompt", policyOf(s).includePrompts ? truncate(text, MAX_TEXT) : "", {
     "opencode.message.id": pr.messageID,
@@ -973,7 +991,7 @@ function title(s, t) {
 // session's previous title, so two titles of a session never share an identity, and no
 // earlier than its last move or its last check made after a tool ran, as a prompt is.
 function emitTitle(s, text, time) {
-  const at = Math.max(num(time) ?? Date.now(), s.lastTitleTime + 1, s.movedAt, s.checkedAt)
+  const at = Math.max(num(time) ?? Date.now(), s.lastTitleTime + 1, s.movedAt, rootOf(s).checkedAt)
   s.lastTitleTime = at
   emitRecord(s, "opencode.session.title", policyOf(s).includePrompts ? text : "", {}, at)
 }
@@ -1300,8 +1318,8 @@ async function onToolPart1(s, part, servers) {
     if (!(await guardReach(s, reach))) return
     // The relay judges a record by its time: a call checked only after it ran must not end
     // before its check. A millisecond later, since terma's clock has a finer grain.
-    s.checkedAt = Date.now() + 1
-    end = Math.max(end ?? 0, s.checkedAt)
+    const at = (rootOf(s).checkedAt = Date.now() + 1)
+    end = Math.max(end ?? 0, at)
   }
   if (part.tool === "task" && !(await subagentChecked(s, subagent))) return
   if (isTainted(s)) return
@@ -1557,7 +1575,7 @@ async function server(input) {
         const reachKey = JSON.stringify(reach)
         if (s.guarded.get(callID)?.reachKey === reachKey) return
         if (!(await guardReach(s, reach))) return
-        s.checkedAt = Date.now() + 1 // strictly after the check, never the same millisecond
+        rootOf(s).checkedAt = Date.now() + 1 // strictly after the check, never the same millisecond
         remember(s.guarded, callID, { reachKey }, MAX_SMALL)
       })
     }),
