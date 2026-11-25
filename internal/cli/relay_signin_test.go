@@ -399,3 +399,28 @@ func queued(t *testing.T, s *spool.Spool) map[string]spool.Event {
 	}
 	return out
 }
+
+// A sign-in the profile is not paired with (an interrupted switch) is no delivery
+// credential: the relay reads its account as unreadable and sends nothing with it (#166).
+func TestAnUnpairedSignInIsNoDeliveryCredential(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
+		p.Account = auth.AccountKey(f.srv.URL, "u-2")
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := testApp.signInSource(cfg).Account(); got != sendas.AccountUnreadable {
+		t.Fatalf("the relay reads the account as %q, want unreadable", got)
+	}
+	if got := testApp.deliveryCredential(cfg)("", "p1"); got != "" {
+		t.Fatalf("an unpaired sign-in reads %q, want none", got)
+	}
+}

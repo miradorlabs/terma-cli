@@ -66,9 +66,10 @@ func (s *sender) send(ctx context.Context, pol Policy, first entry, body []byte,
 		return sent, 0, "", partialSuccess(answer)
 	case pol.Key == "" && sendas.Reason(answer) == sendas.ReasonSignInRetired:
 		// Retired, whatever the status it comes with, as delivery and the heartbeat take it:
-		// never refreshed as a token expired.
+		// never refreshed as a token expired. The route then waits for a sign-in (keyless),
+		// as one whose sign-in gives no token does, rather than keep the relay awake.
 		s.r.opts.SignIn.Retired(bearer)
-		return retry, refusedBackoff, fmt.Sprintf("HTTP %d %s: the sign-in is retired", code, sendas.ReasonSignInRetired), 0
+		return keyless, keylessRetry, fmt.Sprintf("%sretired (HTTP %d %s)", signInErrPrefix, code, sendas.ReasonSignInRetired), 0
 	case code == http.StatusUnauthorized && pol.Key == "":
 		// An expired or rotated token: the next attempt sends a fresh one.
 		s.r.opts.SignIn.Refused(ctx, bearer)
@@ -105,8 +106,9 @@ func (r *Relay) nudgeRefresh(enrollment string) {
 	}
 }
 
-// signInErrPrefix starts the detail of a send whose sign-in's token could not be had, which
-// is warned of: a refresh or keychain that keeps failing must still show.
+// signInErrPrefix starts the detail of a send whose sign-in's token could not be had, or
+// was refused as retired, which is warned of: a refresh or keychain that keeps failing
+// must still show.
 const signInErrPrefix = "the sign-in: "
 
 // partialSuccess reads the rejected count (field 1 of field 1) by hand, since the collector

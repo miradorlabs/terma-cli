@@ -498,3 +498,24 @@ func TestAnOlderRelaysOutboxIsNeitherReadNorWritten(t *testing.T) {
 		}
 	}
 }
+
+// A sign-in refused as retired leaves its route waiting for a sign-in, as one that gives no
+// token does: the relay reads as idle at once, never kept awake for a retry (#166).
+func TestARetiredRefusalLeavesTheRelayIdle(t *testing.T) {
+	t.Parallel()
+	u := newSignInUpstream(t, http.StatusUnauthorized)
+	u.body = []byte(`{"code":16,"message":"retired","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SIGN_IN_RETIRED"}]}`)
+	signIn := &testSignIn{account: accountA}
+	dir := t.TempDir()
+	queue(t, dir, accountA)
+	r := signedInRelay(t, u, signIn, dir)
+	waitFor(t, func() bool {
+		signIn.mu.Lock()
+		defer signIn.mu.Unlock()
+		return signIn.retired
+	})
+	waitFor(t, func() bool { _, idle := r.Idle(); return idle })
+	if c := r.Stats().Snapshot().Counters; c["upstream_retries"] != 0 {
+		t.Fatalf("counters %v; want the route waiting for a sign-in, not retried", c)
+	}
+}
