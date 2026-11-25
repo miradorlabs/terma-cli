@@ -31,12 +31,14 @@ import { fileURLToPath } from "node:url"
 // Every rule here that runs on the clock, and why:
 // - BATCH_DELAY_MS: a batch leaves this long after its first item, so a quiet session still sends.
 // - post's back-off (1 s, doubling, MAX_RETRIES times) and HEADERS_TTL_MS: a relay may restart.
-// - HOOK_TIMEOUT_MS, HOOK_KILL_GRACE_MS: a hung hook is ended, so its session's queue moves on.
+// - HOOK_TIMEOUT_MS (REACH_HOOK_TIMEOUT_MS for a reach check), HOOK_KILL_GRACE_MS: a hung hook
+//   is ended, so its session's queue moves on.
 // - HOOK_QUEUE_WAIT_MS: a tool held for a reach check waits this long at most for its turn.
 // - MISSING_RETRY_MS: a terma that could not be run is not tried again on every hook.
 // - RECORD_WAIT_MS: a session with no record is given up on (fails closed), not held forever.
-// - At exit: the hooks get their run limit, the flush EXIT_FLUSH_MS, OpenCode 1's log LOG_SETTLE_MS.
-// - update() stamps what follows a move 1 ms after its claim, so none of it sorts before the claim.
+// - At exit: the hooks get HOOK_TIMEOUT_MS, the flush EXIT_FLUSH_MS, OpenCode 1's log LOG_SETTLE_MS.
+// - update() stamps what follows a move 1 ms after its claim, so none of it sorts before the claim;
+//   onToolPart1 ends a call checked only after it ran 1 ms after that check, for the same reason.
 
 // Bodies are bounded so a single reply or tool result cannot make an export enormous.
 const MAX_TEXT = 64 * 1024
@@ -54,6 +56,9 @@ const MAX_PENDING_BATCHES = 32
 const HEADERS_TTL_MS = 29 * 60 * 1000
 // A session's hooks run one at a time; a hung one is terminated so its queue keeps moving.
 const HOOK_TIMEOUT_MS = 2000
+// A reach check decides whether a session is recorded at all, so it gets a little longer
+// than `terma hook` allows itself, 5 s; every other hook keeps HOOK_TIMEOUT_MS.
+const REACH_HOOK_TIMEOUT_MS = 5500
 const HOOK_KILL_GRACE_MS = 250
 const MAX_HOOK_QUEUE = 64
 // How long a hook may wait in its session's queue before its caller stops waiting: a tool
@@ -69,10 +74,10 @@ const LOG_SETTLE_MS = 1500
 const EXIT_FLUSH_MS = 4000
 // How long a session waits for its record before it is given up on (fail closed).
 const RECORD_WAIT_MS = 5000
-// What the plugin remembers is bounded, so a long-running server cannot grow it forever.
+// What the plugin remembers is bounded, so a long-running server cannot grow it forever;
+// only the ids of tainted sessions are kept for good (see taint).
 const MAX_SESSIONS = 512
 const MAX_EVENTS = 8192
-const MAX_TAINTED = 4096
 const MAX_PER_SESSION = 1024
 const MAX_SMALL = 256
 
@@ -377,11 +382,17 @@ async function authHeaders(cfg) {
 
 // runHook hands an event to `terma hook <event>` on a queue: the session's own (a FIFO, so
 // its claim always finishes before its other hooks) or, for a session this process does
-// not keep, state.hooks.unowned. Queues do not wait for each other. A timed-out child is
-// terminated, and its queue advances only once it is gone. Resolves true iff the hook
-// exited 0; the caller stops waiting, with false, once the hook has waited
-// HOOK_QUEUE_WAIT_MS for its turn or run past its limit. A hook given up on still runs in
-// its turn.
+// not keep, state.hooks.unowned. Queues do not wait for each other. A hook's limit is
+// hookLimit(event), counted from its turn. What can happen to a hook, and what its caller
+// gets:
+//   runs and exits 0                         true
+//   runs and exits non-zero                  false
+//   waits past HOOK_QUEUE_WAIT_MS for its    false then; it still runs in its turn
+//   turn
+//   runs past its limit                      false; it is ended with its process group, and
+//                                            its queue moves on once it is gone
+//   queue full (MAX_HOOK_QUEUE) or terma     false at once; it is not started
+//   cannot be run
 function runHook(lane, event, payload) {
   const h = state.hooks
   if (termaMissing() || lane.hookPending >= MAX_HOOK_QUEUE) return Promise.resolve(false)
@@ -411,7 +422,7 @@ function runHook(lane, event, payload) {
   const slot = lane.hookQueue.then(() => {
     // Its turn: the run limit starts now, not when it was queued.
     clearTimeout(queued)
-    if (!settled) running = giveUp(HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS + 500)
+    if (!settled) running = giveUp(hookLimit(event) + HOOK_KILL_GRACE_MS + 500)
     return spawnHook(argv, event, payload)
   })
   lane.hookQueue = slot.then((s) => s.exit, () => undefined).finally(() => {
@@ -421,8 +432,14 @@ function runHook(lane, event, payload) {
   return answer
 }
 
+// hookLimit is how long a hook may run.
+function hookLimit(event) {
+  return event === "opencode-tool-reach" ? REACH_HOOK_TIMEOUT_MS : HOOK_TIMEOUT_MS
+}
+
 function spawnHook(argv, event, payload) {
   if (termaMissing()) return { result: Promise.resolve(false), exit: Promise.resolve() }
+  const grouped = process.platform !== "win32"
   let resolveExit
   const exit = new Promise((r) => {
     resolveExit = r
@@ -449,10 +466,11 @@ function spawnHook(argv, event, payload) {
       }
     }
     // The hook leads a process group of its own, so the group is signalled: a child of the
-    // hook (git) ends with it. Where a group cannot be signalled, the hook alone is.
+    // hook (git) ends with it. Where there is no group, or it cannot be signalled, the hook
+    // alone is.
     const sendKill = (sig) => {
       try {
-        if (child.pid > 1) return void process.kill(-child.pid, sig)
+        if (grouped && child.pid > 1) return void process.kill(-child.pid, sig)
       } catch (err) {
         if (err?.code === "ESRCH") return markExited()
       }
@@ -474,13 +492,15 @@ function spawnHook(argv, event, payload) {
         finish(false)
       }, HOOK_KILL_GRACE_MS)
       killTimer.unref?.()
-    }, HOOK_TIMEOUT_MS)
+    }, hookLimit(event))
     timer.unref?.()
     try {
       // In a process group of its own: OpenCode 2 signals the group a tool step ran in when
       // the step ends, which killed a hook started for that step (a file edit, the idle
-      // hook that starts the flush) wherever terma took longer than that to start.
-      child = spawn(argv[0], [...argv.slice(1), event], { stdio: ["pipe", "ignore", "ignore"], detached: true })
+      // hook that starts the flush) wherever terma took longer than that to start. Windows
+      // has no process groups: before OpenCode is supported there, decide how a hook is kept
+      // apart from the step's signals and how a hung hook's children are ended.
+      child = spawn(argv[0], [...argv.slice(1), event], { stdio: ["pipe", "ignore", "ignore"], detached: grouped })
       child.on("spawn", termaFound)
       child.on("error", (err) => {
         if (err?.code === "ENOENT" || err?.code === "EACCES") termaLost(argv[0], err.code)
@@ -562,6 +582,8 @@ function newSession(id, owner) {
     asked: new Map(), // permission request id -> qualified call id
     rejected: new Set(),
     guarded: new Map(), // provider call id -> { reachKey }
+    fenced: false, // terma marked the session's run Mixed after a reach check failed
+    fencing: false, // that request is running
     pendingTitle: null,
     entry: {}, // an entry point's own per-session data
   }
@@ -701,11 +723,13 @@ function blocked(s) {
 }
 
 // A failed reach hook taints the session and every session above it: their content could
-// now include what the child read across organizations, so none of them exports more.
+// now include what the child read across organizations, so none of them exports more. A
+// taint is one short id and is never dropped: dropping one would let a session that failed
+// closed export again.
 function taint(s) {
   let id = s.id
   for (let i = 0; i < 16 && id; i++) {
-    remember(state.tainted, id, undefined, MAX_TAINTED)
+    state.tainted.add(id)
     const parent = id === s.id ? s.parentID : state.sessions.get(id)?.parentID
     if (!parent || parent === id) break
     id = parent
@@ -970,10 +994,11 @@ async function shutdown(owner) {
 
 // --- reach --------------------------------------------------------------------------
 
-// Each major's name for a tool that reads or runs something, mapped to one vocabulary.
-const REACH_TOOLS = { read: "read", grep: "grep", glob: "glob", list: "list", bash: "bash", shell: "bash" }
+// Each major's name for a tool that reads, changes or runs something, mapped to one
+// vocabulary. An edit is checked on the file it changes, as a read is on the file it reads.
+const REACH_TOOLS = { read: "read", write: "write", edit: "edit", grep: "grep", glob: "glob", list: "list", bash: "bash", shell: "bash" }
 
-// toolReach describes what a read, search, list or shell call can reach, or null.
+// toolReach describes what a read, edit, search, list or shell call can reach, or null.
 function toolReach(name, args) {
   const kind = REACH_TOOLS[name]
   if (!kind || !args || typeof args !== "object") return null
@@ -981,6 +1006,8 @@ function toolReach(name, args) {
   const path = typeof args.filePath === "string" && args.filePath ? args.filePath : typeof args.path === "string" && args.path ? args.path : ""
   switch (kind) {
     case "read":
+    case "write":
+    case "edit":
       if (path) out.paths = [path]
       break
     case "grep":
@@ -1005,22 +1032,39 @@ function toolReach(name, args) {
 }
 
 // guardReach runs the reach hook for a call; one that fails taints the session (fails
-// closed) and says so once in OpenCode's log, unless terma cannot be run, which has its own
-// warning. Resolves false when the session may not export the call.
+// closed), says so once in OpenCode's log and fences the session's run, unless terma cannot
+// be run, which has its own warning. Resolves false when the session may not export the call.
 async function guardReach(s, reach) {
   const { tool: name, ...rest } = reach
   const ok = await runHook(s, "opencode-tool-reach", { ...base(s), tool: name, ...rest })
   if (!ok) {
     const fresh = !isTainted(s)
     taint(s)
-    if (fresh && !termaMissing()) {
-      const log = loggers[loggers.length - 1]
-      try {
-        log?.(`terma: could not check what a tool reaches in session ${s.id}; nothing more of this session is recorded.`)
-      } catch {}
+    if (!termaMissing()) {
+      if (fresh) {
+        const log = loggers[loggers.length - 1]
+        try {
+          log?.(`terma: could not check what a tool reaches in session ${s.id}; nothing more of this session is recorded.`)
+        } catch {}
+      }
+      fence(s)
     }
   }
   return ok
+}
+
+// fence asks terma to mark the run of a session that failed closed Mixed, as OMP's
+// extension does: with a shell reach terma cannot place, so the relay drops what is
+// exported of the run from then on and `terma doctor` names it. Nothing waits for it. One
+// that fails is tried again at the session's next tool call; it goes straight to the hook
+// queue, since run() skips a tainted session's work.
+function fence(s) {
+  if (s.fenced || s.fencing || termaMissing()) return
+  s.fencing = true
+  runHook(s, "opencode-tool-reach", { ...base(s), tool: "bash", command: "eval $TERMA_REACH_FAILED" }).then((ok) => {
+    s.fencing = false
+    if (ok) s.fenced = true
+  })
 }
 
 // --- OpenCode 1 entry ---------------------------------------------------------------
@@ -1161,11 +1205,22 @@ async function onToolPart1(s, part, servers) {
   if (st.time?.compacted) return
   if (s.messages.get(part.messageID)?.copied) return
   if (num(st.time?.end) !== undefined && st.time.end < s.created) return
-  // The call may have reached something the guard before it did not see; check again.
-  const reach = toolReach(part.tool, st.input)
+  // The call may have reached something the guard before it did not see; check again. A
+  // patch's files are only known once it ran.
+  let reach = toolReach(part.tool, st.input)
+  if (!reach && EDIT_TOOLS.has(part.tool)) {
+    const files = filesOf1(s, part.tool, st)
+    if (files.length > 0) reach = { tool: part.tool, paths: files }
+  }
   const guarded = s.guarded.get(part.callID)
   s.guarded.delete(part.callID)
-  if (reach && guarded?.reachKey !== JSON.stringify(reach) && !(await guardReach(s, reach))) return
+  let end = num(st.time?.end)
+  if (reach && guarded?.reachKey !== JSON.stringify(reach)) {
+    if (!(await guardReach(s, reach))) return
+    // The relay judges a record by its time: a call checked only after it ran must not end
+    // before its check. A millisecond later, since terma's clock has a finer grain.
+    end = Math.max(end ?? 0, Date.now() + 1)
+  }
   if (isTainted(s)) return
   let status = "completed"
   let denial
@@ -1186,7 +1241,7 @@ async function onToolPart1(s, part, servers) {
     name: part.tool,
     turn: turnOf1(s, s.messages.get(part.messageID)?.parentID),
     start: num(st.time?.start),
-    end: num(st.time?.end),
+    end,
     status,
     denial,
     exitCode: num(st.metadata?.exit),
@@ -1392,6 +1447,9 @@ async function server(input) {
     "tool.execute.before": guard(async (inp, out) => {
       const s = see(inp?.sessionID)
       if (!s || typeof inp?.callID !== "string") return
+      // A session that failed closed asks again, if it must, for its run to be fenced; the
+      // tool does not wait for it.
+      if (isTainted(s)) fence(s)
       const reach = toolReach(inp.tool, out?.args ?? inp.args)
       if (!reach) return
       remember(s.guarded, inp.callID, { reachKey: JSON.stringify(reach) }, MAX_SMALL)

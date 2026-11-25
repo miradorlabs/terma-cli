@@ -62,7 +62,8 @@ afterAll(() => {
 // tab, and the JSON it got on stdin. A hook naming a session in slow hangs after logging.
 // An event in delayed takes that many seconds, then touches <event>.done: when it finished
 // is that file's modification time, read with finishedAt (a shell's own clock is not
-// trusted for milliseconds).
+// trusted for milliseconds). A fence (the reach that asks terma to mark a run Mixed) fails
+// as any reach does, until <dir>/fence.ok exists.
 function fakeTerma(dir, { fail = [], slow = [], delayed = {} } = {}) {
   const log = join(dir, "hooks.log")
   const path = join(dir, "terma")
@@ -71,7 +72,8 @@ function fakeTerma(dir, { fail = [], slow = [], delayed = {} } = {}) {
   const waiting = Object.entries(delayed)
     .map(([e, secs]) => `[ "$2" = "${e}" ] && sleep ${secs} && : > '${join(dir, e + ".done")}'`)
     .join("\n")
-  writeFileSync(path, `#!/bin/sh\ninput=$(cat)\nprintf '%s\\t%s\\n' "$2" "$input" >> '${log}'\n${hanging}\n${waiting}\n${failing}\nexit 0\n`)
+  const fencing = `case "$input" in *TERMA_REACH_FAILED*) [ -e '${join(dir, "fence.ok")}' ] && exit 0;; esac`
+  writeFileSync(path, `#!/bin/sh\ninput=$(cat)\nprintf '%s\\t%s\\n' "$2" "$input" >> '${log}'\n${hanging}\n${waiting}\n${fencing}\n${failing}\nexit 0\n`)
   chmodSync(path, 0o700)
   return {
     argv: [path, "hook"],
@@ -559,6 +561,8 @@ const textPart = (sessionID, messageID, id, text) => ev("message.part.updated", 
 const toolPart = (sessionID, messageID, callID, tool, state) =>
   ev("message.part.updated", { part: { id: "prt_" + messageID + "_" + callID, sessionID, messageID, callID, type: "tool", tool, state } })
 const RULE_ERROR = "The user has specified a rule which prevents you from using this specific tool call."
+// The shell reach a session that failed closed sends, so terma marks its run Mixed.
+const FENCE = "eval $TERMA_REACH_FAILED"
 const done = (input, output, extra = {}) => ({ status: "completed", input, output, title: "t", metadata: {}, time: { start: 2100, end: 2200 }, ...extra })
 
 async function start(overrides, { terma, client, directory = "/repo" } = {}) {
@@ -972,7 +976,9 @@ test("a move whose claim fails sends nothing more of the session", async () => {
   await hooks.dispose()
   expect(r.spans()).toEqual([])
   expect(named(r.logs(), "opencode.user_prompt").map((x) => A(x)["opencode.message.id"])).toEqual(["msg_before"])
-  expect(r.terma.calls().map((c) => c.event)).toEqual(["opencode-session-start", "opencode-prompt", "opencode-tool-reach"])
+  // The failed claim is followed by the fence.
+  expect(r.terma.calls().map((c) => c.event)).toEqual(["opencode-session-start", "opencode-prompt", "opencode-tool-reach", "opencode-tool-reach"])
+  expect(r.terma.calls().at(-1).payload.command).toBe(FENCE)
 })
 
 test("a null CONFIG makes the plugin inert", async () => {
@@ -1136,7 +1142,11 @@ test("a file attached to a prompt is reach-checked first, and its content is not
   await refused.hooks["chat.message"]({ sessionID: "ses_at2" }, structuredClone(message))
   await refused.hooks.dispose()
   expect(named(refused.r.logs(), "opencode.user_prompt")).toEqual([])
-  expect(refused.r.terma.calls().map((c) => c.event)).toEqual(["opencode-session-start", "opencode-tool-reach"])
+  expect(refused.r.terma.calls().map((c) => [c.event, c.payload.command])).toEqual([
+    ["opencode-session-start", undefined],
+    ["opencode-tool-reach", undefined],
+    ["opencode-tool-reach", FENCE],
+  ])
 })
 
 test("an attached image is reach-checked by the path OpenCode read it from", async () => {
@@ -1313,9 +1323,15 @@ test("the session left is the one used least recently", async () => {
 })
 
 test("a reach check queued behind slow hooks waits for its turn, not from when it was asked", async () => {
-  // Three idle hooks of about a second each: the check waits longer in the queue than a
-  // hook may run (HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS + 500), but each of them finishes.
-  const { r, hooks, warnings } = await start({}, { terma: { delayed: { "opencode-idle": 1.1 } } })
+  // Three idle hooks of about a second each: the check waits longer in the queue than it
+  // may run (its limit made HOOK_TIMEOUT_MS here, + HOOK_KILL_GRACE_MS + 500), but each of
+  // them finishes.
+  const r = rig({}, { delayed: { "opencode-idle": 1.1 } })
+  const source = SOURCE.replace("const REACH_HOOK_TIMEOUT_MS = 5500", "const REACH_HOOK_TIMEOUT_MS = 2000")
+  expect(source).not.toBe(SOURCE)
+  const mod = await load(r.config, { source })
+  const warnings = []
+  const hooks = await mod.default.server({ client: fakeClient(null, warnings), directory: "/repo", worktree: "/repo" })
   await hooks.event(sessionCreated("ses_q"))
   for (let i = 0; i < 3; i++) await hooks.event(ev("session.idle", { sessionID: "ses_q" }))
   const began = Date.now()
@@ -1479,7 +1495,7 @@ test("a hook that runs past its limit is ended with the processes it started", a
   // The hook starts a child and waits for it: ending the hook alone would leave the child.
   const dir = mkdtempSync(join(root, "kill-"))
   const hook = join(dir, "terma")
-  writeFileSync(hook, `#!/bin/sh\ncat > /dev/null\nsleep 30 &\necho $! > '${dir}/child.pid'\nwait\n`)
+  writeFileSync(hook, `#!/bin/sh\ncat > /dev/null\necho $$ > '${dir}/hook.pid'\nsleep 30 &\necho $! > '${dir}/child.pid'\nwait\n`)
   chmodSync(hook, 0o700)
   const alive = (pid) => {
     try {
@@ -1492,9 +1508,152 @@ test("a hook that runs past its limit is ended with the processes it started", a
   const { hooks } = await start({ hookCommand: [hook, "hook"] })
   await hooks.event(sessionCreated("ses_kill"))
   await Promise.all([...globalThis[KEY].sessions.values()].map((s) => s.queue))
-  const pid = Number(readFileSync(join(dir, "child.pid"), "utf8"))
-  expect(pid).toBeGreaterThan(1)
-  for (let i = 0; i < 100 && alive(pid); i++) await Bun.sleep(10)
-  expect(alive(pid)).toBe(false)
+  const pids = ["hook.pid", "child.pid"].map((f) => Number(readFileSync(join(dir, f), "utf8")))
+  for (const pid of pids) expect(pid).toBeGreaterThan(1)
+  for (let i = 0; i < 100 && pids.some(alive); i++) await Bun.sleep(10)
+  expect(pids.map(alive)).toEqual([false, false])
   await hooks.dispose()
 }, 15_000)
+
+// settled waits until a session's hooks asked for so far, the fence included, are done.
+async function settled(id) {
+  const s = globalThis[KEY].sessions.get(id)
+  await s.hookQueue
+  for (let i = 0; i < 200 && s.fencing; i++) await Bun.sleep(5)
+}
+const fences = (r) => r.terma.calls().filter((c) => c.event === "opencode-tool-reach" && c.payload.command === FENCE)
+
+test("a reach check may take as long as terma hook allows itself", async () => {
+  // 3 s: past every other hook's limit, inside the reach check's.
+  const { r, hooks, warnings } = await start({}, { terma: { delayed: { "opencode-tool-reach": 3 } } })
+  await hooks.event(sessionCreated("ses_long"))
+  await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_long", callID: "c1" }, { args: { filePath: "/repo/a" } })
+  expect(finishedAt(r.dir, "opencode-tool-reach")).toBeNumber()
+  expect(globalThis[KEY].tainted.has("ses_long")).toBe(false)
+  await hooks.event(toolPart("ses_long", "msg_1", "c1", "read", done({ filePath: "/repo/a" }, "ok")))
+  await hooks.dispose()
+  expect(tools(r.spans()).map((s) => A(s)["gen_ai.tool.call.id"])).toEqual(["msg_1:c1"])
+  expect(warnings).toEqual([])
+}, 15_000)
+
+test("a failed reach check asks terma once to mark the run Mixed, and the tool does not wait for it", async () => {
+  const { r, hooks } = await start({}, { terma: { fail: ["opencode-tool-reach"], delayed: { "opencode-tool-reach": 0.3 } } })
+  writeFileSync(join(r.dir, "fence.ok"), "")
+  await hooks.event(sessionCreated("ses_fn"))
+  await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_fn", callID: "c1" }, { args: { filePath: "/repo/a" } })
+  // The check is done; the fence it started is not.
+  expect(r.terma.calls().filter((c) => c.event === "opencode-tool-reach").length).toBe(1)
+  await settled("ses_fn")
+  expect(fences(r).length).toBe(1)
+  // Once it succeeded, a later tool call asks nothing more.
+  await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_fn", callID: "c2" }, { args: { filePath: "/repo/b" } })
+  await settled("ses_fn")
+  await hooks.dispose()
+  expect(r.terma.calls().map((c) => c.event)).toEqual(["opencode-session-start", "opencode-tool-reach", "opencode-tool-reach"])
+  expect(fences(r).map((c) => c.payload)).toEqual([{ session_id: "ses_fn", cwd: "/repo", tool: "bash", command: FENCE }])
+  expect(globalThis[KEY].sessions.get("ses_fn").fenced).toBe(true)
+}, 15_000)
+
+test("a fence that fails is tried again at the session's next tool call, until it succeeds", async () => {
+  const { r, hooks } = await start({}, { terma: { fail: ["opencode-tool-reach"] } })
+  await hooks.event(sessionCreated("ses_fr"))
+  const call = async (callID) => {
+    await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_fr", callID }, { args: { filePath: "/repo/" + callID } })
+    await settled("ses_fr")
+  }
+  await call("c1")
+  expect(fences(r).length).toBe(1)
+  await call("c2")
+  expect(fences(r).length).toBe(2)
+  writeFileSync(join(r.dir, "fence.ok"), "")
+  await call("c3")
+  expect(fences(r).length).toBe(3)
+  await call("c4")
+  await hooks.dispose()
+  expect(fences(r).length).toBe(3)
+  // The tainted session's own checks are not run again.
+  expect(r.terma.calls().filter((c) => c.event === "opencode-tool-reach" && c.payload.command !== FENCE).length).toBe(1)
+})
+
+test("a session that failed closed stays tainted, however many sessions fail after it", async () => {
+  const { r, hooks } = await start({}, { terma: { fail: ["opencode-tool-reach"] } })
+  await hooks.event(sessionCreated("ses_first"))
+  await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_first", callID: "c1" }, { args: { filePath: "/repo/a" } })
+  // Others that failed since, many of them.
+  const st = globalThis[KEY]
+  for (let i = 0; i < 5000; i++) st.tainted.add("ses_filler_" + i)
+  await hooks.event(sessionCreated("ses_last"))
+  await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_last", callID: "c2" }, { args: { filePath: "/repo/b" } })
+  expect(st.tainted.has("ses_first")).toBe(true)
+  // A tool with no reach and a model call: nothing checks them, so only the taint stops them.
+  await hooks.event(toolPart("ses_first", "msg_1", "c3", "webfetch", done({ url: "https://example.com" }, "page")))
+  await hooks.event(assistantDone("ses_first", "msg_1"))
+  await hooks.dispose()
+  expect(r.spans()).toEqual([])
+})
+
+test("a write and an edit are reach-checked on their file before they run", async () => {
+  const { r, hooks } = await start()
+  await hooks.event(sessionCreated("ses_ed"))
+  await hooks["tool.execute.before"]({ tool: "write", sessionID: "ses_ed", callID: "c1" }, { args: { filePath: "/repo/new.txt", content: "x" } })
+  await hooks["tool.execute.before"]({ tool: "edit", sessionID: "ses_ed", callID: "c2" }, { args: { filePath: "/repo/a.txt", oldString: "a", newString: "b" } })
+  const before = r.terma.calls()
+  await hooks.event(toolPart("ses_ed", "msg_1", "c1", "write", done({ filePath: "/repo/new.txt", content: "x" }, "ok")))
+  await hooks.event(toolPart("ses_ed", "msg_1", "c2", "edit", done({ filePath: "/repo/a.txt", oldString: "a", newString: "b" }, "ok")))
+  await hooks.dispose()
+  expect(before).toEqual([
+    { event: "opencode-session-start", payload: { session_id: "ses_ed", cwd: "/repo" } },
+    { event: "opencode-tool-reach", payload: { session_id: "ses_ed", cwd: "/repo", tool: "write", paths: ["/repo/new.txt"] } },
+    { event: "opencode-tool-reach", payload: { session_id: "ses_ed", cwd: "/repo", tool: "edit", paths: ["/repo/a.txt"] } },
+  ])
+  // The parts repeat what was checked: no second check, and the edits are reported after.
+  expect(r.terma.calls().slice(before.length).map((c) => [c.event, c.payload.tool])).toEqual([
+    ["opencode-file-edit", "write"],
+    ["opencode-file-edit", "edit"],
+  ])
+  // A call checked before it ran keeps OpenCode's own times.
+  expect(tools(r.spans()).map((s) => s.endTimeUnixNano)).toEqual([nanosOf(2200), nanosOf(2200)])
+})
+const nanosOf = (ms) => String(BigInt(ms) * 1000000n)
+const endOf = (span) => Number(BigInt(span.endTimeUnixNano) / 1000000n)
+
+test("a call checked only when its part arrives ends after its check; one checked before keeps its time", async () => {
+  const files = [{ filePath: "/repo/notes.txt", relativePath: "notes.txt", type: "update" }]
+  const cases = [
+    // A patch's files are known only once it ran.
+    ["apply_patch", done({ patchText: "*** Begin Patch" }, "Success", { metadata: { files } }), { tool: "apply_patch", paths: ["/repo/notes.txt"] }],
+    // A shell command the person ran with !cmd fires no tool.execute.before.
+    ["bash", done({ command: "ls" }, "a\n"), { tool: "bash", command: "ls" }],
+  ]
+  for (const [name, state, reach] of cases) {
+    const { r, hooks } = await start({}, { terma: { delayed: { "opencode-tool-reach": 0.3 } } })
+    await hooks.event(sessionCreated("ses_late"))
+    await hooks.event(toolPart("ses_late", "msg_1", "c1", name, state))
+    await hooks.dispose()
+    expect(r.terma.calls().filter((c) => c.event === "opencode-tool-reach").map((c) => c.payload)).toEqual([{ session_id: "ses_late", cwd: "/repo", ...reach }])
+    const [span] = tools(r.spans())
+    expect(endOf(span)).toBeGreaterThan(finishedAt(r.dir, "opencode-tool-reach"))
+    expect(span.startTimeUnixNano).toBe(nanosOf(2100))
+  }
+
+  const { r, hooks } = await start({}, { terma: { delayed: { "opencode-tool-reach": 0.3 } } })
+  await hooks.event(sessionCreated("ses_early"))
+  await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_early", callID: "c1" }, { args: { filePath: "/repo/a" } })
+  await hooks.event(toolPart("ses_early", "msg_1", "c1", "read", done({ filePath: "/repo/a" }, "ok")))
+  await hooks.dispose()
+  expect(tools(r.spans()).map((s) => s.endTimeUnixNano)).toEqual([nanosOf(2200)])
+}, 15_000)
+
+test("an edit whose reach check fails exports nothing of it", async () => {
+  const { r, hooks } = await start({}, { terma: { fail: ["opencode-tool-reach"] } })
+  await hooks.event(sessionCreated("ses_ef"))
+  await hooks["tool.execute.before"]({ tool: "edit", sessionID: "ses_ef", callID: "c1" }, { args: { filePath: "/other/a.txt", oldString: "a", newString: "b" } })
+  await hooks.event(toolPart("ses_ef", "msg_1", "c1", "edit", done({ filePath: "/other/a.txt", oldString: "a", newString: "b" }, "ok")))
+  // A patch no guard saw fails its check when its part arrives.
+  const files = [{ filePath: "/other/b.txt", relativePath: "b.txt", type: "update" }]
+  await hooks.event(sessionCreated("ses_pf"))
+  await hooks.event(toolPart("ses_pf", "msg_2", "c2", "apply_patch", done({ patchText: "*** Begin Patch" }, "Success", { metadata: { files } })))
+  await hooks.dispose()
+  expect(r.spans()).toEqual([])
+  expect(r.terma.calls().filter((c) => c.event === "opencode-file-edit")).toEqual([])
+})

@@ -1,11 +1,14 @@
 package e2e
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"maps"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -534,6 +537,50 @@ func TestOpenCodeTermaRemoved(t *testing.T) {
 		}
 		finishOpenCode(t, sb)
 	})
+}
+
+// How long the plugin's reach check takes with the real terma: the plugin holds a tool for
+// it and gives it REACH_HOOK_TIMEOUT_MS. This logs the times and asserts none: it needs
+// terma only, so it runs once, not on each OpenCode build. It fails only if a hook does.
+func TestOpenCodeReachHookTime(t *testing.T) {
+	sb := openCodeRelay(t, true, nil)
+	const sid = "ses_reach_timing"
+	hook := func(event string, payload map[string]any) time.Duration {
+		t.Helper()
+		body, _ := json.Marshal(payload)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, sb.Terma, "hook", event)
+		cmd.Dir = sb.Repo
+		cmd.Env = sb.termaEnv()
+		cmd.Stdin = bytes.NewReader(body)
+		began := time.Now()
+		out, err := cmd.CombinedOutput()
+		took := time.Since(began)
+		if err != nil {
+			t.Fatalf("terma hook %s: %v\n%s", event, err, out)
+		}
+		return took
+	}
+	t.Logf("opencode-session-start: %v", hook("opencode-session-start", map[string]any{"session_id": sid, "cwd": sb.Repo}))
+	for _, c := range []struct {
+		name  string
+		reach map[string]any
+	}{
+		{"read", map[string]any{"tool": "read", "paths": []string{filepath.Join(sb.Repo, "README.md")}}},
+		{"bash", map[string]any{"tool": "bash", "command": "cat README.md"}},
+	} {
+		var times []time.Duration
+		for range 20 {
+			payload := map[string]any{"session_id": sid, "cwd": sb.Repo}
+			maps.Copy(payload, c.reach)
+			times = append(times, hook("opencode-tool-reach", payload))
+		}
+		first := times[0]
+		slices.Sort(times)
+		t.Logf("opencode-tool-reach %s, %d runs: first %v; min %v, median %v, max %v", c.name, len(times), first, times[0], times[len(times)/2], times[len(times)-1])
+	}
+	finishOpenCode(t, sb)
 }
 
 // UseOpenCodeMCP adds the echo MCP server to the sandbox's OpenCode config as server, so

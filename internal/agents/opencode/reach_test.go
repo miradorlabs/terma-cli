@@ -102,6 +102,65 @@ func TestOpenCodeStartRunAndToolReachCrossOrgMixed(t *testing.T) {
 	}
 }
 
+// The plugin checks a write or an edit on the file it changes before the tool runs. A file
+// that does not exist yet inside another organization's checkout crosses into it: the run
+// goes Mixed at the check, before the edit's span can leave.
+func TestOpenCodeEditReachToANewFileCrossOrgMixed(t *testing.T) {
+	stateDir := t.TempDir()
+	parent, _ := filepath.EvalSymlinks(t.TempDir())
+	repoA, repoB := filepath.Join(parent, "alpha"), filepath.Join(parent, "beta")
+	for _, r := range [][2]string{{repoA, "git@github.com:orgA/alpha.git"}, {repoB, "git@github.com:orgB/beta.git"}} {
+		_, _ = gitx.Git(context.Background(), parent, "init", "-q", "-b", "main", r[0])
+		_, _ = gitx.Git(context.Background(), r[0], "remote", "add", "origin", r[1])
+	}
+	const acct = "1111111111111111"
+	now := time.Now().UTC().Truncate(time.Second)
+	st, err := routing.Create(stateDir, "default", acct, func(s *routing.State) error {
+		for _, spec := range [][3]string{{"orgA", "team-a", "github.com/orgA/alpha"}, {"orgB", "team-b", "github.com/orgB/beta"}} {
+			if _, err := s.Select(routing.Team{OrganizationID: spec[0], AuthURL: "https://api.example.com", TeamID: spec[1],
+				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{spec[2]}, Revision: 1, FetchedAt: now, TeamID: spec[1], OrganizationID: spec[0], AuthURL: "https://api.example.com"}}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp, err := spool.Open(filepath.Join(stateDir, spool.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp.Bind(acct)
+	rt := hookrun.NewRouting("default", &st)
+	env := func(stdin string) hookrun.Env {
+		return hookrun.Env{StateDir: stateDir, Cwd: repoA, Spool: sp, Account: acct, Routing: rt, Now: now, Stdin: strings.NewReader(stdin)}
+	}
+	events := Agent{}.Events()
+	ctx := context.Background()
+
+	for _, tool := range []string{"write", "edit"} {
+		sid := "ses_" + tool + "_new_oc"
+		if err := events["opencode-session-start"](ctx, env(`{"session_id":"`+sid+`","cwd":`+strconv.Quote(repoA)+`}`)); err != nil {
+			t.Fatal(err)
+		}
+		if c, ok := claim.Read(stateDir, sid, now); ok && c.Kind == claim.KindMixed {
+			t.Fatalf("%s: claim is Mixed before any reach: %+v", tool, c)
+		}
+		newFile := filepath.Join(repoB, "pkg", tool+".go")
+		if _, err := os.Stat(newFile); !os.IsNotExist(err) {
+			t.Fatalf("%s exists before the %s: %v", newFile, tool, err)
+		}
+		body, _ := json.Marshal(map[string]any{"session_id": sid, "cwd": repoA, "tool": tool, "paths": []string{newFile}})
+		if err := events["opencode-tool-reach"](ctx, env(string(body))); err != nil {
+			t.Fatal(err)
+		}
+		if c, ok := claim.Read(stateDir, sid, now); !ok || c.Kind != claim.KindMixed {
+			t.Fatalf("%s of a new file in another organization's checkout: claim = %+v (ok=%v); want KindMixed", tool, c, ok)
+		}
+	}
+}
+
 // An attached file OpenCode gives no path for is told to terma as a read it cannot place,
 // under a path that starts with two separators. That must stay an unknown reach: the run
 // goes Mixed, as for a shell command terma cannot follow.
@@ -281,15 +340,15 @@ await hooks.dispose()
 				}
 			}
 		}
-		if len(byTool) == 5 || time.Now().After(deadline) {
+		if len(byTool) == 6 || time.Now().After(deadline) {
 			break
 		}
 	}
-	if reaches != 5 {
-		t.Fatalf("opencode-tool-reach calls = %d (%v); want 5 (deduped across the guard and the tool part, excluding edit)", reaches, byTool)
+	if reaches != 6 {
+		t.Fatalf("opencode-tool-reach calls = %d (%v); want 6 (deduped across the guard and the tool part)", reaches, byTool)
 	}
-	if _, ok := byTool["edit"]; ok {
-		t.Fatalf("edit unexpectedly emitted opencode-tool-reach: %v", byTool["edit"])
+	if paths, _ := byTool["edit"]["paths"].([]any); len(paths) != 1 || paths[0] != "/repoA/x.go" {
+		t.Fatalf("edit reach = %v; want the file it changes", byTool["edit"])
 	}
 	if byTool["bash"]["command"] != "cat ../repoB/a" || byTool["bash"]["dir"] != "/repoB" {
 		t.Fatalf("bash reach = %v", byTool["bash"])
@@ -401,7 +460,8 @@ func TestOpenCodeToolReachFailsClosedUnderNode(t *testing.T) {
 	defer srv.Close()
 
 	hook := filepath.Join(dir, "hook.sh")
-	hookSrc := "#!/bin/sh\nif [ \"$1\" = \"opencode-tool-reach\" ]; then exit 1; fi\nexit 0\n"
+	// A reach into /repoB fails; an edit in /repoA is checked too, and passes.
+	hookSrc := "#!/bin/sh\nif [ \"$1\" = \"opencode-tool-reach\" ]; then case \"$(cat)\" in *repoB*) exit 1;; esac; fi\nexit 0\n"
 	if err := os.WriteFile(hook, []byte(hookSrc), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -498,7 +558,8 @@ func TestOpenCodeChildTaintSuppressesParentExportsUnderNode(t *testing.T) {
 	defer srv.Close()
 
 	hook := filepath.Join(dir, "hook.sh")
-	hookSrc := "#!/bin/sh\nif [ \"$1\" = \"opencode-tool-reach\" ]; then exit 1; fi\nexit 0\n"
+	// A reach into /repoB fails; an edit in /repoA is checked too, and passes.
+	hookSrc := "#!/bin/sh\nif [ \"$1\" = \"opencode-tool-reach\" ]; then case \"$(cat)\" in *repoB*) exit 1;; esac; fi\nexit 0\n"
 	if err := os.WriteFile(hook, []byte(hookSrc), 0o700); err != nil {
 		t.Fatal(err)
 	}
