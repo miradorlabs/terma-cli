@@ -92,7 +92,8 @@ func errorInfoReason(anyMsg []byte) string {
 	return string(WireBytes(WireBytes(anyMsg, 2), 1))
 }
 
-// WireField is one field of a protobuf message as the wire carries it.
+// WireField is one field of a protobuf message as the wire carries it. A field of another
+// type than length-delimited or varint (fixed32, fixed64, a group) has Num and Type only.
 type WireField struct {
 	Num  protowire.Number
 	Type protowire.Type
@@ -131,8 +132,8 @@ func WireFields(msg []byte) iter.Seq[WireField] {
 	}
 }
 
-// WireBytes is the first length-delimited field num of the protobuf message b, nil when it
-// has none, or a field before it can't be read.
+// WireBytes is the first length-delimited field num of the protobuf message b: nil when it
+// has none, or the walk stops at a field it can't read before reaching one.
 func WireBytes(b []byte, num protowire.Number) []byte {
 	for f := range WireFields(b) {
 		if f.Num == num && f.Type == protowire.BytesType {

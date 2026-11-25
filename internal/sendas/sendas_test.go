@@ -66,7 +66,9 @@ func TestWireFields(t *testing.T) {
 	if n != 3 {
 		t.Fatalf("read %d fields of a message cut short in its fourth, want 3", n)
 	}
-	if b := WireBytes(cut[len(msg)-len("second")-2:], 3); b != nil {
+	short := protowire.AppendTag(nil, 3, protowire.BytesType)
+	short = protowire.AppendString(short, "second")
+	if b := WireBytes(short[:len(short)-1], 3); b != nil {
 		t.Fatalf("WireBytes read %q from a field cut short", b)
 	}
 	// A walk stopped early stops, and the same sequence walked again starts over.
