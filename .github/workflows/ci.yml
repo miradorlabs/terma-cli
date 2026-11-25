@@ -245,7 +245,7 @@ jobs:
             cat test/e2e/report/latest.md >> "$GITHUB_STEP_SUMMARY"
           fi
 
-  # The OpenCode plugin is about 1,200 lines of JavaScript, one file for OpenCode 1 and 2,
+  # The OpenCode plugin is one JavaScript file for OpenCode 1 and 2,
   # that setup writes into the user's plugins directory and that ships in the release
   # archives. `make test-plugin` skips it wherever bun is absent, so CI is where it is
   # actually run.

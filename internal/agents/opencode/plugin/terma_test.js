@@ -582,9 +582,10 @@ const RULE_ERROR = "The user has specified a rule which prevents you from using 
 const FENCE = "eval $TERMA_REACH_FAILED"
 const done = (input, output, extra = {}) => ({ status: "completed", input, output, title: "t", metadata: {}, time: { start: 2100, end: 2200 }, ...extra })
 
-async function start(overrides, { terma, client, directory = "/repo" } = {}) {
+async function start(overrides, { terma, client, directory = "/repo", source } = {}) {
   const r = rig(overrides, terma)
-  const mod = await load(r.config)
+  if (source) expect(source).not.toBe(SOURCE)
+  const mod = await load(r.config, { source })
   const warnings = []
   const hooks = await mod.default.server({ client: client ?? fakeClient(null, warnings), directory, worktree: directory })
   return { r, mod, hooks, warnings }
@@ -874,6 +875,32 @@ test("a session whose record never arrives exports nothing and claims nothing", 
   await hooks.dispose()
   expect(r.requests()).toEqual([])
   expect(r.terma.calls()).toEqual([])
+}, 15_000)
+
+test("a lookup that never answers leaves the session dark, and its tools do not wait for it", async () => {
+  const client = { app: { log: async () => {} }, session: { get: () => new Promise(() => {}) } }
+  const source = SOURCE.replace("const RECORD_WAIT_MS = 5000", "const RECORD_WAIT_MS = 300")
+  const { r, hooks } = await start({}, { client, source })
+  await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_hang", callID: "c1" }, { args: { filePath: "/repo/a" } })
+  expect(globalThis[KEY].sessions.get("ses_hang").dark).toBe(true)
+  await hooks.event(toolPart("ses_hang", "msg_1", "c1", "read", done({ filePath: "/repo/a" }, "ok")))
+  await hooks.dispose()
+  expect(r.requests()).toEqual([])
+  expect(r.terma.calls()).toEqual([])
+})
+
+test("the exit waits a bounded time for its own sessions' queues, and not for another entry's", async () => {
+  const { mod, hooks: b } = await start({}, { source: SOURCE.replace("const EXIT_QUEUE_MS = 8000", "const EXIT_QUEUE_MS = 1000") })
+  const a = await mod.default.server({ client: fakeClient(null), directory: "/other", worktree: "/other" })
+  // b's session waits RECORD_WAIT_MS, 5 s, for a record that never comes.
+  await b["chat.message"]({ sessionID: "ses_wait" }, { message: { id: "msg_u" }, parts: [{ type: "text", text: "hi" }] })
+  let began = Date.now()
+  await a.dispose()
+  expect(Date.now() - began).toBeLessThan(500)
+  began = Date.now()
+  await b.dispose()
+  expect(Date.now() - began).toBeGreaterThanOrEqual(900)
+  expect(Date.now() - began).toBeLessThan(2500)
 }, 15_000)
 
 test("a resumed session gets its record from OpenCode and is claimed from it", async () => {
@@ -1395,11 +1422,14 @@ test("the exit waits a bounded time for a relay that is not there", async () => 
   expect(globalThis[KEY].exporter.draining).toBe(true)
 }, 15_000)
 
+const idsOf = (payload) => JSON.parse(payload).resourceSpans[0].scopeSpans[0].spans.map((s) => A(s)["opencode.call.id"])
+const waiting = (ex) => ex.batches.flatMap((b) => idsOf(b.sends[0][1]))
+
 // stalled loads the plugin with one item per batch and a fetch that answers only when let
 // go, so batches pile up behind the one being sent.
-async function stalled() {
+async function stalled(original = SOURCE) {
   const r = rig()
-  const source = SOURCE.replace("const BATCH_SIZE = 64", "const BATCH_SIZE = 1")
+  const source = original.replace("const BATCH_SIZE = 64", "const BATCH_SIZE = 1")
   expect(source).not.toBe(SOURCE)
   const mod = await load(r.config, { source })
   const warnings = []
@@ -1411,7 +1441,9 @@ async function stalled() {
     release = () => ok(new Response("{}"))
   })
   globalThis.fetch = async (url, init) => {
-    sent.push(JSON.parse(init.body).resourceSpans[0].scopeSpans[0].spans.map((s) => A(s)["opencode.call.id"])[0])
+    // An earlier test's export may still be retrying.
+    if (!String(url).startsWith(r.config.endpoint)) return real(url, init)
+    sent.push(idsOf(init.body)[0])
     return gate
   }
   const finish = async () => {
@@ -1438,8 +1470,7 @@ test("while the relay does not answer, the oldest waiting batches are dropped, a
     expect(sent).toEqual(["msg_0"])
     expect(ex.batches.length).toBe(32)
     expect(ex.dropped).toBe(7)
-    expect(ex.batches[0].spans.map((s) => A(s)["opencode.call.id"])).toEqual(["msg_8"])
-    expect(ex.batches.at(-1).spans.map((s) => A(s)["opencode.call.id"])).toEqual(["msg_39"])
+    expect(waiting(ex)).toEqual(Array.from({ length: 32 }, (_, i) => "msg_" + (i + 8)))
     expect(warnings.map((w) => w.message)).toEqual(["terma: the relay is not answering; some OpenCode telemetry was dropped."])
   } finally {
     await finish()
@@ -1460,6 +1491,24 @@ test("batches waiting for a slow relay leave in order, none dropped below the ca
   expect(ex.batches).toEqual([])
   expect(ex.dropped).toBe(0)
   expect(warnings).toEqual([])
+}, 15_000)
+
+test("waiting batches are dropped by size too, oldest first, and the bytes waiting are counted", async () => {
+  const { sent, finish, calls, ex } = await stalled(SOURCE.replace("const MAX_PENDING_BYTES = 8 * 1024 * 1024", "const MAX_PENDING_BYTES = 8 * 1024"))
+  let left
+  try {
+    await calls("ses_big", 20)
+    left = waiting(ex)
+    expect(left.length).toBeGreaterThan(1)
+    expect(left.length).toBeLessThan(19)
+    expect(left).toEqual(Array.from({ length: left.length }, (_, i) => "msg_" + (20 - left.length + i)))
+    expect(ex.dropped).toBe(19 - left.length)
+    expect(ex.pendingBytes).toBe(ex.batches.flatMap((b) => b.sends).reduce((n, [, p]) => n + p.length, 0))
+  } finally {
+    await finish()
+  }
+  expect(sent).toEqual(["msg_0", ...left])
+  expect(ex.pendingBytes).toBe(0)
 }, 15_000)
 
 test("a record that arrives while a session waits for one is picked up when it arrives", async () => {

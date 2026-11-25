@@ -36,7 +36,8 @@ import { fileURLToPath } from "node:url"
 // - HOOK_QUEUE_WAIT_MS: a tool held for a reach check waits this long at most for its turn.
 // - MISSING_RETRY_MS: a terma that could not be run is not tried again on every hook.
 // - RECORD_WAIT_MS: a session with no record is given up on (fails closed), not held forever.
-// - At exit: the hooks get HOOK_TIMEOUT_MS, the flush EXIT_FLUSH_MS, OpenCode 1's log LOG_SETTLE_MS.
+// - At exit: the entry's session queues get EXIT_QUEUE_MS, the hooks HOOK_TIMEOUT_MS, the flush
+//   EXIT_FLUSH_MS, OpenCode 1's log LOG_SETTLE_MS.
 // - update() stamps what follows a move 1 ms after its claim, so none of it sorts before the claim.
 // - A reach check made after its tool ran sets checkedAt 1 ms after it finished, and no model or
 //   tool call the session sends afterwards ends earlier. A patch is checked in tool.execute.after,
@@ -55,6 +56,8 @@ const MAX_RETRIES = 5
 // Batches waiting while the relay does not answer; the oldest go first, so a long-running
 // server cannot grow the queue forever.
 const MAX_PENDING_BATCHES = 32
+// What waits is bounded in bytes as well as in number.
+const MAX_PENDING_BYTES = 8 * 1024 * 1024
 // The headers helper is re-run this often, matching Claude Code's cadence.
 const HEADERS_TTL_MS = 29 * 60 * 1000
 // A session's hooks run one at a time; a hung one is terminated so its queue keeps moving.
@@ -75,6 +78,9 @@ const LOG_SETTLE_MS = 1500
 // How long the exit waits for what is still queued to be sent: a relay that is down must
 // not hold OpenCode open.
 const EXIT_FLUSH_MS = 4000
+// The longest the exit waits for its sessions' queued work: a little more than a reach
+// check may take.
+const EXIT_QUEUE_MS = 8000
 // How long a session waits for its record before it is given up on (fail closed).
 const RECORD_WAIT_MS = 5000
 // What the plugin remembers is bounded, so a long-running server cannot grow it forever;
@@ -121,8 +127,9 @@ function newState() {
       spans: [],
       records: [],
       timer: null,
-      // Batches waiting to be sent, oldest first: { cfg, spans, records }.
+      // Batches waiting to be sent, oldest first: { cfg, sends: [[path, payload]], items, bytes }.
       batches: [],
+      pendingBytes: 0, // the bytes of the batches waiting
       draining: false,
       inflight: Promise.resolve(), // resolves once the batches queued so far are sent or given up on
       dropped: 0, // items in batches dropped while the relay did not answer
@@ -276,10 +283,12 @@ function exportItem(kind, item) {
   ex.timer.unref?.()
 }
 
-// flush queues everything collected as one batch, with the config in force now, and returns
-// a promise that resolves once every batch queued so far is sent or given up on. One drain
-// sends them in order, so two sends never race, and a failed batch is retried with the same
-// bytes. While the relay does not answer, the oldest waiting batches are dropped.
+// flush queues everything collected as one batch, its request bodies built now with the
+// config in force, and returns a promise that resolves once every batch queued so far is sent
+// or given up on. One drain sends them in order, so two sends never race, and a failed batch
+// is retried with the same bytes. While the relay does not answer, the oldest waiting batches
+// are dropped, past MAX_PENDING_BATCHES or MAX_PENDING_BYTES; the newest is never dropped for
+// its size alone.
 function flush() {
   const ex = state.exporter
   if (ex.timer) {
@@ -291,10 +300,18 @@ function flush() {
   ex.spans = []
   ex.records = []
   if (spans.length === 0 && records.length === 0) return ex.inflight
-  ex.batches.push({ cfg: state.config, spans, records })
-  while (ex.batches.length > MAX_PENDING_BATCHES) {
+  const cfg = state.config
+  const resource = { attributes: attrs({ "service.name": "opencode", ...cfg.resourceAttributes }) }
+  const sends = []
+  if (spans.length > 0) sends.push(["/v1/traces", JSON.stringify({ resourceSpans: [{ resource, scopeSpans: [{ scope: SCOPE, spans }] }] })])
+  if (records.length > 0) sends.push(["/v1/logs", JSON.stringify({ resourceLogs: [{ resource, scopeLogs: [{ scope: SCOPE, logRecords: records }] }] })])
+  const bytes = sends.reduce((n, [, payload]) => n + payload.length, 0)
+  ex.batches.push({ cfg, sends, items: spans.length + records.length, bytes })
+  ex.pendingBytes += bytes
+  while (ex.batches.length > MAX_PENDING_BATCHES || (ex.pendingBytes > MAX_PENDING_BYTES && ex.batches.length > 1)) {
     const old = ex.batches.shift()
-    ex.dropped += old.spans.length + old.records.length
+    ex.pendingBytes -= old.bytes
+    ex.dropped += old.items
     if (!ex.droppedWarned) {
       ex.droppedWarned = true
       const log = loggers[loggers.length - 1]
@@ -310,20 +327,16 @@ function flush() {
   return ex.inflight
 }
 
-// drain sends the waiting batches one at a time, front first, until none is left. A batch
-// leaves the queue as it is sent, so the one in flight is never the one dropped.
+// drain sends the waiting batches one at a time, front first, until none is left, each
+// batch's requests in order. A batch leaves the queue, and its bytes the count, as it is
+// sent, so the one in flight is never the one dropped.
 async function drain(ex) {
   try {
     while (ex.batches.length > 0) {
-      const { cfg, spans, records } = ex.batches.shift()
+      const { cfg, sends, bytes } = ex.batches.shift()
+      ex.pendingBytes -= bytes
       try {
-        const resource = { attributes: attrs({ "service.name": "opencode", ...cfg.resourceAttributes }) }
-        if (spans.length > 0) {
-          await post(cfg, "/v1/traces", { resourceSpans: [{ resource, scopeSpans: [{ scope: SCOPE, spans }] }] })
-        }
-        if (records.length > 0) {
-          await post(cfg, "/v1/logs", { resourceLogs: [{ resource, scopeLogs: [{ scope: SCOPE, logRecords: records }] }] })
-        }
+        for (const [path, payload] of sends) await post(cfg, path, payload)
       } catch {}
     }
   } finally {
@@ -331,9 +344,8 @@ async function drain(ex) {
   }
 }
 
-async function post(cfg, path, body) {
+async function post(cfg, path, payload) {
   if (!cfg.endpoint) return
-  const payload = JSON.stringify(body)
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const auth = await authHeaders(cfg)
@@ -636,24 +648,23 @@ function prune() {
 
 async function firstSight(s, lookup) {
   let rec = s.latest
-  if (!rec && typeof lookup === "function") {
-    let fetched = null
-    try {
-      fetched = await lookup()
-    } catch {}
-    rec = s.latest ?? (fetched?.id === s.id ? fetched : null)
-  }
-  // No record yet: wait for an event that carries one. Without it the session's
-  // directory and parent are unknown, so it is never claimed and never exported.
+  // No record yet: wait, RECORD_WAIT_MS at most, for OpenCode's answer to the lookup or an
+  // event that carries one, whichever first; an answer with no record does not end the wait,
+  // and an event's record wins. Without one the session's directory and parent are unknown,
+  // so it is never claimed and never exported.
   if (!rec) {
     let timer
+    let fetched = null
     await new Promise((r) => {
       s.recordArrived = r
       timer = setTimeout(r, RECORD_WAIT_MS)
+      Promise.resolve()
+        .then(lookup)
+        .then((f) => f?.id === s.id && r((fetched = f)), () => {})
     })
     clearTimeout(timer)
     s.recordArrived = null
-    rec = s.latest
+    rec = s.latest ?? fetched
   }
   if (!rec) {
     s.dark = true
@@ -991,18 +1002,21 @@ function endUnknown(rec, reason) {
 }
 
 // shutdown sends the pending title call of every session this entry first saw, waits for
-// the sessions' queues and, briefly, for the hooks they started, then flushes, for at most
-// EXIT_FLUSH_MS.
+// those sessions' queues, for at most EXIT_QUEUE_MS, and, briefly, for the hooks they
+// started, then flushes, for at most EXIT_FLUSH_MS.
 async function shutdown(owner) {
   const now = Date.now()
   for (const s of state.sessions.values()) {
     if (s.owner === owner) run(s, () => s.pendingTitle && titleCallEnded(s, { end: now }))
   }
-  for (let i = 0; i < 32; i++) {
-    const busy = [...state.sessions.values()].filter((s) => s.busy > 0)
-    if (busy.length === 0) break
-    await Promise.all(busy.map((s) => s.queue))
+  const queues = async () => {
+    for (let i = 0; i < 32; i++) {
+      const busy = [...state.sessions.values()].filter((s) => s.owner === owner && s.busy > 0)
+      if (busy.length === 0) break
+      await Promise.all(busy.map((s) => s.queue))
+    }
   }
+  await Promise.race([queues(), sleep(EXIT_QUEUE_MS, true)])
   const hooks = [...state.hooks.running].map((lane) => lane.hookQueue)
   await Promise.race([Promise.all(hooks), sleep(HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS, true)])
   await Promise.race([flush(), sleep(EXIT_FLUSH_MS, true)])
@@ -1010,10 +1024,20 @@ async function shutdown(owner) {
 
 // --- reach --------------------------------------------------------------------------
 //
-// A read, search, list, shell command, write or edit is checked before it runs, in
-// tool.execute.before, which the tool waits for. A patch is checked in tool.execute.after,
-// which OpenCode waits for before it hands the result on. Only a call no hook saw is
-// checked when its part arrives.
+// Where a reach is checked:
+//   site                 checks                         when                         waits  sets
+//   tool.execute.before  a read, search, list, shell    before the tool runs         yes    nothing
+//                        command, write or edit
+//   tool.execute.after   what a call reaches known      after the tool ran, before   yes    checkedAt
+//                        once it ran (a patch's files)  its result is handed on
+//   onToolPart1          a call no hook saw (a shell    when its completed part      no     checkedAt, the
+//                        command the person runs, one   arrives                             call's end
+//                        finished in an earlier run)
+//   chat.message         the files attached to a        before the prompt is sent    yes    the prompt's time,
+//                        prompt                         on                                  after the check
+//   update (a move)      the directory moved into       at the move's turn in the    no     movedAt
+//                                                       session's queue
+// "waits" is whether OpenCode waits for the check.
 
 // Each major's name for a tool that reads, changes or runs something, mapped to one
 // vocabulary. An edit is checked on the file it changes, as a read is on the file it reads.
