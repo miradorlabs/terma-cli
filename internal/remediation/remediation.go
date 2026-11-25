@@ -38,6 +38,9 @@ type Campaign struct {
 	UpdatedAt            time.Time `json:"updated_at"`
 }
 
+// client takes no redirect: the route answers itself, and anything else is a failure.
+var client = &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+
 // Stub is the offline test override, TERMA_REMEDIATION_STUB: when set, Fetch decodes it as
 // the route's answer and reaches nothing.
 func Stub() string { return os.Getenv("TERMA_REMEDIATION_STUB") }
@@ -58,7 +61,7 @@ func Fetch(ctx context.Context, authURL, version string) (*Campaign, error) {
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "terma-cli/"+version)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -152,11 +155,13 @@ func (n Notice) Summary() string {
 	return ""
 }
 
-// Lines are the campaign's title, then its steps, numbered.
+// Lines are the campaign's title and message, then its steps, numbered.
 func (n Notice) Lines() []string {
 	var lines []string
-	if n.Campaign.Title != "" {
-		lines = append(lines, n.Campaign.Title)
+	for _, l := range []string{n.Campaign.Title, n.Campaign.Message} {
+		if l != "" {
+			lines = append(lines, l)
+		}
 	}
 	for i, s := range n.Campaign.Steps {
 		lines = append(lines, fmt.Sprintf("%d. %s", i+1, s))

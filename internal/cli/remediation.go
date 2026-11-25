@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/remediation"
 )
@@ -29,8 +30,8 @@ func (app *App) remediationNotice(ctx context.Context, cfg *config.Config, userS
 		return remediation.Notice{}
 	}
 	n := remediation.Evaluate(c, app.version, userSession)
-	// Read from the environment, where config.Config.APIKey comes from too, so that a
-	// configuration that did not load still names it.
+	// config.Config.APIKey is TERMA_API_KEY, trimmed; read here from the environment, the
+	// same way, so that a configuration that did not load still names it.
 	n.KeyInEnv = strings.TrimSpace(os.Getenv("TERMA_API_KEY")) != ""
 	return n
 }
@@ -59,12 +60,16 @@ func (app *App) remediationAuthURL(cfg *config.Config) string {
 
 // hasUserSession reports whether cfg's profile is signed in as a person, for this
 // environment, with a sign-in that still sends: not a server key, nor none, nor a
-// retired one.
+// retired one, nor one whose tokens are gone from the keychain. A keychain that is locked
+// now still holds the session: doctor's sign-in check says what to do about that.
 func hasUserSession(cfg *config.Config) bool {
 	if cfg == nil || cfg.APIKey != "" || cfg.ServerKeySignIn {
 		return false
 	}
-	ident, err := auth.LoadIdentity(cfg.Dir, cfg.ProfileName)
+	ident, err := auth.LoadCredential(cfg.Dir, cfg.ProfileName)
+	if secret.IsUnavailable(err) {
+		ident, err = auth.LoadIdentity(cfg.Dir, cfg.ProfileName)
+	}
 	return err == nil && ident.CheckEnvironment(cfg.AuthURL) == nil && ident.RetiredAt.IsZero() &&
 		auth.AccountKey(ident.AuthURL, ident.UserID) != ""
 }

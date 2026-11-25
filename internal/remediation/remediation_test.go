@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -55,11 +56,11 @@ func TestEvaluate(t *testing.T) {
 // The summary names the required release, this one and the commands, in that order.
 func TestSummaryAndLines(t *testing.T) {
 	t.Parallel()
-	n := Evaluate(&Campaign{Title: "Update terma", Steps: []string{"Run terma update", "Run terma setup"}, MinimumClientVersion: "0.43.0"}, "0.41.2", true)
+	n := Evaluate(&Campaign{Title: "Update terma", Message: "Old releases stop sending.", Steps: []string{"Run terma update", "Run terma setup"}, MinimumClientVersion: "0.43.0"}, "0.41.2", true)
 	if got := n.Summary(); got != "terma 0.43.0 or later is required, this is 0.41.2 — run `terma update`, then `terma setup`" {
 		t.Errorf("summary = %q", got)
 	}
-	if got := strings.Join(n.Lines(), "|"); got != "Update terma|1. Run terma update|2. Run terma setup" {
+	if got := strings.Join(n.Lines(), "|"); got != "Update terma|Old releases stop sending.|1. Run terma update|2. Run terma setup" {
 		t.Errorf("lines = %q", got)
 	}
 }
@@ -160,5 +161,23 @@ func TestFetchTimesOutOnItsOwn(t *testing.T) {
 	c, err := Fetch(context.Background(), srv.URL, "0.41.2")
 	if took := time.Since(start); c != nil || err == nil || took < Timeout || took > Timeout+2*time.Second {
 		t.Fatalf("Fetch = %+v, %v after %s; want an error after %s", c, err, took, Timeout)
+	}
+}
+
+// A redirect is a failure: Fetch never follows it, even to a route that would answer.
+func TestFetchFollowsNoRedirect(t *testing.T) {
+	t.Setenv("TERMA_REMEDIATION_STUB", "")
+	var followed atomic.Bool
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		followed.Store(true)
+		_, _ = w.Write([]byte(`{"campaign":{"id":"c1","minimum_client_version":"0.43.0"}}`))
+	}))
+	t.Cleanup(target.Close)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL+Path, http.StatusFound)
+	}))
+	t.Cleanup(srv.Close)
+	if c, err := Fetch(t.Context(), srv.URL, "0.41.2"); c != nil || err == nil || followed.Load() {
+		t.Fatalf("Fetch = %+v, %v, followed %v", c, err, followed.Load())
 	}
 }

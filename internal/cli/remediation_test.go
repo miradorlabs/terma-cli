@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/miradorlabs/terma-cli/internal/account/secret"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
 )
@@ -38,7 +39,7 @@ func TestDoctorShowsTheRemediationNotice(t *testing.T) {
 	var b strings.Builder
 	printContext(&b, doctor.Context(env))
 	out := b.String()
-	for _, want := range []string{"Required:    " + required, "Terma needs a newer CLI", "1. terma update", "2. terma setup"} {
+	for _, want := range []string{"Required:    " + required, "Terma needs a newer CLI", "\n             m\n", "1. terma update", "2. terma setup"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("doctor's context lacks %q:\n%s", want, out)
 		}
@@ -117,6 +118,20 @@ func TestHasUserSession(t *testing.T) {
 	if cfg, err = testApp.loadConfig(); err != nil || !hasUserSession(cfg) {
 		t.Fatalf("a person's sign-in is not a user session: %v", err)
 	}
+	// Tokens gone from the keychain are no session, though the index still names one.
+	if err := secret.Delete(testApp.dir, "user-credential/"+config.DefaultProfile); err != nil {
+		t.Fatal(err)
+	}
+	if hasUserSession(cfg) {
+		t.Error("a sign-in without its tokens is a user session")
+	}
+	signInTo(t, gateway, orgA())
+	// A keychain locked now still holds the session.
+	unlock := secret.FailForTest(t, testApp.dir)
+	if !hasUserSession(cfg) {
+		t.Error("a locked keychain lost the user session")
+	}
+	unlock()
 	serverKey := *cfg
 	serverKey.ServerKeySignIn = true
 	viaEnv := *cfg
