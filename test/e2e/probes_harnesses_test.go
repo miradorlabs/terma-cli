@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -39,6 +38,39 @@ type harnessDriver struct {
 	args func(sb *Sandbox, prompt, session string, resume, tools bool) []string
 	// resumes says whether across-turns can drive the harness.
 	resumes bool
+	// ofBuild is the driver for build b, for a harness whose tools or command line differ by
+	// build.
+	ofBuild func(b Binary) harnessDriver
+}
+
+// openCodeDriver is OpenCode's driver for build b: OpenCode 2 names its shell tool and runs
+// `opencode run` its own way (openCodeCallFor, openCodeRunArgs).
+func openCodeDriver(b Binary) harnessDriver {
+	return harnessDriver{
+		harness: "opencode", each: func(t *testing.T, run func(*testing.T, Binary)) {
+			forEachOpenCode(t, func(t *testing.T, b Binary, _ bool) { run(t, b) })
+		},
+		modelCall: chatCompletions, failures: openAIFailures, resumes: true, ofBuild: openCodeDriver,
+		provider: func(calls *atomic.Int32, cmd string) http.Handler {
+			if cmd == "" {
+				return openAIProbeProvider(calls, "", nil)
+			}
+			call := openCodeCallFor(b, "call_probe", openCodeIntent{shell: cmd, description: "probe"})
+			return openAIProbeProvider(calls, call.name, call.args)
+		},
+		configure: func(sb *Sandbox, url string) []string {
+			sb.UseOpenCodeProvider(url)
+			return nil
+		},
+		args: func(sb *Sandbox, prompt, _ string, resume, _ bool) []string {
+			sb.requireOpenCodeSandbox(b)
+			a := openCodeRunArgs(b, sb.Repo, false)
+			if resume {
+				a = append(a, "--continue")
+			}
+			return append(a, prompt)
+		},
+	}
 }
 
 // providerFailure is one status a retries probe answers with, and its body.
@@ -108,26 +140,7 @@ var harnessDrivers = []harnessDriver{
 			return append(a, "-p", prompt)
 		},
 	},
-	{
-		harness: "opencode", each: func(t *testing.T, run func(*testing.T, Binary)) {
-			forEachOpenCode(t, func(t *testing.T, b Binary, _ bool) { run(t, b) })
-		},
-		modelCall: chatCompletions, failures: openAIFailures, resumes: true,
-		provider: func(calls *atomic.Int32, cmd string) http.Handler {
-			return openAIBash(calls, cmd, map[string]any{"command": cmd, "description": "probe"})
-		},
-		configure: func(sb *Sandbox, url string) []string {
-			sb.UseOpenCodeProvider(url)
-			return []string{"XDG_CONFIG_HOME=" + filepath.Join(sb.Home, ".config")}
-		},
-		args: func(sb *Sandbox, prompt, _ string, resume, _ bool) []string {
-			a := []string{"run", "--format", "json", "--dir", sb.Repo}
-			if resume {
-				a = append(a, "--continue")
-			}
-			return append(a, prompt)
-		},
-	},
+	openCodeDriver(Binary{}),
 	{
 		harness: "pi", each: forEachPi, modelCall: chatCompletions, failures: openAIFailures, resumes: true,
 		provider: func(calls *atomic.Int32, cmd string) http.Handler {
@@ -217,6 +230,10 @@ func harnessProbe(t *testing.T, names []string, keep func(harnessDriver) bool, p
 			d.each(t, func(t *testing.T, b Binary) {
 				track(t)
 				profileOf(t, b) // the build's test, not a probe's subtest, says whether it failed
+				if d.ofBuild != nil {
+					probe(t, d.ofBuild(b), b)
+					return
+				}
 				probe(t, d, b)
 			})
 		})

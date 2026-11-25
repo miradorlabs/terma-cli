@@ -171,7 +171,7 @@ func TestOpenCodeProfileEgress(t *testing.T) {
 			},
 			run: func(t *testing.T, sb *Sandbox, b Binary) []string {
 				sb.OpenCodeRun(b, sb.Repo, "", profilePrompt)
-				return []string{"run", "--format", "json", "--dir", "<repo>"}
+				return openCodeRunArgs(b, "<repo>", false)
 			},
 			exclude: []string{"<home>/.config/opencode/opencode.json"},
 			kinds: []StorageKind{

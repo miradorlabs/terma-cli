@@ -53,6 +53,10 @@ type delegatedCode struct {
 const (
 	accountOrg  = "11111111-1111-4111-8111-111111111111"
 	accountUser = "22222222-2222-4222-8222-222222222222"
+	// otherOrg and otherOrgProject are the second organization and its team, served only to
+	// a sandbox WithOtherOrganization.
+	otherOrg        = "33333333-3333-4333-8333-333333333333"
+	otherOrgProject = "proj_other_org"
 	// desktopSession is the Terma Desktop session that delegates, the family of every
 	// session it delegates.
 	desktopSession = "33333333-3333-4333-8333-333333333333"
@@ -116,9 +120,17 @@ func (sb *Sandbox) StartAccount() *Account {
 			// A user session belongs to no organization.
 			_ = json.NewEncoder(w).Encode(map[string]any{"organization_id": "", "auth_type": "user_token", "user_id": accountUser, "email": "live@terma.test"})
 		case "/v1/organizations":
-			_ = json.NewEncoder(w).Encode(map[string]any{"organizations": []map[string]any{{"id": accountOrg, "name": "Live", "role": "admin", "type": "shared"}}})
+			orgs := []map[string]any{{"id": accountOrg, "name": "Live", "role": "admin", "type": "shared"}}
+			if len(sb.OtherOrganization) > 0 {
+				orgs = append(orgs, map[string]any{"id": otherOrg, "name": "Elsewhere", "role": "member", "type": "shared"})
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"organizations": orgs})
 		case "/v1/projects":
 			// A user token reads every organization's teams, so it must name one.
+			if org := r.URL.Query().Get("organization_id"); org == otherOrg && len(sb.OtherOrganization) > 0 {
+				_ = json.NewEncoder(w).Encode(map[string]any{"projects": []map[string]any{{"id": otherOrgProject, "name": "Elsewhere", "organization_id": otherOrg}}})
+				return
+			}
 			if r.URL.Query().Get("organization_id") != accountOrg {
 				writeAuthError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "", "organization_id is required with a user token")
 				return
@@ -133,7 +145,11 @@ func (sb *Sandbox) StartAccount() *Account {
 				return
 			}
 			withhold := a.withholdContent.Load()
-			repos, _ := json.Marshal(append([]string{}, sb.Repositories...))
+			list := sb.Repositories
+			if r.URL.Query().Get("project_id") == otherOrgProject {
+				list = sb.OtherOrganization
+			}
+			repos, _ := json.Marshal(append([]string{}, list...))
 			// git_hooks on: the scenarios commit by hand and expect the trailer, which only
 			// the hooks terma installs in the repository can add.
 			fmt.Fprintf(w, `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":%s},"git_hooks":true,"capture":{"exclude_prompts":%t,"exclude_tool_content":%t}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`, repos, withhold, withhold)

@@ -72,7 +72,10 @@ func volatile(key string) bool {
 // IDs). Direct and relayed runs have different IDs, so their samples can differ.
 // See Codex rust-v0.158.0, codex-rs/rollout/src/persistence_metrics.rs.
 func sometimes(key string) bool {
-	return key == "log retention_sweep" || strings.HasPrefix(key, "metric codex.rollout.persistence.")
+	return key == "log retention_sweep" || strings.HasPrefix(key, "metric codex.rollout.persistence.") ||
+		// A one-shot `opencode run` can end before its title call answers: the call's span is
+		// sent, closed at exit, and OpenCode never renames the session in that process.
+		key == "log opencode.session.title"
 }
 
 // endedCleanly reports whether the agent ran its session-end hook: Codex sometimes
@@ -366,15 +369,6 @@ func TestRelayWorkloadsCodex(t *testing.T) {
 
 // --- OpenCode ----------------------------------------------------------------------
 
-// openAIToolProvider asks OpenCode's bash tool to run cmd on the first call, then
-// replies.
-func openAIToolProvider(calls *atomic.Int32, cmd string) http.Handler {
-	if cmd == "" {
-		return openAIToolCallProvider(calls, "", nil)
-	}
-	return openAIToolCallProvider(calls, "bash", map[string]any{"command": cmd, "description": "workload"})
-}
-
 // openAIToolCallProvider asks for one call of tool with args on the first request
 // (none when tool is empty), then replies.
 func openAIToolCallProvider(calls *atomic.Int32, tool string, args map[string]any) http.Handler {
@@ -407,9 +401,15 @@ func TestRelayWorkloadsOpenCode(t *testing.T) {
 				runBoth(t, b, func(t *testing.T) *Sandbox {
 					sb := New(t, Isolated)
 					var calls atomic.Int32
-					provider = httptest.NewServer(openAIToolProvider(&calls, w.cmd))
+					// The workload's shell call, in the build's own tool name; none for a reply.
+					var call openCodeCall
+					if w.cmd != "" {
+						call = openCodeCallFor(b, "call_oc_1", openCodeIntent{shell: w.cmd, description: "workload"})
+					}
+					provider = httptest.NewServer(openAIToolCallProvider(&calls, call.name, call.args))
 					t.Cleanup(provider.Close)
 					sb.UseOpenCodeProvider(provider.URL)
+					sb.UseOpenCode(b)
 					return sb
 				}, func(t *testing.T, sb *Sandbox) {
 					sb.directOpenCode()

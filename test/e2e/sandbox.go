@@ -21,6 +21,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -65,6 +66,9 @@ type Sandbox struct {
 	// serves; the scratch repository's origin, github.com/acme/repo, unless an option
 	// sets it.
 	Repositories []string
+	// OtherOrganization is the repository list of a second organization's one team, which
+	// the account fixture serves only when it is set (WithOtherOrganization).
+	OtherOrganization []string
 	// RendererMarker is what the pre-existing status line prints; the wrapped
 	// status line must still show it.
 	RendererMarker string
@@ -90,8 +94,7 @@ type Sandbox struct {
 	// SetupAgents are chosen at setup too, beyond setupHarnesses: an agent whose hooks are
 	// the machine-wide ones only `terma setup` writes.
 	SetupAgents []string
-	// RelayAgents are pointed at the relay too, beyond Claude Code, Codex and OpenCode
-	// (UseRelay).
+	// RelayAgents are pointed at the relay too, beyond Claude Code and Codex (UseRelay).
 	RelayAgents []string
 	// cleanRoom is a sandbox with no terma in it (CleanRoom).
 	cleanRoom bool
@@ -140,6 +143,12 @@ func WithProject(id string) Option { return func(sb *Sandbox) { sb.ProjectID = i
 // WithRepositories is the team policy's repository list.
 func WithRepositories(repos ...string) Option {
 	return func(sb *Sandbox) { sb.Repositories = repos }
+}
+
+// WithOtherOrganization makes the person belong to a second organization too, whose one
+// team (otherOrgProject) collects repos. Nothing ticks that team until a scenario does.
+func WithOtherOrganization(repos ...string) Option {
+	return func(sb *Sandbox) { sb.OtherOrganization = repos }
 }
 
 // setupHarnesses are the agents every sandbox's setup records.
@@ -276,7 +285,12 @@ func (sb *Sandbox) Setup(env []string, args ...string) string {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, shim, append([]string{"setup", "--yes", "--no-browser", "--insecure-storage", "--relay-service", "off", "--relay-addr", sb.relayAddr}, args...)...)
+	base := []string{"setup", "--yes", "--no-browser", "--insecure-storage", "--relay-service", "off", "--relay-addr", sb.relayAddr}
+	if len(sb.OtherOrganization) > 0 && !slices.Contains(args, "--org") {
+		// A person in two organizations names the one setup signs into.
+		base = append(base, "--org", accountOrg)
+	}
+	cmd := exec.CommandContext(ctx, shim, append(base, args...)...)
 	cmd.WaitDelay = 2 * time.Second
 	cmd.Dir = sb.Repo
 	cmd.Env = append(sb.termaEnv(), env...)
