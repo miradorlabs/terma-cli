@@ -3,6 +3,33 @@
   "id": "gemini-4-neon",
   "steps": [
     {
+      "at": "2026-11-25T04:17:04.591165422Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/whats_new",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "whats_new"
+          ],
+          "title": "What's new page changed (+163 −163 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -13,11 +13,11 @@\n It supports four thinking levels: `low`, `medium`, `high` (default), and [`xhigh`](/docs/thinking#understanding-thinking-levels).\n \n {% card-grid %}\n-  {% card description=\"View token limits, supported capabilities, and full specifications.\" href=\"/docs/models/gemini-4-neon\" icon=\"id_card\" title=\"Model card\" /%}\n-\n   {% card description=\"Test prompts with Gemini 4 Neon in Google AI Studio.\" href=\"https://aistudio.google.com/prompts/new_chat?model=gemini-4-neon\" icon=\"experiment\" title=\"Try in AI Studio\" /%}\n \n   {% card description=\"Move existing workloads to Gemini 4 Neon with the migration checklist.\" href=\"/docs/whats-new-gemini-4-neon#migration-checklist\" icon=\"rocket_launch\" title=\"Migrate to Neon\" /%}\n+\n+  {% card description=\"View token limits, supported capabilities, and full specifications.\" href=\"/docs/models/gemini-4-neon\" icon=\"id_card\" title=\"Model card\" /%}\n \n {% /card-grid %}\n \n",
+          "stats": {
+            "added_chars": 163,
+            "removed_chars": 163
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-25T00:34:16.969764304Z",
       "event": "changed",
       "changes": [
