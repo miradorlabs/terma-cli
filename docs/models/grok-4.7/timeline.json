@@ -3,6 +3,33 @@
   "id": "grok-4.7",
   "steps": [
     {
+      "at": "2026-11-25T05:25:01.086881697Z",
+      "event": "changed",
+      "changes": [
+        {
+          "id": "docs/overview",
+          "category": "docs",
+          "op": "changed",
+          "path": [
+            "docs",
+            "overview"
+          ],
+          "title": "Model page changed (+32 −0 chars)",
+          "impact": "informational",
+          "before": null,
+          "after": null,
+          "text_diff": "@@ -7,6 +7,7 @@\n - **Modalities:** text, image → text\n - **Context window:** 500,000 tokens\n - **Model name:** `grok-4.7`\n+- **Aliases:** `grok-4.7-latest`\n - **Batch API:** Supported\n \n ## Capabilities\n",
+          "stats": {
+            "added_chars": 32,
+            "removed_chars": 0
+          },
+          "terma": null,
+          "source": null,
+          "documented": null
+        }
+      ]
+    },
+    {
       "at": "2026-11-20T11:38:30.987288166Z",
       "event": "changed",
       "changes": [
