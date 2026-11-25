@@ -9,9 +9,23 @@
     "notes": [
       "Part of this build's capture did not finish; the frequent check tries it again, up to four attempts."
     ],
-    "attempted_at": "2026-11-25T07:43:08.450450844Z",
-    "attempts": 1,
+    "sections": {
+      "support": "2026-11-25T13:59:43.551736985Z"
+    },
+    "attempted_at": "2026-11-25T13:59:43.551736985Z",
+    "attempts": 2,
     "announced_at": "2026-11-25T07:43:08.450450844Z"
   },
-  "side_requests": null
+  "side_requests": null,
+  "support": {
+    "capabilities": [
+      {
+        "id": "relay.telemetry",
+        "label": "Telemetry reaches the project through the local relay",
+        "platform": "darwin/arm64",
+        "result": "pass"
+      }
+    ],
+    "status": "supported"
+  }
 }

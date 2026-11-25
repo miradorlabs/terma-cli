@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-25T13:45:44.81423974Z",
+  "generated_at": "2026-11-25T13:59:43.551736985Z",
   "harnesses": [
     {
       "id": "claude",
@@ -289,7 +289,7 @@
       },
       "changelog": "https://github.com/pingdotgg/t3code/releases",
       "latest": "0.1.12",
-      "support": "untested",
+      "support": "supported",
       "versions_tracked": 9,
       "first_tracked": "2026-10-02",
       "last_change": {

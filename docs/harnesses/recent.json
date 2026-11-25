@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-25T13:45:44.81423974Z",
+  "generated_at": "2026-11-25T13:59:43.551736985Z",
   "versions": [
     {
       "harness": "pi",
@@ -41,8 +41,10 @@
       "version": "0.1.12",
       "released_at": "2026-11-25T07:37:43.095Z",
       "captured_at": "2026-11-25T07:43:08.450450844Z",
-      "platforms": [],
-      "support": "untested",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
       "previous": "0.1.11",
       "changes": 0,
       "categories": {},
@@ -56,8 +58,8 @@
       "highlights": [],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-25T07:43:08.450450844Z",
-      "attempts": 1
+      "attempted_at": "2026-11-25T13:59:43.551736985Z",
+      "attempts": 2
     },
     {
       "harness": "claude",

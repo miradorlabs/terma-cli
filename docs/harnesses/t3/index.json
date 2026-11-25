@@ -12,7 +12,7 @@
     },
     "changelog": "https://github.com/pingdotgg/t3code/releases",
     "latest": "0.1.12",
-    "support": "untested",
+    "support": "supported",
     "versions_tracked": 9,
     "first_tracked": "2026-10-02",
     "last_change": {
@@ -29,8 +29,10 @@
       "version": "0.1.12",
       "released_at": "2026-11-25T07:37:43.095Z",
       "captured_at": "2026-11-25T07:43:08.450450844Z",
-      "platforms": [],
-      "support": "untested",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
       "previous": "0.1.11",
       "changes": 0,
       "categories": {},
@@ -44,8 +46,8 @@
       "highlights": [],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-25T07:43:08.450450844Z",
-      "attempts": 1
+      "attempted_at": "2026-11-25T13:59:43.551736985Z",
+      "attempts": 2
     },
     {
       "version": "0.1.11",
