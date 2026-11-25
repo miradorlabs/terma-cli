@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-25T05:25:01.086881697Z",
+  "generated_at": "2026-11-25T10:52:30.735737521Z",
   "vendors": [
     {
       "id": "anthropic",
@@ -113,8 +113,8 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-23T15:14:29.913232916Z",
-        "changes": 2
+        "at": "2026-11-25T10:52:30.735737521Z",
+        "changes": 1
       },
       "probed": false
     },
@@ -134,8 +134,8 @@
       "reasoning": true,
       "harnesses": [],
       "last_change": {
-        "at": "2026-11-23T15:14:29.913232916Z",
-        "changes": 2
+        "at": "2026-11-25T10:52:30.735737521Z",
+        "changes": 1
       },
       "probed": false
     },
