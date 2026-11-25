@@ -40,7 +40,8 @@ type Options struct {
 	Router Router
 	// NudgeRefresh triggers a coalesced, non-blocking refresh on ingest 403 ORG_NOT_ACCESSIBLE.
 	NudgeRefresh func(enrollment string)
-	// HeartbeatSend, set, turns the heartbeat on; HeartbeatEvery is its period.
+	// HeartbeatSend, set, turns the heartbeat on; HeartbeatEvery is its period. It gets the
+	// caller's ctx and bounds its own request.
 	HeartbeatSend  func(ctx context.Context, beat *logspb.LogsData) error
 	HeartbeatEvery time.Duration
 	// ClaimCacheTTL and PolicyCacheTTL keep Lookup's and Resolve's answers that long (0: ask every time).

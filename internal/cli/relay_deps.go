@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	"google.golang.org/protobuf/proto"
@@ -182,8 +183,10 @@ func sendHeartbeat(ctx context.Context, endpoint, bearer, team string, beat *log
 
 // heartbeatClient refuses redirects, as the OTLP sender does: Go keeps the Authorization
 // header on a same-host https→http downgrade, which would send the person's token in
-// cleartext.
+// cleartext. Its Timeout bounds the request alone, as the relay's sendTimeout does a part's:
+// the sign-in's token, had before it, may wait on a refresh well past it (#165).
 var heartbeatClient = &http.Client{
+	Timeout: 15 * time.Second,
 	CheckRedirect: func(req *http.Request, _ []*http.Request) error {
 		return fmt.Errorf("refusing to follow redirect to %s: the OTLP endpoint does not redirect heartbeats", req.URL.Redacted())
 	},
