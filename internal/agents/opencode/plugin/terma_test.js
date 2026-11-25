@@ -889,7 +889,16 @@ test("a lookup that never answers leaves the session dark, and its tools do not 
   expect(r.terma.calls()).toEqual([])
 })
 
-test("a subagent that went dark fails the session that opened it closed", async () => {
+// How a task's part ends: completed, naming the child; or in error with no metadata, the
+// child named only while the task ran.
+const DARK_TASKS = {
+  "completed": [done({ prompt: "look" }, "the child's answer", { metadata: { sessionId: "ses_kid" } })],
+  "in error, the child named only while it ran": [
+    { status: "running", input: { prompt: "look" }, metadata: { sessionId: "ses_kid" }, time: { start: 2100 } },
+    { status: "error", input: { prompt: "look" }, error: "the child's answer", time: { start: 2100, end: 2200 } },
+  ],
+}
+test.each(Object.keys(DARK_TASKS))("a subagent that went dark fails the session that opened it closed: a task %s", async (how) => {
   // The child's record never comes, so nothing it read was checked, and its answer is the
   // task call's result. The task's part arrives while the child still waits for its record.
   const warnings = []
@@ -897,7 +906,7 @@ test("a subagent that went dark fails the session that opened it closed", async 
   const { r, hooks } = await start({}, { client: fakeClient(() => null, warnings), source })
   await hooks.event(sessionCreated("ses_par"))
   const read = hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_kid", callID: "k1" }, { args: { filePath: "/other/secret" } })
-  await hooks.event(toolPart("ses_par", "msg_1", "t1", "task", done({ prompt: "look" }, "the child's answer", { metadata: { sessionId: "ses_kid" } })))
+  for (const state of DARK_TASKS[how]) await hooks.event(toolPart("ses_par", "msg_1", "t1", "task", state))
   await hooks.event(assistantDone("ses_par", "msg_2"))
   await read
   await hooks.dispose()

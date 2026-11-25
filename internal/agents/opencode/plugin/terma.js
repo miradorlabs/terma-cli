@@ -1192,13 +1192,15 @@ function mcpOf1(name, servers) {
 
 // entry1 is a session's OpenCode 1 data, made once with its whole shape: steps, the
 // assistant messages a model step was seen for; prompts, the user messages that were real
-// prompts; lastPrompt, the last real prompt's id, the turn a self-started message joins.
+// prompts; lastPrompt, the last real prompt's id, the turn a self-started message joins;
+// subagents, the session each task call opened, by qualified call id.
 function entry1(s) {
   const e = s.entry
   if (!e.steps) {
     e.steps = new Set()
     e.prompts = new Set()
     e.lastPrompt = ""
+    e.subagents = new Map()
   }
   return e
 }
@@ -1274,8 +1276,14 @@ function keepText1(s, part) {
 
 async function onToolPart1(s, part, servers) {
   const st = part.state ?? {}
-  if (st.status !== "completed" && st.status !== "error") return
   const id = qualify(part.messageID, part.callID)
+  // A task's part names the session it opened from when it starts to run; one that ends in
+  // error may not, so the name is kept from the first part that carries it.
+  const { subagents } = entry1(s)
+  if (part.tool === "task" && typeof st.metadata?.sessionId === "string") remember(subagents, id, st.metadata.sessionId, MAX_SMALL)
+  if (st.status !== "completed" && st.status !== "error") return
+  const subagent = subagents.get(id)
+  subagents.delete(id)
   if (s.doneTools.has(id)) return
   remember(s.doneTools, id)
   // Pruning republishes an old call it compacted; it is not a new one.
@@ -1295,7 +1303,7 @@ async function onToolPart1(s, part, servers) {
     s.checkedAt = Date.now() + 1
     end = Math.max(end ?? 0, s.checkedAt)
   }
-  if (part.tool === "task" && !(await subagentChecked(s, st.metadata?.sessionId))) return
+  if (part.tool === "task" && !(await subagentChecked(s, subagent))) return
   if (isTainted(s)) return
   let status = "completed"
   let denial
@@ -1325,7 +1333,7 @@ async function onToolPart1(s, part, servers) {
     title: st.title,
     files: filesOf1(s, part.tool, st),
     mcp: mcpOf1(str(part.tool), servers),
-    subagentSession: part.tool === "task" ? st.metadata?.sessionId || undefined : undefined,
+    subagentSession: subagent,
   })
 }
 
