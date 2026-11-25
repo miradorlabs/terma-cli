@@ -24,6 +24,7 @@ import { createHash } from "node:crypto"
 import { existsSync, readFileSync } from "node:fs"
 import { spawn, execFile } from "node:child_process"
 import { dirname, isAbsolute, join, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
 // --- limits -------------------------------------------------------------------------
 
@@ -89,7 +90,6 @@ function newState() {
     sessions: new Map(),
     tainted: new Set(),
     seenEvents: new Set(),
-    mcpServers: new Set(),
     owners: 0,
   }
 }
@@ -482,9 +482,14 @@ function sight(sessionID, { record, fetch, owner } = {}) {
     prune()
     if (record) s.latest = record
     run(s, () => firstSight(s, fetch))
-  } else if (record) {
-    if (s.known) update(s, record)
-    else s.latest = record
+  } else {
+    // Kept in order of last use, so prune drops the session idle longest.
+    state.sessions.delete(sessionID)
+    state.sessions.set(sessionID, s)
+    if (record) {
+      if (s.known) update(s, record)
+      else s.latest = record
+    }
   }
   return s
 }
@@ -902,20 +907,23 @@ function recordOf(info) {
 function filesOf1(s, name, st) {
   let list = []
   if (name === "read" || name === "write" || name === "edit") list = [st.input?.filePath]
-  else if (name === "apply_patch" && Array.isArray(st.metadata?.files)) list = st.metadata.files.map((f) => f?.filePath)
-  return list
+  // A patch that moves a file wrote the new path and removed the old one.
+  else if (name === "apply_patch" && Array.isArray(st.metadata?.files)) list = st.metadata.files.flatMap((f) => [f?.filePath, f?.movePath])
+  const files = list
     .filter((f) => typeof f === "string" && f)
     .map((f) => (isAbsolute(f) || !s.directory ? f : resolve(s.directory, f)))
+  return [...new Set(files)]
 }
 
 // OpenCode 1 names an MCP tool <server>_<tool>, the server's name with anything but
 // letters, digits, "-" and "_" made "_". Each name is tried as configured, as OpenCode
 // writes it, and with every non-alphanumeric made "_"; the longest match wins, then the
-// earlier form. OpenCode's own tools are never a server's.
-function mcpOf1(name) {
+// earlier form. OpenCode's own tools are never a server's. servers is the names the
+// tool's own directory configured.
+function mcpOf1(name, servers) {
   if (BUILTIN_UNDERSCORE_TOOLS.has(name)) return undefined
   let best = null
-  for (const server of state.mcpServers) {
+  for (const server of servers) {
     const forms = [server, server.replace(/[^A-Za-z0-9_-]/g, "_"), server.replace(/[^A-Za-z0-9]/g, "_")]
     forms.forEach((prefix, rank) => {
       if (name.length <= prefix.length + 1 || !name.startsWith(prefix + "_")) return
@@ -941,6 +949,11 @@ function onAssistant1(s, info) {
   remember(s.doneCalls, info.id)
   const parts = s.texts.get(info.id)
   s.texts.delete(info.id)
+  // A shell command the person ran makes an assistant message that no model answered: no
+  // finish, no error and no usage. It is not a call.
+  const t = info.tokens ?? {}
+  const usage = [info.cost, t.input, t.output, t.reasoning, t.cache?.read, t.cache?.write]
+  if (!info.error && !(typeof info.finish === "string" && info.finish) && !usage.some((v) => num(v) > 0)) return
   const text = parts ? [...parts.values()].filter((t) => t).join("\n\n") : ""
   const tokens = info.tokens && typeof info.tokens === "object" ? info.tokens : null
   const compaction = info.summary === true
@@ -978,12 +991,14 @@ function keepText1(s, part) {
   parts.set(part.id, str(part.text))
 }
 
-async function onToolPart1(s, part) {
+async function onToolPart1(s, part, servers) {
   const st = part.state ?? {}
   if (st.status !== "completed" && st.status !== "error") return
   const id = qualify(part.messageID, part.callID)
   if (s.doneTools.has(id)) return
   remember(s.doneTools, id)
+  // Pruning republishes an old call it compacted; it is not a new one.
+  if (st.time?.compacted) return
   if (s.messages.get(part.messageID)?.copied) return
   if (num(st.time?.end) !== undefined && st.time.end < s.created) return
   // The call may have reached something the guard before it did not see; check again.
@@ -1019,7 +1034,7 @@ async function onToolPart1(s, part) {
     output: st.status === "completed" ? st.output : st.error,
     title: st.title,
     files: filesOf1(s, part.tool, st),
-    mcp: mcpOf1(str(part.tool)),
+    mcp: mcpOf1(str(part.tool), servers),
     subagentSession: part.tool === "task" ? st.metadata?.sessionId || undefined : undefined,
   })
 }
@@ -1028,6 +1043,8 @@ async function onToolPart1(s, part) {
 async function server(input) {
   if (!CONFIG || typeof CONFIG.endpoint !== "string" || !CONFIG.endpoint) return {}
   const owner = "opencode1:" + ++state.owners
+  // The MCP servers this directory configured; another directory's names are not its.
+  const mcpServers = new Set()
   const client = input?.client
   loggers.push((message) => {
     const r = client?.app?.log?.({ body: { service: "terma", level: "warn", message } })
@@ -1099,7 +1116,7 @@ async function server(input) {
           run(s, () => keepText1(s, part))
         } else if (part.type === "tool") {
           const s = see(part.sessionID)
-          run(s, () => onToolPart1(s, part))
+          run(s, () => onToolPart1(s, part, mcpServers))
         }
         return
       }
@@ -1128,7 +1145,7 @@ async function server(input) {
     event: guard(async ({ event } = {}) => onEvent(event)),
 
     config: guard(async (cfg) => {
-      for (const name of Object.keys(cfg?.mcp ?? {})) remember(state.mcpServers, name, undefined, MAX_SMALL)
+      for (const name of Object.keys(cfg?.mcp ?? {})) remember(mcpServers, name, undefined, MAX_SMALL)
     }),
 
     "chat.message": guard(async (inp, out) => {
@@ -1136,16 +1153,32 @@ async function server(input) {
       if (!s) return
       const msg = out?.message ?? {}
       const parts = Array.isArray(out?.parts) ? out.parts : []
+      // An attached file (or folder) is read into synthetic text parts with no tool call:
+      // reach-check it as a read or a list, and keep its content out of the prompt.
+      const reaches = []
+      for (const x of parts) {
+        if (x?.type !== "file" || typeof x.url !== "string" || !x.url.startsWith("file:")) continue
+        let path
+        try {
+          path = fileURLToPath(x.url)
+        } catch {
+          continue
+        }
+        reaches.push(x.mime === "application/x-directory" ? { tool: "list", lists: [path] } : { tool: "read", paths: [path] })
+      }
       // Under `opencode run` the hook's own input names no agent or model; the message does.
       const pr = {
         messageID: msg.id ?? inp?.messageID,
-        text: parts.filter((x) => x?.type === "text").map((x) => str(x.text)).join("\n"),
+        text: parts.filter((x) => x?.type === "text" && x.synthetic !== true).map((x) => str(x.text)).join("\n"),
         agent: msg.agent ?? inp?.agent ?? undefined,
         model: msg.model?.modelID ?? inp?.model?.modelID,
         provider: msg.model?.providerID ?? inp?.model?.providerID,
         time: num(msg.time?.created),
       }
-      run(s, () => prompt(s, pr))
+      run(s, async () => {
+        for (const reach of reaches) if (!(await guardReach(s, reach))) return
+        if (!isTainted(s)) prompt(s, pr)
+      })
     }),
 
     // Only to see the title call start. It writes nothing to the request.

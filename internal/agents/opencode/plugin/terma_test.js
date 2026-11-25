@@ -116,10 +116,10 @@ function rig(overrides = {}, termaOptions) {
 
 // load evaluates a fresh copy of the plugin. Unless keep is set, the shared state of an
 // earlier copy is dropped first, as in a new OpenCode process.
-async function load(config, { keep = false } = {}) {
+async function load(config, { keep = false, source = SOURCE } = {}) {
   if (!keep) delete globalThis[KEY]
-  const src = config === null ? SOURCE : SOURCE.replace(PLACEHOLDER, `const CONFIG = ${JSON.stringify(config)}`)
-  if (config !== null) expect(src).not.toBe(SOURCE)
+  const src = config === null ? source : source.replace(PLACEHOLDER, `const CONFIG = ${JSON.stringify(config)}`)
+  if (config !== null) expect(src).not.toBe(source)
   // Bun caches directory listings during module resolution: a fresh directory per copy.
   const path = join(mkdtempSync(join(root, "module-")), "terma.js")
   writeFileSync(path, src)
@@ -1007,3 +1007,101 @@ test("a missing terma is tried again after a minute; only sessions seen after it
   expect(chats(r.spans()).map((s) => A(s)["opencode.call.id"])).toEqual(["msg_y1"])
   expect(warnings.length).toBe(1)
 }, 15_000)
+
+test("a file attached to a prompt is reach-checked first, and its content is not the prompt", async () => {
+  const message = {
+    message: { id: "msg_u" },
+    parts: [
+      { type: "text", synthetic: true, text: 'Called the Read tool with the following input: {"filePath":"/repo/notes.txt"}' },
+      { type: "text", synthetic: true, text: "<path>/repo/notes.txt</path>\n<type>file</type>\n<content>\n1: alpha FILE-CANARY" },
+      { type: "file", mime: "text/plain", url: "file:///repo/notes.txt", filename: "notes.txt" },
+      { type: "text", text: "summarize it" },
+    ],
+  }
+  const { r, hooks } = await start()
+  await hooks.event(sessionCreated("ses_at"))
+  await hooks["chat.message"]({ sessionID: "ses_at" }, structuredClone(message))
+  await hooks.dispose()
+  const [p] = named(r.logs(), "opencode.user_prompt")
+  expect(p.body.stringValue).toBe("summarize it")
+  expect(A(p)["opencode.prompt.length"]).toBe(12)
+  expect(JSON.stringify(r.requests())).not.toContain("FILE-CANARY")
+  expect(r.terma.calls()).toEqual([
+    { event: "opencode-session-start", payload: { session_id: "ses_at", cwd: "/repo" } },
+    { event: "opencode-tool-reach", payload: { session_id: "ses_at", cwd: "/repo", tool: "read", paths: ["/repo/notes.txt"] } },
+    { event: "opencode-prompt", payload: { session_id: "ses_at", cwd: "/repo" } },
+  ])
+
+  // A reach that fails taints the session: the prompt is not exported.
+  const refused = await start({}, { terma: { fail: ["opencode-tool-reach"] } })
+  await refused.hooks.event(sessionCreated("ses_at2"))
+  await refused.hooks["chat.message"]({ sessionID: "ses_at2" }, structuredClone(message))
+  await refused.hooks.dispose()
+  expect(named(refused.r.logs(), "opencode.user_prompt")).toEqual([])
+  expect(refused.r.terma.calls().map((c) => c.event)).toEqual(["opencode-session-start", "opencode-tool-reach"])
+})
+
+test("a patch that moves a file names both paths", async () => {
+  const { r, hooks } = await start()
+  await hooks.event(sessionCreated("ses_mv"))
+  const files = [{ filePath: "/repo/notes.txt", relativePath: "moved.txt", type: "move", movePath: "/repo/moved.txt" }]
+  await hooks.event(toolPart("ses_mv", "msg_1", "c1", "apply_patch", done({ patchText: "*** Begin Patch" }, "Success", { metadata: { files } })))
+  await hooks.dispose()
+  const [span] = tools(r.spans())
+  expect(A(span)["opencode.tool.files"]).toEqual(["/repo/notes.txt", "/repo/moved.txt"])
+  const edits = r.terma.calls().filter((c) => c.event === "opencode-file-edit")
+  expect(edits.map((c) => c.payload.files)).toEqual([["/repo/notes.txt", "/repo/moved.txt"]])
+})
+
+test("an assistant message no model answered is not a call; its tool part still is", async () => {
+  const { r, hooks } = await start()
+  await hooks.event(sessionCreated("ses_sh"))
+  const zero = { cost: 0, tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }, finish: undefined }
+  await hooks.event(toolPart("ses_sh", "msg_sh", "c1", "bash", done({ command: "pwd" }, "/repo\n", { metadata: { exit: 0 } })))
+  await hooks.event(assistantDone("ses_sh", "msg_sh", zero))
+  await hooks.event(assistantDone("ses_sh", "msg_err", { ...zero, error: { name: "APIError", data: { message: "stopped" } } }))
+  await hooks.dispose()
+  expect(chats(r.spans()).map((s) => [A(s)["opencode.call.id"], s.status.code])).toEqual([["msg_err", 2]])
+  expect(tools(r.spans()).map((s) => A(s)["gen_ai.tool.call.id"])).toEqual(["msg_sh:c1"])
+})
+
+test("MCP names belong to the directory that configured them", async () => {
+  const r = rig()
+  const mod = await load(r.config)
+  const a = await mod.default.server({ client: fakeClient(null), directory: "/repo", worktree: "/repo" })
+  const b = await mod.default.server({ client: fakeClient(null), directory: "/other", worktree: "/other" })
+  await a.config({ mcp: { acme: {} } })
+  await b.config({ mcp: { acme_git: {} } })
+  await a.event(sessionCreated("ses_a"))
+  await a.event(toolPart("ses_a", "msg_1", "c1", "acme_git_status", done({}, "ok")))
+  await a.dispose()
+  await b.dispose()
+  const [span] = tools(r.spans())
+  expect(A(span)["opencode.mcp.server"]).toBe("acme")
+  expect(A(span)["opencode.mcp.tool"]).toBe("git_status")
+})
+
+test("a tool part OpenCode compacted is not a new call", async () => {
+  const { r, hooks } = await start()
+  await hooks.event(sessionCreated("ses_cp"))
+  await hooks.event(toolPart("ses_cp", "msg_1", "c1", "edit", done({ filePath: "/repo/a" }, "ok", { time: { start: 2100, end: 2200, compacted: 9000 } })))
+  await hooks.dispose()
+  expect(tools(r.spans())).toEqual([])
+  expect(r.terma.calls().map((c) => c.event)).toEqual(["opencode-session-start"])
+})
+
+test("the session left is the one used least recently", async () => {
+  const r = rig()
+  const source = SOURCE.replace("const MAX_SESSIONS = 512", "const MAX_SESSIONS = 2")
+  expect(source).not.toBe(SOURCE)
+  const mod = await load(r.config, { source })
+  const hooks = await mod.default.server({ client: fakeClient(null), directory: "/repo", worktree: "/repo" })
+  await hooks.event(sessionCreated("ses_1"))
+  await hooks.event(sessionCreated("ses_2"))
+  await hooks.dispose()
+  await hooks.event(ev("session.idle", { sessionID: "ses_1" }))
+  await hooks.dispose()
+  await hooks.event(sessionCreated("ses_3"))
+  expect([...globalThis[KEY].sessions.keys()].sort()).toEqual(["ses_1", "ses_3"])
+  await hooks.dispose()
+})

@@ -10,7 +10,7 @@ import (
 // minimumVersions is the first build of each OpenCode major terma's plugin works with, by
 // major. 1.16.0 is the first OpenCode 1 that calls the plugin's dispose hook, where the
 // plugin sends what it still holds: an earlier one exits with the last batch unsent. A major
-// not listed passes.
+// below 1 is older than 1's minimum; a later major not listed passes.
 var minimumVersions = map[int]string{
 	1: "1.16.0",
 	2: "2.0.0",
@@ -31,7 +31,10 @@ func tooOldVersion(version string) (string, bool) {
 	}
 	minimumVersion, listed := minimumVersions[found[0]]
 	if !listed {
-		return "", false
+		if found[0] >= 1 {
+			return "", false
+		}
+		minimumVersion = minimumVersions[1]
 	}
 	minimum, _ := parseVersion(minimumVersion)
 	if slices.Compare(found, minimum) >= 0 {

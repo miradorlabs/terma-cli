@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// Each major has its own minimum; a version terma cannot read, or a major it lists no
-// minimum for, is not too old.
+// Each major has its own minimum; a 0.x is older than 1's. A version terma cannot read, or a
+// later major it lists no minimum for, is not too old.
 func TestTooOldVersionByMajor(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {
@@ -25,7 +25,7 @@ func TestTooOldVersionByMajor(t *testing.T) {
 		{"1.16.0-beta.1", false, ""},
 		{"", false, ""},
 		{"nightly", false, ""},
-		{"0.9.0", false, ""},
+		{"0.9.0", true, "1.16.0"},
 		{"3.0.0", false, ""},
 	} {
 		why, old := tooOldVersion(c.version)
