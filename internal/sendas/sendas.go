@@ -6,6 +6,7 @@ package sendas
 import (
 	"context"
 	"encoding/json"
+	"iter"
 	"strings"
 
 	"google.golang.org/protobuf/encoding/protowire"
@@ -73,60 +74,70 @@ func Reason(body []byte) string {
 	if reason := jsonReason(body); reason != "" {
 		return reason
 	}
-	for b := body; len(b) > 0; {
-		num, typ, n := protowire.ConsumeTag(b)
-		if n < 0 {
-			return ""
-		}
-		b = b[n:]
-		if num == 3 && typ == protowire.BytesType {
-			detail, m := protowire.ConsumeBytes(b)
-			if m < 0 {
-				return ""
-			}
-			if reason := errorInfoReason(detail); reason != "" {
+	for f := range WireFields(body) {
+		if f.Num == 3 && f.Type == protowire.BytesType {
+			if reason := errorInfoReason(f.Bytes); reason != "" {
 				return reason
 			}
-			b = b[m:]
-			continue
 		}
-		m := protowire.ConsumeFieldValue(num, typ, b)
-		if m < 0 {
-			return ""
-		}
-		b = b[m:]
 	}
 	return ""
 }
 
 // errorInfoReason reads an Any's reason when it holds an ErrorInfo.
 func errorInfoReason(anyMsg []byte) string {
-	if !strings.HasSuffix(string(field(anyMsg, 1)), errorInfoType) {
+	if !strings.HasSuffix(string(WireBytes(anyMsg, 1)), errorInfoType) {
 		return ""
 	}
-	return string(field(field(anyMsg, 2), 1))
+	return string(WireBytes(WireBytes(anyMsg, 2), 1))
 }
 
-// field is the first length-delimited field num of a message, nil when it has none.
-func field(b []byte, num protowire.Number) []byte {
-	for len(b) > 0 {
-		n, t, l := protowire.ConsumeTag(b)
-		if l < 0 {
-			return nil
-		}
-		b = b[l:]
-		if n == num && t == protowire.BytesType {
-			v, m := protowire.ConsumeBytes(b)
-			if m < 0 {
-				return nil
+// WireField is one field of a protobuf message as the wire carries it.
+type WireField struct {
+	Num  protowire.Number
+	Type protowire.Type
+	// Bytes is a length-delimited field's contents, nil for any other type.
+	Bytes []byte
+	// Varint is a varint field's value, 0 for any other type.
+	Varint uint64
+}
+
+// WireFields yields the fields of the protobuf message msg in order, read by hand so that
+// neither the relay nor the hooks import gRPC's packages for a response's few fields. It
+// stops at the first field that can't be read: what follows a malformed field is unknown.
+func WireFields(msg []byte) iter.Seq[WireField] {
+	return func(yield func(WireField) bool) {
+		// Each walk reads from the start, with a cursor of its own.
+		for b := msg; len(b) > 0; {
+			num, typ, n := protowire.ConsumeTag(b)
+			if n < 0 {
+				return
 			}
-			return v
+			b = b[n:]
+			f := WireField{Num: num, Type: typ}
+			switch typ {
+			case protowire.BytesType:
+				f.Bytes, n = protowire.ConsumeBytes(b)
+			case protowire.VarintType:
+				f.Varint, n = protowire.ConsumeVarint(b)
+			default:
+				n = protowire.ConsumeFieldValue(num, typ, b)
+			}
+			if n < 0 || !yield(f) {
+				return
+			}
+			b = b[n:]
 		}
-		m := protowire.ConsumeFieldValue(n, t, b)
-		if m < 0 {
-			return nil
+	}
+}
+
+// WireBytes is the first length-delimited field num of the protobuf message b, nil when it
+// has none, or a field before it can't be read.
+func WireBytes(b []byte, num protowire.Number) []byte {
+	for f := range WireFields(b) {
+		if f.Num == num && f.Type == protowire.BytesType {
+			return f.Bytes
 		}
-		b = b[m:]
 	}
 	return nil
 }
