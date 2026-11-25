@@ -244,3 +244,51 @@ func TestPruneKeepsAgedOwnerWithLiveDeltaOrManifest(t *testing.T) {
 		t.Fatalf("aged lone owner survived prune")
 	}
 }
+
+// The owner helpers decide whose a session is: a claimed owner file wins, "" included; with
+// none, a stored manifest keeps its account and a session of deltas alone takes the one
+// account they claim. A write is admitted unless the owner, or the stored manifest, names
+// another account; one that names no one conflicts with nothing.
+func TestOwnerHelpers(t *testing.T) {
+	t.Parallel()
+	const a, b = "aaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbb"
+	none := owner{}
+	ownedByA := owner{account: a, claimed: true}
+	ownedByNoOne := owner{account: "", claimed: true}
+	for _, c := range []struct {
+		name          string
+		o             owner
+		stored        bool
+		storedAccount string
+		claims        []string
+		write         string
+		wantAccount   string
+		wantConflicts bool
+		wantAdmits    bool
+	}{
+		{"claimed: the owner wins over the manifest", ownedByA, true, b, nil, a, a, false, false},
+		{"claimed: another account conflicts", ownedByA, true, a, nil, b, a, true, false},
+		{"claimed: a write naming no one", ownedByA, true, a, nil, "", a, false, true},
+		{"claimed for no one: stays no one's", ownedByNoOne, true, a, []string{a}, a, "", false, true},
+		{"claimed for no one, no manifest", ownedByNoOne, false, "", []string{a}, a, "", false, true},
+		{"unclaimed: the stored manifest's account", none, true, a, []string{b}, a, a, false, true},
+		{"unclaimed: a write against the stored account", none, true, a, nil, b, a, false, false},
+		{"unclaimed: a stored manifest naming no one", none, true, "", nil, b, "", false, true},
+		{"unclaimed deltas: the one they claim", none, false, "", []string{"", a, a}, b, a, false, true},
+		{"unclaimed deltas: several claim no one", none, false, "", []string{a, b}, a, "", false, true},
+		{"nothing at all", none, false, "", nil, a, "", false, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			if got := c.o.resolveAccount(c.stored, c.storedAccount, c.claims); got != c.wantAccount {
+				t.Errorf("resolveAccount = %q, want %q", got, c.wantAccount)
+			}
+			if got := c.o.conflicts(c.write); got != c.wantConflicts {
+				t.Errorf("conflicts(%q) = %v, want %v", c.write, got, c.wantConflicts)
+			}
+			if got := c.o.admits(c.stored, c.storedAccount, c.write); got != c.wantAdmits {
+				t.Errorf("admits(%v, %q, %q) = %v, want %v", c.stored, c.storedAccount, c.write, got, c.wantAdmits)
+			}
+		})
+	}
+}
