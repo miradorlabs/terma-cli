@@ -38,10 +38,12 @@ const BATCH_DELAY_MS = 3000
 const MAX_RETRIES = 5
 // The headers helper is re-run this often, matching Claude Code's cadence.
 const HEADERS_TTL_MS = 29 * 60 * 1000
-// One hook runs at a time; a hung one is terminated so the queue keeps moving.
+// A session's hooks run one at a time; a hung one is terminated so its queue keeps moving.
 const HOOK_TIMEOUT_MS = 2000
 const HOOK_KILL_GRACE_MS = 250
 const MAX_HOOK_QUEUE = 64
+// A terma that could not be run is tried again this long after the last attempt.
+const MISSING_RETRY_MS = 60 * 1000
 // How long a session waits for its record before it is given up on (fail closed).
 const RECORD_WAIT_MS = 5000
 // What the plugin remembers is bounded, so a long-running server cannot grow it forever.
@@ -54,6 +56,8 @@ const MAX_SMALL = 256
 const SCOPE = { name: "terma-opencode", version: "2" }
 const DEFAULT_HOOK = ["terma", "hook"]
 const EDIT_TOOLS = new Set(["write", "edit", "apply_patch", "patch"])
+// OpenCode 1's own tools whose names could pass for <server>_<tool>.
+const BUILTIN_UNDERSCORE_TOOLS = new Set(["apply_patch", "plan_enter", "plan_exit"])
 // OpenCode 1.x names the placeholder this way until the title call answers.
 const PLACEHOLDER_TITLE = /^New session - \d{4}-\d{2}-\d{2}T/
 const RULE_REFUSAL = "The user has specified a rule which prevents"
@@ -73,7 +77,15 @@ function newState() {
   return {
     config: settings(null),
     exporter: { spans: [], records: [], timer: null, inflight: Promise.resolve(), headers: null, headersAt: 0 },
-    hooks: { queue: Promise.resolve(), pending: 0, missing: false, warned: false },
+    hooks: {
+      missing: false,
+      missingAt: 0,
+      warned: false,
+      // Every hook queue with a hook waiting or running, sessions that left the map included.
+      running: new Set(),
+      // The queue of hooks that name no session this process keeps.
+      unowned: { hookQueue: Promise.resolve(), hookPending: 0 },
+    },
     sessions: new Map(),
     tainted: new Set(),
     seenEvents: new Set(),
@@ -112,6 +124,7 @@ function configure(st, raw) {
     st.exporter.headers = null
     st.exporter.headersAt = 0
     st.hooks.missing = false
+    st.hooks.missingAt = 0
     st.hooks.warned = false
   }
   st.config = next
@@ -294,17 +307,20 @@ async function authHeaders(cfg) {
 
 // --- hook runner --------------------------------------------------------------------
 
-// runHook hands an event to `terma hook <event>`. One FIFO for the process, so a session's
-// claim always finishes before its other hooks; a timed-out child is terminated, and the
-// queue advances only once it is gone. Resolves true iff the hook exited 0.
-function runHook(event, payload) {
+// runHook hands an event to `terma hook <event>` on a queue: the session's own (a FIFO, so
+// its claim always finishes before its other hooks) or, for a session this process does
+// not keep, state.hooks.unowned. Queues do not wait for each other. A timed-out child is
+// terminated, and its queue advances only once it is gone. Resolves true iff the hook
+// exited 0.
+function runHook(lane, event, payload) {
   const h = state.hooks
-  if (h.missing || h.pending >= MAX_HOOK_QUEUE) return Promise.resolve(false)
+  if (termaMissing() || lane.hookPending >= MAX_HOOK_QUEUE) return Promise.resolve(false)
   const argv = state.config.hookCommand
-  h.pending++
-  const slot = h.queue.then(() => spawnHook(argv, event, payload))
-  h.queue = slot.then((s) => s.exit, () => undefined).finally(() => {
-    h.pending--
+  lane.hookPending++
+  h.running.add(lane)
+  const slot = lane.hookQueue.then(() => spawnHook(argv, event, payload))
+  lane.hookQueue = slot.then((s) => s.exit, () => undefined).finally(() => {
+    if (--lane.hookPending <= 0) h.running.delete(lane)
   })
   return new Promise((done) => {
     let settled = false
@@ -322,7 +338,7 @@ function runHook(event, payload) {
 }
 
 function spawnHook(argv, event, payload) {
-  if (state.hooks.missing) return { result: Promise.resolve(false), exit: Promise.resolve() }
+  if (termaMissing()) return { result: Promise.resolve(false), exit: Promise.resolve() }
   let resolveExit
   const exit = new Promise((r) => {
     resolveExit = r
@@ -371,8 +387,9 @@ function spawnHook(argv, event, payload) {
     timer.unref?.()
     try {
       child = spawn(argv[0], [...argv.slice(1), event], { stdio: ["pipe", "ignore", "ignore"] })
+      child.on("spawn", termaFound)
       child.on("error", (err) => {
-        if (err?.code === "ENOENT" || err?.code === "EACCES") termaMissing(argv[0], err.code)
+        if (err?.code === "ENOENT" || err?.code === "EACCES") termaLost(argv[0], err.code)
         if (!child?.pid || err?.code === "ESRCH") markExited()
         finish(false)
       })
@@ -383,7 +400,7 @@ function spawnHook(argv, event, payload) {
       child.stdin.on("error", () => {})
       child.stdin.end(JSON.stringify(payload))
     } catch (err) {
-      if (err?.code === "ENOENT" || err?.code === "EACCES") termaMissing(argv[0], err.code)
+      if (err?.code === "ENOENT" || err?.code === "EACCES") termaLost(argv[0], err.code)
       markExited()
       finish(false)
     }
@@ -391,17 +408,32 @@ function spawnHook(argv, event, payload) {
   return { result, exit }
 }
 
-// termaMissing stops every further hook and says so once, in OpenCode's own log: a session
-// nobody claimed must not be exported, and a person should learn why nothing arrives.
-function termaMissing(command, code) {
+// termaLost stops every further hook for a while and says so once per config, in
+// OpenCode's own log: a session nobody claimed must not be exported, and a person should
+// learn why nothing arrives. The first hook after MISSING_RETRY_MS tries terma again.
+function termaLost(command, code) {
   const h = state.hooks
   h.missing = true
+  h.missingAt = Date.now()
   if (h.warned) return
   h.warned = true
   const log = loggers[loggers.length - 1]
   try {
     log?.(`terma: cannot run ${command} (${code}). OpenCode sessions are not recorded until "terma setup" is run again.`)
   } catch {}
+}
+
+// termaFound clears a missing terma once a hook starts again. Sessions that went dark
+// while it was missing stay dark; sessions seen from now on are claimed as usual.
+function termaFound() {
+  state.hooks.missing = false
+  state.hooks.missingAt = 0
+}
+
+// termaMissing is whether hooks are off now: terma could not be run, recently.
+function termaMissing() {
+  const h = state.hooks
+  return h.missing && Date.now() - h.missingAt < MISSING_RETRY_MS
 }
 
 // --- sessions -----------------------------------------------------------------------
@@ -420,6 +452,8 @@ function newSession(id, owner) {
     lastTitleTime: 0,
     queue: Promise.resolve(),
     busy: 0,
+    hookQueue: Promise.resolve(), // its hooks, one at a time, in the order they were asked for
+    hookPending: 0,
     claimed: false,
     dark: false,
     policy: {},
@@ -458,7 +492,7 @@ function sight(sessionID, { record, fetch, owner } = {}) {
 function prune() {
   if (state.sessions.size <= MAX_SESSIONS) return
   for (const [id, s] of state.sessions) {
-    if (s.busy === 0) {
+    if (s.busy === 0 && s.hookPending === 0) {
       state.sessions.delete(id)
       if (state.sessions.size <= MAX_SESSIONS) return
     }
@@ -492,10 +526,10 @@ async function firstSight(s, lookup) {
   s.created = num(rec.created) ?? 0
   s.title = str(rec.title)
   s.policy = repoPolicy(s.directory)
-  s.claimed = await runHook("opencode-session-start", base(s))
+  s.claimed = await runHook(s, "opencode-session-start", base(s))
   // A timeout or a refusal is not fatal: the relay holds an unclaimed session and the
   // next prompt claims it again. A terma that cannot be run is.
-  if (!s.claimed && state.hooks.missing) {
+  if (!s.claimed && termaMissing()) {
     s.dark = true
     return
   }
@@ -535,7 +569,7 @@ function run(s, fn) {
 }
 
 function blocked(s) {
-  if (!s.claimed && state.hooks.missing) s.dark = true
+  if (!s.claimed && termaMissing()) s.dark = true
   return s.dark || isTainted(s)
 }
 
@@ -722,7 +756,7 @@ function tool(s, t) {
   // The touch names the call, so the platform joins it to this span; only a completed
   // edit changed a file. The hook has its own policy, so it runs whatever content says.
   if (EDIT_TOOLS.has(t.name) && t.status === "completed" && files.length > 0) {
-    runHook("opencode-file-edit", { ...base(s), tool: t.name, tool_call_id: id, files })
+    runHook(s, "opencode-file-edit", { ...base(s), tool: t.name, tool_call_id: id, files })
   }
 }
 
@@ -737,7 +771,7 @@ function prompt(s, pr) {
     "gen_ai.request.model": pr.model,
     "gen_ai.provider.name": pr.provider,
   }, pr.time)
-  runHook("opencode-prompt", base(s))
+  runHook(s, "opencode-prompt", base(s))
 }
 
 // title records a root session's new title: never the placeholder, never for a subagent
@@ -769,13 +803,20 @@ function titleCallEnded(s, { end, tokens, cost } = {}) {
 }
 
 function idle(s) {
-  runHook("opencode-idle", base(s))
+  runHook(s, "opencode-idle", base(s))
 }
 
 function end(s, reason) {
   if (s.pendingTitle) titleCallEnded(s, { end: Date.now() })
-  runHook("opencode-session-end", { session_id: s.id, cwd: s.directory, reason })
+  runHook(s, "opencode-session-end", { session_id: s.id, cwd: s.directory, reason })
   if (state.sessions.get(s.id) === s) state.sessions.delete(s.id)
+}
+
+// endUnknown ends a session this process never kept, as when an old one is deleted from a
+// list: it is not claimed, titled or exported, only ended.
+function endUnknown(rec, reason) {
+  if (isTainted(rec)) return
+  runHook(state.hooks.unowned, "opencode-session-end", { session_id: rec.id, cwd: rec.directory, reason })
 }
 
 // shutdown sends the pending title call of every session this entry first saw, waits for
@@ -790,7 +831,8 @@ async function shutdown(owner) {
     if (busy.length === 0) break
     await Promise.all(busy.map((s) => s.queue))
   }
-  await Promise.race([state.hooks.queue, sleep(HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS, true)])
+  const hooks = [...state.hooks.running].map((lane) => lane.hookQueue)
+  await Promise.race([Promise.all(hooks), sleep(HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS, true)])
   await flush()
 }
 
@@ -834,7 +876,7 @@ function toolReach(name, args) {
 // closed). Resolves false when the session may not export the call.
 async function guardReach(s, reach) {
   const { tool: name, ...rest } = reach
-  const ok = await runHook("opencode-tool-reach", { ...base(s), tool: name, ...rest })
+  const ok = await runHook(s, "opencode-tool-reach", { ...base(s), tool: name, ...rest })
   if (!ok) taint(s)
   return ok
 }
@@ -864,15 +906,20 @@ function filesOf1(s, name, st) {
 }
 
 // OpenCode 1 names an MCP tool <server>_<tool>, the server's name with anything but
-// letters and digits made "_". The longest configured name that matches wins.
+// letters, digits, "-" and "_" made "_". Each name is tried as configured, as OpenCode
+// writes it, and with every non-alphanumeric made "_"; the longest match wins, then the
+// earlier form. OpenCode's own tools are never a server's.
 function mcpOf1(name) {
+  if (BUILTIN_UNDERSCORE_TOOLS.has(name)) return undefined
   let best = null
   for (const server of state.mcpServers) {
-    for (const prefix of new Set([server, server.replace(/[^A-Za-z0-9]/g, "_")])) {
-      if (name.length > prefix.length + 1 && name.startsWith(prefix + "_") && (!best || prefix.length > best.prefix.length)) {
-        best = { prefix, server }
+    const forms = [server, server.replace(/[^A-Za-z0-9_-]/g, "_"), server.replace(/[^A-Za-z0-9]/g, "_")]
+    forms.forEach((prefix, rank) => {
+      if (name.length <= prefix.length + 1 || !name.startsWith(prefix + "_")) return
+      if (!best || prefix.length > best.prefix.length || (prefix.length === best.prefix.length && rank < best.rank)) {
+        best = { prefix, server, rank }
       }
-    }
+    })
   }
   return best ? { server: best.server, tool: name.slice(best.prefix.length + 1) } : undefined
 }
@@ -1020,7 +1067,12 @@ async function server(input) {
       }
       case "session.deleted": {
         const rec = recordOf(p.info)
-        const s = rec && see(rec.id, rec)
+        if (!rec) return
+        if (!state.sessions.has(rec.id)) {
+          endUnknown(rec, "deleted")
+          return
+        }
+        const s = see(rec.id, rec)
         run(s, () => end(s, "deleted"))
         return
       }

@@ -7,7 +7,7 @@
 //
 // `bun test` in this folder.
 import { test, expect, beforeAll, afterAll, describe } from "bun:test"
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, chmodSync, existsSync, rmSync } from "node:fs"
+import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, chmodSync, existsSync, rmSync, renameSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -56,13 +56,15 @@ afterAll(() => {
 
 // --- rig ----------------------------------------------------------------------------
 
-// A fake `terma hook`: hooks run one at a time, so one log keeps their order. Each line is
-// the event, a tab, and the JSON it got on stdin.
-function fakeTerma(dir, { fail = [] } = {}) {
+// A fake `terma hook`: a session's hooks run one at a time, so one log keeps their order
+// within each session; each hook appends its line in one write. Each line is the event, a
+// tab, and the JSON it got on stdin. A hook naming a session in slow hangs after logging.
+function fakeTerma(dir, { fail = [], slow = [] } = {}) {
   const log = join(dir, "hooks.log")
   const path = join(dir, "terma")
   const failing = fail.map((e) => `[ "$2" = "${e}" ] && exit 1`).join("\n")
-  writeFileSync(path, `#!/bin/sh\n{ printf '%s\\t' "$2"; cat; printf '\\n'; } >> '${log}'\n${failing}\nexit 0\n`)
+  const hanging = slow.map((id) => `case "$input" in *'"${id}"'*) exec sleep 30;; esac`).join("\n")
+  writeFileSync(path, `#!/bin/sh\ninput=$(cat)\nprintf '%s\\t%s\\n' "$2" "$input" >> '${log}'\n${hanging}\n${failing}\nexit 0\n`)
   chmodSync(path, 0o700)
   return {
     argv: [path, "hook"],
@@ -255,7 +257,9 @@ const prompts = (records) => records.filter((r) => r.kind === "hook" && r.name =
 function identity(result) {
   const spans = result.spans.map((s) => JSON.stringify([s.traceId, s.spanId, s.name, s.kind, s.attributes, s.status])).sort()
   const logs = result.logs.map((l) => JSON.stringify([l.traceId, l.body, l.attributes])).sort()
-  return { spans, logs, hooks: result.hooks }
+  // Hooks of different sessions run side by side: only each session's own order is fixed.
+  const hooks = [...result.hooks].sort((a, b) => (a.payload.session_id < b.payload.session_id ? -1 : a.payload.session_id > b.payload.session_id ? 1 : 0))
+  return { spans, logs, hooks }
 }
 
 // --- every case ---------------------------------------------------------------------
@@ -847,8 +851,8 @@ test("the repository's policy applies per session directory", async () => {
   expect(sessions).toEqual(new Set(["ses_p", "ses_o"]))
   const bodies = Object.fromEntries(named(r.logs(), "opencode.user_prompt").map((x) => [sessionOf(x), x.body.stringValue]))
   expect(bodies).toEqual({ ses_p: "", ses_o: "secret prompt" })
-  // Hooks run whatever the export policy says.
-  expect(r.terma.calls().filter((c) => c.event === "opencode-session-start").map((c) => c.payload.session_id)).toEqual(["ses_q", "ses_p", "ses_o"])
+  // Hooks run whatever the export policy says. Sessions' claims run side by side, in any order.
+  expect(r.terma.calls().filter((c) => c.event === "opencode-session-start").map((c) => c.payload.session_id).sort()).toEqual(["ses_o", "ses_p", "ses_q"])
 })
 
 test("a null CONFIG makes the plugin inert", async () => {
@@ -863,6 +867,15 @@ test("the module's only export is the default, with id, server and setup", async
   expect(mod.default.id).toBe("terma")
 })
 
+test("deleting a session this process never saw only ends it", async () => {
+  const { r, hooks } = await start()
+  await hooks.event(ev("session.deleted", { info: { id: "ses_old", directory: "/old", version: "1.19.6", title: "Old title", time: { created: 1000 } } }))
+  await hooks.dispose()
+  expect(r.terma.calls()).toEqual([{ event: "opencode-session-end", payload: { session_id: "ses_old", cwd: "/old", reason: "deleted" } }])
+  expect(r.requests()).toEqual([])
+  expect(globalThis[KEY].sessions.has("ses_old")).toBe(false)
+})
+
 test("deleting a session ends it", async () => {
   const { r, hooks } = await start()
   await hooks.event(sessionCreated("ses_z"))
@@ -873,3 +886,102 @@ test("deleting a session ends it", async () => {
     { event: "opencode-session-end", payload: { session_id: "ses_z", cwd: "/repo", reason: "deleted" } },
   ])
 })
+
+test("MCP names on OpenCode 1: as OpenCode writes them, never a built-in tool", async () => {
+  const { r, hooks } = await start()
+  await hooks.config({ mcp: { "my-server": {}, "my.server": {}, apply: {}, plan: {} } })
+  await hooks.event(sessionCreated("ses_mcp"))
+  for (const [callID, name] of [["c1", "my-server_echo"], ["c2", "my_server_echo"], ["c3", "apply_patch"], ["c4", "plan_enter"], ["c5", "plan_exit"]]) {
+    await hooks.event(toolPart("ses_mcp", "msg_1", callID, name, done({}, "ok")))
+  }
+  await hooks.dispose()
+  const byName = Object.fromEntries(tools(r.spans()).map((s) => [A(s)["gen_ai.tool.name"], A(s)]))
+  expect(byName["my-server_echo"]["opencode.mcp.server"]).toBe("my-server")
+  expect(byName["my-server_echo"]["opencode.mcp.tool"]).toBe("echo")
+  expect(byName["my_server_echo"]["opencode.mcp.server"]).toBe("my.server")
+  expect(byName["my_server_echo"]["opencode.mcp.tool"]).toBe("echo")
+  for (const name of ["apply_patch", "plan_enter", "plan_exit"]) {
+    expect(byName[name]).toBeDefined()
+    expect(byName[name]["opencode.mcp.server"]).toBeUndefined()
+    expect(byName[name]["opencode.mcp.tool"]).toBeUndefined()
+  }
+})
+
+test("a slow session's hooks do not hold up another session's", async () => {
+  const { r, hooks } = await start({}, { terma: { slow: ["ses_slow"] } })
+  await hooks.event(sessionCreated("ses_slow"))
+  // A burst from the slow session, all queued behind its hung claim.
+  for (let i = 0; i < 8; i++) hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_slow", callID: "s" + i }, { args: { filePath: "/repo/s" + i } })
+  await hooks.event(sessionCreated("ses_fast"))
+  const began = Date.now()
+  await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_fast", callID: "f1" }, { args: { filePath: "/repo/f" } })
+  expect(Date.now() - began).toBeLessThan(1000)
+  await hooks.event(toolPart("ses_fast", "msg_f", "f1", "read", done({ filePath: "/repo/f" }, "ok")))
+  await hooks.event(assistantDone("ses_fast", "msg_f"))
+  await hooks.dispose()
+  expect(globalThis[KEY].tainted.has("ses_fast")).toBe(false)
+  const fast = r.terma.calls().filter((c) => c.payload.session_id === "ses_fast").map((c) => c.event)
+  expect(fast).toEqual(["opencode-session-start", "opencode-tool-reach"])
+  expect(new Set(tools(r.spans()).map(sessionOf))).toEqual(new Set(["ses_fast"]))
+  expect(chats(r.spans()).map((s) => A(s)["opencode.call.id"])).toEqual(["msg_f"])
+  // The slow session's claim ran first in its queue and timed out; the rest gave up behind it.
+  expect(r.terma.calls().find((c) => c.payload.session_id === "ses_slow").event).toBe("opencode-session-start")
+}, 15_000)
+
+test("a missing terma is tried again after a minute; only sessions seen after it works are recorded", async () => {
+  const r = rig()
+  const path = r.terma.argv[0]
+  const away = path + ".away"
+  renameSync(path, away)
+  const mod = await load(r.config)
+  const warnings = []
+  const hooks = await mod.default.server({ client: fakeClient(null, warnings), directory: "/repo", worktree: "/repo" })
+  const st = globalThis[KEY]
+  const age = () => {
+    st.hooks.missingAt -= 60_000
+  }
+
+  await hooks.event(sessionCreated("ses_x"))
+  await hooks["chat.message"]({ sessionID: "ses_x" }, { message: { id: "msg_ux" }, parts: [{ type: "text", text: "hi" }] })
+  await hooks.event(assistantDone("ses_x", "msg_x1"))
+  for (let i = 0; i < 100 && warnings.length === 0; i++) await Bun.sleep(20)
+  expect(warnings.length).toBe(1)
+  expect(st.hooks.missing).toBe(true)
+
+  // A minute on, terma is still missing: one new attempt, which restarts the clock.
+  age()
+  const aged = st.hooks.missingAt
+  await hooks.event(sessionCreated("ses_v"))
+  await hooks.event(assistantDone("ses_v", "msg_v1"))
+  await hooks.dispose()
+  expect(st.hooks.missing).toBe(true)
+  expect(st.hooks.missingAt).toBeGreaterThan(aged)
+
+  // terma is back, but inside the window: nothing is spawned.
+  renameSync(away, path)
+  await hooks.event(sessionCreated("ses_w"))
+  await hooks.event(assistantDone("ses_w", "msg_w1"))
+  await hooks.event(ev("session.idle", { sessionID: "ses_x" }))
+  await hooks.dispose()
+  expect(r.terma.calls()).toEqual([])
+
+  // After the window the next hook runs terma; a session first seen now is claimed.
+  age()
+  await hooks.event(sessionCreated("ses_y"))
+  await hooks["chat.message"]({ sessionID: "ses_y" }, { message: { id: "msg_uy" }, parts: [{ type: "text", text: "hello" }] })
+  await hooks.event(assistantDone("ses_y", "msg_y1"))
+  // The sessions that went dark stay dark.
+  for (const id of ["ses_x", "ses_v", "ses_w"]) {
+    await hooks.event(assistantDone(id, "msg_" + id + "_late", { time: { created: 4000, completed: 5000 } }))
+    await hooks.event(ev("session.idle", { sessionID: id }))
+  }
+  await hooks.dispose()
+  expect(st.hooks.missing).toBe(false)
+  expect(r.terma.calls().map((c) => [c.event, c.payload.session_id])).toEqual([
+    ["opencode-session-start", "ses_y"],
+    ["opencode-prompt", "ses_y"],
+  ])
+  expect(new Set([...r.spans(), ...r.logs()].map(sessionOf))).toEqual(new Set(["ses_y"]))
+  expect(chats(r.spans()).map((s) => A(s)["opencode.call.id"])).toEqual(["msg_y1"])
+  expect(warnings.length).toBe(1)
+}, 15_000)
