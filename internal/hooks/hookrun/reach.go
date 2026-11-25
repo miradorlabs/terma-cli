@@ -113,6 +113,31 @@ func nobodys(dir string) bool {
 	return slices.ContainsFunc(machineRoots(), func(root string) bool { return under(dir, root) })
 }
 
+// IsNobodyDir reports whether dir, outside any git checkout, is no one's workspace
+// (root, kernel/device filesystems, OS directories, or shared scratch space outside home).
+func IsNobodyDir(dir string) bool { return nobodys(dir) }
+
+// ExpandReach expands paths (including Alone/Search markers and subdirectories) relative
+// to cwd using the same static scan live reach hooks run, returning concrete paths and
+// whether any path or command had statically unknown reach.
+func ExpandReach(paths []string, cwd string) (expanded []string, unknown bool) {
+	if len(paths) == 0 {
+		return nil, false
+	}
+	scanned := searchedBy(paths, cwd, os.LookupEnv, time.Now().Add(maxShellTime))
+	out := make([]string, 0, len(scanned))
+	for _, p := range scanned {
+		if isUnknownReach(p) {
+			unknown = true
+			continue
+		}
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out, unknown
+}
+
 // under reports whether dir is root or a folder below it.
 func under(dir, root string) bool {
 	if root == "" || len(dir) < len(root) || dir[:len(root)] != root && (filepath.Separator != '\\' || !strings.EqualFold(dir[:len(root)], root)) {

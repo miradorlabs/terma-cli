@@ -63,6 +63,32 @@ attribute_groups:
           still name it.
       - ref: vcs.ref.head.type
         note: branch, omitted on a detached HEAD.
+  - id: terma.history.stamp
+    visibility: public
+    stability: development
+    brief: What `terma history upload` adds to the resource and records of historical sessions it uploads.
+    attributes:
+      - ref: terma.session.historical
+        requirement_level: required
+        note: Always true on uploaded historical records and resources; stripped by the live relay.
+      - ref: mirador.project.id
+        requirement_level: required
+      - ref: terma.version
+        requirement_level: required
+      - ref: terma.user.id
+        requirement_level:
+          conditionally_required: When terma names the signed-in user for the team the session goes to.
+      - ref: terma.repository.root
+      - ref: terma.working_directory
+      - ref: terma.repository.worktree.linked
+      - ref: terma.repository.worktree.name
+      - ref: vcs.repository.url.full
+        note: The segment's origin, without credentials; omitted where origin is a local path.
+      - ref: vcs.repository.name
+      - ref: vcs.owner.name
+      - ref: vcs.provider.name
+      - ref: vcs.ref.head.name
+      - ref: vcs.ref.head.type
   - id: terma.relay.withheld
     visibility: public
     stability: development

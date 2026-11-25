@@ -55,6 +55,7 @@ func (app *App) NewRootCommand() *cobra.Command {
                    Run it again to repair the machine.
   terma teams      chooses the teams this machine sends telemetry to, across all
                    your organizations, and which organization owns a repository.
+  terma history    uploads past coding agent sessions to your selected teams.
   terma doctor     verifies the whole chain end to end; every failure names its fix.
   terma update     installs the latest release and refreshes what terma installed.
   terma teardown   undoes setup on this machine (--sign-out also signs out).
@@ -89,6 +90,7 @@ Every command is safe to run again.`,
 	root.AddCommand(
 		app.newSetupCommand(),
 		app.newTeamsCommand(),
+		app.newHistoryCommand(),
 		app.newDoctorCommand(),
 		app.newUpdateCommand(),
 		app.newTeardownCommand(),
@@ -182,6 +184,9 @@ func (app *App) automaticUpdatesAllowed(cmd *cobra.Command, interactive bool) bo
 // reads its output, and no hook or flush, which stay silent, runs it.
 func (app *App) humanFacing(cmd *cobra.Command, interactive bool) bool {
 	if !interactive || (app.flags.output != "" && app.flags.output != "table") {
+		return false
+	}
+	if f := cmd.Flags().Lookup("dry-run"); f != nil && f.Value.String() == "true" {
 		return false
 	}
 	for c := cmd; c != nil; c = c.Parent() {

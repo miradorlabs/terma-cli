@@ -220,6 +220,7 @@ func (r *Relay) dress(pol Policy, p *part, project string, ran claim.Claim, how 
 	}
 	stampCheckout(p, ran, pol.IncludeToolContent, home)
 	stampParent(p, ran)
+	stripHistorical(p)
 	nameUser(p, pol)
 	if how.how != "" {
 		stamp(p, semconv.TermaRelayAttributionKey, how.how)
