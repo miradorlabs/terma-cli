@@ -268,6 +268,8 @@ func TestOpenCodeDetectDoesNotFailWhenAbsent(t *testing.T) {
 // its file mode; an absent or inert one is left alone.
 func TestRefreshPluginKeepsItsConfiguration(t *testing.T) {
 	h, path := opencodeIn(t)
+	h.hook = []string{filepath.Join(t.TempDir(), "terma"), "hook"}
+	writeExec(t, h.hook[0], "#!/bin/sh\nexit 0\n")
 	if _, changed, err := h.RefreshPlugin(); err != nil || changed {
 		t.Fatalf("absent plugin: changed=%v err=%v", changed, err)
 	}

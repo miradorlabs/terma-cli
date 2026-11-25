@@ -1,0 +1,326 @@
+{
+ "case": "api-error",
+ "opencode": "1.19.6",
+ "requests": [
+  {
+   "path": "/v1/traces",
+   "body": {
+    "resourceSpans": [
+     {
+      "resource": {
+       "attributes": [
+        {
+         "key": "service.name",
+         "value": {
+          "stringValue": "opencode"
+         }
+        }
+       ]
+      },
+      "scopeSpans": [
+       {
+        "scope": {
+         "name": "terma-opencode",
+         "version": "2"
+        },
+        "spans": [
+         {
+          "traceId": "73fc81d4f449ec698741aa9caf9b84e2",
+          "spanId": "88884ef9f5a046eb",
+          "name": "chat m",
+          "kind": 3,
+          "startTimeUnixNano": "1795617995372000000",
+          "endTimeUnixNano": "1795617995397000000",
+          "attributes": [
+           {
+            "key": "gen_ai.operation.name",
+            "value": {
+             "stringValue": "chat"
+            }
+           },
+           {
+            "key": "opencode.call.id",
+            "value": {
+             "stringValue": "title:msg_2132c38ef001CE1yr0ogU6dcuv"
+            }
+           },
+           {
+            "key": "opencode.call.kind",
+            "value": {
+             "stringValue": "title"
+            }
+           },
+           {
+            "key": "gen_ai.request.model",
+            "value": {
+             "stringValue": "m"
+            }
+           },
+           {
+            "key": "gen_ai.provider.name",
+            "value": {
+             "stringValue": "fake"
+            }
+           },
+           {
+            "key": "opencode.agent",
+            "value": {
+             "stringValue": "title"
+            }
+           },
+           {
+            "key": "session.id",
+            "value": {
+             "stringValue": "ses_decd3c736ffeEnYvATl6OoSMPY"
+            }
+           },
+           {
+            "key": "opencode.version",
+            "value": {
+             "stringValue": "1.19.6"
+            }
+           }
+          ],
+          "status": {
+           "code": 1
+          }
+         },
+         {
+          "traceId": "73fc81d4f449ec698741aa9caf9b84e2",
+          "spanId": "81af16db40084385",
+          "name": "chat m",
+          "kind": 3,
+          "startTimeUnixNano": "1795617995361000000",
+          "endTimeUnixNano": "1795617995835000000",
+          "attributes": [
+           {
+            "key": "gen_ai.operation.name",
+            "value": {
+             "stringValue": "chat"
+            }
+           },
+           {
+            "key": "opencode.call.id",
+            "value": {
+             "stringValue": "msg_2132c3a61001H4OcooUbjZwjdB"
+            }
+           },
+           {
+            "key": "opencode.message.id",
+            "value": {
+             "stringValue": "msg_2132c3a61001H4OcooUbjZwjdB"
+            }
+           },
+           {
+            "key": "opencode.parent_message.id",
+            "value": {
+             "stringValue": "msg_2132c38ef001CE1yr0ogU6dcuv"
+            }
+           },
+           {
+            "key": "gen_ai.request.model",
+            "value": {
+             "stringValue": "m"
+            }
+           },
+           {
+            "key": "gen_ai.provider.name",
+            "value": {
+             "stringValue": "fake"
+            }
+           },
+           {
+            "key": "opencode.agent",
+            "value": {
+             "stringValue": "build"
+            }
+           },
+           {
+            "key": "error.type",
+            "value": {
+             "stringValue": "APIError"
+            }
+           },
+           {
+            "key": "opencode.error.message",
+            "value": {
+             "stringValue": "scripted provider refuses this request"
+            }
+           },
+           {
+            "key": "session.id",
+            "value": {
+             "stringValue": "ses_decd3c736ffeEnYvATl6OoSMPY"
+            }
+           },
+           {
+            "key": "opencode.version",
+            "value": {
+             "stringValue": "1.19.6"
+            }
+           }
+          ],
+          "status": {
+           "code": 2
+          }
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "path": "/v1/logs",
+   "body": {
+    "resourceLogs": [
+     {
+      "resource": {
+       "attributes": [
+        {
+         "key": "service.name",
+         "value": {
+          "stringValue": "opencode"
+         }
+        }
+       ]
+      },
+      "scopeLogs": [
+       {
+        "scope": {
+         "name": "terma-opencode",
+         "version": "2"
+        },
+        "logRecords": [
+         {
+          "timeUnixNano": "1795617994991000000",
+          "severityNumber": 9,
+          "severityText": "INFO",
+          "body": {
+           "stringValue": "\"SCRIPT[/home/user/work/t-api-error]: error400 ; Follow the script.\""
+          },
+          "attributes": [
+           {
+            "key": "event.name",
+            "value": {
+             "stringValue": "opencode.user_prompt"
+            }
+           },
+           {
+            "key": "opencode.message.id",
+            "value": {
+             "stringValue": "msg_2132c38ef001CE1yr0ogU6dcuv"
+            }
+           },
+           {
+            "key": "opencode.prompt.length",
+            "value": {
+             "intValue": "128"
+            }
+           },
+           {
+            "key": "opencode.agent",
+            "value": {
+             "stringValue": "build"
+            }
+           },
+           {
+            "key": "gen_ai.request.model",
+            "value": {
+             "stringValue": "m"
+            }
+           },
+           {
+            "key": "gen_ai.provider.name",
+            "value": {
+             "stringValue": "fake"
+            }
+           },
+           {
+            "key": "session.id",
+            "value": {
+             "stringValue": "ses_decd3c736ffeEnYvATl6OoSMPY"
+            }
+           },
+           {
+            "key": "opencode.version",
+            "value": {
+             "stringValue": "1.19.6"
+            }
+           }
+          ],
+          "traceId": "73fc81d4f449ec698741aa9caf9b84e2"
+         },
+         {
+          "timeUnixNano": "1795617995397000000",
+          "severityNumber": 9,
+          "severityText": "INFO",
+          "body": {
+           "stringValue": "Scripted session title"
+          },
+          "attributes": [
+           {
+            "key": "event.name",
+            "value": {
+             "stringValue": "opencode.session.title"
+            }
+           },
+           {
+            "key": "session.id",
+            "value": {
+             "stringValue": "ses_decd3c736ffeEnYvATl6OoSMPY"
+            }
+           },
+           {
+            "key": "opencode.version",
+            "value": {
+             "stringValue": "1.19.6"
+            }
+           }
+          ],
+          "traceId": "73fc81d4f449ec698741aa9caf9b84e2"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "hooks": [
+  {
+   "at": 1795617994983,
+   "event": "opencode-session-start",
+   "payload": {
+    "session_id": "ses_decd3c736ffeEnYvATl6OoSMPY",
+    "cwd": "/home/user/work/t-api-error"
+   }
+  },
+  {
+   "at": 1795617995191,
+   "event": "opencode-prompt",
+   "payload": {
+    "session_id": "ses_decd3c736ffeEnYvATl6OoSMPY",
+    "cwd": "/home/user/work/t-api-error"
+   }
+  },
+  {
+   "at": 1795617995833,
+   "event": "opencode-idle",
+   "payload": {
+    "session_id": "ses_decd3c736ffeEnYvATl6OoSMPY",
+    "cwd": "/home/user/work/t-api-error"
+   }
+  },
+  {
+   "at": 1795617995852,
+   "event": "opencode-idle",
+   "payload": {
+    "session_id": "ses_decd3c736ffeEnYvATl6OoSMPY",
+    "cwd": "/home/user/work/t-api-error"
+   }
+  }
+ ]
+}

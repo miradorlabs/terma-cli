@@ -18,7 +18,7 @@
 // Dependency-free on purpose. OpenCode loads directory plugins without installing
 // anything for them, so this file uses only what Bun and Node ship.
 
-const CONFIG = {"version":1,"endpoint":"http://127.0.0.1:43180","headers":{"Authorization":"Bearer relay-token"},"signals":["traces","logs","metrics"],"includePrompts":true,"includeToolContent":true,"hookCommand":["terma","hook"]}
+const CONFIG = {"version":1,"endpoint":"http://127.0.0.1:43180","headers":{"Authorization":"Bearer relay-token"},"signals":["traces","logs","metrics"],"includePrompts":true,"includeToolContent":true,"hookCommand":["/usr/local/bin/terma","hook"]}
 
 import { createHash } from "node:crypto"
 import { existsSync, readFileSync } from "node:fs"
