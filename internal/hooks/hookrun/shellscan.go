@@ -83,7 +83,7 @@ func historicalEnv(name string) (string, bool) {
 	return "", false
 }
 func (sc *scan) isHistoricalUnknownVar(name string) bool {
-	if !sc.historical || !isName(name) || name == "_" || name == "PWD" || name == "OLDPWD" || name == "IFS" || name == "PATH" || name == "HOME" || (os.PathSeparator == '\\' && name == "USERPROFILE") {
+	if !sc.historical || !isName(name) || name == "_" || name == "PWD" || name == "OLDPWD" || name == "IFS" || name == "HOME" || (os.PathSeparator == '/' && name == "PATH") || (os.PathSeparator == '\\' && name == "USERPROFILE") {
 		return false
 	}
 	v, set := sc.vars[name]

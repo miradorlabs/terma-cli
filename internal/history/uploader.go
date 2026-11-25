@@ -8,12 +8,9 @@ import (
 	"slices"
 	"time"
 
-	"google.golang.org/protobuf/proto"
-
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 )
 
 // Options configures one Upload run.
@@ -122,7 +119,8 @@ func Upload(ctx context.Context, opts Options) (Summary, error) {
 	}
 
 	resolver := newCwdResolver(opts.State, opts.AuthURL, opts.ServerKey, opts.ServerKeyTeam, opts.ServerKeyAuthURL, now)
-	buckets, err := discoverAndPlan(ctx, opts, resolver, existingStates, resumableByRoute, resumableKeys, labelFor, cachedUserID, now, activeWindow, &sum)
+	reachCache := map[string]cachedCompanionReach{}
+	buckets, err := discoverAndPlan(ctx, opts, resolver, existingStates, resumableByRoute, resumableKeys, labelFor, cachedUserID, now, activeWindow, reachCache, &sum)
 	if err != nil {
 		return sum, err
 	}
@@ -140,7 +138,7 @@ func Upload(ctx context.Context, opts Options) (Summary, error) {
 			sum.Interrupted = true
 			return sum, err
 		}
-		if err := processRoute(ctx, opts, existingStates, buckets[eid], activeWindow, maxReqBytes, cachedUserID, nowFn, report, orgBlocked, &sum); err != nil {
+		if err := processRoute(ctx, opts, existingStates, buckets[eid], activeWindow, maxReqBytes, cachedUserID, nowFn, report, orgBlocked, reachCache, &sum); err != nil {
 			return sum, err
 		}
 	}
@@ -159,9 +157,24 @@ func discoverAndPlan(
 	userIDFor func(routing.Team, string) string,
 	now time.Time,
 	activeWindow time.Duration,
+	reachCache map[string]cachedCompanionReach,
 	sum *Summary,
 ) (map[string]*routeBucket, error) {
 	buckets := map[string]*routeBucket{}
+	addBucketPlan := func(eid string, team routing.Team, key string, f agents.HistoryFile, companions []agents.HistoryFile, missingParent string, src agents.HistorySource, recs int, bytes int64) {
+		b := buckets[eid]
+		if b == nil {
+			b = &routeBucket{team: team, label: labelFor(team), sessions: map[string]*routeSessionPlan{}}
+			buckets[eid] = b
+		}
+		sp := b.sessions[key]
+		if sp == nil {
+			sp = &routeSessionPlan{key: key, file: f, companions: companions, missingParent: missingParent, source: src}
+			b.sessions[key] = sp
+		}
+		sp.records += recs
+		sp.estimatedBytes += bytes
+	}
 	for _, src := range opts.Sources {
 		if err := ctx.Err(); err != nil {
 			sum.Interrupted = true
@@ -193,24 +206,21 @@ func discoverAndPlan(
 				sum.addSkippedSession(SkipOutsideSince, 1)
 				continue
 			}
-			var runSnap runs.Snapshot
-			var lookupSnap func(string) runs.Snapshot
-			getRunSnap := func() (runs.Snapshot, func(string) runs.Snapshot) {
-				if lookupSnap == nil {
-					runSnap, lookupSnap = newRunSnapLookup(opts.StateDir, f.SessionID)
-				}
-				return runSnap, lookupSnap
+			if f.CompanionReadError || slices.ContainsFunc(companions, func(c agents.HistoryFile) bool { return c.CompanionReadError }) {
+				sum.addSkippedSession(SkipUnreadable, 1)
+				continue
 			}
-			type planSeg struct {
-				seg        agents.HistorySegment
+			type segSummary struct {
 				target     RouteTarget
 				ok         bool
 				skipReason string
+				records    int
 			}
-			var planSegs []planSeg
+			var segSums []segSummary
 			var reachSegs []segReachInfo
 			isChild := f.ParentSessionID != ""
-			err := src.ReadHistory(ctx, f, agents.HistoryReadOptions{IncludeSupplemental: opts.DryRun}, func(seg agents.HistorySegment) error {
+			// Pass 1 never retains protobuf payloads in memory (even on --dry-run).
+			err := src.ReadHistory(ctx, f, agents.HistoryReadOptions{IncludeSupplemental: false}, func(seg agents.HistorySegment) error {
 				if err := ctx.Err(); err != nil {
 					return err
 				}
@@ -220,11 +230,9 @@ func discoverAndPlan(
 						cwd: seg.Cwd, subagent: isChild || seg.Subagent, reaches: seg.ToolReaches,
 						earliest: earliestSegmentTime(seg), target: target, ok: ok,
 					})
-				} else {
-					seg.NativeLogs, seg.SupplementalLogs, seg.ToolReaches = nil, nil, nil
 				}
 				if seg.RecordCount > 0 {
-					planSegs = append(planSegs, planSeg{seg: seg, target: target, ok: ok, skipReason: skipReason})
+					segSums = append(segSums, segSummary{target: target, ok: ok, skipReason: skipReason, records: seg.RecordCount})
 				}
 				return nil
 			})
@@ -240,22 +248,8 @@ func discoverAndPlan(
 				}
 				continue
 			}
-			var reachMixedAt time.Time
-			var hasReachMixed bool
-			if opts.DryRun {
-				if len(companions) > 0 || missingParent != "" {
-					compSegs, compCutoff, hasCompCutoff, cerr := collectCompanionReach(ctx, opts.StateDir, src, resolver, companions, missingParent)
-					if cerr != nil {
-						sum.Interrupted = true
-						return nil, cerr
-					}
-					reachSegs = append(reachSegs, compSegs...)
-					reachMixedAt, hasReachMixed = mergeMixedCutoff(reachMixedAt, hasReachMixed, compCutoff, hasCompCutoff)
-				}
-				rAt, hasR := sessionReachMixedAt(resolver, reachSegs)
-				reachMixedAt, hasReachMixed = mergeMixedCutoff(reachMixedAt, hasReachMixed, rAt, hasR)
-			}
-			for _, rs := range planSegs {
+			anyRouted := false
+			for _, rs := range segSums {
 				if !rs.ok {
 					if !f.OutsideSince {
 						sum.addSkippedSegment(rs.skipReason, 1)
@@ -266,45 +260,44 @@ func discoverAndPlan(
 				if f.OutsideSince && !resumableByRoute[eid][key] {
 					continue
 				}
-				recCount := rs.seg.RecordCount
-				var estBytes int64
-				st, hasState := existingStates[eid]
-				_, prevFailed := st.IsFailed(key)
-				alreadySettled := hasState && (st.IsDone(key) || prevFailed)
-				if !alreadySettled && opts.DryRun {
-					snap, lookup := getRunSnap()
-					var resumeMax time.Time
-					if prev, ok := st.InProgress[key]; ok && !prev.SourceModTime.IsZero() && f.ModTime.After(prev.SourceModTime) {
-						resumeMax = prev.SourceModTime
-					}
-					prepared, n, mixedDropped := prepareSegmentFiltered(rs.seg, opts.Filter, rs.target.Team.Policy, buildStampOptions(opts, rs.target, userIDFor), snap, lookup, reachMixedAt, hasReachMixed, resumeMax)
-					if n == 0 || prepared == nil {
-						if mixedDropped > 0 {
-							sum.addSkippedSegment(SkipMixed, 1)
-						} else {
-							sum.addSkippedSegment(SkipEmptyAfterFilter, 1)
-						}
-						continue
-					}
-					recCount = n
-					estBytes = int64(proto.Size(prepared))
+				anyRouted = true
+				if !opts.DryRun {
+					addBucketPlan(eid, rs.target.Team, key, f, companions, missingParent, src, rs.records, 0)
 				}
-				b := buckets[eid]
-				if b == nil {
-					b = &routeBucket{
-						team:     rs.target.Team,
-						label:    labelFor(rs.target.Team),
-						sessions: map[string]*routeSessionPlan{},
-					}
-					buckets[eid] = b
+			}
+			if !opts.DryRun || !anyRouted {
+				continue
+			}
+			var reachMixedAt time.Time
+			var hasReachMixed bool
+			if len(companions) > 0 || missingParent != "" {
+				compSegs, compCutoff, hasCompCutoff, cerr := collectCompanionReach(ctx, opts.StateDir, src, resolver, companions, missingParent, reachCache)
+				if cerr != nil {
+					sum.Interrupted = true
+					return nil, cerr
 				}
-				sp := b.sessions[key]
-				if sp == nil {
-					sp = &routeSessionPlan{key: key, file: f, companions: companions, missingParent: missingParent, source: src}
-					b.sessions[key] = sp
+				reachSegs = append(reachSegs, compSegs...)
+				reachMixedAt, hasReachMixed = mergeMixedCutoff(reachMixedAt, hasReachMixed, compCutoff, hasCompCutoff)
+			}
+			rAt, hasR := sessionReachMixedAt(resolver, reachSegs)
+			reachMixedAt, hasReachMixed = mergeMixedCutoff(reachMixedAt, hasReachMixed, rAt, hasR)
+
+			// Pass 2 (bounded memory) streams segments one at a time for dry-run estimates.
+			byRoute, merr := measureDryRunSession(ctx, opts, src, f, key, resolver, existingStates, resumableByRoute, reachMixedAt, hasReachMixed, userIDFor, sum)
+			if merr != nil {
+				if errors.Is(merr, context.Canceled) {
+					sum.Interrupted = true
+					return nil, merr
 				}
-				sp.records += recCount
-				sp.estimatedBytes += estBytes
+				if errors.Is(merr, fs.ErrNotExist) {
+					sum.addSkippedSession(SkipMissingFile, 1)
+				} else {
+					sum.addSkippedSession(SkipUnreadable, 1)
+				}
+				continue
+			}
+			for eid, est := range byRoute {
+				addBucketPlan(eid, est.team, key, f, companions, missingParent, src, est.records, est.bytes)
 			}
 		}
 	}
@@ -322,6 +315,7 @@ func processRoute(
 	nowFn func() time.Time,
 	report func(ProgressEvent),
 	orgBlocked map[string]string,
+	reachCache map[string]cachedCompanionReach,
 	sum *Summary,
 ) error {
 	eid := b.team.EnrollmentID
@@ -406,7 +400,7 @@ func processRoute(
 
 	// Re-send in_progress sessions FIRST and skip holdings check for them.
 	for i, sp := range resumeQueue {
-		stopRoute, retErr := uploadOneSession(ctx, opts, &st, b, sp, pacer, endpoint, serverKey, activeWindow, maxReqBytes, i+1, len(resumeQueue), len(candidateQueue), userIDFor, nowFn, report, sum, orgBlocked)
+		stopRoute, retErr := uploadOneSession(ctx, opts, &st, b, sp, pacer, endpoint, serverKey, activeWindow, maxReqBytes, i+1, len(resumeQueue), len(candidateQueue), userIDFor, nowFn, report, sum, orgBlocked, reachCache)
 		if retErr != nil {
 			return retErr
 		}
@@ -428,7 +422,7 @@ func processRoute(
 		return err
 	}
 	for i, sp := range uploadQueue {
-		stopRoute, retErr := uploadOneSession(ctx, opts, &st, b, sp, pacer, endpoint, serverKey, activeWindow, maxReqBytes, i+1, len(uploadQueue), 0, userIDFor, nowFn, report, sum, orgBlocked)
+		stopRoute, retErr := uploadOneSession(ctx, opts, &st, b, sp, pacer, endpoint, serverKey, activeWindow, maxReqBytes, i+1, len(uploadQueue), 0, userIDFor, nowFn, report, sum, orgBlocked, reachCache)
 		if retErr != nil {
 			return retErr
 		}

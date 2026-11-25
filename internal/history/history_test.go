@@ -1851,3 +1851,134 @@ func TestSpawnFamilyChildSiblingOrphanDeletedShellTargetGitDashCAndFetchedAtTick
 		}
 	}
 }
+
+func TestUnroutedMainWithSubagentsTimeScopedResumeApiRouteNoFalseMixedAndCompanionError(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	repoA := initTestGitRepo(t, "https://github.com/org-a/app.git")
+	repoB := initTestGitRepo(t, "https://github.com/org-b/other.git")
+	if err := os.WriteFile(filepath.Join(repoA, "secret-a.txt"), []byte("a"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repoA, "go.mod"), []byte("module x\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	scratch := t.TempDir()
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	day1 := now.Add(-48 * time.Hour)
+	day2 := now.Add(-24 * time.Hour)
+
+	// Org A and Org B active; NO Personal team selected.
+	st := routing.State{
+		StateID: "st-1", Generation: 1, ConsentGeneration: 1, Account: "acc1",
+		Teams: []routing.Team{
+			{
+				EnrollmentID: "enr-a", TeamID: "team-a", OrganizationID: "org-a", AuthURL: "https://auth.example.com",
+				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-a/app"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-a", TeamID: "team-a", AuthURL: "https://auth.example.com", FetchedAt: now},
+			},
+			{
+				EnrollmentID: "enr-b", TeamID: "team-b", OrganizationID: "org-b", AuthURL: "https://auth.example.com",
+				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-b/other"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-b", TeamID: "team-b", AuthURL: "https://auth.example.com", FetchedAt: now},
+			},
+		},
+		Bindings: map[string]routing.Binding{
+			"github.com/org-a/app":   {Organization: "org-a"},
+			"github.com/org-b/other": {Organization: "org-b"},
+		},
+	}
+
+	var mu sync.Mutex
+	byTeam := map[string][]string{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		byTeam[r.Header.Get("X-Mirador-Project")] = append(byTeam[r.Header.Get("X-Mirador-Project")], string(body))
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	// 1. Unrouted main in scratch reads Org A at T+1m then spawns subagent in Org B at T+2m -> subagent MUST DROP!
+	s1Main := makeNativeSegment("claude", "s-unrouted-main-sub", scratch, "MAIN_SCRATCH", day1)
+	s1Main.ToolReaches = []agents.HistoryToolReach{{At: day1.Add(time.Minute), Cwd: scratch, Paths: []string{filepath.Join(repoA, "secret-a.txt")}}}
+	s1Sub := makeNativeSegment("claude", "s-unrouted-main-sub", repoB, "UNROUTED_PARENT_SUB_B_LEAK", day1.Add(2*time.Minute))
+	s1Sub.Subagent = true
+
+	// 2. Unrouted main in scratch spawns sibling subagents in Org A (T+1m) and Org B (T+2m) -> Org B sibling MUST DROP!
+	s2Main := makeNativeSegment("claude", "s-sib-sub", scratch, "MAIN_SCRATCH", day1)
+	s2SubA := makeNativeSegment("claude", "s-sib-sub", repoA, "SIB_SUB_A_BEFORE_OK", day1.Add(time.Minute))
+	s2SubA.Subagent = true
+	s2SubB := makeNativeSegment("claude", "s-sib-sub", repoB, "SIB_SUB_B_CROSS_LEAK", day1.Add(2*time.Minute))
+	s2SubB.Subagent = true
+
+	// 3. Deleted main cwd spawns subagent in Org B -> fails closed, subagent MUST DROP!
+	s3Main := makeNativeSegment("claude", "s-del-main-sub", filepath.Join(t.TempDir(), "gone-repo"), "GONE", day1)
+	s3SubB := makeNativeSegment("claude", "s-del-main-sub", repoB, "DEL_MAIN_SUB_B_LEAK", day1.Add(time.Minute))
+	s3SubB.Subagent = true
+
+	// 4. Parent + child finish cleanly in Org A on Day 1; parent resumes cleanly in Org B on Day 2 -> BOTH upload!
+	s4MainA := makeNativeSegment("claude", "s-resumed-with-sub", repoA, "DAY1_MAIN_A_OK", day1)
+	s4SubA := makeNativeSegment("claude", "s-resumed-with-sub", repoA, "DAY1_SUB_A_OK", day1.Add(time.Minute))
+	s4SubA.Subagent = true
+	s4MainB := makeNativeSegment("claude", "s-resumed-with-sub", repoB, "DAY2_MAIN_B_OK", day2)
+
+	// 5. Common root-anchored route strings (`rg '/v1/logs' internal/`) and `grep 'go.mod/v2' docs.md` stay CLEAN!
+	s5Clean := makeNativeSegment("claude", "s-route-regex", repoA, "ROUTE_REGEX_CLEAN_OK", day1.Add(5*time.Minute))
+	s5Clean.ToolReaches = []agents.HistoryToolReach{
+		{At: day1.Add(time.Minute), Cwd: repoA, Paths: hookrun.Alone(hookrun.ShellPathsHistorical("rg '/v1/logs' internal/", repoA)...)},
+		{At: day1.Add(2 * time.Minute), Cwd: repoA, Paths: hookrun.Alone(hookrun.ShellPathsHistorical("grep 'go.mod/v2' docs.md", repoA)...)},
+	}
+
+	// 6. CompanionReadError fails closed as SkipUnreadable!
+	s6Err := makeNativeSegment("claude", "s-comp-err", repoA, "COMP_ERR_LEAK", day1)
+
+	src := &stubHistorySource{
+		source: "claude",
+		files: []agents.HistoryFile{
+			{SourceSystem: "claude", SessionID: "s-unrouted-main-sub", ModTime: day1},
+			{SourceSystem: "claude", SessionID: "s-sib-sub", ModTime: day1},
+			{SourceSystem: "claude", SessionID: "s-del-main-sub", ModTime: day1},
+			{SourceSystem: "claude", SessionID: "s-resumed-with-sub", ModTime: day2},
+			{SourceSystem: "claude", SessionID: "s-route-regex", ModTime: day1},
+			{SourceSystem: "claude", SessionID: "s-comp-err", ModTime: day1, CompanionReadError: true},
+		},
+		segments: map[string][]agents.HistorySegment{
+			"s-unrouted-main-sub": {s1Main, s1Sub},
+			"s-sib-sub":           {s2Main, s2SubA, s2SubB},
+			"s-del-main-sub":      {s3Main, s3SubB},
+			"s-resumed-with-sub":  {s4MainA, s4SubA, s4MainB},
+			"s-route-regex":       {s5Clean},
+			"s-comp-err":          {s6Err},
+		},
+	}
+
+	sum, err := Upload(context.Background(), Options{
+		StateDir: stateDir, Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
+		State: st, Sources: []agents.HistorySource{src}, Filter: relay.NewContentFilter(nil), Holdings: stubHoldings{},
+		Transport:   &Transport{Version: "test", HTTP: srv.Client(), SignIn: &fakeSignIn{account: "acc1", tokens: []string{"tok"}}, BytesPerSec: 1 << 30},
+		EndpointFor: func(string) string { return srv.URL },
+		Now:         func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotA := strings.Join(byTeam["team-a"], "\n")
+	gotB := strings.Join(byTeam["team-b"], "\n")
+	for _, want := range []string{"SIB_SUB_A_BEFORE_OK", "DAY1_MAIN_A_OK", "DAY1_SUB_A_OK", "ROUTE_REGEX_CLEAN_OK"} {
+		if !strings.Contains(gotA, want) {
+			t.Errorf("expected %q uploaded to team-a", want)
+		}
+	}
+	if !strings.Contains(gotB, "DAY2_MAIN_B_OK") {
+		t.Errorf("expected DAY2_MAIN_B_OK uploaded to team-b")
+	}
+	all := gotA + "\n" + gotB
+	for _, leak := range []string{"UNROUTED_PARENT_SUB_B_LEAK", "SIB_SUB_B_CROSS_LEAK", "DEL_MAIN_SUB_B_LEAK", "COMP_ERR_LEAK"} {
+		if strings.Contains(all, leak) {
+			t.Fatalf("leaked %q upstream!", leak)
+		}
+	}
+	if sum.SkippedSessions[SkipUnreadable] != 1 {
+		t.Errorf("expected 1 unreadable skip for CompanionReadError, got %+v", sum.SkippedSessions)
+	}
+}

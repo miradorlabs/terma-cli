@@ -57,14 +57,14 @@ func (sc *scan) candidatePath(t string, r role, fallback bool) {
 				}
 			} else if (r == creates || slashed && (r == plain || r == folder || r == slashedOnly)) && !res.named {
 				if p, ok := sc.path(t, d); ok {
-					if rPath, parent, _, found := sc.walkPath(p, true); !found && !sc.unknown {
-						if sc.historical {
-							if rPath != "" && (!fallback || filepath.Dir(rPath) == parent && strings.ContainsAny(strings.TrimRight(t, `/\`), `/\`)) {
-								sc.place(rPath)
-							} else if rPath == "" && !fallback {
-								sc.fail()
-							}
-						} else if parent != "" && (!fallback || filepath.Dir(rPath) == parent && strings.ContainsAny(strings.TrimRight(t, `/\`), `/\`)) {
+					if rPath, parent, _, found := sc.walkPath(p, true); !found && !sc.unknown && parent != "" && (!fallback || filepath.Dir(rPath) == parent && strings.ContainsAny(strings.TrimRight(t, `/\`), `/\`)) {
+						// In historical mode, preserve the missing path when its nearest
+						// existing ancestor is a non-root directory (e.g. /work/deleted-b/notes
+						// instead of /work), while letting root-anchored non-path strings like
+						// /v1/logs resolve via parent "/" like live hooks.
+						if sc.historical && rPath != "" && parent != filepath.Dir(parent) {
+							sc.place(rPath)
+						} else {
 							sc.place(parent)
 						}
 					}

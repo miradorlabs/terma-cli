@@ -382,6 +382,40 @@ func TestClaudeBranchSwitchFlushesAndLongSingleCwdIsBounded(t *testing.T) {
 	}
 }
 
+func TestClaudeUnreadableSubagentsDirSetsCompanionReadError(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses directory mode 0000")
+	}
+	cfgDir := t.TempDir()
+	t.Setenv("CLAUDE_CONFIG_DIR", cfgDir)
+	projDir := filepath.Join(cfgDir, "projects", "-work-repo-a")
+	sid := "22222222-3333-4444-5555-666666666666"
+	subDir := filepath.Join(projDir, sid, "subagents")
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mainPath := filepath.Join(projDir, sid+".jsonl")
+	if err := os.WriteFile(mainPath, []byte(`{"type":"user","cwd":"/work/repo-a","message":{"role":"user","content":"hi"}}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-3 * time.Hour)
+	if err := os.Chtimes(mainPath, old, old); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(subDir, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(subDir, 0o755) })
+
+	files, err := (Agent{}).DiscoverHistory(context.Background(), agents.HistoryDiscoverOptions{Now: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || !files[0].CompanionReadError {
+		t.Fatalf("expected CompanionReadError=true for unreadable subagents dir, got %+v", files)
+	}
+}
+
 func kvStr(attrs []*commonpb.KeyValue, key string) string {
 	for _, kv := range attrs {
 		if kv.GetKey() == key {

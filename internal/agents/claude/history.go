@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -86,7 +87,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 			stem := strings.TrimSuffix(ent.Name(), ".jsonl")
 			modTime := info.ModTime()
 			subDir := filepath.Join(projPath, stem, "subagents")
-			extras, extraMod := findClaudeSubagents(subDir)
+			extras, extraMod, subErr := findClaudeSubagents(subDir)
 			if extraMod.After(modTime) {
 				modTime = extraMod
 			}
@@ -102,14 +103,15 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 				continue
 			}
 			hf := agents.HistoryFile{
-				SourceSystem: claudeSourceSystem,
-				SessionID:    sid,
-				Path:         mainPath,
-				ExtraPaths:   extras,
-				WatchDirs:    []string{subDir},
-				ModTime:      modTime,
-				Active:       active,
-				OutsideSince: outside,
+				SourceSystem:       claudeSourceSystem,
+				SessionID:          sid,
+				Path:               mainPath,
+				ExtraPaths:         extras,
+				WatchDirs:          []string{subDir},
+				ModTime:            modTime,
+				Active:             active,
+				OutsideSince:       outside,
+				CompanionReadError: subErr,
 			}
 			if prev, exists := bySession[sid]; !exists || hf.ModTime.After(prev.ModTime) {
 				bySession[sid] = hf
@@ -128,20 +130,34 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 }
 
 // findClaudeSubagents lists regular .jsonl files in a session's subagents directory and
-// returns them sorted along with their latest modification time.
-func findClaudeSubagents(dir string) ([]string, time.Time) {
+// returns them sorted, their latest modification time, and whether reading failed with a
+// non-ErrNotExist error (so callers fail closed instead of treating unreadable children as absent).
+func findClaudeSubagents(dir string) ([]string, time.Time, bool) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, time.Time{}
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, time.Time{}, false
+		}
+		return nil, time.Time{}, true
 	}
 	var paths []string
 	var latest time.Time
+	readErr := false
 	for _, ent := range entries {
-		if ent.IsDir() || ent.Type()&os.ModeSymlink != 0 || !strings.HasSuffix(ent.Name(), ".jsonl") {
+		if ent.IsDir() || !strings.HasSuffix(ent.Name(), ".jsonl") {
+			continue
+		}
+		if ent.Type()&os.ModeSymlink != 0 {
 			continue
 		}
 		info, err := ent.Info()
-		if err != nil || !info.Mode().IsRegular() {
+		if err != nil {
+			if !errors.Is(err, fs.ErrNotExist) {
+				readErr = true
+			}
+			continue
+		}
+		if !info.Mode().IsRegular() {
 			continue
 		}
 		paths = append(paths, filepath.Join(dir, ent.Name()))
@@ -150,7 +166,7 @@ func findClaudeSubagents(dir string) ([]string, time.Time) {
 		}
 	}
 	slices.Sort(paths)
-	return paths, latest
+	return paths, latest, readErr
 }
 
 // peekClaudeSessionID scans the leading lines of a Claude Code transcript for its recorded

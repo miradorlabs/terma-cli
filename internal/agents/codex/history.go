@@ -46,9 +46,13 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 	}
 
 	bySession := map[string]agents.HistoryFile{}
+	anyUnreadable := false
 	for _, sub := range []string{"sessions", "archived_sessions"} {
 		dir := filepath.Join(home, sub)
-		if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
+		if _, err := os.Stat(dir); err != nil {
+			if !errors.Is(err, fs.ErrNotExist) {
+				anyUnreadable = true
+			}
 			continue
 		}
 		err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, walkErr error) error {
@@ -56,6 +60,9 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 				return err
 			}
 			if walkErr != nil {
+				if !errors.Is(walkErr, fs.ErrNotExist) {
+					anyUnreadable = true
+				}
 				return nil
 			}
 			if d.Type()&os.ModeSymlink != 0 {
@@ -72,14 +79,23 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 				return nil
 			}
 			info, err := d.Info()
-			if err != nil || !info.Mode().IsRegular() {
+			if err != nil {
+				if !errors.Is(err, fs.ErrNotExist) {
+					anyUnreadable = true
+				}
+				return nil
+			}
+			if !info.Mode().IsRegular() {
 				return nil
 			}
 			modTime := info.ModTime()
 			active := now.Sub(modTime) < activeWindow
 			outside := !opts.Since.IsZero() && modTime.Before(opts.Since)
 			sid := codexSessionIDFromFilename(base)
-			metaID, parentID := peekCodexRolloutMeta(path)
+			metaID, parentID, unreadable := peekCodexRolloutMeta(path)
+			if unreadable {
+				anyUnreadable = true
+			}
 			if metaID != "" {
 				sid = metaID
 			}
@@ -107,6 +123,9 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 
 	out := make([]agents.HistoryFile, 0, len(bySession))
 	for _, hf := range bySession {
+		if anyUnreadable {
+			hf.CompanionReadError = true
+		}
 		out = append(out, hf)
 	}
 	slices.SortFunc(out, func(a, b agents.HistoryFile) int {
@@ -127,11 +146,12 @@ func codexSessionIDFromFilename(base string) string {
 }
 
 // peekCodexRolloutMeta reads the rollout's first lines for session_meta's session id and
-// optional spawned subagent parent_thread_id.
-func peekCodexRolloutMeta(path string) (sessionID, parentID string) {
+// optional spawned subagent parent_thread_id. unreadable is true when opening or reading
+// fails with a non-ErrNotExist error so family privacy checks fail closed.
+func peekCodexRolloutMeta(path string) (sessionID, parentID string, unreadable bool) {
 	f, err := os.Open(path)
 	if err != nil {
-		return "", ""
+		return "", "", !errors.Is(err, fs.ErrNotExist)
 	}
 	defer func() { _ = f.Close() }()
 	br := bufio.NewReader(f)
@@ -163,14 +183,17 @@ func peekCodexRolloutMeta(path string) (sessionID, parentID string) {
 						parentID = sub.ThreadSpawn.ParentThreadID
 					}
 				}
-				return sessionID, parentID
+				return sessionID, parentID, false
 			}
 		}
 		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				return "", "", true
+			}
 			break
 		}
 	}
-	return "", ""
+	return "", "", false
 }
 
 // ReadHistory converts a Codex rollout file into contiguous OTLP log segments grouped by
@@ -228,6 +251,28 @@ func codexNormalizeCwd(raw, fallback string) string {
 	return s
 }
 
+func isPOSIXShell(exe string) bool {
+	base := strings.ToLower(strings.TrimSuffix(filepath.Base(exe), ".exe"))
+	switch base {
+	case "sh", "bash", "zsh", "dash", "ksh", "ash", "fish", "su":
+		return true
+	}
+	return false
+}
+
+func shellQuoteArgv(argv []string) string {
+	var b strings.Builder
+	for i, arg := range argv {
+		if i > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteByte('\'')
+		b.WriteString(strings.ReplaceAll(arg, "'", `'\''`))
+		b.WriteByte('\'')
+	}
+	return b.String()
+}
+
 func codexCommandReachPaths(cmd []string, itemCwd, sessionCwd string) []string {
 	dir := codexNormalizeCwd(itemCwd, sessionCwd)
 	var out []string
@@ -237,11 +282,17 @@ func codexCommandReachPaths(cmd []string, itemCwd, sessionCwd string) []string {
 	if len(cmd) == 0 {
 		return out
 	}
-	shellCmd := strings.Join(cmd, " ")
-	if len(cmd) >= 3 && (cmd[1] == "-c" || cmd[1] == "-lc" || cmd[1] == "-cl") {
-		shellCmd = cmd[2]
+	// Unwrap -c/-lc/-cl ONLY for recognized POSIX shells so non-shell commands like
+	// ["head", "-c", "80", "/work/B/notes"] keep all arguments, and shell-quote direct
+	// argv tokens so literal arguments like "$foo" or spaces preserve argv boundaries.
+	if len(cmd) >= 3 && isPOSIXShell(cmd[0]) && (cmd[1] == "-c" || cmd[1] == "-lc" || cmd[1] == "-cl") {
+		out = append(out, hookrun.Alone(hookrun.ShellPathsHistorical(cmd[2], dir)...)...)
+		if len(cmd) > 3 {
+			out = append(out, hookrun.Alone(hookrun.ShellPathsHistorical(shellQuoteArgv(append([]string{"_"}, cmd[3:]...)), dir)...)...)
+		}
+		return out
 	}
-	return append(out, hookrun.Alone(hookrun.ShellPathsHistorical(shellCmd, dir)...)...)
+	return append(out, hookrun.Alone(hookrun.ShellPathsHistorical(shellQuoteArgv(cmd), dir)...)...)
 }
 
 func codexToolReachPaths(name, args, cwd string) []string {

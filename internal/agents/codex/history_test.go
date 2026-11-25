@@ -482,6 +482,27 @@ func TestCodexLegacyShellArgvPatchWrapperSubagentParentAndBareReach(t *testing.T
 	if !sawB || !sawC || !sawD || !sawUnknown {
 		t.Errorf("missing expected reaches: sawB=%v sawC=%v sawD=%v sawUnknown=%v reaches=%+v", sawB, sawC, sawD, sawUnknown, segs[0].ToolReaches)
 	}
+
+	// Non-shell argv with -c (head -c 80 <workDir>/B/notes) must keep all args; direct argv
+	// containing literal $foo must stay shell-quoted and NOT trigger UnknownReach.
+	workDir := t.TempDir()
+	notesB := filepath.Join(workDir, "B", "notes")
+	headReach := codexCommandReachPaths([]string{"head", "-c", "80", notesB}, "/work/repo-a", "/work/repo-a")
+	sawHeadB := false
+	for _, p := range headReach {
+		if strings.Contains(p, notesB) {
+			sawHeadB = true
+		}
+	}
+	if !sawHeadB {
+		t.Errorf("head -c 80 %s lost target argument: %+v", notesB, headReach)
+	}
+	rgReach := codexCommandReachPaths([]string{"rg", "$foo", "main.go"}, "/work/repo-a", "/work/repo-a")
+	for _, p := range rgReach {
+		if strings.Contains(p, "\x00unknown") {
+			t.Errorf("direct argv rg $foo falsely triggered UnknownReach: %+v", rgReach)
+		}
+	}
 }
 
 func cxStr(attrs []*commonpb.KeyValue, key string) string {

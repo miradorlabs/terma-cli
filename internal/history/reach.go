@@ -1,9 +1,10 @@
 package history
 
 import (
+	"cmp"
 	"context"
 	"errors"
-	"os"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"time"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/routing"
@@ -44,6 +44,12 @@ func mergeMixedCutoff(cur time.Time, hasCur bool, at time.Time, hasAt bool) (tim
 	return cur, true
 }
 
+type cachedCompanionReach struct {
+	segs         []segReachInfo
+	ledgerCutoff time.Time
+	hasCutoff    bool
+}
+
 func collectCompanionReach(
 	ctx context.Context,
 	stateDir string,
@@ -51,6 +57,7 @@ func collectCompanionReach(
 	resolver *cwdResolver,
 	companions []agents.HistoryFile,
 	missingParent string,
+	cache map[string]cachedCompanionReach,
 ) ([]segReachInfo, time.Time, bool, error) {
 	var out []segReachInfo
 	var ledgerCutoff time.Time
@@ -62,17 +69,32 @@ func collectCompanionReach(
 		// spawned child whose parent may have crossed organizations before spawning it.
 		ledgerCutoff, hasLedgerCutoff = time.Time{}, true
 	}
+	stateKey := ""
+	if resolver != nil {
+		stateKey = fmt.Sprintf("%s:%d:%d", resolver.state.StateID, resolver.state.Generation, resolver.state.ConsentGeneration)
+	}
 	for _, comp := range companions {
 		if err := ctx.Err(); err != nil {
 			return nil, time.Time{}, false, err
 		}
+		cacheKey := fmt.Sprintf("%s\x00%s\x00%s\x00%s\x00%d", stateKey, comp.SourceSystem, comp.SessionID, comp.Path, comp.ModTime.UnixNano())
+		if cache != nil {
+			if hit, ok := cache[cacheKey]; ok {
+				out = append(out, hit.segs...)
+				ledgerCutoff, hasLedgerCutoff = mergeMixedCutoff(ledgerCutoff, hasLedgerCutoff, hit.ledgerCutoff, hit.hasCutoff)
+				continue
+			}
+		}
+		var compSegs []segReachInfo
+		var compCutoff time.Time
+		hasCompCutoff := false
 		if mAt, mixed := runs.Read(stateDir, comp.SessionID).MixedInterval(farPast, farFuture); mixed {
-			ledgerCutoff, hasLedgerCutoff = mergeMixedCutoff(ledgerCutoff, hasLedgerCutoff, mAt, true)
+			compCutoff, hasCompCutoff = mergeMixedCutoff(compCutoff, hasCompCutoff, mAt, true)
 		}
 		isChild := comp.ParentSessionID != ""
 		err := src.ReadHistory(ctx, comp, agents.HistoryReadOptions{IncludeSupplemental: false}, func(seg agents.HistorySegment) error {
 			target, ok, _ := resolver.resolve(ctx, seg.Cwd, seg.FallbackRepoURL, seg.FallbackBranch)
-			out = append(out, segReachInfo{
+			compSegs = append(compSegs, segReachInfo{
 				cwd:      seg.Cwd,
 				subagent: isChild || seg.Subagent,
 				reaches:  seg.ToolReaches,
@@ -87,8 +109,13 @@ func collectCompanionReach(
 				return nil, time.Time{}, false, err
 			}
 			// Fail closed when any transcript in the spawn family cannot be read.
-			ledgerCutoff, hasLedgerCutoff = time.Time{}, true
+			compCutoff, hasCompCutoff = time.Time{}, true
 		}
+		if cache != nil {
+			cache[cacheKey] = cachedCompanionReach{segs: compSegs, ledgerCutoff: compCutoff, hasCutoff: hasCompCutoff}
+		}
+		out = append(out, compSegs...)
+		ledgerCutoff, hasLedgerCutoff = mergeMixedCutoff(ledgerCutoff, hasLedgerCutoff, compCutoff, hasCompCutoff)
 	}
 	return out, ledgerCutoff, hasLedgerCutoff, nil
 }
@@ -132,32 +159,108 @@ func sessionReachMixedAt(resolver *cwdResolver, segs []segReachInfo) (time.Time,
 		return a.pending || b.pending || a.org != b.org
 	}
 
-	// Collect known organizations across main segments (including blocked/bound-not-collected
-	// checkouts) so subagents and unrouted segments compare against them.
-	var mainClasses []orgClass
+	type timedOrg struct {
+		at  time.Time
+		org orgClass
+	}
+	var mainTimed, subTimed []timedOrg
+	var unknownMainAt time.Time
+	hasUnknownMain, hasSubagent := false, false
 	for _, rs := range segs {
-		if !rs.subagent {
+		if rs.subagent {
+			hasSubagent = true
 			if oc := orgOf(rs.target.Location); oc.ok {
-				mainClasses = append(mainClasses, oc)
+				subTimed = append(subTimed, timedOrg{at: rs.earliest, org: oc})
+			}
+			continue
+		}
+		if rs.target.Location.Kind == "" {
+			if rs.cwd != "" {
+				unknownMainAt, hasUnknownMain = mergeMixedCutoff(unknownMainAt, hasUnknownMain, rs.earliest, true)
+			}
+			continue
+		}
+		if oc := orgOf(rs.target.Location); oc.ok {
+			mainTimed = append(mainTimed, timedOrg{at: rs.earliest, org: oc})
+		}
+	}
+	slices.SortStableFunc(mainTimed, func(a, b timedOrg) int { return a.at.Compare(b.at) })
+
+	// mainInForceAt returns the main-segment organization(s) active at timestamp at (the
+	// latest main segment with m.at <= at, falling back to the earliest main segment).
+	// Comparing subagents only against the main placement in force when they ran avoids
+	// false Mixed marks when a parent finishes in org A and later resumes in org B.
+	mainInForceAt := func(at time.Time) []orgClass {
+		if len(mainTimed) == 0 {
+			return nil
+		}
+		if at.IsZero() {
+			out := make([]orgClass, len(mainTimed))
+			for i, m := range mainTimed {
+				out[i] = m.org
+			}
+			return out
+		}
+		chosen := mainTimed[0].at
+		for _, m := range mainTimed {
+			if !m.at.After(at) {
+				chosen = m.at
+			} else {
+				break
 			}
 		}
+		var out []orgClass
+		for _, m := range mainTimed {
+			if m.at.Equal(chosen) {
+				out = append(out, m.org)
+			}
+		}
+		return out
+	}
+
+	// If a main segment had an unresolvable cwd (deleted repo or origin mismatch) while
+	// subagents exist, fail closed because the parent's organization is unknown.
+	if hasUnknownMain && hasSubagent {
+		mark(unknownMainAt)
 	}
 	for _, rs := range segs {
 		if !rs.subagent {
 			continue
 		}
 		if rs.target.Location.Kind == "" {
-			if rs.cwd != "" && len(mainClasses) > 0 {
+			if rs.cwd != "" && (len(mainTimed) > 0 || len(subTimed) > 0) {
 				mark(rs.earliest)
 			}
 			continue
 		}
 		subClass := orgOf(rs.target.Location)
-		for _, mc := range mainClasses {
+		for _, mc := range mainInForceAt(rs.earliest) {
 			if crosses(mc, subClass) {
 				mark(rs.earliest)
 				break
 			}
+		}
+	}
+	// Sibling subagents running under the same main placement (including when the main
+	// session has no resolved org, e.g. OutsideGit with no Personal team) must not span
+	// different organizations.
+	for i := range subTimed {
+		mi := mainInForceAt(subTimed[i].at)
+		for j := i + 1; j < len(subTimed); j++ {
+			if !crosses(subTimed[i].org, subTimed[j].org) {
+				continue
+			}
+			mj := mainInForceAt(subTimed[j].at)
+			if len(mi) > 0 && len(mj) > 0 && !slices.Equal(mi, mj) {
+				continue
+			}
+			at := subTimed[j].at
+			if subTimed[i].at.IsZero() || subTimed[j].at.IsZero() {
+				at = time.Time{}
+			} else if subTimed[i].at.After(at) {
+				at = subTimed[i].at
+			}
+			mark(at)
 		}
 	}
 
@@ -174,30 +277,40 @@ func sessionReachMixedAt(resolver *cwdResolver, segs []segReachInfo) (time.Time,
 		return res
 	}
 
+	allSubOrgs := make([]orgClass, len(subTimed))
+	for i, s := range subTimed {
+		allSubOrgs[i] = s.org
+	}
 	for _, rs := range segs {
 		if len(rs.reaches) == 0 {
 			continue
 		}
 		segOrg := orgOf(rs.target.Location)
-		var bases []orgClass
-		if rs.subagent {
-			bases = mainClasses
-			if segOrg.ok {
-				bases = append(slices.Clone(mainClasses), segOrg)
-			}
-		} else if segOrg.ok {
-			bases = []orgClass{segOrg}
-		} else {
-			// Unrouted main segment (e.g. OutsideGit without Personal, or missing_cwd):
-			// compare its tool reaches against every known main org in the session.
-			bases = mainClasses
-		}
-		if len(bases) == 0 {
-			continue
-		}
-		baseRoot := rs.target.Checkout.Root
+		baseRoot := cmp.Or(rs.target.Checkout.Root, rs.target.Checkout.Cwd)
 		for _, tr := range rs.reaches {
 			if found && !earliest.IsZero() && !tr.At.IsZero() && !tr.At.Before(earliest) {
+				continue
+			}
+			var bases []orgClass
+			switch {
+			case rs.subagent:
+				inForce := mainInForceAt(cmp.Or(tr.At, rs.earliest))
+				bases = append(bases, inForce...)
+				if segOrg.ok {
+					bases = append(bases, segOrg)
+				}
+				if len(inForce) == 0 {
+					bases = append(bases, allSubOrgs...)
+				}
+			case segOrg.ok:
+				bases = []orgClass{segOrg}
+			default:
+				// Unrouted main segment (e.g. OutsideGit without Personal, or missing_cwd):
+				// compare its tool reaches against the active main org and all subagent orgs.
+				bases = append(bases, mainInForceAt(cmp.Or(tr.At, rs.earliest))...)
+				bases = append(bases, allSubOrgs...)
+			}
+			if len(bases) == 0 {
 				continue
 			}
 			expanded, unknown := hookrun.ExpandReachHistorical(tr.Paths, tr.Cwd)
@@ -247,55 +360,6 @@ func sessionReachMixedAt(resolver *cwdResolver, segs []segReachInfo) (time.Time,
 		}
 	}
 	return earliest, found
-}
-
-// classifyReachedPath classifies a reached path without spawning git subprocesses.
-// Uses gitx.LocateFS so deleted subdirectories inside an existing checkout still resolve
-// to their enclosing repository, while missing paths outside baseRoot and outside
-// nobody's directories fail closed (unknown=true) even when no Personal team is selected.
-func classifyReachedPath(cand, baseRoot string) reachedClass {
-	info, statErr := os.Stat(cand)
-	if statErr == nil {
-		dir := cand
-		if !info.IsDir() {
-			dir = filepath.Dir(cand)
-		}
-		if _, gitDir, ok := gitx.LocateFS(dir); ok && gitDir != "" {
-			if origin, _ := gitx.OriginFS(gitDir); routing.Owner(origin) != "" {
-				return reachedClass{loc: routing.Location{Kind: routing.Repository, Repository: origin}}
-			}
-		}
-		if hookrun.IsNobodyDir(dir) {
-			return reachedClass{nobody: true}
-		}
-		return reachedClass{loc: routing.Location{Kind: routing.OutsideGit}}
-	}
-	// Path no longer exists on disk: walk ancestors via gitx.LocateFS first so a deleted
-	// subdirectory inside the segment's own repository (e.g. build/dist or removed pkg)
-	// never falsely triggers Mixed, and a deleted path inside another existing repo still
-	// resolves to that repo.
-	if root, gitDir, ok := gitx.LocateFS(cand); ok && gitDir != "" {
-		if baseRoot != "" && sameCleanPath(root, baseRoot) {
-			return reachedClass{nobody: true}
-		}
-		if origin, _ := gitx.OriginFS(gitDir); routing.Owner(origin) != "" {
-			return reachedClass{loc: routing.Location{Kind: routing.Repository, Repository: origin}}
-		}
-	}
-	if hookrun.IsNobodyDir(cand) || hookrun.IsNobodyDir(filepath.Dir(cand)) {
-		return reachedClass{nobody: true}
-	}
-	return reachedClass{unknown: true}
-}
-
-func sameCleanPath(a, b string) bool {
-	ca, cb := filepath.Clean(a), filepath.Clean(b)
-	if ca == cb {
-		return true
-	}
-	ra, ea := filepath.EvalSymlinks(ca)
-	rb, eb := filepath.EvalSymlinks(cb)
-	return ea == nil && eb == nil && ra == rb
 }
 
 func earliestSegmentTime(seg agents.HistorySegment) time.Time {

@@ -36,6 +36,7 @@ func uploadOneSession(
 	report func(ProgressEvent),
 	sum *Summary,
 	orgBlocked map[string]string,
+	reachCache map[string]cachedCompanionReach,
 ) (stopRoute bool, fatalErr error) {
 	if err := ctx.Err(); err != nil {
 		sum.Interrupted = true
@@ -108,7 +109,7 @@ func uploadOneSession(
 	var reachMixedAt time.Time
 	var hasReachMixed bool
 	if len(sp.companions) > 0 || sp.missingParent != "" {
-		compSegs, compCutoff, hasCompCutoff, cerr := collectCompanionReach(ctx, opts.StateDir, sp.source, sessionResolver, sp.companions, sp.missingParent)
+		compSegs, compCutoff, hasCompCutoff, cerr := collectCompanionReach(ctx, opts.StateDir, sp.source, sessionResolver, sp.companions, sp.missingParent, reachCache)
 		if cerr != nil {
 			sum.Interrupted = true
 			return true, cerr
