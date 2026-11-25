@@ -96,15 +96,18 @@ type TeamIssue struct {
 
 // Summary is the complete structured outcome of one Upload run.
 type Summary struct {
-	DryRun          bool            `json:"dry_run,omitempty"`
-	Interrupted     bool            `json:"interrupted,omitempty"`
-	DiscoveredFiles int             `json:"discovered_files"`
-	SentSessions    int             `json:"sent_sessions"`
-	SentRecords     int             `json:"sent_records"`
-	SentBytes       int64           `json:"sent_bytes"`
-	Planned         []RoutePlan     `json:"planned,omitempty"`
-	SkippedSessions map[string]int  `json:"skipped_sessions,omitempty"`
-	SkippedSegments map[string]int  `json:"skipped_segments,omitempty"`
+	DryRun          bool           `json:"dry_run,omitempty"`
+	Interrupted     bool           `json:"interrupted,omitempty"`
+	DiscoveredFiles int            `json:"discovered_files"`
+	SentSessions    int            `json:"sent_sessions"`
+	SentRecords     int            `json:"sent_records"`
+	SentBytes       int64          `json:"sent_bytes"`
+	Planned         []RoutePlan    `json:"planned,omitempty"`
+	SkippedSessions map[string]int `json:"skipped_sessions,omitempty"`
+	SkippedSegments map[string]int `json:"skipped_segments,omitempty"`
+	// WithheldRecords counts records not sent (or, in a dry run, not planned) because they
+	// fall at or after their session's Mixed cutoff, including in sessions partly sent.
+	WithheldRecords int             `json:"withheld_records,omitempty"`
 	Failed          []FailedSession `json:"failed,omitempty"`
 	TeamIssues      []TeamIssue     `json:"team_issues,omitempty"`
 	// Unreadable names up to three transcripts or directories discovery could not read;

@@ -572,6 +572,31 @@ func TestCodexArgvRendersAsShellCommandAndRelativeCwdJoins(t *testing.T) {
 	}
 }
 
+// A code-mode script's image read appears only as an ImageView item, so its path is a reach.
+func TestCodexImageViewIsAReach(t *testing.T) {
+	var reached []string
+	p := newCodexHistoryParser("019d2b54-7a10-7000-8000-000000000301", false, func(seg agents.HistorySegment) error {
+		for _, tr := range seg.ToolReaches {
+			reached = append(reached, tr.Paths...)
+		}
+		return nil
+	})
+	for _, line := range []string{
+		`{"timestamp":"2026-10-03T10:00:00Z","type":"session_meta","payload":{"id":"019d2b54-7a10-7000-8000-000000000301","cwd":"/work/repo-a"}}`,
+		`{"timestamp":"2026-10-03T10:00:02Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"ImageView","id":"iv-1","path":"file:///work/repo-b/design.png"}}}`,
+	} {
+		if err := p.handleLine([]byte(line), 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := p.finish(); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(reached, func(r string) bool { return strings.HasSuffix(r, filepath.FromSlash("/work/repo-b/design.png")) }) {
+		t.Errorf("ImageView path not recorded as a reach: %q", reached)
+	}
+}
+
 func TestCodexUntimedPromptStaysUntimed(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("CODEX_HOME", home)

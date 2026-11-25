@@ -316,6 +316,7 @@ func measureDryRunSession(
 			resumeMax = prev.SourceModTime
 		}
 		prepared, n, mixedDropped := prepareSegmentFiltered(seg, opts.Filter, target.Team.Policy, buildStampOptions(opts, target, userIDFor), snap, lookup, reachMixedAt, hasReachMixed, resumeMax)
+		sum.WithheldRecords += mixedDropped
 		if n == 0 || prepared == nil {
 			if mixedDropped > 0 {
 				sum.addSkippedSegment(SkipMixed, 1)
@@ -382,7 +383,9 @@ func classifyReachedPath(cand, baseRoot string) reachedClass {
 			return reachedClass{loc: routing.Location{Kind: routing.Repository, Repository: origin}}
 		}
 	}
-	if hookrun.IsNobodyDir(cand) || hookrun.IsNobodyDir(filepath.Dir(cand)) {
+	// IsNobodyDir goes by name, so it covers a missing path under /tmp or /etc. The parent
+	// is not asked: the parent of a deleted top-level directory is "/", which is nobody's.
+	if hookrun.IsNobodyDir(cand) {
 		return reachedClass{nobody: true}
 	}
 	return reachedClass{unknown: true}

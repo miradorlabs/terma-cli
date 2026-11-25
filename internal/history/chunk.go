@@ -322,23 +322,3 @@ func (w *ChunkWriter) Flush() error {
 	w.estBytes = 0
 	return w.onChunk(ch)
 }
-
-// ChunkLogs marshals prepared OTLP log batches into one or more protobuf request bodies,
-// each strictly at most maxBytes bytes. If a single log record cannot fit within maxBytes
-// it returns a *PermanentError so the session is recorded as failed rather than sent oversized.
-func ChunkLogs(batches []*logspb.LogsData, maxBytes int) ([]Chunk, error) {
-	var chunks []Chunk
-	w := NewChunkWriter(maxBytes, func(ch Chunk) error {
-		chunks = append(chunks, ch)
-		return nil
-	})
-	for _, batch := range batches {
-		if err := w.Add(batch); err != nil {
-			return nil, err
-		}
-	}
-	if err := w.Flush(); err != nil {
-		return nil, err
-	}
-	return chunks, nil
-}

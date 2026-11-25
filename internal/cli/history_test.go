@@ -258,6 +258,17 @@ func TestHistoryUploadFailsClosedWithoutRoutingState(t *testing.T) {
 	}
 }
 
+// git answers for GIT_DIR's repository whatever folder is asked about, so history upload
+// refuses to route sessions while it is set.
+func TestHistoryUploadRefusesGitRepositoryOverride(t *testing.T) {
+	useDirs(t, t.TempDir(), t.TempDir())
+	t.Setenv("GIT_DIR", filepath.Join(t.TempDir(), ".git"))
+	_, _, err := termaRun{}.exec(t, "history", "upload", "--dry-run")
+	if err == nil || !strings.Contains(err.Error(), "GIT_DIR is set") {
+		t.Fatalf("expected a refusal naming GIT_DIR, got: %v", err)
+	}
+}
+
 func TestHistoryUploadExitsNonZeroOnHoldingsFailure(t *testing.T) {
 	cfgDir := t.TempDir()
 	stateDir := t.TempDir()
@@ -331,9 +342,11 @@ func TestRenderHistorySummaryNamesUnreadablePaths(t *testing.T) {
 	var b strings.Builder
 	renderHistorySummary(&b, history.Summary{
 		SkippedSessions: map[string]int{history.SkipUnreadable: 4},
+		WithheldRecords: 7,
 		Unreadable:      []string{"/home/u/.codex/sessions/2026/rollout-x.jsonl", "/home/u/.claude/projects/p/s/subagents"},
 	})
 	want := "Could not read: /home/u/.codex/sessions/2026/rollout-x.jsonl, /home/u/.claude/projects/p/s/subagents (sessions that may depend on them were skipped)\n"
+	want = "Withheld after a Mixed cutoff: 7 record(s)\n" + want
 	if !strings.Contains(b.String(), "Skipped sessions: unreadable=4\n"+want) {
 		t.Errorf("summary output:\n%s\nwant it to contain:\n%s", b.String(), want)
 	}

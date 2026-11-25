@@ -243,6 +243,9 @@ func familyMixedAt(resolver *cwdResolver, segs []segReachInfo, subagents bool) (
 		return res
 	}
 	for _, rs := range segs {
+		if found && earliest.IsZero() {
+			break
+		}
 		if len(rs.reaches) == 0 {
 			continue
 		}

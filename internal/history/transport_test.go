@@ -86,7 +86,7 @@ func TestChunkLogsSplitsAtCapAndRejectsOversizedSingleRecord(t *testing.T) {
 			}},
 		}},
 	}
-	chunks, err := ChunkLogs([]*logspb.LogsData{batch}, 1400)
+	chunks, err := chunkLogs([]*logspb.LogsData{batch}, 1400)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestChunkLogsSplitsAtCapAndRejectsOversizedSingleRecord(t *testing.T) {
 			ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{makeRec(2000)}}},
 		}},
 	}
-	_, err = ChunkLogs([]*logspb.LogsData{oversized}, 1400)
+	_, err = chunkLogs([]*logspb.LogsData{oversized}, 1400)
 	if _, ok := errors.AsType[*PermanentError](err); !ok {
 		t.Fatalf("oversized record error = %v, want *PermanentError", err)
 	}
@@ -346,4 +346,22 @@ func TestTransportPartialSuccessAndAuthResponses(t *testing.T) {
 			t.Fatalf("truncated 200 error = %T (%v), want *TransientError", err, err)
 		}
 	})
+}
+
+// chunkLogs runs batches through a ChunkWriter and collects the chunks.
+func chunkLogs(batches []*logspb.LogsData, maxBytes int) ([]Chunk, error) {
+	var chunks []Chunk
+	w := NewChunkWriter(maxBytes, func(ch Chunk) error {
+		chunks = append(chunks, ch)
+		return nil
+	})
+	for _, batch := range batches {
+		if err := w.Add(batch); err != nil {
+			return nil, err
+		}
+	}
+	if err := w.Flush(); err != nil {
+		return nil, err
+	}
+	return chunks, nil
 }

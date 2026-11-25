@@ -187,27 +187,41 @@ func TestFamilyWithSubagentsSpanningTwoOrgsIsCutWhenSecondAppears(t *testing.T) 
 	checkSent(t, sent["team-a"]+"\n"+sent["team-b"], []string{"PARENT_IN_A_OK", "CHILD_EARLY_A_OK"}, []string{"PARENT_IN_B_LEAK", "CHILD_LATE_A_LEAK"})
 }
 
-// A command naming a path under a top-level directory that no longer exists cuts the
+// A reach to a top-level directory that no longer exists, or to a path under it, cuts the
 // session at that call, rather than reading as a reach to "/".
-func TestMissingTopLevelShellPathCutsSession(t *testing.T) {
+func TestMissingTopLevelPathCutsSession(t *testing.T) {
 	t.Parallel()
 	repoA := initTestGitRepo(t, "https://github.com/org-a/app.git")
 	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
 	t0 := now.Add(-4 * time.Hour)
 	gone := "/terma-nonexistent-mount-" + filepath.Base(t.TempDir())
-	before := makeNativeSegment("claude", "s-mount", repoA, "BEFORE_MOUNT_OK", t0)
-	after := makeNativeSegment("claude", "s-mount", repoA, "AFTER_MOUNT_LEAK", t0.Add(2*time.Minute))
-	after.ToolReaches = []agents.HistoryToolReach{{At: t0.Add(time.Minute), Cwd: repoA, Paths: hookrun.Alone(hookrun.ShellPathsHistorical("cat "+gone+"/org-b/notes", repoA)...)}}
-	src := &stubHistorySource{
-		source:   "claude",
-		files:    []agents.HistoryFile{{SourceSystem: "claude", SessionID: "s-mount", ModTime: now.Add(-3 * time.Hour)}},
-		segments: map[string][]agents.HistorySegment{"s-mount": {before, after}},
+	shell := func(cmd string) []string { return hookrun.Alone(hookrun.ShellPathsHistorical(cmd, repoA)...) }
+	for name, paths := range map[string][]string{
+		"file under it":    shell("cat " + gone + "/org-b/notes"),
+		"search of it":     shell("rg apiKey " + gone),
+		"cd into it":       shell("cd " + gone + " && cat secret.go"),
+		"search tool path": hookrun.SearchHistorical(gone, "*.go"),
+	} {
+		before := makeNativeSegment("claude", "s-mount", repoA, "BEFORE_MOUNT_OK", t0)
+		after := makeNativeSegment("claude", "s-mount", repoA, "AFTER_MOUNT_LEAK", t0.Add(2*time.Minute))
+		after.ToolReaches = []agents.HistoryToolReach{{At: t0.Add(time.Minute), Cwd: repoA, Paths: paths}}
+		src := &stubHistorySource{
+			source:   "claude",
+			files:    []agents.HistoryFile{{SourceSystem: "claude", SessionID: "s-mount", ModTime: now.Add(-3 * time.Hour)}},
+			segments: map[string][]agents.HistorySegment{"s-mount": {before, after}},
+		}
+		srv, got := captureServer(t)
+		sum, err := Upload(context.Background(), uploadOpts(t.TempDir(), twoOrgState(now, false), srv, now, src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sent := got()["team-a"]; !strings.Contains(sent, "BEFORE_MOUNT_OK") || strings.Contains(sent, "AFTER_MOUNT_LEAK") {
+			t.Errorf("%s (%q): want the session cut at the reach", name, paths)
+		}
+		if sum.SentSessions != 1 || sum.WithheldRecords != 1 {
+			t.Errorf("%s: sent %d session(s), withheld %d record(s); want 1 and 1", name, sum.SentSessions, sum.WithheldRecords)
+		}
 	}
-	srv, got := captureServer(t)
-	if _, err := Upload(context.Background(), uploadOpts(t.TempDir(), twoOrgState(now, false), srv, now, src)); err != nil {
-		t.Fatal(err)
-	}
-	checkSent(t, got()["team-a"], []string{"BEFORE_MOUNT_OK"}, []string{"AFTER_MOUNT_LEAK"})
 }
 
 // writeOldFile writes path with an mtime three hours before now.

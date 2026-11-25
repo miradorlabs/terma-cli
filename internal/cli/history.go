@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -63,6 +64,13 @@ sessions first.`,
 }
 
 func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun bool) error {
+	// git answers for the repository these name whatever folder is asked about, so every
+	// session's working directory would route as that one repository.
+	for _, name := range []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR"} {
+		if os.Getenv(name) != "" {
+			return fmt.Errorf("%s is set, so every folder would read as that repository; unset it and run `terma history upload` again", name)
+		}
+	}
 	now := time.Now()
 	since, err := parseHistorySince(sinceSpec, now)
 	if err != nil {
@@ -312,6 +320,9 @@ func renderHistorySummary(w io.Writer, sum history.Summary) {
 			parts = append(parts, fmt.Sprintf("%s=%d", k, sum.SkippedSegments[k]))
 		}
 		fmt.Fprintf(w, "Skipped segments: %s\n", strings.Join(parts, ", "))
+	}
+	if sum.WithheldRecords > 0 {
+		fmt.Fprintf(w, "Withheld after a Mixed cutoff: %d record(s)\n", sum.WithheldRecords)
 	}
 	if len(sum.Unreadable) > 0 {
 		fmt.Fprintf(w, "Could not read: %s (sessions that may depend on them were skipped)\n", strings.Join(sum.Unreadable, ", "))

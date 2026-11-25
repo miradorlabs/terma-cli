@@ -322,6 +322,11 @@ func (p *codexHistoryParser) handleEventMsg(raw json.RawMessage, ts time.Time) e
 				durMs = pl.Item.Duration.Secs*1000 + pl.Item.Duration.Nanos/1e6
 			}
 			return p.emitToolResult(pl.Item.ID, "exec_command", string(argsJSON), out, success, durMs, p.traceBytes, ts)
+		case "ImageView":
+			// A code-mode script's image read shows up only as this item.
+			if pl.Item.Path != "" {
+				p.addReach(ts, p.cwd, hookrun.Alone(codexNormalizeCwd(pl.Item.Path, p.cwd)))
+			}
 		case "FileChange":
 			var paths []string
 			if pl.Item.Path != "" {

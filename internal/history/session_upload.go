@@ -228,6 +228,7 @@ func uploadOneSession(
 		return stopRouteWithIssue(b, remaining, SkipSendFailed, streamErr.Error(), report, sum), nil
 	}
 
+	sum.WithheldRecords += mixedDropped
 	if totalRecs == 0 {
 		if st.IsInProgress(sp.key) {
 			delete(st.InProgress, sp.key)
