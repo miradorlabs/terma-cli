@@ -22940,7 +22940,7 @@
         "read": true
       },
       "CLAUDE_CODE_ARTIFACT_COMMENTS": {
-        "description": "Set to `0` to stop Claude reading and replying to comments on an artifact. Has no effect when `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` has turned artifacts off. Requires Claude Code v2.1.221 or later",
+        "description": "Set to `0` to stop the `Artifact` tool from reading and replying to comments on an artifact. Has no effect when `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` has turned artifacts off. Requires Claude Code v2.1.221 or later",
         "read": true
       },
       "CLAUDE_CODE_ARTIFACT_COMMENTS_AUTOREACT": {
@@ -22948,7 +22948,7 @@
         "read": true
       },
       "CLAUDE_CODE_ARTIFACT_PUBLISH_EDITS": {
-        "description": "Set to `0` to stop Claude from applying small changes to an artifact's file as part of publishing it. Claude then edits the file with its file-editing tools and publishes it as a separate step. Requires Claude Code v2.1.300 or later",
+        "description": "Set to `0` to stop Claude from applying small changes to an artifact's local file as part of publishing it. Requires Claude Code v2.1.300 or later",
         "read": true
       },
       "CLAUDE_CODE_ATTRIBUTION_HEADER": {
@@ -23217,6 +23217,10 @@
       },
       "CLAUDE_CODE_DISABLE_REFUSAL_FALLBACK": {
         "description": "Set to `1` to turn off the automatic model switch when a safety classifier flags a request, the behavior the `switchModelsOnFlag` setting controls",
+        "read": true
+      },
+      "CLAUDE_CODE_DISABLE_RESPONSE_COMPRESSION": {
+        "description": "Set to `1` to request uncompressed model responses if your proxy leaves compressed ones unfinished. Not recommended for self-hosted runners or Remote Control. Ignored in project and local settings. Requires Claude Code v2.1.331 or later",
         "read": true
       },
       "CLAUDE_CODE_DISABLE_SHELL_HEAD_START": {
@@ -23976,7 +23980,7 @@
         "read": true
       },
       "DISABLE_COMPACT": {
-        "description": "Set to `1` to disable all compaction: both automatic compaction and the manual `/compact` command",
+        "description": "Set to `1` to disable all compaction, including `/compact` and the rewind menu's summarize options",
         "read": true
       },
       "DISABLE_COST_WARNINGS": {
@@ -24188,7 +24192,7 @@
         "read": true
       },
       "OTEL_LOG_RAW_API_BODIES": {
-        "description": "Emit Anthropic Messages API request and response JSON as `api_request_body` / `api_response_body` log events. Set to `1` for inline bodies truncated at the content limit, or `file:<dir>` to write untruncated bodies to disk and emit a `body_ref` path instead. `CLAUDE_CODE_OTEL_CONTENT_MAX_LENGTH` configures the content limit, 60 KB by default. Disabled by default; bodies include the entire conversation history. Set it in your shell, user settings, or managed settings. Ignored in project and local settings. See Monitoring",
+        "description": "Emit Anthropic Messages API request and response JSON as `api_request_body` / `api_response_body` log events. Set to `1` for inline bodies truncated at the content limit, or `file:<dir>` to write untruncated bodies to disk and emit a `body_ref` path instead. Disabled by default; bodies can include the entire conversation history. Set it in your shell, user settings, or managed settings. Ignored in project and local settings. See Monitoring",
         "read": true
       },
       "OTEL_LOG_TOOL_CONTENT": {
@@ -24328,7 +24332,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-24T23:02:10.147159457Z",
+    "fetched_at": "2026-11-25T01:47:53.60607582Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -26744,7 +26748,6 @@
       "CLAUDE_CODE_DISABLE_REDIRECT_CHECK",
       "CLAUDE_CODE_DISABLE_REDIRECT_DENY_RECHECK",
       "CLAUDE_CODE_DISABLE_REFUSAL_RETRY",
-      "CLAUDE_CODE_DISABLE_RESPONSE_COMPRESSION",
       "CLAUDE_CODE_DISABLE_RESUME_LOAD_GOODBYE_SKIP",
       "CLAUDE_CODE_DISABLE_SELF_NAMED_CERT_DROP",
       "CLAUDE_CODE_DISABLE_STARTUP_WORK_GATE",
