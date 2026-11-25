@@ -21,6 +21,7 @@ const (
 	claudeEventTimeFmt   = "2006-01-02T15:04:05.000Z"
 	claudeServiceCLI     = "claude-code"
 	claudeServiceDesktop = "claude-code-desktop"
+	claudeMaxSegRecords  = 256
 )
 
 func (p *claudeHistoryParser) flushPendingCall() error {
@@ -48,7 +49,7 @@ func (p *claudeHistoryParser) flushPendingCall() error {
 }
 
 func (p *claudeHistoryParser) appendToSegment(cwd, branch string, subagent bool, lr *logspb.LogRecord) error {
-	if p.segStarted && (cwd != p.segCwd || subagent != p.segSubagent) {
+	if p.segStarted && (cwd != p.segCwd || subagent != p.segSubagent || (branch != "" && p.segBranch != "" && branch != p.segBranch)) {
 		if err := p.flushSegment(); err != nil {
 			return err
 		}
@@ -58,11 +59,14 @@ func (p *claudeHistoryParser) appendToSegment(cwd, branch string, subagent bool,
 	p.segBranch = cmp.Or(p.segBranch, branch)
 	p.segSubagent = subagent
 	p.segRecords = append(p.segRecords, lr)
+	if len(p.segRecords) >= claudeMaxSegRecords {
+		return p.flushSegment()
+	}
 	return nil
 }
 
 func (p *claudeHistoryParser) addReach(cwd, branch string, subagent bool, at time.Time, paths []string) error {
-	if p.segStarted && (cwd != p.segCwd || subagent != p.segSubagent) {
+	if p.segStarted && (cwd != p.segCwd || subagent != p.segSubagent || (branch != "" && p.segBranch != "" && branch != p.segBranch)) {
 		if err := p.flushSegment(); err != nil {
 			return err
 		}

@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -295,6 +296,7 @@ func TestCodexCrossCwdToolArgsDroppedAndResumedStartUsesSegmentTimestamp(t *test
 	lines := []string{
 		`{"timestamp":"2026-10-03T10:00:00Z","type":"session_meta","payload":{"id":"sess-xorg","timestamp":"2026-10-03T10:00:00Z","cwd":"/work/repo-a"}}`,
 		`{"timestamp":"2026-10-03T10:00:01Z","type":"response_item","payload":{"type":"function_call","call_id":"call-1","name":"shell","arguments":"{\"cmd\":\"echo SECRET_ORG_A_ARG\"}"}}`,
+		`{"timestamp":"2026-10-03T10:00:02Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"FileChange","id":"fc-a","changes":[{"path":"/work/repo-a/touched.go"}]}}}`,
 		`{"timestamp":"2026-10-03T11:00:00Z","type":"turn_context","payload":{"turn_id":"t2","cwd":"/work/repo-b"}}`,
 		`{"timestamp":"2026-10-03T11:00:01Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call-1","output":"SECRET_ORG_A_OUTPUT"}}`,
 		`{"timestamp":"2026-10-03T11:00:02Z","type":"event_msg","payload":{"type":"user_message","message":"work in repo b"}}`,
@@ -314,23 +316,26 @@ func TestCodexCrossCwdToolArgsDroppedAndResumedStartUsesSegmentTimestamp(t *test
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if len(segs) != 1 || segs[0].Cwd != "/work/repo-b" {
-		t.Fatalf("got %d segments, want 1 in /work/repo-b", len(segs))
+	if len(segs) != 2 || segs[0].Cwd != "/work/repo-a" || segs[0].RecordCount != 0 || segs[1].Cwd != "/work/repo-b" {
+		t.Fatalf("got %d segments %+v, want reach-only /work/repo-a then /work/repo-b", len(segs), segs)
 	}
-	wire, _ := proto.Marshal(segs[0].NativeLogs)
+	if len(segs[0].ToolReaches) == 0 {
+		t.Fatalf("expected /work/repo-a reach-only segment to preserve pre-switch ToolReaches")
+	}
+	wire, _ := proto.Marshal(segs[1].NativeLogs)
 	if strings.Contains(string(wire), "SECRET_ORG_A") {
 		t.Fatalf("org A tool arguments or delayed output leaked into org B segment")
 	}
 	wantStart := time.Date(2026, 10, 3, 11, 0, 2, 0, time.UTC).UnixNano()
-	for _, lr := range segs[0].NativeLogs.ResourceLogs[0].ScopeLogs[0].LogRecords {
+	for _, lr := range segs[1].NativeLogs.ResourceLogs[0].ScopeLogs[0].LogRecords {
 		if cxStr(lr.Attributes, "event.name") == "codex.conversation_starts" && int64(lr.TimeUnixNano) != wantStart {
 			t.Errorf("resumed conversation_starts TimeUnixNano = %d, want %d (segment time, not repo-a metaTime)", lr.TimeUnixNano, wantStart)
 		}
 	}
 	// Verify CommandExecution.cwd (file:// URI) and FileChange paths were captured in ToolReaches,
-	// while stale repo-a reach before segment start was cleared.
+	// while repo-a reach stayed isolated in segs[0] and did not contaminate segs[1].
 	var sawC, sawD bool
-	for _, r := range segs[0].ToolReaches {
+	for _, r := range segs[1].ToolReaches {
 		if r.Cwd == "/work/repo-c" {
 			sawC = true
 		}
@@ -347,7 +352,46 @@ func TestCodexCrossCwdToolArgsDroppedAndResumedStartUsesSegmentTimestamp(t *test
 		}
 	}
 	if !sawC || !sawD {
-		t.Errorf("missing expected reaches: sawC=%v sawD=%v reaches=%+v", sawC, sawD, segs[0].ToolReaches)
+		t.Errorf("missing expected reaches: sawC=%v sawD=%v reaches=%+v", sawC, sawD, segs[1].ToolReaches)
+	}
+}
+
+func TestCodexBoundedSingleCwdFlushEmitsOneConversationStart(t *testing.T) {
+	t.Parallel()
+	var lines []string
+	lines = append(lines, `{"timestamp":"2026-10-03T10:00:00Z","type":"session_meta","payload":{"id":"sess-big","cwd":"/work/repo-a"}}`)
+	t0 := time.Date(2026, 10, 3, 10, 0, 1, 0, time.UTC)
+	for i := range 270 {
+		ts := t0.Add(time.Duration(i) * time.Second).Format(time.RFC3339)
+		lines = append(lines, fmt.Sprintf(`{"timestamp":%q,"type":"event_msg","payload":{"type":"user_message","message":"msg-%d"}}`, ts, i))
+	}
+	path := filepath.Join(t.TempDir(), "rollout-2026-10-03T10-00-00-sess-big.jsonl")
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var segs []agents.HistorySegment
+	if err := (Agent{}).ReadHistory(context.Background(), agents.HistoryFile{
+		SourceSystem: "codex", SessionID: "sess-big", Path: path,
+	}, agents.HistoryReadOptions{}, func(seg agents.HistorySegment) error {
+		segs = append(segs, seg)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(segs) < 2 {
+		t.Fatalf("expected >= 2 bounded segments for 270 prompts, got %d", len(segs))
+	}
+	starts, total := 0, 0
+	for _, s := range segs {
+		total += s.RecordCount
+		for _, lr := range s.NativeLogs.ResourceLogs[0].ScopeLogs[0].LogRecords {
+			if cxStr(lr.Attributes, "event.name") == "codex.conversation_starts" {
+				starts++
+			}
+		}
+	}
+	if starts != 1 || total != 271 {
+		t.Fatalf("starts=%d total=%d, want 1 conversation_starts and 271 records", starts, total)
 	}
 }
 

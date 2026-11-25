@@ -26,6 +26,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 	"github.com/miradorlabs/terma-cli/internal/routing"
@@ -1701,5 +1702,152 @@ func TestHeldSubagentUnroutedReachSpawnedChildAndHistoricalBranch(t *testing.T) 
 	}
 	if sum.SkippedSessions[SkipActive] < 2 {
 		t.Errorf("expected both active child and its parent skipped as active, got SkippedSessions=%+v", sum.SkippedSessions)
+	}
+}
+
+func TestSpawnFamilyChildSiblingOrphanDeletedShellTargetGitDashCAndFetchedAtTick(t *testing.T) {
+	t.Parallel()
+	stateDir := t.TempDir()
+	repoA := initTestGitRepo(t, "https://github.com/org-a/app.git")
+	repoB := initTestGitRepo(t, "https://github.com/org-b/secret.git")
+	secretB := filepath.Join(repoB, "secret.go")
+	if err := os.WriteFile(secretB, []byte("package secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	t0 := now.Add(-4 * time.Hour)
+
+	stBefore := routing.State{
+		StateID: "st-1", Generation: 1, ConsentGeneration: 1, Account: "acc1",
+		Teams: []routing.Team{
+			{
+				EnrollmentID: "enr-a", TeamID: "team-a", OrganizationID: "org-a", AuthURL: "https://auth.example.com",
+				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-a/app"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-a", TeamID: "team-a", AuthURL: "https://auth.example.com", FetchedAt: now},
+			},
+			{
+				EnrollmentID: "enr-b", TeamID: "team-b", OrganizationID: "org-b", AuthURL: "https://auth.example.com",
+				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-b/secret"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-b", TeamID: "team-b", AuthURL: "https://auth.example.com", FetchedAt: now},
+			},
+		},
+		Bindings: map[string]routing.Binding{
+			"github.com/org-a/app":    {Organization: "org-a"},
+			"github.com/org-b/secret": {Organization: "org-b"},
+		},
+	}
+	// Routine 1-minute TeamRefresher tick: bumps Generation and FetchedAt ONLY (no policy/repo change).
+	stTick := stBefore
+	stTick.Generation = 2
+	stTick.Teams = append([]routing.Team(nil), stBefore.Teams...)
+	stTick.Teams[0].Policy.FetchedAt = now.Add(time.Minute)
+
+	var mu sync.Mutex
+	curState := stBefore
+	posts := 0
+	var received []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		posts++
+		p := posts
+		mu.Unlock()
+		if p == 1 {
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		mu.Lock()
+		received = append(received, string(body))
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	// 1. Parent reads Org B at T+1m then spawns child at T+2m in Org A -> child MUST DROP!
+	segPReadB := makeNativeSegment("codex", "s-p-read-b", repoA, "P_BEFORE_B_OK", t0.Add(30*time.Second))
+	segPReadB.ToolReaches = []agents.HistoryToolReach{{At: t0.Add(time.Minute), Cwd: repoA, Paths: []string{secretB}}}
+	segChildOfB := makeNativeSegment("codex", "s-c-of-b", repoA, "CHILD_QUOTING_B_LEAK", t0.Add(2*time.Minute))
+
+	// 2. Sibling 1 reads Org B at T+1m; Sibling 2 runs in Org A at T+2m -> Sibling 2 MUST DROP!
+	segSibRoot := makeNativeSegment("codex", "s-sib-root", repoA, "SIB_ROOT_OK", t0.Add(15*time.Second))
+	segSib1 := makeNativeSegment("codex", "s-sib-1", repoA, "SIB1_LEAK", t0.Add(time.Minute))
+	segSib1.ToolReaches = []agents.HistoryToolReach{{At: t0.Add(time.Minute), Cwd: repoA, Paths: []string{secretB}}}
+	segSib2 := makeNativeSegment("codex", "s-sib-2", repoA, "SIB2_LEAK", t0.Add(2*time.Minute))
+
+	// 3. Orphan child whose parent rollout is missing from disk -> fails closed!
+	segOrphan := makeNativeSegment("codex", "s-orphan", repoA, "ORPHAN_LEAK", t0.Add(time.Minute))
+
+	// 4. `git -C . status` stays clean (no IFS false positive); deleted external target via shell fails closed!
+	segGitC := makeNativeSegment("codex", "s-git-c", repoA, "GIT_DASH_C_OK", t0.Add(2*time.Minute))
+	segGitC.ToolReaches = []agents.HistoryToolReach{{At: t0.Add(time.Minute), Cwd: repoA, Paths: hookrun.Alone(hookrun.ShellPathsHistorical("git -C . status", repoA)...)}}
+
+	deletedExtTarget := filepath.Join("/workspace", "deleted-b-worktree", "notes")
+	if home, err := os.UserHomeDir(); err == nil && home != "" && home != filepath.Dir(home) {
+		deletedExtTarget = filepath.Join(home, "terma-nonexistent-deleted-b-"+filepath.Base(stateDir), "notes")
+	}
+	segDelShell := makeNativeSegment("codex", "s-del-shell", repoA, "DELETED_SHELL_TARGET_LEAK", t0.Add(2*time.Minute))
+	segDelShell.ToolReaches = []agents.HistoryToolReach{{At: t0.Add(time.Minute), Cwd: repoA, Paths: hookrun.Alone(hookrun.ShellPathsHistorical("grep TODO "+deletedExtTarget, repoA)...)}}
+
+	src := &stubHistorySource{
+		source: "codex",
+		files: []agents.HistoryFile{
+			{SourceSystem: "codex", SessionID: "s-p-read-b", ModTime: now.Add(-3 * time.Hour)},
+			{SourceSystem: "codex", SessionID: "s-c-of-b", ParentSessionID: "s-p-read-b", ModTime: now.Add(-3 * time.Hour)},
+			{SourceSystem: "codex", SessionID: "s-sib-root", ModTime: now.Add(-3 * time.Hour)},
+			{SourceSystem: "codex", SessionID: "s-sib-1", ParentSessionID: "s-sib-root", ModTime: now.Add(-3 * time.Hour)},
+			{SourceSystem: "codex", SessionID: "s-sib-2", ParentSessionID: "s-sib-root", ModTime: now.Add(-3 * time.Hour)},
+			{SourceSystem: "codex", SessionID: "s-orphan", ParentSessionID: "s-deleted-parent", ModTime: now.Add(-3 * time.Hour)},
+			{SourceSystem: "codex", SessionID: "s-git-c", ModTime: now.Add(-3 * time.Hour)},
+			{SourceSystem: "codex", SessionID: "s-del-shell", ModTime: now.Add(-3 * time.Hour)},
+		},
+		segments: map[string][]agents.HistorySegment{
+			"s-p-read-b":  {segPReadB},
+			"s-c-of-b":    {segChildOfB},
+			"s-sib-root":  {segSibRoot},
+			"s-sib-1":     {segSib1},
+			"s-sib-2":     {segSib2},
+			"s-orphan":    {segOrphan},
+			"s-git-c":     {segGitC},
+			"s-del-shell": {segDelShell},
+		},
+	}
+
+	sum, err := Upload(context.Background(), Options{
+		StateDir: stateDir, Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
+		State: stBefore,
+		ReloadState: func() (routing.State, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			return curState, nil
+		},
+		Sources: []agents.HistorySource{src}, Filter: relay.NewContentFilter(nil), Holdings: stubHoldings{},
+		Transport: &Transport{
+			Version: "test", HTTP: srv.Client(), SignIn: &fakeSignIn{account: "acc1", tokens: []string{"tok"}},
+			BytesPerSec: 1 << 30, InitialBackoff: time.Millisecond,
+			Sleep: func(context.Context, time.Duration) error {
+				mu.Lock()
+				curState = stTick
+				mu.Unlock()
+				return nil
+			},
+		},
+		EndpointFor: func(string) string { return srv.URL },
+		Now:         func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sum.TeamIssues) != 0 {
+		t.Fatalf("routine FetchedAt-only refresh must not abort route; got TeamIssues=%+v", sum.TeamIssues)
+	}
+	all := strings.Join(received, "\n")
+	for _, want := range []string{"P_BEFORE_B_OK", "SIB_ROOT_OK", "GIT_DASH_C_OK"} {
+		if !strings.Contains(all, want) {
+			t.Errorf("expected %q in uploaded payloads", want)
+		}
+	}
+	for _, leak := range []string{"CHILD_QUOTING_B_LEAK", "SIB1_LEAK", "SIB2_LEAK", "ORPHAN_LEAK", "DELETED_SHELL_TARGET_LEAK"} {
+		if strings.Contains(all, leak) {
+			t.Fatalf("leaked %q upstream!", leak)
+		}
 	}
 }

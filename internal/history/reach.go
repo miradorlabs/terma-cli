@@ -44,30 +44,37 @@ func mergeMixedCutoff(cur time.Time, hasCur bool, at time.Time, hasAt bool) (tim
 	return cur, true
 }
 
-func collectDescendantReach(
+func collectCompanionReach(
 	ctx context.Context,
 	stateDir string,
 	src agents.HistorySource,
 	resolver *cwdResolver,
-	descendants []agents.HistoryFile,
+	companions []agents.HistoryFile,
+	missingParent string,
 ) ([]segReachInfo, time.Time, bool, error) {
 	var out []segReachInfo
 	var ledgerCutoff time.Time
 	hasLedgerCutoff := false
 	farPast := time.Unix(1, 0).UTC()
 	farFuture := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
-	for _, desc := range descendants {
+	if missingParent != "" {
+		// Parent transcript is missing from disk: fail closed rather than uploading a
+		// spawned child whose parent may have crossed organizations before spawning it.
+		ledgerCutoff, hasLedgerCutoff = time.Time{}, true
+	}
+	for _, comp := range companions {
 		if err := ctx.Err(); err != nil {
 			return nil, time.Time{}, false, err
 		}
-		if mAt, mixed := runs.Read(stateDir, desc.SessionID).MixedInterval(farPast, farFuture); mixed {
+		if mAt, mixed := runs.Read(stateDir, comp.SessionID).MixedInterval(farPast, farFuture); mixed {
 			ledgerCutoff, hasLedgerCutoff = mergeMixedCutoff(ledgerCutoff, hasLedgerCutoff, mAt, true)
 		}
-		err := src.ReadHistory(ctx, desc, agents.HistoryReadOptions{IncludeSupplemental: false}, func(seg agents.HistorySegment) error {
+		isChild := comp.ParentSessionID != ""
+		err := src.ReadHistory(ctx, comp, agents.HistoryReadOptions{IncludeSupplemental: false}, func(seg agents.HistorySegment) error {
 			target, ok, _ := resolver.resolve(ctx, seg.Cwd, seg.FallbackRepoURL, seg.FallbackBranch)
 			out = append(out, segReachInfo{
 				cwd:      seg.Cwd,
-				subagent: true,
+				subagent: isChild || seg.Subagent,
 				reaches:  seg.ToolReaches,
 				earliest: earliestSegmentTime(seg),
 				target:   target,
@@ -79,7 +86,7 @@ func collectDescendantReach(
 			if errors.Is(err, context.Canceled) {
 				return nil, time.Time{}, false, err
 			}
-			// Fail closed when a spawned child transcript cannot be read.
+			// Fail closed when any transcript in the spawn family cannot be read.
 			ledgerCutoff, hasLedgerCutoff = time.Time{}, true
 		}
 	}

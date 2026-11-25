@@ -25,6 +25,7 @@ const (
 	codexDefaultProv    = "OpenAI"
 	codexEventTimeFmt   = "2006-01-02T15:04:05.000Z"
 	codexMaxToolOutput  = 16 << 10
+	codexMaxSegRecords  = 256
 )
 
 func (p *codexHistoryParser) setCwd(cwd string) error {
@@ -33,9 +34,6 @@ func (p *codexHistoryParser) setCwd(cwd string) error {
 			p.priorCwdCalls[callID] = true
 		}
 		clear(p.pendingCalls)
-		if !p.segStarted {
-			p.segReaches = nil
-		}
 	}
 	if p.segStarted && cwd != p.segCwd {
 		if err := p.flushSegment(); err != nil {
@@ -44,6 +42,14 @@ func (p *codexHistoryParser) setCwd(cwd string) error {
 	}
 	p.cwd = cwd
 	return nil
+}
+
+func (p *codexHistoryParser) addReach(at time.Time, cwd string, paths []string) {
+	if !p.segStarted {
+		p.segStarted = true
+		p.segCwd = p.cwd
+	}
+	p.segReaches = append(p.segReaches, agents.HistoryToolReach{At: at, Cwd: cwd, Paths: paths})
 }
 
 func (p *codexHistoryParser) ensureSegment(ts time.Time) {
@@ -129,7 +135,7 @@ func (p *codexHistoryParser) emitUserPrompt(text string, ts time.Time) error {
 		Body:                 &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "codex.user_prompt"}},
 		Attributes:           attrs,
 	})
-	return nil
+	return p.maybeFlushSegmentChunk()
 }
 
 func (p *codexHistoryParser) emitModelCall(u codexUsageNumbers, ts time.Time) error {
@@ -158,7 +164,7 @@ func (p *codexHistoryParser) emitModelCall(u codexUsageNumbers, ts time.Time) er
 		Body:                 &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "codex.sse_event"}},
 		Attributes:           attrs,
 	})
-	return nil
+	return p.maybeFlushSegmentChunk()
 }
 
 func (p *codexHistoryParser) emitToolResult(callID, toolName, arguments, output string, success bool, durationMs int64, trace []byte, ts time.Time) error {
@@ -192,7 +198,7 @@ func (p *codexHistoryParser) emitToolResult(callID, toolName, arguments, output 
 		Body:                 &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "codex.tool_result"}},
 		Attributes:           attrs,
 	})
-	return nil
+	return p.maybeFlushSegmentChunk()
 }
 
 func (p *codexHistoryParser) emitAssistantReply(msgID, text, phase string, ts time.Time) error {
@@ -229,6 +235,13 @@ func (p *codexHistoryParser) emitAssistantReply(msgID, text, phase string, ts ti
 		Body:                 &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: semconv.TermaAssistantMessageEvent}},
 		Attributes:           attrs,
 	})
+	return p.maybeFlushSegmentChunk()
+}
+
+func (p *codexHistoryParser) maybeFlushSegmentChunk() error {
+	if len(p.segNative)+len(p.segSupplements) >= codexMaxSegRecords {
+		return p.flushSegmentWithReset(false)
+	}
 	return nil
 }
 
@@ -252,8 +265,15 @@ func (p *codexHistoryParser) commonNativeAttrs(eventName string, ts time.Time) [
 }
 
 func (p *codexHistoryParser) flushSegment() error {
+	return p.flushSegmentWithReset(true)
+}
+
+func (p *codexHistoryParser) flushSegmentWithReset(reset bool) error {
 	if len(p.segNative) == 0 && len(p.segSupplements) == 0 && len(p.segReaches) == 0 {
-		p.segStarted = false
+		if reset {
+			p.segStarted = false
+			p.segHasStart = false
+		}
 		p.segReaches = nil
 		return nil
 	}
@@ -262,7 +282,9 @@ func (p *codexHistoryParser) flushSegment() error {
 	reaches := p.segReaches
 	cwd := p.segCwd
 	p.segNative, p.segSupplements, p.segReaches = nil, nil, nil
-	p.segStarted, p.segHasStart = false, false
+	if reset {
+		p.segStarted, p.segHasStart = false, false
+	}
 
 	seg := agents.HistorySegment{
 		SourceSystem: codexSourceSystem,

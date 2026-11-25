@@ -349,6 +349,39 @@ func TestClaudeForkSessionIDBranchHistoricalEnvAndBareReach(t *testing.T) {
 	}
 }
 
+func TestClaudeBranchSwitchFlushesAndLongSingleCwdIsBounded(t *testing.T) {
+	t.Parallel()
+	var lines []string
+	t0 := time.Date(2026, 11, 20, 10, 0, 0, 0, time.UTC)
+	lines = append(lines,
+		`{"type":"user","uuid":"u1","sessionId":"sess-br","cwd":"/work/repo-a","gitBranch":"branch-one","timestamp":"2026-11-20T10:00:00Z","message":{"role":"user","content":"first"}}`,
+		`{"type":"user","uuid":"u2","sessionId":"sess-br","cwd":"/work/repo-a","gitBranch":"branch-two","timestamp":"2026-11-20T10:01:00Z","message":{"role":"user","content":"second"}}`,
+	)
+	for i := range 270 {
+		ts := t0.Add(time.Duration(i+120) * time.Second).Format(time.RFC3339)
+		lines = append(lines, `{"type":"user","uuid":"ub-`+string(rune('a'+(i%26)))+`","sessionId":"sess-br","cwd":"/work/repo-a","gitBranch":"branch-two","timestamp":"`+ts+`","message":{"role":"user","content":"msg"}}`)
+	}
+	path := filepath.Join(t.TempDir(), "sess-br.jsonl")
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var segs []agents.HistorySegment
+	if err := (Agent{}).ReadHistory(context.Background(), agents.HistoryFile{
+		SourceSystem: "claude", SessionID: "sess-br", Path: path,
+	}, agents.HistoryReadOptions{}, func(seg agents.HistorySegment) error {
+		segs = append(segs, seg)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(segs) < 3 {
+		t.Fatalf("expected >= 3 segments (branch switch + bounded flush), got %d", len(segs))
+	}
+	if segs[0].FallbackBranch != "branch-one" || segs[1].FallbackBranch != "branch-two" {
+		t.Fatalf("branches = (%q, %q), want (branch-one, branch-two)", segs[0].FallbackBranch, segs[1].FallbackBranch)
+	}
+}
+
 func kvStr(attrs []*commonpb.KeyValue, key string) string {
 	for _, kv := range attrs {
 		if kv.GetKey() == key {

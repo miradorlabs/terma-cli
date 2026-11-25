@@ -57,8 +57,16 @@ func (sc *scan) candidatePath(t string, r role, fallback bool) {
 				}
 			} else if (r == creates || slashed && (r == plain || r == folder || r == slashedOnly)) && !res.named {
 				if p, ok := sc.path(t, d); ok {
-					if rPath, parent, _, found := sc.walkPath(p, true); !found && !sc.unknown && parent != "" && (!fallback || filepath.Dir(rPath) == parent && strings.ContainsAny(strings.TrimRight(t, `/\`), `/\`)) {
-						sc.place(parent)
+					if rPath, parent, _, found := sc.walkPath(p, true); !found && !sc.unknown {
+						if sc.historical {
+							if rPath != "" && (!fallback || filepath.Dir(rPath) == parent && strings.ContainsAny(strings.TrimRight(t, `/\`), `/\`)) {
+								sc.place(rPath)
+							} else if rPath == "" && !fallback {
+								sc.fail()
+							}
+						} else if parent != "" && (!fallback || filepath.Dir(rPath) == parent && strings.ContainsAny(strings.TrimRight(t, `/\`), `/\`)) {
+							sc.place(parent)
+						}
 					}
 				}
 			}
@@ -196,7 +204,7 @@ func (sc *scan) resolveJoined(base, raw string, logical bool) (string, bool) {
 			out = append(out, part)
 		} else if cur := vol + sep + strings.Join(out, sep); part == ".." && cur != "" {
 			if t, _, info, found := sc.walkPath(cur, true); !found || !info.IsDir() {
-				sc.unknown = sc.unknown || sc.created[pick(filepath.Separator == '\\', strings.ToLower(t), t)]
+				sc.unknown = sc.unknown || sc.historical || sc.created[pick(filepath.Separator == '\\', strings.ToLower(t), t)]
 				return "", false
 			} else if _, _, li, ok := sc.walkPath(cur, false); ok && li.Mode()&fs.ModeSymlink != 0 {
 				sc.place(t)
@@ -212,6 +220,13 @@ func (sc *scan) reachRole(w, dir string, r role) (res string, _ os.FileInfo) {
 		return "", nil
 	} else if r0, parent, info, found := sc.walkPath(p, false); !found {
 		sc.unknown = sc.unknown || (r == target || r == physTarget) && sc.created[pick(filepath.Separator == '\\', strings.ToLower(r0), r0)]
+		if sc.historical && (r == target || r == physTarget) {
+			if r0 != "" {
+				sc.place(r0)
+			} else {
+				sc.fail()
+			}
+		}
 		return "", nil
 	} else if res = r0; info.IsDir() {
 		sc.place(res)
@@ -222,7 +237,7 @@ func (sc *scan) reachRole(w, dir string, r role) (res string, _ os.FileInfo) {
 		sc.place(pick(tInfo.IsDir(), dst, tParent))
 		return pick(r == physTarget, dst, pick(r == target, p, res)), tInfo
 	} else if !sc.unknown && tParent != "" {
-		sc.place(tParent)
+		sc.place(pick(sc.historical && dst != "", dst, tParent))
 	}
 	return res, nil
 }

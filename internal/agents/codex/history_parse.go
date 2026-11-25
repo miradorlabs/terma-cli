@@ -306,7 +306,7 @@ func (p *codexHistoryParser) handleEventMsg(raw json.RawMessage, ts time.Time) e
 			p.emittedCalls[pl.Item.ID] = true
 			cmdCwd := codexNormalizeCwd(pl.Item.Cwd, p.cwd)
 			if paths := codexCommandReachPaths(pl.Item.Command, pl.Item.Cwd, p.cwd); len(paths) > 0 {
-				p.segReaches = append(p.segReaches, agents.HistoryToolReach{At: ts, Cwd: cmdCwd, Paths: paths})
+				p.addReach(ts, cmdCwd, paths)
 			}
 			argsJSON, _ := json.Marshal(map[string]any{"cmd": strings.Join(pl.Item.Command, " ")})
 			out := cmp.Or(pl.Item.FormattedOutput, pl.Item.AggregatedOutput)
@@ -333,9 +333,7 @@ func (p *codexHistoryParser) handleEventMsg(raw json.RawMessage, ts time.Time) e
 				}
 			}
 			if len(paths) > 0 {
-				p.segReaches = append(p.segReaches, agents.HistoryToolReach{
-					At: ts, Cwd: codexNormalizeCwd(pl.Item.Cwd, p.cwd), Paths: hookrun.Alone(paths...),
-				})
+				p.addReach(ts, codexNormalizeCwd(pl.Item.Cwd, p.cwd), hookrun.Alone(paths...))
 			}
 		}
 	}
@@ -396,14 +394,14 @@ func (p *codexHistoryParser) handleResponseItem(raw json.RawMessage, ts time.Tim
 			p.pendingCalls[pl.CallID] = codexPendingCall{Name: pl.Name, Arguments: pl.Input, Cwd: p.cwd, At: ts, TraceID: p.traceBytes}
 		}
 		if paths := codexToolReachPaths(pl.Name, pl.Input, p.cwd); len(paths) > 0 {
-			p.segReaches = append(p.segReaches, agents.HistoryToolReach{At: ts, Cwd: p.cwd, Paths: paths})
+			p.addReach(ts, p.cwd, paths)
 		}
 	case "function_call":
 		if pl.CallID != "" {
 			p.pendingCalls[pl.CallID] = codexPendingCall{Name: pl.Name, Arguments: pl.Arguments, Cwd: p.cwd, At: ts, TraceID: p.traceBytes}
 		}
 		if paths := codexToolReachPaths(pl.Name, pl.Arguments, p.cwd); len(paths) > 0 {
-			p.segReaches = append(p.segReaches, agents.HistoryToolReach{At: ts, Cwd: p.cwd, Paths: paths})
+			p.addReach(ts, p.cwd, paths)
 		}
 	case "custom_tool_call_output", "function_call_output":
 		if pl.CallID == "" || p.emittedCalls[pl.CallID] {

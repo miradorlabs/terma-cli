@@ -77,10 +77,13 @@ func historicalEnv(name string) (string, bool) {
 	if name == "HOME" || (os.PathSeparator == '\\' && name == "USERPROFILE") {
 		return os.LookupEnv(name)
 	}
+	if name == "PATH" && os.PathSeparator == '/' {
+		return "/usr/bin:/bin", true
+	}
 	return "", false
 }
 func (sc *scan) isHistoricalUnknownVar(name string) bool {
-	if !sc.historical || !isName(name) || name == "_" || name == "PWD" || name == "OLDPWD" || name == "HOME" || (os.PathSeparator == '\\' && name == "USERPROFILE") {
+	if !sc.historical || !isName(name) || name == "_" || name == "PWD" || name == "OLDPWD" || name == "IFS" || name == "PATH" || name == "HOME" || (os.PathSeparator == '\\' && name == "USERPROFILE") {
 		return false
 	}
 	v, set := sc.vars[name]

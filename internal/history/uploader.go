@@ -48,7 +48,8 @@ type Options struct {
 type routeSessionPlan struct {
 	key            string
 	file           agents.HistoryFile
-	descendants    []agents.HistoryFile
+	companions     []agents.HistoryFile
+	missingParent  string
 	source         agents.HistorySource
 	records        int
 	estimatedBytes int64
@@ -174,6 +175,7 @@ func discoverAndPlan(
 		if err != nil {
 			return nil, fmt.Errorf("discover %s history: %w", src.SourceSystem(), err)
 		}
+		bySession := indexBySession(files)
 		childrenByParent := buildChildrenMap(files)
 		for _, f := range files {
 			if err := ctx.Err(); err != nil {
@@ -182,8 +184,8 @@ func discoverAndPlan(
 			}
 			sum.DiscoveredFiles++
 			key := SessionKey(f.SourceSystem, f.SessionID)
-			descendants := collectDescendants(f.SessionID, childrenByParent)
-			if f.Active || slices.ContainsFunc(descendants, func(d agents.HistoryFile) bool { return d.Active }) {
+			companions, missingParent := collectFamily(f, bySession, childrenByParent)
+			if f.Active || slices.ContainsFunc(companions, func(c agents.HistoryFile) bool { return c.Active }) {
 				sum.addSkippedSession(SkipActive, 1)
 				continue
 			}
@@ -207,6 +209,7 @@ func discoverAndPlan(
 			}
 			var planSegs []planSeg
 			var reachSegs []segReachInfo
+			isChild := f.ParentSessionID != ""
 			err := src.ReadHistory(ctx, f, agents.HistoryReadOptions{IncludeSupplemental: opts.DryRun}, func(seg agents.HistorySegment) error {
 				if err := ctx.Err(); err != nil {
 					return err
@@ -214,7 +217,7 @@ func discoverAndPlan(
 				target, ok, skipReason := resolver.resolve(ctx, seg.Cwd, seg.FallbackRepoURL, seg.FallbackBranch)
 				if opts.DryRun {
 					reachSegs = append(reachSegs, segReachInfo{
-						cwd: seg.Cwd, subagent: seg.Subagent, reaches: seg.ToolReaches,
+						cwd: seg.Cwd, subagent: isChild || seg.Subagent, reaches: seg.ToolReaches,
 						earliest: earliestSegmentTime(seg), target: target, ok: ok,
 					})
 				} else {
@@ -240,14 +243,14 @@ func discoverAndPlan(
 			var reachMixedAt time.Time
 			var hasReachMixed bool
 			if opts.DryRun {
-				if len(descendants) > 0 {
-					descSegs, descCutoff, hasDescCutoff, derr := collectDescendantReach(ctx, opts.StateDir, src, resolver, descendants)
-					if derr != nil {
+				if len(companions) > 0 || missingParent != "" {
+					compSegs, compCutoff, hasCompCutoff, cerr := collectCompanionReach(ctx, opts.StateDir, src, resolver, companions, missingParent)
+					if cerr != nil {
 						sum.Interrupted = true
-						return nil, derr
+						return nil, cerr
 					}
-					reachSegs = append(reachSegs, descSegs...)
-					reachMixedAt, hasReachMixed = mergeMixedCutoff(reachMixedAt, hasReachMixed, descCutoff, hasDescCutoff)
+					reachSegs = append(reachSegs, compSegs...)
+					reachMixedAt, hasReachMixed = mergeMixedCutoff(reachMixedAt, hasReachMixed, compCutoff, hasCompCutoff)
 				}
 				rAt, hasR := sessionReachMixedAt(resolver, reachSegs)
 				reachMixedAt, hasReachMixed = mergeMixedCutoff(reachMixedAt, hasReachMixed, rAt, hasR)
@@ -297,7 +300,7 @@ func discoverAndPlan(
 				}
 				sp := b.sessions[key]
 				if sp == nil {
-					sp = &routeSessionPlan{key: key, file: f, descendants: descendants, source: src}
+					sp = &routeSessionPlan{key: key, file: f, companions: companions, missingParent: missingParent, source: src}
 					b.sessions[key] = sp
 				}
 				sp.records += recCount

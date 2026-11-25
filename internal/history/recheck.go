@@ -2,6 +2,7 @@ package history
 
 import (
 	"cmp"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -100,6 +101,30 @@ func policyContentMatches(a, b config.Policy) bool {
 		a.Mode == b.Mode &&
 		a.Wildcards == b.Wildcards &&
 		slices.Equal(a.Repositories, b.Repositories)
+}
+
+// routingPoliciesMatch reports whether two routing snapshots have identical routing
+// semantics (selections, bindings, team availability, and policy rules/content switches),
+// ignoring FetchedAt-only Generation ticks from routine background policy refreshes.
+func routingPoliciesMatch(a, b routing.State, now time.Time) bool {
+	if a.StateID != b.StateID || a.Account != b.Account || a.ConsentGeneration != b.ConsentGeneration {
+		return false
+	}
+	if len(a.Teams) != len(b.Teams) || !maps.Equal(a.Bindings, b.Bindings) {
+		return false
+	}
+	for _, ta := range a.Teams {
+		tb, ok := b.Team(ta.EnrollmentID)
+		if !ok {
+			return false
+		}
+		if ta.OrganizationID != tb.OrganizationID || ta.TeamID != tb.TeamID ||
+			ta.Personal != tb.Personal || ta.AuthURL != tb.AuthURL ||
+			ta.StateAt(now) != tb.StateAt(now) || !policyContentMatches(ta.Policy, tb.Policy) {
+			return false
+		}
+	}
+	return true
 }
 
 func recheckRouteTeam(opts Options, enrollmentID string, now time.Time) (routing.State, routing.Team, string, string, bool) {

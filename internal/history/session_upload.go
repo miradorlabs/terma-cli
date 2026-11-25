@@ -43,9 +43,9 @@ func uploadOneSession(
 	}
 	remaining := max(1, total-idx+1) + max(0, extraRemaining)
 
-	// Re-stat transcript and spawned child files right before reading so a session resumed
+	// Re-stat transcript and spawn-family files right before reading so a session resumed
 	// while earlier routes were draining is never uploaded mid-write or marked done early.
-	preSnap, exists := statSessionFiles(sp.file, sp.descendants)
+	preSnap, exists := statSessionFiles(sp.file, sp.companions)
 	if !exists {
 		sum.addSkippedSession(SkipMissingFile, 1)
 		return false, nil
@@ -77,13 +77,14 @@ func uploadOneSession(
 	runSnap, lookupSnap := newRunSnapLookup(opts.StateDir, sp.file.SessionID)
 
 	// Pass 1 (lightweight): collect routing and tool-reach metadata across the session and
-	// any spawned child transcripts without retaining protobuf log records in memory.
+	// its entire spawn family without retaining protobuf log records in memory.
 	var reachSegs []segReachInfo
+	isChild := sp.file.ParentSessionID != ""
 	readErr := sp.source.ReadHistory(ctx, sp.file, agents.HistoryReadOptions{IncludeSupplemental: false}, func(seg agents.HistorySegment) error {
 		target, ok, _ := sessionResolver.resolve(ctx, seg.Cwd, seg.FallbackRepoURL, seg.FallbackBranch)
 		reachSegs = append(reachSegs, segReachInfo{
 			cwd:      seg.Cwd,
-			subagent: seg.Subagent,
+			subagent: isChild || seg.Subagent,
 			reaches:  seg.ToolReaches,
 			earliest: earliestSegmentTime(seg),
 			target:   target,
@@ -106,18 +107,18 @@ func uploadOneSession(
 
 	var reachMixedAt time.Time
 	var hasReachMixed bool
-	if len(sp.descendants) > 0 {
-		descSegs, descCutoff, hasDescCutoff, derr := collectDescendantReach(ctx, opts.StateDir, sp.source, sessionResolver, sp.descendants)
-		if derr != nil {
+	if len(sp.companions) > 0 || sp.missingParent != "" {
+		compSegs, compCutoff, hasCompCutoff, cerr := collectCompanionReach(ctx, opts.StateDir, sp.source, sessionResolver, sp.companions, sp.missingParent)
+		if cerr != nil {
 			sum.Interrupted = true
-			return true, derr
+			return true, cerr
 		}
-		reachSegs = append(reachSegs, descSegs...)
-		reachMixedAt, hasReachMixed = mergeMixedCutoff(reachMixedAt, hasReachMixed, descCutoff, hasDescCutoff)
+		reachSegs = append(reachSegs, compSegs...)
+		reachMixedAt, hasReachMixed = mergeMixedCutoff(reachMixedAt, hasReachMixed, compCutoff, hasCompCutoff)
 	}
 
 	// Re-stat immediately after Pass 1 so a turn appended while reading never leaves.
-	afterReadSnap, stillExists := statSessionFiles(sp.file, sp.descendants)
+	afterReadSnap, stillExists := statSessionFiles(sp.file, sp.companions)
 	if !stillExists {
 		sum.addSkippedSession(SkipMissingFile, 1)
 		return false, nil
@@ -139,7 +140,7 @@ func uploadOneSession(
 	lastOrgEpochs := orgEpochSnapshot(freshState.Teams, freshTeam.OrganizationID, freshTeam.AuthURL)
 	beforeAttempt := func(context.Context) error {
 		curNow := nowFn()
-		snap, existsNow := statSessionFiles(sp.file, sp.descendants)
+		snap, existsNow := statSessionFiles(sp.file, sp.companions)
 		if !existsNow {
 			return &preAttemptStopError{skipReason: SkipMissingFile, reason: "session transcript removed during upload", active: true}
 		}
@@ -153,7 +154,7 @@ func uploadOneSession(
 		if checkState.StateID != freshState.StateID || checkState.ConsentGeneration != freshState.ConsentGeneration {
 			return &preAttemptStopError{skipReason: SkipDeselected, reason: "routing selections or repository bindings changed during upload; re-run to apply"}
 		}
-		if !routing.SameGeneration(freshState, checkState) || !policyContentMatches(preparedPolicy, checkTeam.Policy) {
+		if !routingPoliciesMatch(freshState, checkState, curNow) {
 			return &preAttemptStopError{skipReason: SkipPolicyChanged, reason: "routing or content policy changed during upload; re-run to apply updated policy"}
 		}
 		lastCheckTeam = checkTeam
@@ -170,6 +171,9 @@ func uploadOneSession(
 	mixedDropped := 0
 	chunker := NewChunkWriter(maxReqBytes, func(ch Chunk) error {
 		if !markedInProgress {
+			if err := beforeAttempt(ctx); err != nil {
+				return err
+			}
 			st.MarkInProgress(sp.file.SourceSystem, sp.file.SessionID, nowFn(), sp.records, sp.estimatedBytes, preSnap.modTime)
 			if err := SaveState(opts.StateDir, *st); err != nil {
 				stateSaveErr = fmt.Errorf("save history state: %w", err)
@@ -269,7 +273,7 @@ func uploadOneSession(
 
 	// Re-stat right before marking done: if the user resumed the session while we were
 	// uploading it, keep it in_progress so later turns are never skipped.
-	postSnap, stillHere := statSessionFiles(sp.file, sp.descendants)
+	postSnap, stillHere := statSessionFiles(sp.file, sp.companions)
 	if !stillHere {
 		sum.addSkippedSession(SkipMissingFile, 1)
 		return false, nil
