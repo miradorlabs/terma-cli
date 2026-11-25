@@ -549,7 +549,15 @@ async function firstSight(s, lookup) {
 }
 
 function update(s, rec) {
-  if (rec.directory) s.directory = rec.directory
+  if (rec.directory && rec.directory !== s.directory) {
+    // A session that moved is under the policy of the repository it is in now. The move
+    // takes its place in the queue: what was said before it leaves under the old one.
+    const directory = rec.directory
+    run(s, () => {
+      s.directory = directory
+      s.policy = repoPolicy(directory)
+    })
+  }
   if (rec.parentID) s.parentID = rec.parentID
   if (rec.title && rec.title !== s.title) {
     s.title = rec.title

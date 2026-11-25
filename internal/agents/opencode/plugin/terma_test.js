@@ -882,6 +882,27 @@ test("the repository's policy applies per session directory", async () => {
   expect(r.terma.calls().filter((c) => c.event === "opencode-session-start").map((c) => c.payload.session_id).sort()).toEqual(["ses_o", "ses_p", "ses_q"])
 })
 
+test("a session that moves takes the policy of the repository it moved into", async () => {
+  const open = mkdtempSync(join(root, "open-"))
+  mkdirSync(join(open, ".git"))
+  const private_ = mkdtempSync(join(root, "private-"))
+  mkdirSync(join(private_, ".git"))
+  mkdirSync(join(private_, ".opencode"))
+  writeFileSync(join(private_, ".opencode", "terma.json"), JSON.stringify({ includePrompts: false }))
+
+  const { r, hooks } = await start()
+  await hooks.event(sessionCreated("ses_m", { directory: open }))
+  await hooks["chat.message"]({ sessionID: "ses_m" }, { message: { id: "msg_before" }, parts: [{ type: "text", text: "before the move" }] })
+  await hooks.event(ev("session.updated", { info: { id: "ses_m", directory: private_, version: "1.19.6", title: "New session - 2026-11-25T00:00:00.000Z", time: { created: 1000, updated: 2000 } } }))
+  await hooks["chat.message"]({ sessionID: "ses_m" }, { message: { id: "msg_after" }, parts: [{ type: "text", text: "after the move" }] })
+  await hooks.dispose()
+  const bodies = Object.fromEntries(named(r.logs(), "opencode.user_prompt").map((x) => [A(x)["opencode.message.id"], x.body.stringValue]))
+  expect(bodies).toEqual({ msg_before: "before the move", msg_after: "" })
+  // Hooks after the move name the new directory.
+  const prompts = r.terma.calls().filter((c) => c.event === "opencode-prompt").map((c) => c.payload.cwd)
+  expect(prompts).toEqual([open, private_])
+})
+
 test("a null CONFIG makes the plugin inert", async () => {
   const mod = await load(null)
   expect(await mod.default.server({ client: fakeClient(null), directory: root, worktree: root })).toEqual({})
