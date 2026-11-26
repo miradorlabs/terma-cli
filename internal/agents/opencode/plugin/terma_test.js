@@ -2433,10 +2433,20 @@ for (const label of ["2.4.1/01-plain", "2.4.1/02-tools", "2.4.1/09-subagent", "s
         if (ms(record.timeUnixNano) - (typeof hook.at === "number" ? hook.at : Date.parse(hook.at)) >= 40) held++
       }
       expect(held).toBeGreaterThan(0)
-      // Ends and usage are OpenCode's own, as in the unpaced replay.
+      // Usage is OpenCode's own, as in the unpaced replay, and so is every end, except that of
+      // a call that ended while its session was still being claimed: that one is held to its
+      // prompt. Which calls those are depends on how long the claim took on this machine (the
+      // subagent's call in 2.0.0/sub ends 50 ms after its prompt), so the rule is asserted
+      // whichever way it fell.
       const plain = await replayed2(label)
-      const facts = (spans) => spans.map((sp) => [A(sp)["opencode.call.id"] ?? A(sp)["gen_ai.tool.call.id"], sp.endTimeUnixNano, A(sp)["gen_ai.usage.input_tokens"], A(sp)["gen_ai.usage.total_cost"]]).filter((f) => !String(f[0]).startsWith("title:")).sort()
-      expect(facts(res.spans)).toEqual(facts(plain.spans))
+      const stamps = new Map(prompts.map((r) => [sessionOf(r) + " " + A(r)["opencode.message.id"], BigInt(r.timeUnixNano)]))
+      const idOf = (sp) => A(sp)["opencode.call.id"] ?? A(sp)["gen_ai.tool.call.id"]
+      const facts = (spans, end) => spans.map((sp) => [idOf(sp), end(sp), A(sp)["gen_ai.usage.input_tokens"], A(sp)["gen_ai.usage.total_cost"]]).filter((f) => !String(f[0]).startsWith("title:")).sort()
+      const heldEnd = (sp) => {
+        const stamp = stamps.get(sessionOf(sp) + " " + A(sp)["opencode.parent_message.id"])
+        return stamp !== undefined && BigInt(sp.endTimeUnixNano) < stamp ? String(stamp) : sp.endTimeUnixNano
+      }
+      expect(facts(res.spans, (sp) => sp.endTimeUnixNano)).toEqual(facts(plain.spans, heldEnd))
     },
     REPLAY_TIMEOUT,
   )
@@ -3336,10 +3346,11 @@ test("a prompt is stamped no earlier than its session's claim, and the calls it 
   const turn1 = r.spans().filter((sp) => A(sp)["opencode.parent_message.id"] === "msg_A" || kindOf(sp) === "title")
   expect(turn1.map((sp) => sp.name).sort()).toEqual(["chat m-title", "chat m1"])
   for (const sp of turn1) expect(ms(sp.startTimeUnixNano)).toBeGreaterThanOrEqual(ms(first.timeUnixNano))
-  // Only the start moved, and no further than the prompt: the step ends when OpenCode said.
+  // Only the start moved, and no further than the prompt: the step ends when OpenCode said
+  // (or at its prompt, on a machine so slow that the claim outlasted the whole step).
   const call1 = chats(turn1).find((sp) => !kindOf(sp))
   expect(ms(call1.startTimeUnixNano)).toBe(ms(first.timeUnixNano))
-  expect(ms(call1.endTimeUnixNano)).toBe(asked + 400)
+  expect(ms(call1.endTimeUnixNano)).toBe(Math.max(asked + 400, ms(first.timeUnixNano)))
 
   const second = prompts.find((l) => A(l)["opencode.message.id"] === "msg_B")
   expect(ms(second.timeUnixNano) - again).toBeGreaterThanOrEqual(0)

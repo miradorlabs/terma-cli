@@ -649,7 +649,10 @@ call that made them. Reasoning text is never collected, and a file one of OpenCo
 commands writes is not attributed to its session. When a reach is checked only after its call
 ran, what the session and the sessions above it send waits for the check, but only for the
 sessions that OpenCode process knows: a parent session in another OpenCode process is not held
-back. On OpenCode 2, every session of the background service runs in one process.
+back. On OpenCode 2, every session of the background service runs in one process. Also on
+OpenCode 2, the first model call or tool call of a session can be recorded a few tens of
+milliseconds shorter than it was: OpenCode does not wait for terma's first check of the
+session, and nothing is recorded as starting before the prompt that asked for it.
 
 On OpenCode 2, some attached files stop a session from being recorded. terma checks that a
 file an agent reads belongs to a repository your team collects, and for these OpenCode 2
@@ -659,7 +662,7 @@ gives the plugin the file's content but not where the file is, so it cannot be c
 - on OpenCode 2.0.0, an image or PDF attached by its path.
 
 From such a prompt on, nothing of the session is recorded until the session is next resumed,
-and `terma doctor` lists the run as Mixed, as for any reach terma cannot place. A file
+and `terma doctor` lists it under "Paused sessions", as for any reach terma cannot place. A file
 attached with `@file` is checked and recorded as usual, and so is an image or PDF attached
 by its path on OpenCode 2.4.1. An image pasted from the clipboard has no file behind it: it
 is treated as your own input, like pasted text, and nothing of the image is sent. Text that
@@ -670,7 +673,10 @@ does this with an SVG dragged into the prompt (read in its code, not seen in a r
 A session you move to another repository on OpenCode 2 is recorded under that repository's
 rules from the move on. What was said before the move stays as it was recorded, but the
 session's title, and replies that draw on the earlier conversation, are recorded under the
-new repository's rules once the session is there.
+new repository's rules once the session is there. terma takes a few tens of milliseconds to
+claim the session in its new repository, and a model step or tool call that starts and ends
+within that time is recorded under the repository the session came from, which can be another
+team's or another organization's.
 
 On Windows, setup lists Antigravity, Grok Build and OpenCode as Coming Soon: `agy` runs its
 hooks with `cmd` there, and terma's hook command for it has been checked only on macOS and

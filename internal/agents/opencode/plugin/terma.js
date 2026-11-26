@@ -1738,7 +1738,6 @@ const EVENTS2 = new Set([
 // What `opencode run -f` appends to a prompt's text for each text file: its name and content.
 const INLINED_FILES = /(?:^|\n\n)<file name="[\s\S]*">\n[\s\S]*\n<\/file>$/
 
-
 // data2 is the OpenCode 2 entry's own data for a session, kept in its entry slot.
 function data2(s) {
   const e = s.entry
@@ -1802,6 +1801,23 @@ function begun2(e, turn, t) {
   return stamp !== undefined && t < stamp ? stamp : t
 }
 
+// unexplainedRise2 is how far a usage update raised the session's totals when nothing the
+// plugin reports explains it, else null: OpenCode 2 gives a title call no usage of its own,
+// only the session's totals, so such a rise right before a rename is the title call's. A
+// step that ended explains exactly what it used (taken off e.ended), in any order, and a
+// compaction in flight brings its own. Totals only rise; a fall explains nothing.
+function unexplainedRise2(e, now) {
+  const prev = e.usage ?? totals2(null)
+  e.usage = now
+  const r = {}
+  for (const k of Object.keys(now)) r[k] = now[k] - prev[k]
+  r.cost = Number(r.cost.toFixed(12))
+  const step = e.ended.findIndex((u) => Object.keys(r).every((k) => (k === "cost" ? Number(u.cost.toFixed(12)) : u[k]) === r[k]))
+  if (step >= 0) e.ended.splice(step, 1)
+  const values = Object.values(r)
+  return step < 0 && !e.compaction && values.every((v) => v >= 0) && values.some((v) => v > 0) ? r : null
+}
+
 function totals2(rec) {
   const t = rec?.tokens ?? {}
   return {
@@ -1823,8 +1839,6 @@ function texts2(content) {
   return Array.isArray(content) ? content.filter((p) => p?.type === "text").map((p) => str(p.text)).join("\n") : ""
 }
 
-// The files a file tool read or changed, absolute: OpenCode 2 names them relative to the
-// directory the session runs in.
 // reach2 is what a call can reach, known before it runs: the core's for a read, an edit, a
 // search or a shell call, and for a patch the files its text names. OpenCode 2 waits for
 // tool.execute.before, so a patch is checked before it changes anything.
@@ -1845,6 +1859,8 @@ function patchFiles2(text) {
   return out
 }
 
+// The files a file tool read or changed, absolute: OpenCode 2 names them relative to the
+// directory the session runs in.
 function filesOf2(s, name, input, metadata) {
   let list = []
   if (name === "read" || name === "write" || name === "edit") list = [input?.path]
@@ -1974,21 +1990,9 @@ function handle2(s, event) {
     case "session.tool.success":
     case "session.tool.failed":
       return endTool2(s, e, event)
-    case "session.usage.updated": {
-      const now = totals2(d)
-      const prev = e.usage ?? totals2(null)
-      const r = {}
-      for (const k of Object.keys(now)) r[k] = now[k] - prev[k]
-      r.cost = Number(r.cost.toFixed(12))
-      // Only a rise nothing else explains is a title call's: a step that ended brings
-      // exactly what it used, and a compaction in flight brings its own.
-      const step = e.ended.findIndex((u) => Object.keys(r).every((k) => (k === "cost" ? Number(u.cost.toFixed(12)) : u[k]) === r[k]))
-      if (step >= 0) e.ended.splice(step, 1)
-      const values = Object.values(r)
-      e.titleRise = step < 0 && !e.compaction && values.every((v) => v >= 0) && values.some((v) => v > 0) ? r : null
-      e.usage = now
+    case "session.usage.updated":
+      e.titleRise = unexplainedRise2(e, totals2(d))
       return
-    }
     case "session.renamed": {
       // The title call's span goes before its title. A side question's usage cannot be told
       // from the title's, so a title that shared its time with one is sent without any.
@@ -2200,11 +2204,11 @@ async function setup(ctx) {
     }
   }
   const see = (id, record, directory) => {
-    const fresh = typeof id === "string" && !state.sessions.has(id)
+    const first = typeof id === "string" && !state.sessions.has(id)
     const s = sight(id, { record, fetch: lookup(id), owner: directory ? ownerOf(directory) : owner })
     // Next in the session's queue after its claim: the relay files a record under the claim
     // and the run in force at its time, so no prompt is stamped before this one's claim.
-    if (s && fresh) run(s, () => void (data2(s).floor = Math.max(data2(s).floor, Date.now())))
+    if (s && first) run(s, () => void (data2(s).floor = Math.max(data2(s).floor, Date.now())))
     return s
   }
   const guard = (fn) => async (input) => {

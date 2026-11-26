@@ -398,15 +398,19 @@ func TestRelayWorkloadsOpenCode(t *testing.T) {
 		for _, w := range []struct{ name, cmd string }{{"reply", ""}, {"bash", "printf ok"}} {
 			t.Run(w.name, func(t *testing.T) {
 				var provider *httptest.Server
+				var calls atomic.Int32
 				runBoth(t, b, func(t *testing.T) *Sandbox {
 					sb := New(t, Isolated)
-					var calls atomic.Int32
-					// The workload's shell call, in the build's own tool name; none for a reply.
-					var call openCodeCall
+					calls.Store(0)
+					// The workload's shell call, in the build's own tool name; none for a reply. The
+					// scripted provider keeps it for the conversation: OpenCode's title request can
+					// reach a provider first, and one that answers its first request with the call
+					// then has none left for the conversation, so the session never runs it.
+					var steps []openCodeStep
 					if w.cmd != "" {
-						call = openCodeCallFor(b, "call_oc_1", openCodeIntent{shell: w.cmd, description: "workload"})
+						steps = []openCodeStep{{calls: []openCodeCall{openCodeCallFor(b, "call_oc_1", openCodeIntent{shell: w.cmd, description: "workload"})}}}
 					}
-					provider = httptest.NewServer(openAIToolCallProvider(&calls, call.name, call.args))
+					provider = httptest.NewServer(openCodeScriptedProvider(&calls, steps...))
 					t.Cleanup(provider.Close)
 					sb.UseOpenCodeProvider(provider.URL)
 					sb.UseOpenCode(b)
@@ -414,6 +418,10 @@ func TestRelayWorkloadsOpenCode(t *testing.T) {
 				}, func(t *testing.T, sb *Sandbox) {
 					sb.directOpenCode()
 					sb.OpenCodeRun(b, sb.Repo, "", "Do the task. TERMA_WORKLOAD")
+					// The call's request, then the one that carries its result back.
+					if w.cmd != "" && calls.Load() < 2 {
+						t.Errorf("the workload's shell call did not run: %d conversation requests", calls.Load())
+					}
 				})
 			})
 		}
