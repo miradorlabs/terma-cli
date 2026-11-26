@@ -936,6 +936,46 @@ test("a subagent's late reach check holds the session that opened it to the chec
   for (const sp of up) expect(endOf(sp)).toBeGreaterThan(finished)
 })
 
+test("while a late reach check runs, what the rest of the family sends waits for it and is held to its time", async () => {
+  // Nothing ties the parent to the child here (no task part): the parent goes on, as with a
+  // subagent in the background, while the child's shell call is still being checked.
+  const { r, hooks } = await start({}, { terma: { delayed: { "opencode-tool-reach": 0.3 } } })
+  await hooks.event(sessionCreated("ses_fg"))
+  await hooks.event(sessionCreated("ses_bg", { parentID: "ses_fg" }))
+  await Promise.all([...globalThis[KEY].sessions.values()].map((s) => s.queue))
+  await hooks.event(toolPart("ses_bg", "msg_k", "k1", "bash", done({ command: "cat /other/x" }, "x")))
+  await hooks.event(assistantDone("ses_fg", "msg_1", { time: { created: 2000, completed: Date.now() } }))
+  await hooks.event(ev("session.updated", { info: { id: "ses_fg", directory: "/repo", version: "1.19.6", title: "A real title", time: { created: 1000 } } }))
+  await hooks.dispose()
+  const finished = finishedAt(r.dir, "opencode-tool-reach")
+  const [call] = chats(r.spans()).filter((sp) => A(sp)["session.id"] === "ses_fg")
+  expect(endOf(call)).toBeGreaterThan(finished)
+  expect(Number(BigInt(named(r.logs(), "opencode.session.title")[0].timeUnixNano) / 1000000n)).toBeGreaterThan(finished)
+})
+
+test("a family's floor outlives its root, and a dark session still blocks what is under it once forgotten", async () => {
+  const source = SOURCE.replace("const RECORD_WAIT_MS = 5000", "const RECORD_WAIT_MS = 300")
+  const { r, hooks } = await start({}, { client: fakeClient(() => null), source, terma: { delayed: { "opencode-tool-reach": 0.2 } } })
+  const settled = () => Promise.all([...globalThis[KEY].sessions.values()].map((s) => s.queue))
+  await hooks.event(sessionCreated("ses_top"))
+  await hooks.event(sessionCreated("ses_low", { parentID: "ses_top" }))
+  await hooks.event(toolPart("ses_low", "msg_k", "k1", "bash", done({ command: "ls" }, "x")))
+  await settled() // the check is done while the root is still kept
+  await hooks.event(ev("session.deleted", { info: { id: "ses_top", directory: "/repo", version: "1.19.6", time: { created: 1000 } } }))
+  await settled()
+  expect(globalThis[KEY].sessions.has("ses_top")).toBe(false)
+  await hooks.event(assistantDone("ses_low", "msg_2", { time: { created: 2000, completed: 3000 } }))
+  // A session with no record goes dark, is forgotten as an eviction would, and its child comes.
+  await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_dk", callID: "c1" }, { args: { filePath: "/repo/a" } })
+  globalThis[KEY].sessions.delete("ses_dk")
+  await hooks.event(sessionCreated("ses_orphan", { parentID: "ses_dk" }))
+  await hooks.event(assistantDone("ses_orphan", "msg_3"))
+  await hooks.dispose()
+  const [call] = chats(r.spans()).filter((sp) => A(sp)["session.id"] === "ses_low")
+  expect(endOf(call)).toBeGreaterThan(finishedAt(r.dir, "opencode-tool-reach"))
+  expect(r.spans().filter((sp) => A(sp)["session.id"] === "ses_orphan")).toEqual([])
+}, 15_000)
+
 test("a session under one that went dark is not exported", async () => {
   const source = SOURCE.replace("const RECORD_WAIT_MS = 5000", "const RECORD_WAIT_MS = 300")
   const { r, hooks } = await start({}, { client: fakeClient(() => null), source })

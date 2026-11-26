@@ -41,8 +41,8 @@ import { fileURLToPath } from "node:url"
 // - At exit, one after another: the entry's session queues get EXIT_QUEUE_MS, the hooks still
 //   running HOOK_TIMEOUT_MS, the flush EXIT_FLUSH_MS, OpenCode 1's log LOG_SETTLE_MS.
 // - update() stamps what follows a move 1 ms after its claim, so none of it sorts before the claim.
-// - A reach check made after its tool ran sets checkedAt, on the root of the session's family,
-//   1 ms after it finished, and no model or tool call the family sends afterwards ends
+// - A reach check made after its tool ran is noted for the session's family (checked), 1 ms
+//   after it finished, and no model or tool call the family sends afterwards ends
 //   earlier, nor is a prompt or title stamped earlier. A patch is checked in
 //   tool.execute.after, which OpenCode waits for, so it keeps its own end; a call no hook saw
 //   is checked when its part arrives and ends at that check.
@@ -151,6 +151,13 @@ function newState() {
     },
     sessions: new Map(),
     tainted: new Set(),
+    // The ids of sessions that went dark, kept for good as taints are: a session that has
+    // ended or been forgotten still fails what is below it closed.
+    dark: new Set(),
+    // The time of the last reach check made after its tool ran, by family (familyOf), and
+    // the late checks running now, which the family's queued work waits for (lateCheck).
+    floors: new Map(),
+    checking: new Map(),
     seenEvents: new Set(),
     owners: 0,
   }
@@ -584,9 +591,6 @@ function newSession(id, owner) {
     directory: "",
     askedDirectory: "", // the directory most recently moved to, applied or still queued
     movedAt: 0, // when the last move's claim finished; nothing after it is stamped earlier
-    // When the last reach check made after its tool ran finished, kept on the family's root
-    // (rootOf): nothing the family sends afterwards ends or is stamped earlier.
-    checkedAt: 0,
     version: "",
     created: 0,
     title: "",
@@ -672,7 +676,7 @@ async function firstSight(s, lookup) {
     rec = s.latest ?? fetched
   }
   if (!rec) {
-    s.dark = true
+    darken(s)
     return
   }
   s.latest = null
@@ -688,7 +692,7 @@ async function firstSight(s, lookup) {
   // A timeout or a refusal is not fatal: the relay holds an unclaimed session and the
   // next prompt claims it again. A terma that cannot be run is.
   if (!s.claimed && termaMissing()) {
-    s.dark = true
+    darken(s)
     return
   }
   // The title as it stands now (a later update may have arrived during the claim); this
@@ -731,6 +735,7 @@ function run(s, fn) {
   s.busy++
   s.queue = s.queue.then(async () => {
     try {
+      await state.checking.get(familyOf(s))
       if (!blocked(s)) await fn()
     } catch {
       // A telemetry failure must never surface in the agent.
@@ -742,8 +747,14 @@ function run(s, fn) {
 }
 
 function blocked(s) {
-  if (!s.claimed && termaMissing()) s.dark = true
+  if (!s.claimed && termaMissing()) darken(s)
   return s.dark || isTainted(s)
+}
+
+// darken gives up on a session that could not be claimed: nothing of it is exported.
+function darken(s) {
+  s.dark = true
+  state.dark.add(s.id)
 }
 
 // A failed reach hook taints the session and every session above it: their content could
@@ -759,24 +770,58 @@ function taint(s) {
     id = parent
   }
 }
-// isTainted is whether a session, or one above it, failed closed: tainted, or never given
-// its record (dark), so nothing it read was checked and what is below it derives from it.
-// rootOf is the session at the top of s's family, as far up as this process knows it. A
-// session and its subagents share one run in terma, and so one Mixed cutoff: a reach check
-// made after its tool ran, anywhere in the family, holds the whole family's times.
-function rootOf(s) {
-  for (let i = 0; i < 16; i++) {
-    const parent = s.parentID ? state.sessions.get(s.parentID) : undefined
-    if (!parent || parent === s) break
-    s = parent
+// familyOf names s's family by the topmost session above it that this process can name,
+// whether or not that session is still kept. A session and its subagents share one run in
+// terma, and so one Mixed cutoff: a reach check made after its tool ran, anywhere in the
+// family, holds the whole family's times (checked, checkFloor).
+function familyOf(s) {
+  let id = s.id
+  for (let i = 0, parent = s.parentID; i < 16 && parent && parent !== id; i++) {
+    id = parent
+    parent = state.sessions.get(id)?.parentID
   }
-  return s
+  return id
 }
 
+// checked notes that a reach check made after its tool ran has just finished in s's
+// family, a millisecond on so that nothing shares its time, and returns that time.
+function checked(s) {
+  const at = Date.now() + 1
+  remember(state.floors, familyOf(s), at, MAX_SESSIONS)
+  return at
+}
+
+// lateCheck is guardReach for a call that has already run, with nothing waiting for its
+// check. While it runs, the queued work of every session in the family waits for it (run),
+// so nothing that may derive from the call is sent before the check is done, and what is
+// sent afterwards is held to its time. A check is bounded by its hook's limits.
+async function lateCheck(s, reach) {
+  const family = familyOf(s)
+  let done
+  const mine = Promise.all([state.checking.get(family), new Promise((r) => (done = r))])
+  state.checking.set(family, mine)
+  try {
+    const ok = await guardReach(s, reach)
+    if (ok) checked(s)
+    return ok
+  } finally {
+    if (state.checking.get(family) === mine) state.checking.delete(family)
+    done()
+  }
+}
+
+// checkFloor is the time nothing s sends may end or be stamped before: its family's last
+// such check, or 0.
+function checkFloor(s) {
+  return state.floors.get(familyOf(s)) ?? 0
+}
+
+// isTainted is whether a session, or one above it, failed closed: tainted, or never given
+// its record (dark), so nothing it read was checked and what is below it derives from it.
 function isTainted(s) {
   let id = s.id
   for (let i = 0; i < 16 && id; i++) {
-    if (state.tainted.has(id) || state.sessions.get(id)?.dark) return true
+    if (state.tainted.has(id) || state.dark.has(id)) return true
     const parent = id === s.id ? s.parentID : state.sessions.get(id)?.parentID
     if (!parent || parent === id) break
     id = parent
@@ -957,7 +1002,7 @@ function tool(s, t) {
 // the run went Mixed, and a call that overlapped that check may carry what the checked call
 // read or wrote. When OpenCode waits for the check nothing overlaps it, and no time changes.
 function endAfterCheck(s, end) {
-  const floor = rootOf(s).checkedAt
+  const floor = checkFloor(s)
   return floor && num(end) !== undefined && end < floor ? floor : end
 }
 
@@ -967,7 +1012,7 @@ function prompt(s, pr) {
   const text = str(pr.text)
   // No earlier than the session's last move or its last check made after a tool ran: the
   // relay files a record by its time, under the claim and the Mixed cutoff in force then.
-  const floor = Math.max(s.movedAt, rootOf(s).checkedAt)
+  const floor = Math.max(s.movedAt, checkFloor(s))
   const time = floor ? Math.max(num(pr.time) ?? 0, floor) : pr.time
   emitRecord(s, "opencode.user_prompt", policyOf(s).includePrompts ? truncate(text, MAX_TEXT) : "", {
     "opencode.message.id": pr.messageID,
@@ -991,7 +1036,7 @@ function title(s, t) {
 // session's previous title, so two titles of a session never share an identity, and no
 // earlier than its last move or its last check made after a tool ran, as a prompt is.
 function emitTitle(s, text, time) {
-  const at = Math.max(num(time) ?? Date.now(), s.lastTitleTime + 1, s.movedAt, rootOf(s).checkedAt)
+  const at = Math.max(num(time) ?? Date.now(), s.lastTitleTime + 1, s.movedAt, checkFloor(s))
   s.lastTitleTime = at
   emitRecord(s, "opencode.session.title", policyOf(s).includePrompts ? text : "", {}, at)
 }
@@ -1053,9 +1098,9 @@ async function shutdown(owner) {
 //   site                 checks                         when                         waits  sets
 //   tool.execute.before  a read, search, list, shell    before the tool runs         yes    nothing
 //                        command, write or edit
-//   tool.execute.after   what a call reaches known      after the tool ran, before   yes    checkedAt
+//   tool.execute.after   what a call reaches known      after the tool ran, before   yes    the family's floor
 //                        once it ran (a patch's files)  its result is handed on
-//   onToolPart1          a call no hook saw (a shell    when its completed part      no     checkedAt, the
+//   onToolPart1          a call no hook saw (a shell    when its completed part      no     the family's floor,
 //                        command the person runs, one   arrives                             call's end
 //                        finished in an earlier run)
 //   chat.message         the files attached to a        before the prompt is sent    yes    the prompt's time,
@@ -1131,10 +1176,11 @@ function failClosed(s) {
 // subagent still waiting for its record is judged once that wait is over. An entry calls
 // this before it sends the call that opened a subagent.
 async function subagentChecked(s, id) {
-  const child = typeof id === "string" ? state.sessions.get(id) : undefined
-  if (!child || child === s) return true
-  await child.queue
-  if (!child.dark && !isTainted(child)) return true
+  if (typeof id !== "string" || id === s.id) return true
+  const child = state.sessions.get(id)
+  if (child) await child.queue
+  // By id too: a subagent that has ended or been forgotten is still known to have failed.
+  if (!state.dark.has(id) && !state.tainted.has(id) && !(child && isTainted(child))) return true
   failClosed(s)
   return false
 }
@@ -1315,11 +1361,10 @@ async function onToolPart1(s, part, servers) {
   s.guarded.delete(part.callID)
   let end = num(st.time?.end)
   if (reach && guarded?.reachKey !== JSON.stringify(reach)) {
-    if (!(await guardReach(s, reach))) return
+    if (!(await lateCheck(s, reach))) return
     // The relay judges a record by its time: a call checked only after it ran must not end
-    // before its check. A millisecond later, since terma's clock has a finer grain.
-    const at = (rootOf(s).checkedAt = Date.now() + 1)
-    end = Math.max(end ?? 0, at)
+    // before its check.
+    end = Math.max(end ?? 0, checkFloor(s))
   }
   if (part.tool === "task" && !(await subagentChecked(s, subagent))) return
   if (isTainted(s)) return
@@ -1575,7 +1620,7 @@ async function server(input) {
         const reachKey = JSON.stringify(reach)
         if (s.guarded.get(callID)?.reachKey === reachKey) return
         if (!(await guardReach(s, reach))) return
-        rootOf(s).checkedAt = Date.now() + 1 // strictly after the check, never the same millisecond
+        checked(s)
         remember(s.guarded, callID, { reachKey }, MAX_SMALL)
       })
     }),
