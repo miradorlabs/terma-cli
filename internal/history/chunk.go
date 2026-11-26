@@ -21,6 +21,11 @@ import (
 // beneath the ingest gateway's 4 MiB limit.
 const MaxRequestBytes = 3584 << 10
 
+// TargetChunkBytes is the size a chunk aims for: the ingest gateway reads a request body for
+// at most 30 s, and a request this size clears that at about 140 kbit/s of upload, where a
+// MaxRequestBytes one needs about 1 Mbit/s. Only a chunk holding one larger record exceeds it.
+const TargetChunkBytes = 512 << 10
+
 // Chunk is one marshaled OTLP LogsData protobuf payload ready to send.
 type Chunk struct {
 	Body    []byte
@@ -145,7 +150,9 @@ func countLogs(msg *logspb.LogsData) int {
 // recorded in snap or derived from transcript tool reach (reachMixedAt when hasReachMixed),
 // drops records newer than maxRecordTime when resuming a transcript modified after an
 // interrupted upload, or drops every record when the ledger is unreadable (failing closed).
-// dropped counts the Mixed drops only: a record past maxRecordTime is left for a later run.
+// dropped counts the Mixed drops only. A record past maxRecordTime is a turn added after the
+// interrupted upload began, which live collection already holds: it is not a Mixed drop and
+// is not counted.
 func FilterMixedLogs(msg *logspb.LogsData, snap runs.Snapshot, lookup func(id string) runs.Snapshot, reachMixedAt time.Time, hasReachMixed bool, maxRecordTime time.Time) (kept, dropped int) {
 	if msg == nil {
 		return 0, 0
@@ -223,8 +230,10 @@ func logRecordAttrString(lr *logspb.LogRecord, key string) string {
 
 // ChunkWriter streams prepared OTLP log batches into bounded protobuf chunks (<= maxBytes),
 // emitting each completed chunk via onChunk so peak memory stays bounded to one chunk at a time.
+// A chunk with more than one record also stays at or under target.
 type ChunkWriter struct {
 	maxBytes   int
+	target     int
 	onChunk    func(Chunk) error
 	cur        *logspb.LogsData
 	curRecords int
@@ -238,13 +247,15 @@ func NewChunkWriter(maxBytes int, onChunk func(Chunk) error) *ChunkWriter {
 	}
 	return &ChunkWriter{
 		maxBytes: maxBytes,
+		target:   min(TargetChunkBytes, maxBytes),
 		onChunk:  onChunk,
 		cur:      &logspb.LogsData{},
 	}
 }
 
 // Add appends one prepared LogsData batch, flushing completed chunks whenever adding a
-// record would exceed maxBytes. Returns *PermanentError if a single record cannot fit.
+// record would take a chunk that holds records past the target, or past maxBytes. Returns
+// *PermanentError if a single record cannot fit in maxBytes.
 func (w *ChunkWriter) Add(batch *logspb.LogsData) error {
 	for _, rl := range batch.GetResourceLogs() {
 		resOverhead := proto.Size(rl.Resource) + len(rl.SchemaUrl) + 32
@@ -264,10 +275,21 @@ func (w *ChunkWriter) Add(batch *logspb.LogsData) error {
 				w.estBytes += scopeOverhead
 			}
 			for _, lr := range sl.GetLogRecords() {
+				recSize := proto.Size(lr) + 16
+				grow := recSize
+				if activeSL == nil {
+					grow += scopeOverhead
+				}
+				// The soft target is judged on the estimate; maxBytes, below, on the exact size.
+				if w.target < w.maxBytes && w.curRecords > 0 && w.estBytes+grow > w.target {
+					if err := w.Flush(); err != nil {
+						return err
+					}
+					activeSL = nil
+				}
 				if activeSL == nil {
 					openScope()
 				}
-				recSize := proto.Size(lr) + 16
 				activeSL.LogRecords = append(activeSL.LogRecords, lr)
 				w.estBytes += recSize
 				// Only run exact proto.Size(w.cur) when our conservative upper-bound

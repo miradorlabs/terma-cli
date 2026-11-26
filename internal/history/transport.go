@@ -18,8 +18,10 @@ import (
 const (
 	// TargetBytesPerSec is the measured safe upload ceiling from MIR-717: 2 MiB/s of OTLP
 	// request bytes, one request in flight at a time per route.
-	TargetBytesPerSec     = 2 << 20
-	defaultRequestTimeout = 30 * time.Second
+	TargetBytesPerSec = 2 << 20
+	// defaultRequestTimeout gives a slow uplink twice the gateway's 30 s body read, so the
+	// gateway, not this client, decides when a request was too slow.
+	defaultRequestTimeout = 60 * time.Second
 	defaultInitialBackoff = time.Second
 	defaultMaxBackoff     = 60 * time.Second
 	defaultMaxRetryAfter  = 5 * time.Minute
