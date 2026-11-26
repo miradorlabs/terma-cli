@@ -23,6 +23,8 @@ const (
 	testTeamPlat = "platform"
 	testTeamCore = "core"
 	testTeamOwn  = "personal"
+	testOrgGamma = "44444444-4444-4444-8444-444444444444"
+	testTeamOps  = "ops"
 )
 
 func routedFixture(t *testing.T) Routing {
@@ -257,13 +259,16 @@ func TestTeamsCheckAndRowsShowMixedRunsAndBlockedCounts(t *testing.T) {
 	}
 	joined := strings.Join(lines, "\n")
 	for _, want := range []string{
-		"Teams|Acme Platform — active: github.com/acme/*",
+		"Teams|Acme Platform — active",
+		"Collects|github.com/acme/* (Acme Platform)",
+		"|everything else (Personal)",
 		"Mixed|5 session run(s) Mixed",
 		"|session s-1 crossed organizations, into github.com/acme/api",
 		`|session s-2 ran a shell command whose reach is not known: cd "$(cat p)" && cat …`,
 		"|session s-3 touched more places than the run ledger keeps",
 		"|session s-5 with a run ledger that cannot be read",
-		"Relay held|2 record(s) for Acme Platform, which could not send",
+		"Relay held|", // its rows sort by blocker, and enrollment IDs are random
+		"|2 record(s) for Acme Platform, which could not send",
 		"|1 record(s) for ended, no longer ticked",
 	} {
 		if !strings.Contains(joined, want) {
@@ -280,33 +285,98 @@ func TestTeamsCheckAndRowsShowMixedRunsAndBlockedCounts(t *testing.T) {
 	}
 }
 
-// TeamRows names each conflict, then the order routing tries the teams in and why it moves.
-func TestTeamRowsShowConflictsAndRoutingOrder(t *testing.T) {
-	t.Parallel()
-	now := time.Now().UTC()
+// collectsFixture is routedFixture plus an older Beta Labs Core whose list overlaps Acme
+// Platform's, and a Gamma Ops that lost access to its organization.
+func collectsFixture(t *testing.T, now time.Time) Routing {
+	t.Helper()
 	r := routedFixture(t)
+	r.Teams[testTeamOps], r.Orgs[testOrgGamma] = "Ops", "Gamma"
+	r.State.Teams[0].Policy.Repositories = []string{"github.com/acme/one", "github.com/shared/tool"}
 	r.State.Teams[0].Policy.UpdatedAt = now
-	beta := routing.Team{OrganizationID: testOrgBeta, AuthURL: testAuthURL, TeamID: testTeamCore, Policy: config.Policy{
-		Mode: config.ModeRepo, Repositories: []string{"github.com/acme/one"}, Revision: 1, FetchedAt: now, UpdatedAt: now.Add(-time.Hour),
-		OrganizationID: testOrgBeta, AuthURL: testAuthURL, TeamID: testTeamCore,
-	}}
-	if _, err := r.State.Select(beta); err != nil {
-		t.Fatal(err)
+	team := func(org, id string, age time.Duration, repos ...string) routing.Team {
+		return routing.Team{OrganizationID: org, AuthURL: testAuthURL, TeamID: id, Policy: config.Policy{
+			Mode: config.ModeRepo, Repositories: repos, Revision: 1, FetchedAt: now, UpdatedAt: now.Add(-age), Wildcards: true,
+			OrganizationID: org, AuthURL: testAuthURL, TeamID: id,
+		}}
 	}
+	for _, tm := range []routing.Team{
+		team(testOrgBeta, testTeamCore, time.Hour, "github.com/acme/*", "github.com/shared/tool", "github.com/beta/core"),
+		team(testOrgGamma, testTeamOps, 0, "github.com/gamma/*", "github.com/beta/core"),
+	} {
+		if _, err := r.State.Select(tm); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ops := &r.State.Teams[slices.IndexFunc(r.State.Teams, func(t routing.Team) bool { return t.TeamID == testTeamOps })]
+	ops.Refusals, ops.LastError = 2, routing.OrgAccessLost
+	return r
+}
+
+func rowLines(r Routing, now time.Time) []string {
 	var lines []string
 	for _, row := range TeamRows(r, now) {
 		lines = append(lines, row.Label+"|"+row.Value)
 	}
-	for _, want := range []string{
-		"Conflicts|github.com/acme/one is listed by Acme Platform and Beta Labs Core: Acme Platform collects it, as its policy is newer",
-		"Routing order|1. Acme Platform — " + PolicyAge(r.State.Teams[0]),
+	return lines
+}
+
+// TeamRows lists each team with its state, then each entry with the team
+// that collects it: the newer policy wins an overlap and names the loser, an entry listed
+// twice shows once, a refused team collects nothing, and Personal comes last.
+func TestTeamRowsShowWhatEachTeamCollects(t *testing.T) {
+	t.Parallel()
+	now := time.Now().UTC()
+	r := collectsFixture(t, now)
+	acme, beta := r.State.Teams[0], r.State.Teams[1]
+	want := []string{
+		"Teams|Acme Platform — active",
+		"|Beta Labs Core — active",
+		"|Gamma Ops — refused (you no longer have access to its organization)",
+		"|Personal — active",
+		"Collects|github.com/acme/one (Acme Platform) — also listed by Beta Labs Core, which does not collect it",
+		"|github.com/shared/tool (Acme Platform) — also listed by Beta Labs Core, which does not collect it",
+		"|github.com/acme/* (Beta Labs Core)",
+		"|github.com/beta/core (Beta Labs Core)",
+		"|everything else (Personal)",
+		"Routing order|1. Acme Platform — " + PolicyAge(acme),
 		"|2. Beta Labs Core — " + PolicyAge(beta),
 		"|3. Personal — last, collects what no organization does",
 		"|" + OrderChanges,
+	}
+	if got := rowLines(r, now); !slices.Equal(got, want) {
+		t.Errorf("TeamRows =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+
+	// A winner that cannot send holds what it wins rather than passing it on.
+	r.State.Teams[0].SignInNeeded = true
+	if got := rowLines(r, now); !slices.Contains(got, "Collects|github.com/acme/one (Acme Platform) — held: sign in needed; also listed by Beta Labs Core, which does not collect it") {
+		t.Errorf("held winner:\n%s", strings.Join(got, "\n"))
+	}
+
+	// Personal with its own list shows each entry; one an organization also lists goes there.
+	r.State.Teams[0].SignInNeeded = false
+	own := &r.State.Teams[len(r.State.Teams)-1]
+	own.Policy.Mode, own.Policy.Repositories = config.ModeRepo, []string{"github.com/me/dotfiles", "github.com/acme/one"}
+	got := rowLines(r, now)
+	for _, w := range []string{
+		"Collects|github.com/acme/one (Acme Platform) — also listed by Beta Labs Core, Personal, which do not collect it",
+		"|github.com/me/dotfiles (Personal)",
 	} {
-		if !slices.Contains(lines, want) {
-			t.Errorf("TeamRows lacks %q:\n%s", want, strings.Join(lines, "\n"))
+		if !slices.Contains(got, w) {
+			t.Errorf("TeamRows lacks %q:\n%s", w, strings.Join(got, "\n"))
 		}
+	}
+	if slices.ContainsFunc(got, func(l string) bool { return strings.Contains(l, "everything else") || strings.Contains(l, "gamma") }) {
+		t.Errorf("TeamRows collects everything else or a refused team's list:\n%s", strings.Join(got, "\n"))
+	}
+
+	// A team that lists nothing says so; with nothing listed anywhere, Collects says so too.
+	for i := range r.State.Teams {
+		r.State.Teams[i].Policy.Repositories = nil
+	}
+	got = rowLines(r, now)
+	if !slices.Contains(got, "Teams|Acme Platform — active; lists no repositories yet") || !slices.Contains(got, "Collects|nothing: no ticked team lists a repository") {
+		t.Errorf("empty lists:\n%s", strings.Join(got, "\n"))
 	}
 	if beta.Policy.UpdatedAt = (time.Time{}); PolicyAge(beta) != "policy update time unknown" {
 		t.Errorf("PolicyAge of an undated policy = %q", PolicyAge(beta))

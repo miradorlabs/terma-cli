@@ -41,12 +41,16 @@ func printContext(w io.Writer, rows []doctor.Row) {
 		return
 	}
 	out := style.Highlight(w)
+	width := 13
+	for _, r := range rows {
+		width = max(width, len(r.Label)+2)
+	}
 	for _, r := range rows {
 		label := ""
 		if r.Label != "" {
 			label = r.Label + ":"
 		}
-		fmt.Fprintf(out, "%-13s%s\n", label, r.Value)
+		fmt.Fprintf(out, "%-*s%s\n", width, label, r.Value)
 	}
 	fmt.Fprintln(out)
 }
