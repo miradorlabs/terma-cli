@@ -618,7 +618,7 @@ func TestTeamsSelectWildcardOverlapGlobalAndNoKeyMinting(t *testing.T) {
 			t.Fatalf("order = %v, want Beta Core then Acme API", v.Order)
 		}
 		text, err := runTerma(t, "teams")
-		if err != nil || !strings.Contains(flat(text), "! Policy conflict between Beta Labs Beta Core, Acme API") || !strings.Contains(text, conflictStep) || strings.Contains(text, "Routing order") {
+		if err != nil || !strings.Contains(flat(text), "! Conflict Beta Core and Acme API list the same repository.") || !strings.Contains(text, conflictStep) || strings.Contains(text, "Routing order") {
 			t.Fatalf("teams text lacks the one conflict line (%v):\n%s", err, text)
 		}
 	})

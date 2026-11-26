@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -152,7 +151,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	}
 
 	ui := newSetupUI(out, f.verbose)
-	ui.title, ui.warnTitle = "Setup complete", "Almost done — finish the steps marked ! below"
+	ui.title, ui.warnTitle = "Setup complete", "Almost done. Finish the steps marked !"
 	recorded := false
 	team := ""
 	var chosenOrg *organization
@@ -242,7 +241,6 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 				},
 				warn: func(label, what string) {
 					ui.Warn(label, what)
-					ui.Then("Run `terma doctor` to see what is wrong and how to fix it.")
 				},
 				then:   ui.Then,
 				detail: ui.Detail(),
@@ -263,7 +261,6 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 				ui.Summary("Check-in", what)
 			} else {
 				ui.Warn("Check-in", what)
-				ui.Then("Run `terma doctor` to see why this machine could not report to your organization.")
 			}
 		},
 	}
@@ -293,10 +290,10 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 		return err
 	}
 	if res.Policy.Global() {
-		ui.title = "Setup complete — every session and commit on this machine reports to " + cmp.Or(team, "your organization")
+		ui.Summary("Collects", "Every session and commit on this machine.")
 	}
 	app.reportUpdates(ui)
-	ui.Then("Run `terma doctor` any time to see what terma is collecting and check it end to end.")
+	ui.Then(doctorStep)
 	ui.finish()
 	return nil
 }

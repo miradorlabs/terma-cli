@@ -42,7 +42,7 @@ func TestSetupTeamPickerDescriptionsAndPersonal(t *testing.T) {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
 	want := []prompt.Item{
-		{Label: "Personal", Kind: prompt.Check, Selected: true},
+		{Label: "Personal", Detail: personalDetail, Kind: prompt.Check, Selected: true, Heading: personalHeading},
 		{Label: "Acme Web", Detail: "The web front end", Kind: prompt.Check, Selected: true, Heading: orgA().Name},
 		{Label: "Acme API", Kind: prompt.Check, Selected: true},
 	}
@@ -71,7 +71,7 @@ func TestTeamsFormDescriptionsAndPersonal(t *testing.T) {
 	if len(form.Items) != 4 {
 		t.Fatalf("items = %+v", form.Items)
 	}
-	if got := form.Items[0]; got.Label != "Personal" || got.Heading != "" || got.Detail != "" || slots[0] != (checklistSlot{1, 0}) {
+	if got := form.Items[0]; got.Label != "Personal" || got.Heading != personalHeading || got.Detail != personalDetail || slots[0] != (checklistSlot{1, 0}) {
 		t.Errorf("personal item = %+v at slot %+v, want it first", got, slots[0])
 	}
 	form.Items, slots = form.Items[1:], slots[1:]
@@ -88,10 +88,11 @@ func TestTeamsFormDescriptionsAndPersonal(t *testing.T) {
 		t.Errorf("first organization team at slot %+v", slots[0])
 	}
 
+	v.Changes = []string{"ticked Acme Web"}
 	v.state = routing.State{Teams: []routing.Team{{TeamID: "t1", OrganizationID: "o1"}, {TeamID: "pt", OrganizationID: "p1", Personal: true}}}
 	var out bytes.Buffer
 	renderTeams(&out, v)
-	if text := flat(out.String()); !strings.Contains(text, "✓ Teams Acme Web, Personal") || strings.Contains(text, "Default") || strings.Contains(text, "conflict") {
+	if text := flat(out.String()); !strings.HasPrefix(text, "! Changes applied. Some teams need you. ✓ Teams Acme Web, Personal") || strings.Contains(text, "Default") || strings.Contains(text, "conflict") {
 		t.Errorf("teams text is not the short summary:\n%s", out.String())
 	}
 }

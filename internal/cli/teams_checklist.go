@@ -24,6 +24,13 @@ func pickerDetail(description, note string) string {
 // the organization's heading and the team's own name.
 const personalLabel = "Personal"
 
+// personalHeading and personalDetail give Personal its own group in a picker, laid out
+// as an organization's; a description from the backend replaces personalDetail.
+const (
+	personalHeading = "You"
+	personalDetail  = "Your own workspace."
+)
+
 // teamPickerTitle asks the question both team pickers put; the keys are on the line below.
 const teamPickerTitle = "Which teams should this machine send to?"
 
@@ -54,7 +61,8 @@ func teamsForm(v teamsView) (*prompt.Form, []checklistSlot) {
 		for j, t := range o.Teams {
 			item := prompt.Item{Label: cmp.Or(t.Name, t.ID), Detail: pickerDetail(t.Description, teamStateNote(t)), Kind: prompt.Check, Selected: t.Selected, Heading: heading}
 			if solo(o) {
-				item.Label, item.Heading = personalLabel, ""
+				item.Label, item.Heading = personalLabel, personalHeading
+				item.Detail = pickerDetail(cmp.Or(t.Description, personalDetail), teamStateNote(t))
 			}
 			if (t.Unreadable != "" || o.Inaccessible) && !t.Selected {
 				item.Disabled, item.Reason = true, cmp.Or(t.Unreadable, o.Note)

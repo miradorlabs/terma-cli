@@ -15,7 +15,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
-	"golang.org/x/term"
 )
 
 // setupUI reports setup's steps, verdict and next steps; successful steps and details
@@ -61,7 +60,7 @@ func (u *setupUI) Caution(label, what string) { u.keep(u.p.Warn("!"), label, wha
 // keep adds a checklist line, wrapping what under itself.
 func (u *setupUI) keep(mark, label, what string) {
 	const indent = 2 + 1 + 1 + stepLabelWidth + 1
-	lines := wrapStep(what, cmp.Or(terminalColumns(u.out), 80)-indent)
+	lines := wrapStep(what, cmp.Or(style.Columns(u.out), 80)-indent)
 	u.lines = append(u.lines, fmt.Sprintf("  %s %-*s %s", mark, stepLabelWidth, label, u.p.Commands(lines[0])))
 	for _, l := range lines[1:] {
 		u.lines = append(u.lines, strings.Repeat(" ", indent)+u.p.Commands(l))
@@ -103,10 +102,8 @@ func (u *setupUI) teamsConfigured(orgs []organization, teams []discoveredTeam) {
 		switch {
 		case dt.team.Personal:
 			labels = append(labels, personalLabel)
-		case len(orgs) > 1:
-			labels = append(labels, orgTeamLabel(dt.orgName, dt.teamName))
 		default:
-			labels = append(labels, dt.teamName)
+			labels = append(labels, orgTeamLabel(dt.orgName, dt.teamName))
 		}
 		if pol := dt.team.Policy; !pol.AdmitsNone() {
 			anyAdmits = true
@@ -131,41 +128,34 @@ func (u *setupUI) policyNextSteps(pol config.Policy, admits, gitHooksOff bool) {
 
 // reportConflicts names the selected teams whose policies list the same repositories.
 func (u *setupUI) reportConflicts(st routing.State, names teamNames) {
-	if line := conflictLine(st, names, len(names.Orgs) > 1); line != "" {
-		u.Caution("Policy conflict", line)
-		u.Then(conflictStep)
+	if line := conflictLine(st, names); line != "" {
+		u.Caution("Conflict", line)
 	}
 }
+
+// doctorStep is setup's one pointer to `terma doctor`, which explains every ! line.
+const doctorStep = "Run `terma doctor` to check everything and see which team collects each repository."
 
 // conflictStep points to where each conflict is explained.
 const conflictStep = "Run `terma doctor` to see which team collects each repository."
 
-// conflictLine lists the teams in st whose policies overlap, or "" when none do.
-func conflictLine(st routing.State, names teamNames, multi bool) string {
+// conflictLine names the teams in st whose policies overlap, or is "" when none do.
+func conflictLine(st routing.State, names teamNames) string {
 	var labels []string
 	for _, o := range routing.Overlaps(st) {
 		for _, t := range []routing.Team{o.Winner, o.Other} {
-			if l := summaryLabel(names, multi, t); !slices.Contains(labels, l) {
+			if l := teamLabel(names, t); !slices.Contains(labels, l) {
 				labels = append(labels, l)
 			}
 		}
 	}
-	if len(labels) == 0 {
+	switch len(labels) {
+	case 0:
 		return ""
+	case 2:
+		return labels[0] + " and " + labels[1] + " list the same repository."
 	}
-	return "between " + strings.Join(labels, ", ")
-}
-
-// summaryLabel names t as the Teams line does: with its organization when there are several.
-func summaryLabel(names teamNames, multi bool, t routing.Team) string {
-	if t.Personal {
-		return personalLabel
-	}
-	name := cmp.Or(names.Teams[t.TeamID], t.TeamID)
-	if multi {
-		return orgTeamLabel(names.Orgs[t.OrganizationID], name)
-	}
-	return name
+	return strings.Join(labels[:len(labels)-1], ", ") + " and " + labels[len(labels)-1] + " list the same repositories."
 }
 
 func orgNamesList(orgs []organization) []string {
@@ -190,18 +180,24 @@ func (u *setupUI) printLines() {
 	u.lines = nil
 }
 
-func (u *setupUI) finish() {
-	u.printLines()
+// headline opens the summary: the title in bold green, or the warn title in bold yellow
+// when a step needs the developer.
+func (u *setupUI) headline() {
 	if u.warned {
-		fmt.Fprintf(u.out, "\n%s %s\n", u.p.Warn("!"), u.p.Bold(cmp.Or(u.warnTitle, u.title+" — the steps marked ! need you")))
+		fmt.Fprintf(u.out, "\n%s\n", u.p.Warn(u.p.Bold("! "+cmp.Or(u.warnTitle, u.title+". Some steps need you."))))
 	} else {
-		fmt.Fprintf(u.out, "\n%s %s\n", u.p.OK("✓"), u.p.Bold(u.title))
+		fmt.Fprintf(u.out, "\n%s\n", u.p.OK(u.p.Bold("✓ "+u.title)))
 	}
+}
+
+func (u *setupUI) finish() {
+	u.headline()
+	u.printLines()
 	if len(u.next) == 0 {
 		return
 	}
 	fmt.Fprintf(u.out, "\n%s\n", u.p.Bold("Next steps:"))
-	width := cmp.Or(terminalColumns(u.out), 80) - 4
+	width := cmp.Or(style.Columns(u.out), 80) - 4
 	for _, step := range u.next {
 		lines := wrapStep(step, width)
 		fmt.Fprintf(u.out, "  %s %s\n", u.p.Brand("•"), u.p.Commands(lines[0]))
@@ -211,64 +207,14 @@ func (u *setupUI) finish() {
 	}
 }
 
-// terminalColumns is w's width when it is a terminal, or 0.
-func terminalColumns(w io.Writer) int {
-	f, ok := w.(*os.File)
-	if !ok {
-		return 0
-	}
-	cols, _, err := term.GetSize(int(f.Fd()))
-	if err != nil {
-		return 0
-	}
-	return cols
-}
-
-// wrapStep breaks a next step at spaces into lines of at most width columns, never inside a
+// wrapStep breaks a next step into lines of at most width columns, never inside a
 // `quoted command`, keeping the step's own line breaks.
 func wrapStep(step string, width int) []string {
 	var out []string
 	for para := range strings.SplitSeq(step, "\n") {
-		line := ""
-		for _, word := range stepWords(para) {
-			switch {
-			case line == "":
-				line = word
-			case len([]rune(line))+1+len([]rune(word)) <= width:
-				line += " " + word
-			default:
-				out = append(out, line)
-				line = word
-			}
-		}
-		out = append(out, line)
+		out = append(out, style.Wrap(para, width)...)
 	}
 	return out
-}
-
-// stepWords splits s at spaces outside backquotes.
-func stepWords(s string) []string {
-	var words []string
-	var b strings.Builder
-	inQuote := false
-	for _, r := range s {
-		switch {
-		case r == '`':
-			inQuote = !inQuote
-			b.WriteRune(r)
-		case r == ' ' && !inQuote:
-			if b.Len() > 0 {
-				words = append(words, b.String())
-				b.Reset()
-			}
-		default:
-			b.WriteRune(r)
-		}
-	}
-	if b.Len() > 0 {
-		words = append(words, b.String())
-	}
-	return words
 }
 
 // setupHeaderInfo is the column beside the logo; it reads only local state, so it is safe

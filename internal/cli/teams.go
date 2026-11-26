@@ -130,11 +130,10 @@ func renderTeams(w io.Writer, v teamsView) {
 			names.Teams[t.ID] = cmp.Or(t.Name, t.ID)
 		}
 	}
-	multi := len(v.Organizations) > 1
 	u := newSetupUI(w, false)
 	var labels []string
 	for _, t := range v.state.Teams {
-		labels = append(labels, summaryLabel(names, multi, t))
+		labels = append(labels, teamLabel(names, t))
 	}
 	if len(labels) == 0 {
 		u.Warn("Teams", "None selected. Nothing is sent.")
@@ -145,7 +144,7 @@ func renderTeams(w io.Writer, v teamsView) {
 		for _, t := range o.Teams {
 			if t.Selected {
 				if label, action := teamAttention(t); label != "" {
-					u.Warn(label, summaryLabel(names, multi, routing.Team{TeamID: t.ID, OrganizationID: o.ID, Personal: o.Type == "personal"})+". "+action)
+					u.Warn(label, teamLabel(names, routing.Team{TeamID: t.ID, OrganizationID: o.ID, Personal: o.Type == "personal"})+". "+action)
 				}
 			}
 		}
@@ -153,15 +152,16 @@ func renderTeams(w io.Writer, v teamsView) {
 	if v.Unlisted != "" {
 		u.Caution("Note", "Your organizations could not be listed.")
 	}
-	if len(v.Changes) > 0 {
-		u.Summary("Changed", "Your team choices are saved.")
-	}
 	for _, warn := range v.Warnings {
 		u.Caution("Note", warn)
 	}
-	line := conflictLine(v.state, names, multi)
+	line := conflictLine(v.state, names)
 	if line != "" {
-		u.Caution("Policy conflict", line)
+		u.Caution("Conflict", line)
+	}
+	if len(v.Changes) > 0 {
+		u.title, u.warnTitle = "Changes applied", "Changes applied. Some teams need you."
+		u.headline()
 	}
 	u.printLines()
 	if line != "" {

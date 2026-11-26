@@ -37,7 +37,6 @@ func (app *App) setupStatusLine(errOut io.Writer, ui *setupUI, names []string) {
 			}
 		} else {
 			ui.Warn(label, "not wrapped — your plan's usage windows are not captured")
-			ui.Then("Run `terma doctor` to see why the status line was not wrapped.")
 		}
 	}
 }

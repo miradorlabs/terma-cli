@@ -269,18 +269,17 @@ func orgNotAccessibleErr(err error) bool {
 	e, ok := errors.AsType[*api.Error](err)
 	return ok && e.OrgNotAccessible()
 }
+
+// teamLabel names t as doctor does: Personal, or its organization and team.
 func teamLabel(names teamNames, t routing.Team) string {
 	if t.Personal {
 		return personalLabel
 	}
 	return orgTeamLabel(names.Orgs[t.OrganizationID], cmp.Or(names.Teams[t.TeamID], t.TeamID))
 }
-func orgTeamLabel(org, team string) string {
-	if org == "" || strings.HasPrefix(team, org) {
-		return team
-	}
-	return org + " " + team
-}
+
+// orgTeamLabel names an organization's team as doctor does.
+func orgTeamLabel(org, team string) string { return doctor.TeamName(org, team) }
 
 type teamNames struct {
 	Teams   map[string]string `json:"teams"`

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"slices"
@@ -53,7 +54,8 @@ func (app *App) chooseSetupTeams(cmd *cobra.Command, disc *setupDiscovery, assum
 			item := prompt.Item{Label: dt.teamName, Detail: pickerDetail(dt.description, ""), Kind: prompt.Check, Selected: keep[i]}
 			switch {
 			case solo(dt):
-				item.Label = personalLabel
+				item.Label, item.Heading = personalLabel, personalHeading
+				item.Detail = pickerDetail(cmp.Or(dt.description, personalDetail), "")
 			case dt.team.OrganizationID != prevOrg:
 				item.Heading, prevOrg = dt.orgName, dt.team.OrganizationID
 			}

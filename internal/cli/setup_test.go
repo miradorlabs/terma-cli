@@ -202,7 +202,7 @@ func TestSetupAndDoctorSayWhenTheTeamHasNoPolicy(t *testing.T) {
 	}
 	// Doctor names the team and organization it asked, to hold against the web app's.
 	out, _ = runTerma(t, "doctor")
-	if !regexp.MustCompile(`repository collected +team "Beta Core" \(bbbbbbbb\) in Beta Labs has no collection policy\n`).MatchString(out) || !strings.Contains(out, doctor.NoPolicyStep) {
+	if !regexp.MustCompile(`! team "Beta Core" \(bbbbbbbb\) in Beta Labs has no collection policy\n`).MatchString(out) || !strings.Contains(out, doctor.NoPolicyStep) {
 		t.Errorf("doctor did not say which team has no policy:\n%s", out)
 	}
 }

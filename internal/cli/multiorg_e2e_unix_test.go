@@ -365,7 +365,7 @@ func TestMultiOrgSingleTokenEndToEnd(t *testing.T) {
 	// Route explain matches each destination before sending.
 	for repo, want := range map[string]string{
 		acmeRepo:     "Goes to:   Acme",
-		betaRepo:     "Goes to:   Beta Labs",
+		betaRepo:     "Goes to:   Beta Core",
 		personalRepo: "Goes to:   Personal",
 	} {
 		out, err := runTerma(t, "route", "explain", repo)
@@ -537,7 +537,7 @@ func TestMultiOrgSingleTokenEndToEnd(t *testing.T) {
 		t.Fatalf("stale alice CAS update err = %v, want ErrAccountMismatch", err)
 	}
 	// Under bob, beta/core routes to Beta Core and acme/api is not collected.
-	if out, err := runTerma(t, "route", "explain", betaRepo); err != nil || !strings.Contains(out, "Goes to:   Beta Labs") {
+	if out, err := runTerma(t, "route", "explain", betaRepo); err != nil || !strings.Contains(out, "Goes to:   Beta Core") {
 		t.Fatalf("bob route explain beta (%v):\n%s", err, out)
 	}
 	if out, err := runTerma(t, "route", "explain", acmeRepo); err != nil || !strings.Contains(out, "nothing leaves this machine") {

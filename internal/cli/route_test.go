@@ -76,12 +76,12 @@ func TestRouteExplainMatchesRouterAcrossAllCases(t *testing.T) {
 
 	// Wildcard, exact, personal, outside git.
 	out, v := explainText(st, names, "git@github.com:Acme/api.git")
-	wantRouteLines(t, out, "Goes to:   Acme Platform", "Entry:     github.com/acme/*")
+	wantRouteLines(t, out, "Goes to:   Acme › Platform", "Entry:     github.com/acme/*")
 	if v.Outcome != routing.Send || v.Team == nil || v.Team.TeamID != teamsAcmeWeb {
 		t.Fatalf("wildcard view = %+v", v)
 	}
 	out, _ = explainText(st, names, "https://github.com/clientco/app")
-	wantRouteLines(t, out, "Goes to:   Beta Labs Contractors", "Entry:     github.com/clientco/app")
+	wantRouteLines(t, out, "Goes to:   Beta Labs › Contractors", "Entry:     github.com/clientco/app")
 	out, _ = explainText(st, names, "github.com/dawson/side")
 	wantRouteLines(t, out, "Goes to:   Personal\n")
 	out, _ = explainText(st, names, "")
@@ -93,7 +93,7 @@ func TestRouteExplainMatchesRouterAcrossAllCases(t *testing.T) {
 	overlapSt.Teams[0].Policy.UpdatedAt = time.Now().Add(-48 * time.Hour)
 	overlapSt.Teams[1].Policy.UpdatedAt = time.Now().Add(-time.Hour)
 	out, v = explainText(overlapSt, names, "github.com/acme/api")
-	wantRouteLines(t, out, "Goes to:   Beta Labs Contractors", "Acme Platform lists github.com/acme/*, but a more recently updated policy collects it")
+	wantRouteLines(t, out, "Goes to:   Beta Labs › Contractors", "Acme › Platform lists github.com/acme/*, but a more recently updated policy collects it")
 	if v.Outcome != routing.Send || v.Team == nil || v.Team.TeamID != betaCore {
 		t.Fatalf("overlap view = %+v", v)
 	}
@@ -111,7 +111,7 @@ func TestRouteExplainMatchesRouterAcrossAllCases(t *testing.T) {
 	orgLostSt.Teams[0].Refusals = 2
 	orgLostSt.Teams[0].LastError = routing.OrgAccessLost
 	out, v = explainText(orgLostSt, names, "github.com/acme/api")
-	wantRouteLines(t, out, "Goes to:   Personal", "Acme Platform lists github.com/acme/*, but it is refused ("+orgInaccessibleNote+"), so it is passed over")
+	wantRouteLines(t, out, "Goes to:   Personal", "Acme › Platform lists github.com/acme/*, but it is refused ("+orgInaccessibleNote+"), so it is passed over")
 	if v.Outcome != routing.Send || v.Team == nil || !v.Team.Personal {
 		t.Fatalf("org_access_lost view = %+v", v)
 	}
