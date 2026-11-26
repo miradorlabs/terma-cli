@@ -5,15 +5,12 @@
   "platform": "",
   "captured_at": "2026-11-25T07:43:08.450450844Z",
   "capture": {
-    "partial": true,
-    "notes": [
-      "Part of this build's capture did not finish; the frequent check tries it again, up to four attempts."
-    ],
+    "partial": false,
     "sections": {
       "support": "2026-11-25T13:59:43.551736985Z"
     },
-    "attempted_at": "2026-11-25T20:17:50.242236524Z",
-    "attempts": 3,
+    "attempted_at": "2026-11-26T02:23:47.07151937Z",
+    "attempts": 4,
     "announced_at": "2026-11-25T07:43:08.450450844Z"
   },
   "side_requests": null,

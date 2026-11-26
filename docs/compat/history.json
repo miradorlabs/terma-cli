@@ -13559,7 +13559,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.content_allowed",
     "result": "pass",
-    "last_run": "2026-11-25T19:59:26.709775Z",
+    "last_run": "2026-11-26T02:22:56.875772Z",
     "first_passed": "2026-11-25T13:44:52.264464Z",
     "terma": "terma version dev",
     "test": "TestRelayPi/v1.6.1/content"
@@ -13570,7 +13570,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.content_withheld",
     "result": "pass",
-    "last_run": "2026-11-25T19:59:31.66226Z",
+    "last_run": "2026-11-26T02:23:01.623385Z",
     "first_passed": "2026-11-25T13:44:57.417949Z",
     "terma": "terma version dev",
     "test": "TestRelayPi/v1.6.1/withheld"
@@ -13581,7 +13581,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.equivalent",
     "result": "pass",
-    "last_run": "2026-11-25T19:59:09.311238Z",
+    "last_run": "2026-11-26T02:22:39.647372Z",
     "first_passed": "2026-11-25T13:44:35.479258Z",
     "terma": "terma version dev",
     "test": "TestRelayWorkloadsPi/v1.6.1"
@@ -13592,7 +13592,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.only_opted_in",
     "result": "pass",
-    "last_run": "2026-11-25T19:59:19.468796Z",
+    "last_run": "2026-11-26T02:22:50.075473Z",
     "first_passed": "2026-11-25T13:44:45.133725Z",
     "terma": "terma version dev",
     "test": "TestRelayPiOutsideARepository/v1.6.1"
@@ -13603,7 +13603,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.telemetry",
     "result": "pass",
-    "last_run": "2026-11-25T19:59:31.662296Z",
+    "last_run": "2026-11-26T02:23:01.623426Z",
     "first_passed": "2026-11-25T13:44:57.418042Z",
     "terma": "terma version dev",
     "test": "TestRelayPi/v1.6.1"
@@ -13658,7 +13658,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.telemetry",
     "result": "pass",
-    "last_run": "2026-11-25T20:17:04.156487Z",
+    "last_run": "2026-11-26T02:22:19.125723Z",
     "first_passed": "2026-11-25T13:59:04.042042Z",
     "terma": "terma version dev",
     "test": "TestRelayT3/v0.1.12"
