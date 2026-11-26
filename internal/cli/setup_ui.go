@@ -95,22 +95,17 @@ func (u *setupUI) teamsConfigured(orgs []organization, teams []discoveredTeam) {
 	if len(orgs) > 1 {
 		u.Summary("Organizations", strings.Join(orgNamesList(orgs), ", "))
 	}
-	labels := make([]string, 0, len(teams))
+	dests := make([]orgTeam, 0, len(teams))
 	anyAdmits, gitHooksOff := false, false
 	now := time.Now()
 	for _, dt := range teams {
-		switch {
-		case dt.team.Personal:
-			labels = append(labels, personalLabel)
-		default:
-			labels = append(labels, orgTeamLabel(dt.orgName, dt.teamName))
-		}
+		dests = append(dests, orgTeam{dt.orgName, dt.teamName, dt.team.Personal})
 		if pol := dt.team.Policy; !pol.AdmitsNone() {
 			anyAdmits = true
 			gitHooksOff = gitHooksOff || doctor.GitHooksOff(pol, now)
 		}
 	}
-	u.Summary("Teams", strings.Join(labels, ", "))
+	u.Summary("Sending to", sendingTo(dests))
 	u.policyNextSteps(teams[0].team.Policy, anyAdmits, gitHooksOff)
 }
 
@@ -141,10 +136,11 @@ const conflictStep = "Run `terma doctor` to see which team collects each reposit
 
 // conflictLine names the teams in st whose policies overlap, or is "" when none do.
 func conflictLine(st routing.State, names teamNames) string {
+	// Each name is quoted, as a team name may hold commas, "and" or "›".
 	var labels []string
 	for _, o := range routing.Overlaps(st) {
 		for _, t := range []routing.Team{o.Winner, o.Other} {
-			if l := teamLabel(names, t); !slices.Contains(labels, l) {
+			if l := "'" + teamLabel(names, t) + "'"; !slices.Contains(labels, l) {
 				labels = append(labels, l)
 			}
 		}

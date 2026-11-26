@@ -92,7 +92,25 @@ func TestTeamsFormDescriptionsAndPersonal(t *testing.T) {
 	v.state = routing.State{Teams: []routing.Team{{TeamID: "t1", OrganizationID: "o1"}, {TeamID: "pt", OrganizationID: "p1", Personal: true}}}
 	var out bytes.Buffer
 	renderTeams(&out, v)
-	if text := flat(out.String()); !strings.HasPrefix(text, "! Changes applied. Some teams need you. ✓ Teams Acme Web, Personal") || strings.Contains(text, "Default") || strings.Contains(text, "conflict") {
+	if text := flat(out.String()); !strings.HasPrefix(text, "! Changes applied. Some teams need you. ✓ Sending to Acme › Acme Web You › Personal") || strings.Contains(text, "Default") || strings.Contains(text, "conflict") {
 		t.Errorf("teams text is not the short summary:\n%s", out.String())
+	}
+}
+
+// sendingTo puts one organization per line, its teams together, and Personal last.
+func TestSendingToGroupsTeamsByOrganization(t *testing.T) {
+	t.Parallel()
+	got := sendingTo([]orgTeam{
+		{org: "Mirador Dev", team: "Engineering"},
+		{personal: true, org: "Someone's Personal", team: "Default"},
+		{org: "Terma Demo", team: "Demo"},
+		{org: "Mirador Dev", team: "Platform"},
+	})
+	want := "Mirador Dev › Engineering, Platform\nTerma Demo › Demo\nYou › Personal"
+	if got != want {
+		t.Errorf("sendingTo = %q, want %q", got, want)
+	}
+	if got := sendingTo([]orgTeam{{personal: true}}); got != "You › Personal" {
+		t.Errorf("personal only = %q", got)
 	}
 }

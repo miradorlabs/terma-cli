@@ -156,10 +156,10 @@ func TestRenderCountsEveryLineItWrites(t *testing.T) {
 	out := buf.String()
 	for _, want := range []string{
 		"What should Claude Code send?",
-		"❯ [x] Traces",
-		"  [x] Events",
-		"  (•) Global",
-		"  ( ) Local    Codex has no repository settings",
+		"❯   [x] Traces",
+		"    [x] Events",
+		"    (•) Global",
+		"    ( ) Local    Codex has no repository settings",
 		"  Data", "  Where",
 	} {
 		if !strings.Contains(out, want) {
@@ -338,8 +338,8 @@ func TestRenderAlignsDetailsToTheLongestLabel(t *testing.T) {
 	want := []string{
 		"❯ [x] Personal",
 		"  Terma Demo",
-		"  [ ] Sim                   Live synthetic",
-		"  [x] Platform engineering  Core services",
+		"    [ ] Sim                   Live synthetic",
+		"    [x] Platform engineering  Core services",
 	}
 	for _, w := range want {
 		if !slices.ContainsFunc(lines, func(l string) bool { return strings.HasPrefix(l, w) }) {

@@ -214,7 +214,7 @@ func TestTeamsListsAllOrgsOnSingleUserTokenAndHidesProjectNotFound(t *testing.T)
 	if err != nil {
 		t.Fatalf("teams text: %v\n%s", err, text)
 	}
-	if !strings.Contains(flat(text), "! Teams None selected.") || strings.Contains(text, "[ ]") || strings.Contains(text, personalCollects) {
+	if !strings.Contains(flat(text), "! Sending to Nowhere. Nothing is sent.") || strings.Contains(text, "[ ]") || strings.Contains(text, personalCollects) {
 		t.Errorf("text output is not the short summary:\n%s", text)
 	}
 	if strings.Contains(text, "--authorize") || strings.Contains(text, "--org") {
@@ -335,7 +335,7 @@ func TestTeamsAnnotatesOrgNotAccessibleWithoutFailingOthers(t *testing.T) {
 			if err != nil {
 				t.Fatalf("teams text: %v\n%s", err, text)
 			}
-			if !strings.Contains(text, "Teams") || strings.Contains(text, "Beta Labs") {
+			if !strings.Contains(text, "Sending to") || strings.Contains(text, "Beta Labs") {
 				t.Errorf("unexpected text output:\n%s", text)
 			}
 			// Attempting to tick a team in the inaccessible org fails cleanly.
@@ -618,7 +618,7 @@ func TestTeamsSelectWildcardOverlapGlobalAndNoKeyMinting(t *testing.T) {
 			t.Fatalf("order = %v, want Beta Core then Acme API", v.Order)
 		}
 		text, err := runTerma(t, "teams")
-		if err != nil || !strings.Contains(flat(text), "! Conflict Beta Core and Acme API list the same repository.") || !strings.Contains(text, conflictStep) || strings.Contains(text, "Routing order") {
+		if err != nil || !strings.Contains(flat(text), "! Conflict 'Beta Core' and 'Acme API' list the same repository.") || !strings.Contains(text, conflictStep) || strings.Contains(text, "Routing order") {
 			t.Fatalf("teams text lacks the one conflict line (%v):\n%s", err, text)
 		}
 	})

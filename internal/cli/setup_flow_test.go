@@ -217,7 +217,7 @@ func TestSetupReportsPolicyConflicts(t *testing.T) {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
 	for _, want := range []string{
-		"! Conflict Acme Web, Acme API and Beta Core list the same repositories.",
+		"! Conflict 'Acme Web', 'Acme API' and 'Beta Core' list the same repositories.",
 		doctorStep,
 	} {
 		if !strings.Contains(flat(out), want) {
@@ -350,7 +350,7 @@ func TestSetupSummaryNamesPersonalAndListsNoRepositories(t *testing.T) {
 		[]discoveredTeam{team("Acme", "Acme Web", false, repos), team("Someone's Personal", "Default", true, global)})
 	u.printLines()
 	out := b.String()
-	if !strings.Contains(out, "Teams         Acme Web, Personal\n") || strings.Contains(out, "Default") || strings.Contains(out, "Collects") || strings.Contains(out, "github.com") {
+	if !strings.Contains(flat(out), "Sending to Acme › Acme Web You › Personal") || strings.Contains(out, "Default") || strings.Contains(out, "Collects") || strings.Contains(out, "github.com") {
 		t.Fatalf("summary:\n%s", out)
 	}
 }

@@ -304,32 +304,38 @@ func (f *Form) render(w io.Writer, p style.Palette) int {
 	}
 
 	// Labels pad to the longest one only when some item has text beside it.
-	width, side := 0, false
+	width, side, sections := 0, false, false
 	for _, it := range f.Items {
 		width = max(width, utf8.RuneCountInString(it.Label))
 		side = side || it.aside() != ""
+		sections = sections || it.Heading != ""
 	}
 	if !side {
 		width = 0
 	}
 	// What precedes the text beside a label: cursor, box unless a choice, label, gap.
 	lead := 2 + width + len(detailGap)
+	if sections {
+		lead += len(sectionIndent)
+	}
 	if !f.Choice {
 		lead += 4
 	}
 	room := cmp.Or(f.termWidth, fallbackWidth) - 1 - lead
 
+	indent := ""
 	for i, it := range f.Items {
 		if it.Heading != "" {
+			indent = sectionIndent
 			if i > 0 {
 				line("")
 			}
 			line("  " + it.Heading)
 		}
 		here := i == f.cursor && !it.Disabled
-		cursor := "  "
+		cursor := "  " + indent
 		if here {
-			cursor = brand("❯") + " "
+			cursor = brand("❯") + " " + indent
 		}
 		label := it.Label
 		aside := truncate(it.aside(), room)
@@ -353,6 +359,9 @@ func (f *Form) render(w io.Writer, p style.Palette) int {
 	}
 	return lines
 }
+
+// sectionIndent sets the items under a section's heading in from it.
+const sectionIndent = "  "
 
 // detailGap separates the label column from the text beside it.
 const detailGap = "  "

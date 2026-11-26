@@ -131,14 +131,14 @@ func renderTeams(w io.Writer, v teamsView) {
 		}
 	}
 	u := newSetupUI(w, false)
-	var labels []string
+	var dests []orgTeam
 	for _, t := range v.state.Teams {
-		labels = append(labels, teamLabel(names, t))
+		dests = append(dests, orgTeam{names.Orgs[t.OrganizationID], cmp.Or(names.Teams[t.TeamID], t.TeamID), t.Personal})
 	}
-	if len(labels) == 0 {
-		u.Warn("Teams", "None selected. Nothing is sent.")
+	if len(dests) == 0 {
+		u.Warn("Sending to", "Nowhere. Nothing is sent.")
 	} else {
-		u.Summary("Teams", strings.Join(labels, ", "))
+		u.Summary("Sending to", sendingTo(dests))
 	}
 	for _, o := range v.Organizations {
 		for _, t := range o.Teams {
@@ -159,10 +159,11 @@ func renderTeams(w io.Writer, v teamsView) {
 	if line != "" {
 		u.Caution("Conflict", line)
 	}
+	u.title, u.warnTitle = "All set. Nothing changed.", "Nothing changed. Some teams need you."
 	if len(v.Changes) > 0 {
 		u.title, u.warnTitle = "Changes applied", "Changes applied. Some teams need you."
-		u.headline()
 	}
+	u.headline()
 	u.printLines()
 	if line != "" {
 		fmt.Fprintf(w, "\n%s\n", u.p.Commands(conflictStep))

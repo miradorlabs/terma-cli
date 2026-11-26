@@ -278,6 +278,38 @@ func teamLabel(names teamNames, t routing.Team) string {
 	return orgTeamLabel(names.Orgs[t.OrganizationID], cmp.Or(names.Teams[t.TeamID], t.TeamID))
 }
 
+// sendingTo lists where a machine sends, one organization per line: "Org › TeamA, TeamB",
+// in the order first seen, with Personal last as "You › Personal".
+func sendingTo(teams []orgTeam) string {
+	var orgs []string
+	byOrg := map[string][]string{}
+	personal := false
+	for _, t := range teams {
+		if t.personal {
+			personal = true
+			continue
+		}
+		if _, ok := byOrg[t.org]; !ok {
+			orgs = append(orgs, t.org)
+		}
+		byOrg[t.org] = append(byOrg[t.org], t.team)
+	}
+	lines := make([]string, 0, len(orgs)+1)
+	for _, o := range orgs {
+		lines = append(lines, o+" › "+strings.Join(byOrg[o], ", "))
+	}
+	if personal {
+		lines = append(lines, "You › "+personalLabel)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// orgTeam is one ticked team, named for sendingTo.
+type orgTeam struct {
+	org, team string
+	personal  bool
+}
+
 // orgTeamLabel names an organization's team as doctor does.
 func orgTeamLabel(org, team string) string { return doctor.TeamName(org, team) }
 
