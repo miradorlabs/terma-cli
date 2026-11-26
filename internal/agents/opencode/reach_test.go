@@ -102,6 +102,131 @@ func TestOpenCodeStartRunAndToolReachCrossOrgMixed(t *testing.T) {
 	}
 }
 
+// The plugin checks a write or an edit on the file it changes before the tool runs. A file
+// that does not exist yet inside another organization's checkout crosses into it: the run
+// goes Mixed at the check, before the edit's span can leave.
+func TestOpenCodeEditReachToANewFileCrossOrgMixed(t *testing.T) {
+	stateDir := t.TempDir()
+	parent, _ := filepath.EvalSymlinks(t.TempDir())
+	repoA, repoB := filepath.Join(parent, "alpha"), filepath.Join(parent, "beta")
+	for _, r := range [][2]string{{repoA, "git@github.com:orgA/alpha.git"}, {repoB, "git@github.com:orgB/beta.git"}} {
+		_, _ = gitx.Git(context.Background(), parent, "init", "-q", "-b", "main", r[0])
+		_, _ = gitx.Git(context.Background(), r[0], "remote", "add", "origin", r[1])
+	}
+	const acct = "1111111111111111"
+	now := time.Now().UTC().Truncate(time.Second)
+	st, err := routing.Create(stateDir, "default", acct, func(s *routing.State) error {
+		for _, spec := range [][3]string{{"orgA", "team-a", "github.com/orgA/alpha"}, {"orgB", "team-b", "github.com/orgB/beta"}} {
+			if _, err := s.Select(routing.Team{OrganizationID: spec[0], AuthURL: "https://api.example.com", TeamID: spec[1],
+				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{spec[2]}, Revision: 1, FetchedAt: now, TeamID: spec[1], OrganizationID: spec[0], AuthURL: "https://api.example.com"}}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp, err := spool.Open(filepath.Join(stateDir, spool.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp.Bind(acct)
+	rt := hookrun.NewRouting("default", &st)
+	env := func(stdin string) hookrun.Env {
+		return hookrun.Env{StateDir: stateDir, Cwd: repoA, Spool: sp, Account: acct, Routing: rt, Now: now, Stdin: strings.NewReader(stdin)}
+	}
+	events := Agent{}.Events()
+	ctx := context.Background()
+
+	for _, tool := range []string{"write", "edit"} {
+		sid := "ses_" + tool + "_new_oc"
+		if err := events["opencode-session-start"](ctx, env(`{"session_id":"`+sid+`","cwd":`+strconv.Quote(repoA)+`}`)); err != nil {
+			t.Fatal(err)
+		}
+		if c, ok := claim.Read(stateDir, sid, now); ok && c.Kind == claim.KindMixed {
+			t.Fatalf("%s: claim is Mixed before any reach: %+v", tool, c)
+		}
+		newFile := filepath.Join(repoB, "pkg", tool+".go")
+		if _, err := os.Stat(newFile); !os.IsNotExist(err) {
+			t.Fatalf("%s exists before the %s: %v", newFile, tool, err)
+		}
+		body, _ := json.Marshal(map[string]any{"session_id": sid, "cwd": repoA, "tool": tool, "paths": []string{newFile}})
+		if err := events["opencode-tool-reach"](ctx, env(string(body))); err != nil {
+			t.Fatal(err)
+		}
+		if c, ok := claim.Read(stateDir, sid, now); !ok || c.Kind != claim.KindMixed {
+			t.Fatalf("%s of a new file in another organization's checkout: claim = %+v (ok=%v); want KindMixed", tool, c, ok)
+		}
+	}
+}
+
+// An attached file OpenCode gives no path for is told to terma as a read it cannot place,
+// under a path that starts with two separators. That must stay an unknown reach: the run
+// goes Mixed, as for a shell command terma cannot follow.
+func TestOpenCodeUnplacedAttachmentMarksTheRunMixed(t *testing.T) {
+	stateDir := t.TempDir()
+	parent, _ := filepath.EvalSymlinks(t.TempDir())
+	repo := filepath.Join(parent, "alpha")
+	_, _ = gitx.Git(context.Background(), parent, "init", "-q", "-b", "main", repo)
+	_, _ = gitx.Git(context.Background(), repo, "remote", "add", "origin", "git@github.com:orgA/alpha.git")
+	const acct = "1111111111111111"
+	now := time.Now().UTC().Truncate(time.Second)
+	st, err := routing.Create(stateDir, "default", acct, func(s *routing.State) error {
+		if _, err := s.Select(routing.Team{OrganizationID: "orgA", AuthURL: "https://api.example.com", TeamID: "team-a",
+			Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/orgA/alpha"}, Revision: 1, FetchedAt: now, TeamID: "team-a", OrganizationID: "orgA", AuthURL: "https://api.example.com"}}); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp, err := spool.Open(filepath.Join(stateDir, spool.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sp.Bind(acct)
+	rt := hookrun.NewRouting("default", &st)
+	env := func(stdin string) hookrun.Env {
+		return hookrun.Env{StateDir: stateDir, Cwd: repo, Spool: sp, Account: acct, Routing: rt, Now: now, Stdin: strings.NewReader(stdin)}
+	}
+	events := Agent{}.Events()
+	ctx := context.Background()
+
+	const sid = "ses_attached_oc"
+	if err := events["opencode-session-start"](ctx, env(`{"session_id":"`+sid+`","cwd":`+strconv.Quote(repo)+`}`)); err != nil {
+		t.Fatal(err)
+	}
+	if why := runs.Read(stateDir, sid).Why(now.Add(time.Minute)); why.Reason != "" {
+		t.Fatalf("run is Mixed before any reach: %+v", why)
+	}
+	body, _ := json.Marshal(map[string]any{"session_id": sid, "cwd": repo, "tool": "read", "paths": []string{"//attached-file/unplaced"}})
+	if err := events["opencode-tool-reach"](ctx, env(string(body))); err != nil {
+		t.Fatal(err)
+	}
+	if c, ok := claim.Read(stateDir, sid, now); !ok || c.Kind != claim.KindMixed {
+		t.Fatalf("claim = %+v (ok=%v); want KindMixed", c, ok)
+	}
+	if why := runs.Read(stateDir, sid).Why(now.Add(time.Minute)); why.Reason != runs.UnknownReach {
+		t.Fatalf("Mixed reason = %q (%+v); want %q", why.Reason, why, runs.UnknownReach)
+	}
+
+	// What the plugin sends for a session it dropped after a failed reach check: a shell
+	// reach terma cannot follow, which marks that run Mixed too, so doctor names it.
+	const dropped = "ses_dropped_oc"
+	if err := events["opencode-session-start"](ctx, env(`{"session_id":"`+dropped+`","cwd":`+strconv.Quote(repo)+`}`)); err != nil {
+		t.Fatal(err)
+	}
+	body, _ = json.Marshal(map[string]any{"session_id": dropped, "cwd": repo, "tool": "bash", "command": "eval $TERMA_REACH_FAILED"})
+	if err := events["opencode-tool-reach"](ctx, env(string(body))); err != nil {
+		t.Fatal(err)
+	}
+	if why := runs.Read(stateDir, dropped).Why(now.Add(time.Minute)); why.Reason != runs.UnknownReach {
+		t.Fatalf("a dropped session's run: Mixed reason = %q (%+v); want %q", why.Reason, why, runs.UnknownReach)
+	}
+}
+
 func TestOpenCodeRefreshConnectDisconnectConcurrentLockSafety(t *testing.T) {
 	h, path := opencodeIn(t)
 	e := opencodeExporter(t, h, true)
@@ -171,9 +296,11 @@ func TestOpenCodePluginToolReachContractUnderNode(t *testing.T) {
 	if err := os.WriteFile(hook, []byte("#!/bin/sh\nf=$(mktemp "+hooksDir+"/call.XXXXXX)\nprintf '{\"event\":\"%s\",\"payload\":' \"$1\" > $f.part\ncat >> $f.part\necho '}' >> $f.part\nmv $f.part $f.json\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+	defer srv.Close()
 	src, err := renderPlugin(opencodeConfig{
 		Version:     1,
-		Endpoint:    "http://127.0.0.1:43180",
+		Endpoint:    srv.URL,
 		Signals:     []string{"traces"},
 		HookCommand: []string{hook},
 	})
@@ -184,19 +311,22 @@ func TestOpenCodePluginToolReachContractUnderNode(t *testing.T) {
 	if err := os.WriteFile(pluginPath, src, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	// The read's tool part repeats what its guard saw, so it calls no second reach hook.
 	driver := `
 import { pathToFileURL } from "node:url"
 const mod = await import(pathToFileURL(process.argv[2]).href)
-const hooks = await mod.TermaPlugin({ directory: "/repoA", worktree: "/repoA" })
-await hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_oc", directory: "/repoA" } } } })
+const hooks = await mod.default.server({ directory: "/repoA", worktree: "/repoA" })
+` + opencodeDriverHelpers + `
+await hooks.event(created("ses_oc"))
 await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_oc", callID: "c1" }, { args: { filePath: "/repoB/secret.go" } })
-await hooks["tool.execute.after"]({ tool: "read", sessionID: "ses_oc", callID: "c1", args: { filePath: "/repoB/secret.go" } }, { title: "read", output: "ok" })
+await hooks.event(toolDone("ses_oc", "c1", "read", { filePath: "/repoB/secret.go" }, "ok"))
 await hooks["tool.execute.before"]({ tool: "grep", sessionID: "ses_oc", callID: "c2" }, { args: { path: "/repoB", include: "*.go" } })
 await hooks["tool.execute.before"]({ tool: "glob", sessionID: "ses_oc", callID: "c3" }, { args: { pattern: "../repoB/**/*.go" } })
 await hooks["tool.execute.before"]({ tool: "list", sessionID: "ses_oc", callID: "c4" }, { args: { path: "/repoB" } })
 await hooks["tool.execute.before"]({ tool: "bash", sessionID: "ses_oc", callID: "c5" }, { args: { command: "cat ../repoB/a", workdir: "/repoB" } })
 await hooks["tool.execute.before"]({ tool: "edit", sessionID: "ses_oc", callID: "c6" }, { args: { filePath: "/repoA/x.go" } })
-await hooks["tool.execute.after"]({ tool: "edit", sessionID: "ses_oc", callID: "c6", args: { filePath: "/repoA/x.go" } }, { title: "edit", output: "ok" })
+await hooks.event(toolDone("ses_oc", "c6", "edit", { filePath: "/repoA/x.go" }, "ok"))
+await hooks.dispose()
 `
 	script := filepath.Join(dir, "driver.mjs")
 	if err := os.WriteFile(script, []byte(driver), 0o600); err != nil {
@@ -224,15 +354,15 @@ await hooks["tool.execute.after"]({ tool: "edit", sessionID: "ses_oc", callID: "
 				}
 			}
 		}
-		if len(byTool) == 5 || time.Now().After(deadline) {
+		if len(byTool) == 6 || time.Now().After(deadline) {
 			break
 		}
 	}
-	if reaches != 5 {
-		t.Fatalf("opencode-tool-reach calls = %d (%v); want 5 (deduped across before/after, excluding edit)", reaches, byTool)
+	if reaches != 6 {
+		t.Fatalf("opencode-tool-reach calls = %d (%v); want 6 (deduped across the guard and the tool part)", reaches, byTool)
 	}
-	if _, ok := byTool["edit"]; ok {
-		t.Fatalf("edit unexpectedly emitted opencode-tool-reach: %v", byTool["edit"])
+	if paths, _ := byTool["edit"]["paths"].([]any); len(paths) != 1 || paths[0] != "/repoA/x.go" {
+		t.Fatalf("edit reach = %v; want the file it changes", byTool["edit"])
 	}
 	if byTool["bash"]["command"] != "cat ../repoB/a" || byTool["bash"]["dir"] != "/repoB" {
 		t.Fatalf("bash reach = %v", byTool["bash"])
@@ -283,8 +413,9 @@ func TestOpenCodeHookRunnerKillsTimedOutChildBeforeNextHook(t *testing.T) {
 	driver := `
 import { pathToFileURL } from "node:url"
 const mod = await import(pathToFileURL(process.argv[2]).href)
-const hooks = await mod.TermaPlugin({ directory: "/repoA", worktree: "/repoA" })
-hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_hang", directory: "/repoA" } } } })
+const hooks = await mod.default.server({ directory: "/repoA", worktree: "/repoA" })
+` + opencodeDriverHelpers + `
+hooks.event(created("ses_hang"))
 await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_hang", callID: "c1" }, { args: { filePath: "/repoB/secret.go" } })
 `
 	script := filepath.Join(dir, "driver.mjs")
@@ -343,7 +474,8 @@ func TestOpenCodeToolReachFailsClosedUnderNode(t *testing.T) {
 	defer srv.Close()
 
 	hook := filepath.Join(dir, "hook.sh")
-	hookSrc := "#!/bin/sh\nif [ \"$1\" = \"opencode-tool-reach\" ]; then exit 1; fi\nexit 0\n"
+	// A reach into /repoB fails; an edit in /repoA is checked too, and passes.
+	hookSrc := "#!/bin/sh\nif [ \"$1\" = \"opencode-tool-reach\" ]; then case \"$(cat)\" in *repoB*) exit 1;; esac; fi\nexit 0\n"
 	if err := os.WriteFile(hook, []byte(hookSrc), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -365,15 +497,16 @@ func TestOpenCodeToolReachFailsClosedUnderNode(t *testing.T) {
 	driver := `
 import { pathToFileURL } from "node:url"
 const mod = await import(pathToFileURL(process.argv[2]).href)
-const hooks = await mod.TermaPlugin({ directory: "/repoA", worktree: "/repoA" })
-await hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_fail", directory: "/repoA" } } } })
+const hooks = await mod.default.server({ directory: "/repoA", worktree: "/repoA" })
+` + opencodeDriverHelpers + `
+await hooks.event(created("ses_fail"))
 await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_fail", callID: "c1" }, { args: { filePath: "/repoB/secret.go" } })
-await hooks["tool.execute.after"]({ tool: "read", sessionID: "ses_fail", callID: "c1", args: { filePath: "/repoB/secret.go" } }, { title: "read", output: "SECRET" })
-await hooks.event({ event: { type: "message.updated", properties: { info: { id: "m1", sessionID: "ses_fail", role: "assistant", modelID: "m", time: { created: Date.now() - 10, completed: Date.now() } } } } })
+await hooks.event(toolDone("ses_fail", "c1", "read", { filePath: "/repoB/secret.go" }, "SECRET"))
+await hooks.event(assistantDone("ses_fail", "m1", "m"))
 // Separate clean session still exports.
-await hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_ok", directory: "/repoA" } } } })
+await hooks.event(created("ses_ok"))
 await hooks["tool.execute.before"]({ tool: "edit", sessionID: "ses_ok", callID: "c2" }, { args: { filePath: "/repoA/a.go" } })
-await hooks["tool.execute.after"]({ tool: "edit", sessionID: "ses_ok", callID: "c2", args: { filePath: "/repoA/a.go" } }, { title: "edit", output: "ok" })
+await hooks.event(toolDone("ses_ok", "c2", "edit", { filePath: "/repoA/a.go" }, "ok"))
 await hooks.dispose()
 `
 	script := filepath.Join(dir, "driver.mjs")
@@ -439,7 +572,8 @@ func TestOpenCodeChildTaintSuppressesParentExportsUnderNode(t *testing.T) {
 	defer srv.Close()
 
 	hook := filepath.Join(dir, "hook.sh")
-	hookSrc := "#!/bin/sh\nif [ \"$1\" = \"opencode-tool-reach\" ]; then exit 1; fi\nexit 0\n"
+	// A reach into /repoB fails; an edit in /repoA is checked too, and passes.
+	hookSrc := "#!/bin/sh\nif [ \"$1\" = \"opencode-tool-reach\" ]; then case \"$(cat)\" in *repoB*) exit 1;; esac; fi\nexit 0\n"
 	if err := os.WriteFile(hook, []byte(hookSrc), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -461,20 +595,21 @@ func TestOpenCodeChildTaintSuppressesParentExportsUnderNode(t *testing.T) {
 	driver := `
 import { pathToFileURL } from "node:url"
 const mod = await import(pathToFileURL(process.argv[2]).href)
-const hooks = await mod.TermaPlugin({ directory: "/repoA", worktree: "/repoA" })
-await hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_parent", directory: "/repoA" } } } })
+const hooks = await mod.default.server({ directory: "/repoA", worktree: "/repoA" })
+` + opencodeDriverHelpers + `
+await hooks.event(created("ses_parent"))
 await hooks["tool.execute.before"]({ tool: "task", sessionID: "ses_parent", callID: "t1" }, { args: { prompt: "inspect" } })
-await hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_child", parentID: "ses_parent", directory: "/repoA" } } } })
+await hooks.event(created("ses_child", "ses_parent"))
 await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_child", callID: "c1" }, { args: { filePath: "/repoB/secret.go" } })
-await hooks["tool.execute.after"]({ tool: "read", sessionID: "ses_child", callID: "c1", args: { filePath: "/repoB/secret.go" } }, { title: "read", output: "SECRET" })
+await hooks.event(toolDone("ses_child", "c1", "read", { filePath: "/repoB/secret.go" }, "SECRET"))
 // Parent task finishes and emits follow-up chat; sibling also runs: all must be suppressed.
-await hooks["tool.execute.after"]({ tool: "task", sessionID: "ses_parent", callID: "t1", args: { prompt: "inspect" } }, { title: "task", output: "SECRET SUMMARY" })
-await hooks.event({ event: { type: "message.updated", properties: { info: { id: "mp1", sessionID: "ses_parent", role: "assistant", modelID: "parent-m", time: { created: Date.now() - 10, completed: Date.now() } } } } })
-await hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_sibling", parentID: "ses_parent", directory: "/repoA" } } } })
-await hooks["tool.execute.after"]({ tool: "edit", sessionID: "ses_sibling", callID: "s1", args: { filePath: "/repoA/s.go" } }, { title: "edit", output: "ok" })
+await hooks.event(toolDone("ses_parent", "t1", "task", { prompt: "inspect" }, "SECRET SUMMARY"))
+await hooks.event(assistantDone("ses_parent", "mp1", "parent-m"))
+await hooks.event(created("ses_sibling", "ses_parent"))
+await hooks.event(toolDone("ses_sibling", "s1", "edit", { filePath: "/repoA/s.go" }, "ok"))
 // Unrelated session still exports.
-await hooks.event({ event: { type: "session.created", properties: { info: { id: "ses_other", directory: "/repoA" } } } })
-await hooks["tool.execute.after"]({ tool: "write", sessionID: "ses_other", callID: "o1", args: { filePath: "/repoA/ok.go" } }, { title: "write", output: "ok" })
+await hooks.event(created("ses_other"))
+await hooks.event(toolDone("ses_other", "o1", "write", { filePath: "/repoA/ok.go" }, "ok"))
 await hooks.dispose()
 `
 	script := filepath.Join(dir, "driver.mjs")
@@ -499,3 +634,12 @@ await hooks.dispose()
 		t.Fatalf("expected execute_tool write span for unrelated session; got %v", spanNames)
 	}
 }
+
+// opencodeDriverHelpers builds the OpenCode 1 events the drivers above feed the plugin: a
+// session's record, a tool call's part once it ended, and a completed model call.
+const opencodeDriverHelpers = `
+const now = Date.now()
+const created = (id, parentID) => ({ event: { type: "session.created", properties: { info: { id, parentID, directory: "/repoA", version: "1.19.6", title: "New session - 2026-01-01T00:00:00.000Z", time: { created: now - 1000 } } } } })
+const toolDone = (sessionID, callID, tool, input, output) => ({ event: { type: "message.part.updated", properties: { part: { id: "prt_" + callID, sessionID, messageID: "msg_" + sessionID, callID, type: "tool", tool, state: { status: "completed", input, output, title: tool, metadata: {}, time: { start: now - 20, end: now - 10 } } } } } })
+const assistantDone = (sessionID, id, modelID) => ({ event: { type: "message.updated", properties: { info: { id, sessionID, role: "assistant", parentID: "msg_user", modelID, time: { created: now - 10, completed: now } } } } })
+`

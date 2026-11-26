@@ -10,12 +10,14 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/account/serverkey"
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/harness"
+	"github.com/miradorlabs/terma-cli/internal/procinfo"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
@@ -23,10 +25,11 @@ import (
 // reads only OTEL_* process env, so terma's plugin turns its events into OTLP/JSON and
 // runs terma's helper script for its key. With root set it is the repository's committed
 // policy file instead, which names no destination or key. dir is terma's config directory,
-// which holds the helper scripts.
+// which holds the helper scripts; hook is the command the plugin runs for `terma hook`.
 type exporter struct {
 	root string
 	dir  string
+	hook []string
 }
 
 //go:embed plugin/terma.js
@@ -57,12 +60,6 @@ type opencodeConfig struct {
 	IncludeToolContent bool              `json:"includeToolContent"`
 	ResourceAttributes map[string]string `json:"resourceAttributes,omitempty"`
 	HookCommand        []string          `json:"hookCommand,omitempty"`
-	// PerRepo resolves each session's project from its repository's binding and its key
-	// from HelpersDir/<HelperPrefix><projectID>, stamped on ProjectAttribute.
-	PerRepo          bool   `json:"perRepo,omitempty"`
-	HelpersDir       string `json:"helpersDir,omitempty"`
-	HelperPrefix     string `json:"helperPrefix,omitempty"`
-	ProjectAttribute string `json:"projectAttribute,omitempty"`
 }
 
 // opencodePolicy is the repository-scope file: what a repository may decide. Content is not
@@ -140,7 +137,10 @@ func (c exporter) config(e harness.Exporter) opencodeConfig {
 			}
 		}
 	}
-	cfg.HookCommand = []string{"terma", "hook"}
+	cfg.HookCommand = c.hook
+	if len(cfg.HookCommand) == 0 {
+		cfg.HookCommand = []string{"terma", "hook"}
+	}
 	return cfg
 }
 
@@ -294,7 +294,10 @@ func (c exporter) Connect(e harness.Exporter, _ bool) error {
 }
 
 // RefreshPlugin re-splices an installed plugin's configuration into this build's source,
-// leaving an absent or inert plugin, and the file mode, alone.
+// leaving an absent or inert plugin, and the file mode, alone. The terma it runs is kept
+// while it is an executable at an absolute path; a bare name an earlier build wrote, or a
+// path that is gone, becomes this terma. A terma run from elsewhere never takes over a
+// plugin whose own terma still works.
 func (exporter) RefreshPlugin() (string, bool, error) {
 	path, err := (exporter{}).ConfigPath()
 	if err != nil {
@@ -305,9 +308,20 @@ func (exporter) RefreshPlugin() (string, bool, error) {
 		if !ok {
 			return nil, false, nil
 		}
+		if len(cfg.HookCommand) == 0 || !filepath.IsAbs(cfg.HookCommand[0]) || !executable(cfg.HookCommand[0]) {
+			if terma, err := procinfo.AbsExecutable(); err == nil {
+				cfg.HookCommand = []string{terma, "hook"}
+			}
+		}
 		src, err := renderPlugin(*cfg)
 		return src, true, err
 	})
+}
+
+// executable reports whether path is a regular file someone may run.
+func executable(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.Mode().IsRegular() && (runtime.GOOS == "windows" || info.Mode().Perm()&0o111 != 0)
 }
 
 // Disconnect removes the plugin and terma's helper, or the repository's policy file.

@@ -26,16 +26,17 @@ var (
 	pinnedPromptDropFields = []string{"gen_ai.prompt", "gen_ai.completion", "gen_ai.input.messages", "gen_ai.output.messages", "gen_ai.system_instructions",
 		"gen_ai.tool.definitions",
 		"omp.gen_ai.request.messages", "omp.gen_ai.response.text",
-		"request_text", "response_text",
+		"request_text", "response_text", "opencode.error.message",
 		// Free text that may restate what was said, and keys too generic to vouch for.
 		"error", "reason", "reasoning", "routing.reasoning", "metadata", "value", "key", "from", "db", "query_script",
 		"gen_ai.tool.description", "gen_ai.agent.description", "gen_ai.request.stop_sequences",
 		// Copilot's, content of both kinds: they leave only when prompts and tool content both do.
 		"exception.message", "github.copilot.shutdown_type"}
 	pinnedResourcePromptFields = []string{"process.command_args", "process.command_line"}
-	pinnedPromptBodyEvents     = []string{"opencode.user_prompt", "opencode.session.created", "pi.user_prompt", "omp.user_prompt", "hermes.user_prompt", "hermes.assistant_response", "dsh.user_prompt", "dsh.assistant_response"}
+	pinnedPromptBodyEvents     = []string{"opencode.user_prompt", "opencode.session.title", "opencode.session.created", "pi.user_prompt", "omp.user_prompt", "hermes.user_prompt", "hermes.assistant_response", "dsh.user_prompt", "dsh.assistant_response"}
 	pinnedToolContentFields    = []string{"tool_parameters", "tool_input", "full_command", "bash_command", "arguments", "output",
 		"gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "opencode.tool.file_path", "opencode.session.directory",
+		"opencode.error.message", "opencode.tool.files", "opencode.tool.title",
 		"function_args", "hook_input", "hook_output", "stdout", "stderr",
 		"github.copilot.tool.parameters.command", "github.copilot.tool.parameters.file_path",
 		"github.copilot.git.repository", "github.copilot.github.org", "github.copilot.git.branch", "github.copilot.git.commit_sha",
@@ -46,7 +47,7 @@ var (
 		"file_path", "result", "cwd"}
 	pinnedMessageFields     = []string{"gen_ai.input.messages", "gen_ai.output.messages"}
 	pinnedToolContentEvents = []string{"tool.output", "tool.input"}
-	pinnedSessionKeys       = []string{"session.id@ai.xai.grok_code", "session.id", "conversation.id", "gen_ai.conversation.id@@oh-my-pi/pi-agent-core", "gen_ai.conversation.id", "thread.id", "thread_id"}
+	pinnedSessionKeys       = []string{"session.id@terma-opencode", "session.id@ai.xai.grok_code", "session.id", "conversation.id", "gen_ai.conversation.id@@oh-my-pi/pi-agent-core", "gen_ai.conversation.id", "thread.id", "thread_id"}
 )
 
 func TestComposedRulesArePinned(t *testing.T) {

@@ -39,16 +39,16 @@ func TestOpenCodeTemplateHasOneConfigLineAndOneExport(t *testing.T) {
 	if n := strings.Count(opencodePluginSource, opencodeConfigPlaceholder); n != 1 {
 		t.Fatalf("placeholder appears %d times, want 1", n)
 	}
-	exports := 0
+	var exports []string
 	for line := range strings.SplitSeq(opencodePluginSource, "\n") {
 		if strings.HasPrefix(line, "export ") {
-			exports++
+			exports = append(exports, line)
 		}
 	}
-	// OpenCode's loader treats every export as a plugin function; a stray helper export
-	// would make the plugin fail to load.
-	if exports != 1 {
-		t.Fatalf("plugin has %d exports, want exactly 1 (the plugin function)", exports)
+	// Both majors load every file in the plugins folder and treat its exports as the
+	// plugin: one default export, { id, server, setup }, and nothing else.
+	if len(exports) != 1 || !strings.HasPrefix(exports[0], "export default {") {
+		t.Fatalf("plugin exports %q, want exactly one `export default {`", exports)
 	}
 	if _, ok := readPluginConfig([]byte(opencodePluginSource)); ok {
 		t.Fatal("the raw template must read as unconfigured")
@@ -268,6 +268,8 @@ func TestOpenCodeDetectDoesNotFailWhenAbsent(t *testing.T) {
 // its file mode; an absent or inert one is left alone.
 func TestRefreshPluginKeepsItsConfiguration(t *testing.T) {
 	h, path := opencodeIn(t)
+	h.hook = []string{filepath.Join(t.TempDir(), "terma"), "hook"}
+	writeExec(t, h.hook[0], "#!/bin/sh\nexit 0\n")
 	if _, changed, err := h.RefreshPlugin(); err != nil || changed {
 		t.Fatalf("absent plugin: changed=%v err=%v", changed, err)
 	}

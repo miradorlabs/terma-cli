@@ -76,7 +76,7 @@ func TestEventNamesAreStable(t *testing.T) {
 		"grok-user-prompt-submit",
 		"hermes-file-edit", "hermes-prompt", "hermes-session-end", "hermes-session-start", "hermes-tool-reach",
 		"omp-file-edit", "omp-prompt", "omp-session-end", "omp-session-start", "omp-title", "omp-tool-reach",
-		"opencode-file-edit", "opencode-session-end", "opencode-session-start", "opencode-tool-reach",
+		"opencode-file-edit", "opencode-idle", "opencode-prompt", "opencode-session-end", "opencode-session-start", "opencode-tool-reach",
 		"pi-file-edit", "pi-prompt", "pi-session-end", "pi-session-start", "pi-tool-reach",
 		"post-tool-use", "pre-tool-use", "session-end", "session-start", "stop", "stop-failure", "subagent-start", "subagent-stop",
 		"user-prompt-submit",
@@ -85,13 +85,13 @@ func TestEventNamesAreStable(t *testing.T) {
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("event names changed:\n got %v\nwant %v", got, want)
 	}
-	for _, event := range []string{"stop", "cursor-stop", "codex-stop", "copilot-stop", "antigravity-stop", "session-end"} {
+	for _, event := range []string{"stop", "cursor-stop", "codex-stop", "copilot-stop", "antigravity-stop", "session-end", "opencode-idle", "opencode-session-end"} {
 		if !reg.FlushesAfter(event) {
 			t.Errorf("%s should flush the spool", event)
 		}
 	}
 	if reg.FlushesAfter("post-tool-use") || reg.FlushesAfter("antigravity-post-tool-use") || reg.FlushesAfter("copilot-post-tool-use") ||
-		reg.FlushesAfter("omp-tool-reach") || reg.FlushesAfter("pi-tool-reach") || reg.FlushesAfter("opencode-tool-reach") ||
+		reg.FlushesAfter("omp-tool-reach") || reg.FlushesAfter("pi-tool-reach") || reg.FlushesAfter("opencode-tool-reach") || reg.FlushesAfter("opencode-prompt") ||
 		reg.FlushesAfter("dsh-tool-reach") || reg.FlushesAfter("hermes-tool-reach") {
 		t.Error("a per-tool-call hook must not start a flush")
 	}

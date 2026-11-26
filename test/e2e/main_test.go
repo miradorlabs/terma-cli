@@ -7,6 +7,7 @@ import (
 
 func TestMain(m *testing.M) {
 	RunHookRecorder() // the hooks probe starts this binary as its recording hook
+	RunEchoMCP()      // the OpenCode MCP scenario starts it as its MCP server
 	code := m.Run()
 	if Enabled() {
 		dir := os.Getenv("TERMA_E2E_REPORT")

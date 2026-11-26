@@ -1,0 +1,748 @@
+{
+ "case": "mcp",
+ "opencode": "1.19.6",
+ "requests": [
+  {
+   "path": "/v1/traces",
+   "body": {
+    "resourceSpans": [
+     {
+      "resource": {
+       "attributes": [
+        {
+         "key": "service.name",
+         "value": {
+          "stringValue": "opencode"
+         }
+        }
+       ]
+      },
+      "scopeSpans": [
+       {
+        "scope": {
+         "name": "terma-opencode",
+         "version": "2"
+        },
+        "spans": [
+         {
+          "traceId": "fd116e7e24685c06108ad6d8ee4d61c5",
+          "spanId": "e0736121f8c01c3a",
+          "name": "chat m",
+          "kind": 3,
+          "startTimeUnixNano": "1795617983545000000",
+          "endTimeUnixNano": "1795617983559000000",
+          "attributes": [
+           {
+            "key": "gen_ai.operation.name",
+            "value": {
+             "stringValue": "chat"
+            }
+           },
+           {
+            "key": "opencode.call.id",
+            "value": {
+             "stringValue": "title:msg_2132c0ab8001w791JhSmP1byLA"
+            }
+           },
+           {
+            "key": "opencode.call.kind",
+            "value": {
+             "stringValue": "title"
+            }
+           },
+           {
+            "key": "gen_ai.request.model",
+            "value": {
+             "stringValue": "m"
+            }
+           },
+           {
+            "key": "gen_ai.provider.name",
+            "value": {
+             "stringValue": "fake"
+            }
+           },
+           {
+            "key": "opencode.agent",
+            "value": {
+             "stringValue": "title"
+            }
+           },
+           {
+            "key": "session.id",
+            "value": {
+             "stringValue": "ses_decd3f564ffe6EBOxCeIXeudUx"
+            }
+           },
+           {
+            "key": "opencode.version",
+            "value": {
+             "stringValue": "1.19.6"
+            }
+           }
+          ],
+          "status": {
+           "code": 1
+          }
+         },
+         {
+          "traceId": "fd116e7e24685c06108ad6d8ee4d61c5",
+          "spanId": "2a6f87696d253ab4",
+          "name": "execute_tool capture_echo",
+          "kind": 1,
+          "startTimeUnixNano": "1795617984029000000",
+          "endTimeUnixNano": "1795617984033000000",
+          "attributes": [
+           {
+            "key": "gen_ai.operation.name",
+            "value": {
+             "stringValue": "execute_tool"
+            }
+           },
+           {
+            "key": "gen_ai.tool.name",
+            "value": {
+             "stringValue": "capture_echo"
+            }
+           },
+           {
+            "key": "gen_ai.tool.call.id",
+            "value": {
+             "stringValue": "msg_2132c0c31001qjENCZr8IO2nSk:call_s0_0_84020"
+            }
+           },
+           {
+            "key": "opencode.parent_message.id",
+            "value": {
+             "stringValue": "msg_2132c0ab8001w791JhSmP1byLA"
+            }
+           },
+           {
+            "key": "opencode.tool.status",
+            "value": {
+             "stringValue": "completed"
+            }
+           },
+           {
+            "key": "opencode.tool.output_bytes",
+            "value": {
+             "intValue": "10"
+            }
+           },
+           {
+            "key": "opencode.mcp.server",
+            "value": {
+             "stringValue": "capture"
+            }
+           },
+           {
+            "key": "opencode.mcp.tool",
+            "value": {
+             "stringValue": "echo"
+            }
+           },
+           {
+            "key": "gen_ai.tool.call.arguments",
+            "value": {
+             "stringValue": "{\"text\":\"MCP-CANARY\"}"
+            }
+           },
+           {
+            "key": "gen_ai.tool.call.result",
+            "value": {
+             "stringValue": "MCP-CANARY"
+            }
+           },
+           {
+            "key": "session.id",
+            "value": {
+             "stringValue": "ses_decd3f564ffe6EBOxCeIXeudUx"
+            }
+           },
+           {
+            "key": "opencode.version",
+            "value": {
+             "stringValue": "1.19.6"
+            }
+           }
+          ],
+          "status": {
+           "code": 1
+          }
+         },
+         {
+          "traceId": "fd116e7e24685c06108ad6d8ee4d61c5",
+          "spanId": "11671e02c0a6e121",
+          "name": "chat m",
+          "kind": 3,
+          "startTimeUnixNano": "1795617983537000000",
+          "endTimeUnixNano": "1795617984056000000",
+          "attributes": [
+           {
+            "key": "gen_ai.operation.name",
+            "value": {
+             "stringValue": "chat"
+            }
+           },
+           {
+            "key": "opencode.call.id",
+            "value": {
+             "stringValue": "msg_2132c0c31001qjENCZr8IO2nSk"
+            }
+           },
+           {
+            "key": "opencode.message.id",
+            "value": {
+             "stringValue": "msg_2132c0c31001qjENCZr8IO2nSk"
+            }
+           },
+           {
+            "key": "opencode.parent_message.id",
+            "value": {
+             "stringValue": "msg_2132c0ab8001w791JhSmP1byLA"
+            }
+           },
+           {
+            "key": "gen_ai.request.model",
+            "value": {
+             "stringValue": "m"
+            }
+           },
+           {
+            "key": "gen_ai.provider.name",
+            "value": {
+             "stringValue": "fake"
+            }
+           },
+           {
+            "key": "opencode.agent",
+            "value": {
+             "stringValue": "build"
+            }
+           },
+           {
+            "key": "gen_ai.usage.input_tokens",
+            "value": {
+             "intValue": "100"
+            }
+           },
+           {
+            "key": "gen_ai.usage.output_tokens",
+            "value": {
+             "intValue": "20"
+            }
+           },
+           {
+            "key": "opencode.usage.reasoning_tokens",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.usage.cache_read.input_tokens",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.usage.cache_write.input_tokens",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.usage.total_cost",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.response.finish_reasons",
+            "value": {
+             "stringValue": "tool-calls"
+            }
+           },
+           {
+            "key": "session.id",
+            "value": {
+             "stringValue": "ses_decd3f564ffe6EBOxCeIXeudUx"
+            }
+           },
+           {
+            "key": "opencode.version",
+            "value": {
+             "stringValue": "1.19.6"
+            }
+           }
+          ],
+          "status": {
+           "code": 1
+          }
+         },
+         {
+          "traceId": "fd116e7e24685c06108ad6d8ee4d61c5",
+          "spanId": "af871afe2d88a72e",
+          "name": "execute_tool capture_fail",
+          "kind": 1,
+          "startTimeUnixNano": "1795617984087000000",
+          "endTimeUnixNano": "1795617984091000000",
+          "attributes": [
+           {
+            "key": "gen_ai.operation.name",
+            "value": {
+             "stringValue": "execute_tool"
+            }
+           },
+           {
+            "key": "gen_ai.tool.name",
+            "value": {
+             "stringValue": "capture_fail"
+            }
+           },
+           {
+            "key": "gen_ai.tool.call.id",
+            "value": {
+             "stringValue": "msg_2132c0e3b001p41mFSYrzyilFH:call_s1_0_84082"
+            }
+           },
+           {
+            "key": "opencode.parent_message.id",
+            "value": {
+             "stringValue": "msg_2132c0ab8001w791JhSmP1byLA"
+            }
+           },
+           {
+            "key": "opencode.tool.status",
+            "value": {
+             "stringValue": "error"
+            }
+           },
+           {
+            "key": "opencode.tool.output_bytes",
+            "value": {
+             "intValue": "30"
+            }
+           },
+           {
+            "key": "opencode.mcp.server",
+            "value": {
+             "stringValue": "capture"
+            }
+           },
+           {
+            "key": "opencode.mcp.tool",
+            "value": {
+             "stringValue": "fail"
+            }
+           },
+           {
+            "key": "gen_ai.tool.call.arguments",
+            "value": {
+             "stringValue": "{}"
+            }
+           },
+           {
+            "key": "gen_ai.tool.call.result",
+            "value": {
+             "stringValue": "capture MCP failure on purpose"
+            }
+           },
+           {
+            "key": "session.id",
+            "value": {
+             "stringValue": "ses_decd3f564ffe6EBOxCeIXeudUx"
+            }
+           },
+           {
+            "key": "opencode.version",
+            "value": {
+             "stringValue": "1.19.6"
+            }
+           }
+          ],
+          "status": {
+           "code": 2
+          }
+         },
+         {
+          "traceId": "fd116e7e24685c06108ad6d8ee4d61c5",
+          "spanId": "2b350a89934e597e",
+          "name": "chat m",
+          "kind": 3,
+          "startTimeUnixNano": "1795617984059000000",
+          "endTimeUnixNano": "1795617984106000000",
+          "attributes": [
+           {
+            "key": "gen_ai.operation.name",
+            "value": {
+             "stringValue": "chat"
+            }
+           },
+           {
+            "key": "opencode.call.id",
+            "value": {
+             "stringValue": "msg_2132c0e3b001p41mFSYrzyilFH"
+            }
+           },
+           {
+            "key": "opencode.message.id",
+            "value": {
+             "stringValue": "msg_2132c0e3b001p41mFSYrzyilFH"
+            }
+           },
+           {
+            "key": "opencode.parent_message.id",
+            "value": {
+             "stringValue": "msg_2132c0ab8001w791JhSmP1byLA"
+            }
+           },
+           {
+            "key": "gen_ai.request.model",
+            "value": {
+             "stringValue": "m"
+            }
+           },
+           {
+            "key": "gen_ai.provider.name",
+            "value": {
+             "stringValue": "fake"
+            }
+           },
+           {
+            "key": "opencode.agent",
+            "value": {
+             "stringValue": "build"
+            }
+           },
+           {
+            "key": "gen_ai.usage.input_tokens",
+            "value": {
+             "intValue": "100"
+            }
+           },
+           {
+            "key": "gen_ai.usage.output_tokens",
+            "value": {
+             "intValue": "20"
+            }
+           },
+           {
+            "key": "opencode.usage.reasoning_tokens",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.usage.cache_read.input_tokens",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.usage.cache_write.input_tokens",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.usage.total_cost",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.response.finish_reasons",
+            "value": {
+             "stringValue": "tool-calls"
+            }
+           },
+           {
+            "key": "session.id",
+            "value": {
+             "stringValue": "ses_decd3f564ffe6EBOxCeIXeudUx"
+            }
+           },
+           {
+            "key": "opencode.version",
+            "value": {
+             "stringValue": "1.19.6"
+            }
+           }
+          ],
+          "status": {
+           "code": 1
+          }
+         },
+         {
+          "traceId": "fd116e7e24685c06108ad6d8ee4d61c5",
+          "spanId": "1d082c4edf41f080",
+          "name": "chat m",
+          "kind": 3,
+          "startTimeUnixNano": "1795617984107000000",
+          "endTimeUnixNano": "1795617984145000000",
+          "attributes": [
+           {
+            "key": "gen_ai.operation.name",
+            "value": {
+             "stringValue": "chat"
+            }
+           },
+           {
+            "key": "opencode.call.id",
+            "value": {
+             "stringValue": "msg_2132c0e6b001qJIq5V4ljChpzn"
+            }
+           },
+           {
+            "key": "opencode.message.id",
+            "value": {
+             "stringValue": "msg_2132c0e6b001qJIq5V4ljChpzn"
+            }
+           },
+           {
+            "key": "opencode.parent_message.id",
+            "value": {
+             "stringValue": "msg_2132c0ab8001w791JhSmP1byLA"
+            }
+           },
+           {
+            "key": "gen_ai.request.model",
+            "value": {
+             "stringValue": "m"
+            }
+           },
+           {
+            "key": "gen_ai.provider.name",
+            "value": {
+             "stringValue": "fake"
+            }
+           },
+           {
+            "key": "opencode.agent",
+            "value": {
+             "stringValue": "build"
+            }
+           },
+           {
+            "key": "gen_ai.usage.input_tokens",
+            "value": {
+             "intValue": "12"
+            }
+           },
+           {
+            "key": "gen_ai.usage.output_tokens",
+            "value": {
+             "intValue": "4"
+            }
+           },
+           {
+            "key": "opencode.usage.reasoning_tokens",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.usage.cache_read.input_tokens",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.usage.cache_write.input_tokens",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.usage.total_cost",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.response.finish_reasons",
+            "value": {
+             "stringValue": "stop"
+            }
+           },
+           {
+            "key": "opencode.completion.length",
+            "value": {
+             "intValue": "4"
+            }
+           },
+           {
+            "key": "gen_ai.completion",
+            "value": {
+             "stringValue": "DONE"
+            }
+           },
+           {
+            "key": "session.id",
+            "value": {
+             "stringValue": "ses_decd3f564ffe6EBOxCeIXeudUx"
+            }
+           },
+           {
+            "key": "opencode.version",
+            "value": {
+             "stringValue": "1.19.6"
+            }
+           }
+          ],
+          "status": {
+           "code": 1
+          }
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "path": "/v1/logs",
+   "body": {
+    "resourceLogs": [
+     {
+      "resource": {
+       "attributes": [
+        {
+         "key": "service.name",
+         "value": {
+          "stringValue": "opencode"
+         }
+        }
+       ]
+      },
+      "scopeLogs": [
+       {
+        "scope": {
+         "name": "terma-opencode",
+         "version": "2"
+        },
+        "logRecords": [
+         {
+          "timeUnixNano": "1795617983160000000",
+          "severityNumber": 9,
+          "severityText": "INFO",
+          "body": {
+           "stringValue": "\"SCRIPT[/home/user/work/t-mcp]: mcp, mcpfail ; Follow the script.\""
+          },
+          "attributes": [
+           {
+            "key": "event.name",
+            "value": {
+             "stringValue": "opencode.user_prompt"
+            }
+           },
+           {
+            "key": "opencode.message.id",
+            "value": {
+             "stringValue": "msg_2132c0ab8001w791JhSmP1byLA"
+            }
+           },
+           {
+            "key": "opencode.prompt.length",
+            "value": {
+             "intValue": "120"
+            }
+           },
+           {
+            "key": "opencode.agent",
+            "value": {
+             "stringValue": "build"
+            }
+           },
+           {
+            "key": "gen_ai.request.model",
+            "value": {
+             "stringValue": "m"
+            }
+           },
+           {
+            "key": "gen_ai.provider.name",
+            "value": {
+             "stringValue": "fake"
+            }
+           },
+           {
+            "key": "session.id",
+            "value": {
+             "stringValue": "ses_decd3f564ffe6EBOxCeIXeudUx"
+            }
+           },
+           {
+            "key": "opencode.version",
+            "value": {
+             "stringValue": "1.19.6"
+            }
+           }
+          ],
+          "traceId": "fd116e7e24685c06108ad6d8ee4d61c5"
+         },
+         {
+          "timeUnixNano": "1795617983559000000",
+          "severityNumber": 9,
+          "severityText": "INFO",
+          "body": {
+           "stringValue": "Scripted session title"
+          },
+          "attributes": [
+           {
+            "key": "event.name",
+            "value": {
+             "stringValue": "opencode.session.title"
+            }
+           },
+           {
+            "key": "session.id",
+            "value": {
+             "stringValue": "ses_decd3f564ffe6EBOxCeIXeudUx"
+            }
+           },
+           {
+            "key": "opencode.version",
+            "value": {
+             "stringValue": "1.19.6"
+            }
+           }
+          ],
+          "traceId": "fd116e7e24685c06108ad6d8ee4d61c5"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "hooks": [
+  {
+   "at": 1795617983150,
+   "event": "opencode-session-start",
+   "payload": {
+    "session_id": "ses_decd3f564ffe6EBOxCeIXeudUx",
+    "cwd": "/home/user/work/t-mcp"
+   }
+  },
+  {
+   "at": 1795617983199,
+   "event": "opencode-prompt",
+   "payload": {
+    "session_id": "ses_decd3f564ffe6EBOxCeIXeudUx",
+    "cwd": "/home/user/work/t-mcp"
+   }
+  },
+  {
+   "at": 1795617984152,
+   "event": "opencode-idle",
+   "payload": {
+    "session_id": "ses_decd3f564ffe6EBOxCeIXeudUx",
+    "cwd": "/home/user/work/t-mcp"
+   }
+  }
+ ]
+}

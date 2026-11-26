@@ -1,160 +1,254 @@
 // Terma telemetry plugin for OpenCode.
 //
-// Installed by `terma relay setup` into OpenCode's plugins directory, where it is loaded at
-// startup; `terma teardown` removes it. Do not edit — the next setup or update rewrites it.
+// Installed by `terma setup` into OpenCode's plugins directory, where OpenCode loads it at
+// startup; `terma teardown` removes it. Do not edit: the next setup or update rewrites it.
 // CONFIG below is the only part that differs per machine.
 //
-// What it does: turns OpenCode's own events into OpenTelemetry — one span per model
-// call carrying tokens and cost, one span per tool call, and events for prompts and
-// session lifecycle — and posts them as OTLP/JSON to the Terma endpoint. The one change
-// it makes to a request: an OpenRouter request from a subagent's session names its parent
-// session and agent in the body's `trace` field, so OpenRouter's own trace export can place
-// the subagent. Nothing else is read or changed. Commit attribution is not done here:
-// session start/end and file edits are handed to `terma hook`, where the logic lives.
+// What it does: turns OpenCode's own record of a session into OpenTelemetry (one span per
+// model call, one per tool call, a log record per prompt and per title) and posts it as
+// OTLP/JSON to terma's relay. Claiming a session for a repository, guarding what a tool
+// reaches and reporting file edits are handed to `terma hook <event>`, where the logic
+// lives. It changes no request and reads no response.
+//
+// One file serves both majors: OpenCode 1 calls `server`, OpenCode 2 calls `setup`, and
+// both translate into the same emitter, so both send the same wire. OpenCode 2 evaluates
+// the module once per directory, so everything the plugin keeps is data in one object on
+// globalThis, shared by every copy; a copy evaluated later works on it with its own code.
 //
 // Dependency-free on purpose. OpenCode loads directory plugins without installing
-// anything for them, so this file uses only what Bun ships: fetch, node:crypto,
-// node:fs and node:child_process.
+// anything for them, so this file uses only what Bun and Node ship.
 
 const CONFIG = null /* terma:config */
 
 import { createHash } from "node:crypto"
 import { existsSync, readFileSync } from "node:fs"
 import { spawn, execFile } from "node:child_process"
-import { join, dirname, basename, isAbsolute, resolve } from "node:path"
+import { dirname, isAbsolute, join, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
 // --- limits -------------------------------------------------------------------------
 
-// Bodies are bounded so a single tool result cannot make an export request enormous.
+// Every rule here that runs on the clock, and why:
+// - BATCH_DELAY_MS: a batch leaves this long after its first item, so a quiet session still sends.
+// - post's back-off (1 s, doubling, MAX_RETRIES times) and HEADERS_TTL_MS: a relay may restart.
+// - HOOK_TIMEOUT_MS (REACH_HOOK_TIMEOUT_MS for a reach check), HOOK_KILL_GRACE_MS: a hung hook
+//   is ended, so its session's queue moves on.
+// - HOOK_QUEUE_WAIT_MS: a hook's caller stops waiting once the hook has waited this long for its
+//   turn in the hook queue. A tool held for a check also waits for its session's earlier work
+//   (the record, the claim), each with its own limit here.
+// - MISSING_RETRY_MS: a terma that could not be run is not tried again on every hook.
+// - RECORD_WAIT_MS: a session with no record is given up on (fails closed), not held forever.
+// - At exit, one after another: the entry's session queues get EXIT_QUEUE_MS, the hooks still
+//   running HOOK_TIMEOUT_MS, the flush EXIT_FLUSH_MS, OpenCode 1's log LOG_SETTLE_MS.
+// - update() stamps what follows a move 1 ms after its claim, so none of it sorts before the claim.
+// - A reach check made after its tool ran is noted for the session's family (checked), 1 ms
+//   after it finished, and no model or tool call the family sends afterwards ends
+//   earlier, nor is a prompt or title stamped earlier. A patch is checked in
+//   tool.execute.after, which OpenCode waits for, so it keeps its own end; a call no hook saw
+//   is checked when its part arrives and ends at that check.
+
+// Bodies are bounded so a single reply or tool result cannot make an export enormous.
 const MAX_TEXT = 64 * 1024
 const MAX_TOOL_CONTENT = 16 * 1024
+const MAX_TOOL_TITLE = 512
+const MAX_ERROR = 1024
 // The exporter batches: this many items, or this long after the first, whichever first.
 const BATCH_SIZE = 64
 const BATCH_DELAY_MS = 3000
 const MAX_RETRIES = 5
+// Batches waiting while the relay does not answer; the oldest go first, so a long-running
+// server cannot grow the queue forever.
+const MAX_PENDING_BATCHES = 32
+// What waits is bounded in bytes as well as in number.
+const MAX_PENDING_BYTES = 8 * 1024 * 1024
 // The headers helper is re-run this often, matching Claude Code's cadence.
 const HEADERS_TTL_MS = 29 * 60 * 1000
+// A session's hooks run one at a time; a hung one is terminated so its queue keeps moving.
+const HOOK_TIMEOUT_MS = 2000
+// A reach check decides whether a session is recorded at all, so it gets a little longer
+// than `terma hook` allows itself, 5 s; every other hook keeps HOOK_TIMEOUT_MS.
+const REACH_HOOK_TIMEOUT_MS = 5500
+const HOOK_KILL_GRACE_MS = 250
+const MAX_HOOK_QUEUE = 64
+// How long a hook may wait in its session's hook queue before its caller stops waiting: a
+// tool is held for its reach check, so that wait is bounded.
+const HOOK_QUEUE_WAIT_MS = 10000
+// A terma that could not be run is tried again this long after the last attempt.
+const MISSING_RETRY_MS = 60 * 1000
+// OpenCode 1 writes its log about once a second and drops what is unwritten when it exits:
+// a process that ends sooner than this after terma's warning would lose it.
+const LOG_SETTLE_MS = 1500
+// How long the exit waits for what is still queued to be sent: a relay that is down must
+// not hold OpenCode open.
+const EXIT_FLUSH_MS = 4000
+// The longest the exit waits for its sessions' queued work: a little more than a reach
+// check may take.
+const EXIT_QUEUE_MS = 8000
+// How long a session waits for its record before it is given up on (fail closed).
+const RECORD_WAIT_MS = 5000
+// What the plugin remembers is bounded, so a long-running server cannot grow it forever;
+// only the ids of sessions that failed closed are kept for good (see taint, darken).
+const MAX_SESSIONS = 512
+// Who opened whom is remembered far longer than a session is kept, so a family holds
+// together on a long-running server (see parents).
+const MAX_PARENTS = 65536
+const MAX_EVENTS = 8192
+const MAX_PER_SESSION = 1024
+const MAX_SMALL = 256
 
-const SCOPE = { name: "terma-opencode", version: "1" }
+const SCOPE = { name: "terma-opencode", version: "2" }
+const DEFAULT_HOOK = ["terma", "hook"]
+const EDIT_TOOLS = new Set(["write", "edit", "apply_patch", "patch"])
+// OpenCode 1's own tools whose names could pass for <server>_<tool>.
+const BUILTIN_UNDERSCORE_TOOLS = new Set(["apply_patch", "plan_enter", "plan_exit"])
+// OpenCode 1.x names the placeholder this way until the title call answers.
+const PLACEHOLDER_TITLE = /^New session - \d{4}-\d{2}-\d{2}T/
+const RULE_REFUSAL = "The user has specified a rule which prevents"
+// How OpenCode 1 opens the synthetic part for a file attached to a prompt.
+const READ_ATTACHMENT = "Called the Read tool with the following input: "
+// The path an attached file is reach-checked under when its marker names no path terma can
+// use: two leading separators make it a reach terma cannot place.
+const UNPLACED_ATTACHMENT = "//attached-file/unplaced"
+// The shell command a session that failed closed sends as its reach: one terma cannot
+// follow, so the hook marks the run Mixed. OMP's extension (internal/agents/omp/terma-omp.ts)
+// sends the same one, and a test holds the two together.
+const REACH_FAILED_COMMAND = "eval $TERMA_REACH_FAILED"
 
-// --- config -------------------------------------------------------------------------
+// --- state --------------------------------------------------------------------------
 
-// effectiveConfig is CONFIG with the repository's own policy laid over it: a committed
-// .opencode/terma.json sets what ships from that repository — signals, and whether
-// prompt and tool content are captured — and nothing else. In per-repo mode the shared
-// global plugin captures no content by default, so a repository that wants prompt or
-// tool-content capture opts in through its own committed overlay; no repository's
-// install can turn capture on for another.
-function effectiveConfig(worktree) {
-  const cfg = { ...(CONFIG ?? {}) }
-  cfg.signals = Array.isArray(cfg.signals) ? cfg.signals : []
-  cfg.includePrompts = cfg.includePrompts === true
-  cfg.includeToolContent = cfg.includeToolContent === true
-  cfg.resourceAttributes = { ...(cfg.resourceAttributes ?? {}) }
-  if (!worktree) return cfg
-  // Per-repo routing: point this session's export at whatever Terma project the
-  // repository is bound to. The key for that project lives in its own helper script;
-  // an unbound repository has no project, so the export stays inert (no endpoint).
-  if (cfg.perRepo) {
-    const projectID = readProjectID(worktree)
-    if (!projectID) {
-      cfg.endpoint = ""
-      return cfg
-    }
-    cfg.headersHelper = join(cfg.helpersDir || "", (cfg.helperPrefix || "") + projectID)
-    if (cfg.projectAttribute) cfg.resourceAttributes[cfg.projectAttribute] = projectID
+// The one shared object. Data, promises and the resolvers of those promises only: a later
+// copy of this file (OpenCode 2 evaluates one per directory, and again after a rewrite) must
+// be able to work on it with its own functions, so nothing in it does a copy's work.
+// A change to its shape bumps the number in the key, so a copy never reads another shape.
+const KEY = Symbol.for("terma.opencode.state/1")
+const state = (globalThis[KEY] ??= newState())
+
+// This copy's entry loggers; a missing terma is reported through the newest.
+const loggers = []
+
+function newState() {
+  return {
+    config: settings(null),
+    exporter: {
+      spans: [],
+      records: [],
+      timer: null,
+      // Batches waiting to be sent, oldest first: { cfg, sends: [[path, payload]], items, bytes }.
+      batches: [],
+      pendingBytes: 0, // the bytes of the batches waiting
+      draining: false,
+      inflight: Promise.resolve(), // resolves once the batches queued so far are sent or given up on
+      dropped: 0, // items in batches dropped while the relay did not answer
+      droppedWarned: false,
+      headers: null,
+      headersAt: 0,
+    },
+    hooks: {
+      missing: false,
+      missingAt: 0,
+      warned: false,
+      // Every hook queue with a hook waiting or running, sessions that left the map included.
+      running: new Set(),
+      // The queue of hooks that name no session this process keeps.
+      unowned: { hookQueue: Promise.resolve(), hookPending: 0 },
+    },
+    sessions: new Map(),
+    tainted: new Set(),
+    // The ids of sessions that went dark, kept for good as taints are: a session that has
+    // ended or been forgotten still fails what is below it closed.
+    dark: new Set(),
+    // session id -> the id of the session that opened it, for every subagent seen: a family
+    // is walked through this, never through sessions, which are forgotten when idle.
+    parents: new Map(),
+    // The time of the last reach check made after its tool ran, by family (familyOf), and
+    // the late checks running now, which the family's queued work waits for (lateCheck).
+    floors: new Map(),
+    checking: new Map(),
+    seenEvents: new Set(),
+    owners: 0,
   }
-  try {
-    const local = JSON.parse(readFileSync(join(worktree, ".opencode", "terma.json"), "utf8"))
-    if (Array.isArray(local.signals)) cfg.signals = local.signals
-    if (typeof local.includePrompts === "boolean") cfg.includePrompts = local.includePrompts
-    if (typeof local.includeToolContent === "boolean") cfg.includeToolContent = local.includeToolContent
-  } catch {
-    // No local policy, or one this plugin cannot read: the global settings stand.
-  }
-  return cfg
 }
 
-// readProjectID walks up from a worktree to the first Terma binding and returns its
-// project id, or "" when the repository is not bound to a Terma project. It reads
-// .terma/settings.json, matching the Go side (project.ResolveDir): a linked git worktree
-// with no binding of its own uses its main checkout's, because a new worktree does not
-// get a gitignored binding.
-function readProjectID(worktree) {
-  let dir = worktree
-  for (let i = 0; i < 64 && dir; i++) {
-    const id = bindingProjectID(dir)
-    if (id) return id
-    const parent = dirname(dir)
-    if (parent === dir) break
-    dir = parent
+function settings(raw) {
+  const c = raw && typeof raw === "object" ? raw : {}
+  const strings = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : [])
+  const hookCommand = strings(c.hookCommand)
+  const resourceAttributes = {}
+  for (const [k, v] of Object.entries(c.resourceAttributes ?? {})) {
+    if (k && typeof v === "string" && v) resourceAttributes[k] = v
   }
-  // No binding on the way up: only now, and only at the nearest git root, try the main
-  // checkout of a linked worktree — the same order as ResolveDir (Find, then Resolve).
-  dir = worktree
-  for (let i = 0; i < 64 && dir; i++) {
-    if (existsSync(join(dir, ".git"))) {
-      const main = mainCheckout(dir)
-      return main ? bindingProjectID(main) : ""
-    }
-    const parent = dirname(dir)
-    if (parent === dir) break
-    dir = parent
-  }
-  return ""
-}
-
-// mainCheckout returns the main checkout's root when dir is the root of a linked git
-// worktree, else "". Its .git is a file naming the worktree's git directory, whose
-// commondir leads to the main .git. It is gitx.LinkedWorktreeFS on the Go side.
-function mainCheckout(dir) {
-  try {
-    const line = readFileSync(join(dir, ".git"), "utf8").split("\n")[0].trim()
-    if (!line.startsWith("gitdir:")) return ""
-    let gitDir = line.slice("gitdir:".length).trim()
-    if (!isAbsolute(gitDir)) gitDir = resolve(dir, gitDir)
-    let common = readFileSync(join(gitDir, "commondir"), "utf8").trim()
-    if (!common) return ""
-    if (!isAbsolute(common)) common = resolve(gitDir, common)
-    return basename(common) === ".git" ? dirname(common) : ""
-  } catch {
-    return ""
+  return {
+    endpoint: typeof c.endpoint === "string" ? c.endpoint.replace(/\/+$/, "") : "",
+    headers: c.headers && typeof c.headers === "object" ? { ...c.headers } : {},
+    headersHelper: typeof c.headersHelper === "string" ? c.headersHelper : "",
+    signals: strings(c.signals),
+    includePrompts: c.includePrompts === true,
+    includeToolContent: c.includeToolContent === true,
+    resourceAttributes,
+    hookCommand: hookCommand.length > 0 && hookCommand.length === c.hookCommand.length ? hookCommand : DEFAULT_HOOK,
   }
 }
 
-// bindingProjectID reads the project id from a directory's binding.
-// An id that is not safe as a path component is no binding at all: see validProjectID.
-function bindingProjectID(dir) {
-  try {
-    const id = JSON.parse(readFileSync(join(dir, ".terma", "settings.json"), "utf8"))?.project?.id
-    return id ? validProjectID(String(id)) : ""
-  } catch {
-    return ""
+// configure makes this evaluation's CONFIG the one every copy uses. What is queued leaves
+// with the destination it was collected for, and a refresh that moved terma gets a retry.
+function configure(st, raw) {
+  const next = settings(raw)
+  const route = (c) => JSON.stringify([c.endpoint, c.headers, c.headersHelper, c.hookCommand])
+  if (route(st.config) !== route(next)) {
+    flush()
+    st.exporter.headers = null
+    st.exporter.headersAt = 0
+    st.hooks.missing = false
+    st.hooks.missingAt = 0
+    st.hooks.warned = false
+    st.exporter.droppedWarned = false
   }
+  st.config = next
 }
 
-// validProjectID returns id when it is safe to use as a path component, else "". It is
-// project.ValidID from the Go side, and it is here for the same reason: the binding is a
-// committed file, so it arrives from whoever wrote the repository, and the id is about to
-// name the headers helper this plugin *executes*. join() resolves "..", so an unchecked
-// id like "x/../../../../Projects/repo/run.sh" would run a script the repository chose.
-function validProjectID(id) {
-  return id.length <= 128 && /^[A-Za-z0-9._-]+$/.test(id) && !id.startsWith(".") ? id : ""
+function remember(coll, key, value, max = MAX_PER_SESSION) {
+  if (coll instanceof Map) {
+    coll.delete(key)
+    coll.set(key, value)
+  } else {
+    coll.add(key)
+  }
+  while (coll.size > max) coll.delete(coll.keys().next().value)
+}
+
+function sleep(ms, unref = false) {
+  return new Promise((r) => {
+    const t = setTimeout(r, ms)
+    if (unref) t.unref?.()
+  })
 }
 
 // --- ids and encoding ---------------------------------------------------------------
 
 // Trace and span ids are derived, not random: the same session always maps to the same
-// trace and the same message or tool call to the same span, so a redelivered export
-// dedups on the receiving side instead of duplicating.
-function traceId(sessionID) {
-  return createHash("sha256").update("terma-opencode:" + sessionID).digest("hex").slice(0, 32)
+// trace and the same call to the same span, so a redelivered export dedups downstream.
+function sha(s) {
+  return createHash("sha256").update(s).digest("hex")
 }
-function spanId(id) {
-  return createHash("sha256").update("terma-opencode-span:" + id).digest("hex").slice(0, 16)
+function traceId(sessionID) {
+  return sha("terma-opencode:" + sessionID).slice(0, 32)
+}
+function spanId(kind, id) {
+  return sha("terma-opencode-span:" + kind + ":" + id).slice(0, 16)
+}
+// qualify names a tool call by its assistant message: some providers number their call ids
+// per response (call_0, call_1), so the provider's id alone repeats within a session.
+function qualify(messageID, callID) {
+  return String(messageID ?? "") + ":" + String(callID ?? "")
 }
 function nanos(ms) {
-  return (BigInt(Math.round(ms)) * 1000000n).toString()
+  return (BigInt(Math.round(Number.isFinite(ms) ? ms : Date.now())) * 1000000n).toString()
+}
+function num(v) {
+  return typeof v === "number" && Number.isFinite(v) ? v : undefined
+}
+function str(v) {
+  return typeof v === "string" ? v : ""
 }
 function truncate(s, max) {
   if (typeof s !== "string") return ""
@@ -172,6 +266,11 @@ function attr(key, value) {
     case "number":
       if (!Number.isFinite(value)) return null
       return Number.isInteger(value) ? { key, value: { intValue: String(value) } } : { key, value: { doubleValue: value } }
+    case "object": {
+      if (!Array.isArray(value)) return null
+      const values = value.filter((v) => typeof v === "string").map((v) => ({ stringValue: v }))
+      return values.length > 0 ? { key, value: { arrayValue: { values } } } : null
+    }
     default:
       return null
   }
@@ -187,500 +286,1400 @@ function attrs(obj) {
 
 // --- exporter -----------------------------------------------------------------------
 
-class Exporter {
-  constructor(cfg) {
-    this.cfg = cfg
-    this.base = String(cfg.endpoint ?? "").replace(/\/+$/, "")
-    this.traces = cfg.signals.includes("traces")
-    this.logs = cfg.signals.includes("logs")
-    this.spans = []
-    this.records = []
-    this.timer = null
-    this.inflight = Promise.resolve()
-    this.headers = null
-    this.headersAt = 0
-    this.disabled = !this.base
+function exportItem(kind, item) {
+  const ex = state.exporter
+  ex[kind].push(item)
+  if (ex.spans.length + ex.records.length >= BATCH_SIZE) {
+    flush()
+    return
   }
+  if (ex.timer) return
+  ex.timer = setTimeout(flush, BATCH_DELAY_MS)
+  // Never keep the process alive for a pending export.
+  ex.timer.unref?.()
+}
 
-  resource() {
-    return {
-      attributes: attrs({
-        "service.name": "opencode",
-        ...this.cfg.resourceAttributes,
-      }),
-    }
+// flush queues everything collected as one batch, its request bodies built now with the
+// config in force, and returns a promise that resolves once every batch queued so far is sent
+// or given up on. One drain sends them in order, so two sends never race, and a failed batch
+// is retried with the same bytes. While the relay does not answer, the oldest waiting batches
+// are dropped, past MAX_PENDING_BATCHES or MAX_PENDING_BYTES; the newest is never dropped for
+// its size alone.
+function flush() {
+  const ex = state.exporter
+  if (ex.timer) {
+    clearTimeout(ex.timer)
+    ex.timer = null
   }
-
-  // authHeaders runs the helper script (the key never sits in this file) or falls back
-  // to inline headers; either way the result is cached.
-  async authHeaders() {
-    const now = Date.now()
-    if (this.headers && now - this.headersAt < HEADERS_TTL_MS) return this.headers
-    let headers = {}
-    if (this.cfg.headersHelper) {
+  const spans = ex.spans
+  const records = ex.records
+  ex.spans = []
+  ex.records = []
+  if (spans.length === 0 && records.length === 0) return ex.inflight
+  const cfg = state.config
+  const resource = { attributes: attrs({ "service.name": "opencode", ...cfg.resourceAttributes }) }
+  const sends = []
+  if (spans.length > 0) sends.push(["/v1/traces", JSON.stringify({ resourceSpans: [{ resource, scopeSpans: [{ scope: SCOPE, spans }] }] })])
+  if (records.length > 0) sends.push(["/v1/logs", JSON.stringify({ resourceLogs: [{ resource, scopeLogs: [{ scope: SCOPE, logRecords: records }] }] })])
+  const bytes = sends.reduce((n, [, payload]) => n + Buffer.byteLength(payload), 0)
+  ex.batches.push({ cfg, sends, items: spans.length + records.length, bytes })
+  ex.pendingBytes += bytes
+  while (ex.batches.length > MAX_PENDING_BATCHES || (ex.pendingBytes > MAX_PENDING_BYTES && ex.batches.length > 1)) {
+    const old = ex.batches.shift()
+    ex.pendingBytes -= old.bytes
+    ex.dropped += old.items
+    if (!ex.droppedWarned) {
+      ex.droppedWarned = true
+      const log = loggers[loggers.length - 1]
       try {
-        const out = await new Promise((resolve, reject) => {
-          execFile(this.cfg.headersHelper, [], { timeout: 5000, maxBuffer: 64 * 1024 }, (err, stdout) =>
-            err ? reject(err) : resolve(stdout),
-          )
-        })
-        const parsed = JSON.parse(out)
-        if (parsed && typeof parsed === "object") headers = parsed
-      } catch {
-        headers = {}
+        log?.("terma: the relay is not answering; some OpenCode telemetry was dropped.")
+      } catch {}
+    }
+  }
+  if (!ex.draining) {
+    ex.draining = true
+    ex.inflight = drain(ex)
+  }
+  return ex.inflight
+}
+
+// drain sends the waiting batches one at a time, front first, until none is left, each
+// batch's requests in order. A batch leaves the queue, and its bytes the count, as it is
+// sent, so the one in flight is never the one dropped.
+async function drain(ex) {
+  try {
+    while (ex.batches.length > 0) {
+      const { cfg, sends, bytes } = ex.batches.shift()
+      ex.pendingBytes -= bytes
+      try {
+        for (const [path, payload] of sends) await post(cfg, path, payload)
+      } catch {}
+    }
+  } finally {
+    ex.draining = false
+  }
+}
+
+async function post(cfg, path, payload) {
+  if (!cfg.endpoint) return
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const auth = await authHeaders(cfg)
+      const res = await fetch(cfg.endpoint + path, {
+        method: "POST",
+        headers: { "content-type": "application/json", ...auth },
+        body: payload,
+      })
+      await res.arrayBuffer().catch(() => {})
+      if (res.ok) return
+      // A rejected credential will not fix itself by retrying; a 5xx or 429 might.
+      if (res.status === 401 || res.status === 403) {
+        if (state.config === cfg) state.exporter.headers = null
+        return
       }
-    } else if (this.cfg.headers && typeof this.cfg.headers === "object") {
-      headers = { ...this.cfg.headers }
+      if (res.status < 500 && res.status !== 429) return
+    } catch {
+      // Network error: retry below.
     }
-    this.headers = headers
-    this.headersAt = now
-    return headers
+    if (attempt < MAX_RETRIES) await sleep(Math.min(30000, 1000 * 2 ** attempt))
   }
+}
 
-  span(s) {
-    if (this.disabled || !this.traces) return
-    this.spans.push(s)
-    this.schedule()
-  }
-  record(r) {
-    if (this.disabled || !this.logs) return
-    this.records.push(r)
-    this.schedule()
-  }
-
-  schedule() {
-    if (this.spans.length + this.records.length >= BATCH_SIZE) {
-      this.flush()
-      return
+// authHeaders runs the helper script (the key never sits in this file) or falls back to
+// inline headers. Only the config in force is cached: a batch collected under an earlier
+// one leaves with that one's headers.
+async function authHeaders(cfg) {
+  const ex = state.exporter
+  const current = state.config === cfg
+  if (current && ex.headers && Date.now() - ex.headersAt < HEADERS_TTL_MS) return ex.headers
+  let headers = {}
+  if (cfg.headersHelper) {
+    try {
+      const out = await new Promise((ok, fail) => {
+        execFile(cfg.headersHelper, [], { timeout: 5000, maxBuffer: 64 * 1024 }, (err, stdout) => (err ? fail(err) : ok(stdout)))
+      })
+      const parsed = JSON.parse(out)
+      if (parsed && typeof parsed === "object") headers = parsed
+    } catch {
+      headers = {}
     }
-    if (this.timer) return
-    this.timer = setTimeout(() => this.flush(), BATCH_DELAY_MS)
-    // Never keep the process alive for a pending export.
-    if (typeof this.timer.unref === "function") this.timer.unref()
+  } else {
+    headers = { ...cfg.headers }
   }
+  if (current) {
+    ex.headers = headers
+    ex.headersAt = Date.now()
+  }
+  return headers
+}
 
-  // flush sends everything queued. Sends are chained so two flushes never race, and a
-  // failed batch is retried with backoff rather than dropped or duplicated.
-  flush() {
-    if (this.timer) {
-      clearTimeout(this.timer)
-      this.timer = null
+// --- hook runner --------------------------------------------------------------------
+
+// runHook hands an event to `terma hook <event>` on a queue: the session's own (a FIFO, so
+// its claim always finishes before its other hooks) or, for a session this process does
+// not keep, state.hooks.unowned. Queues do not wait for each other. A hook's limit is
+// hookLimit(event), counted from its turn. What can happen to a hook, and what its caller
+// gets:
+//   runs and exits 0                         true
+//   runs and exits non-zero                  false
+//   waits past HOOK_QUEUE_WAIT_MS for its    false then; it still runs in its turn
+//   turn
+//   runs past its limit                      false; it is ended with its process group, and
+//                                            its queue moves on once it is gone
+//   queue full (MAX_HOOK_QUEUE) or terma     false at once; it is not started
+//   cannot be run
+function runHook(lane, event, payload) {
+  const h = state.hooks
+  if (termaMissing() || lane.hookPending >= MAX_HOOK_QUEUE) return Promise.resolve(false)
+  const argv = state.config.hookCommand
+  let done
+  const answer = new Promise((r) => {
+    done = r
+  })
+  let settled = false
+  let running
+  const settle = (ok) => {
+    if (!settled) {
+      settled = true
+      clearTimeout(queued)
+      clearTimeout(running)
+      done(ok)
     }
-    const spans = this.spans
-    const records = this.records
-    this.spans = []
-    this.records = []
-    if (spans.length === 0 && records.length === 0) return this.inflight
-    this.inflight = this.inflight.then(async () => {
-      if (spans.length > 0) {
-        await this.post("/v1/traces", {
-          resourceSpans: [{ resource: this.resource(), scopeSpans: [{ scope: SCOPE, spans }] }],
-        })
+  }
+  const giveUp = (ms) => {
+    const t = setTimeout(() => settle(false), ms)
+    t.unref?.()
+    return t
+  }
+  const queued = giveUp(HOOK_QUEUE_WAIT_MS)
+  lane.hookPending++
+  h.running.add(lane)
+  const slot = lane.hookQueue.then(() => {
+    // Its turn: the run limit starts now, not when it was queued.
+    clearTimeout(queued)
+    if (!settled) running = giveUp(hookLimit(event) + HOOK_KILL_GRACE_MS + 500)
+    return spawnHook(argv, event, payload)
+  })
+  lane.hookQueue = slot.then((s) => s.exit, () => undefined).finally(() => {
+    if (--lane.hookPending <= 0) h.running.delete(lane)
+  })
+  slot.then((s) => s.result, () => false).then(settle, () => settle(false))
+  return answer
+}
+
+// hookLimit is how long a hook may run.
+function hookLimit(event) {
+  return event === "opencode-tool-reach" ? REACH_HOOK_TIMEOUT_MS : HOOK_TIMEOUT_MS
+}
+
+function spawnHook(argv, event, payload) {
+  if (termaMissing()) return { result: Promise.resolve(false), exit: Promise.resolve() }
+  const grouped = process.platform !== "win32"
+  let resolveExit
+  const exit = new Promise((r) => {
+    resolveExit = r
+  })
+  const result = new Promise((done) => {
+    let settled = false
+    let exited = false
+    let child = null
+    let killTimer
+    const finish = (ok) => {
+      if (!settled) {
+        settled = true
+        clearTimeout(timer)
+        clearTimeout(killTimer)
+        done(ok)
       }
-      if (records.length > 0) {
-        await this.post("/v1/logs", {
-          resourceLogs: [{ resource: this.resource(), scopeLogs: [{ scope: SCOPE, logRecords: records }] }],
-        })
+    }
+    const markExited = () => {
+      if (!exited) {
+        exited = true
+        clearTimeout(timer)
+        clearTimeout(killTimer)
+        resolveExit()
+      }
+    }
+    // The hook leads a process group of its own, so the group is signalled: a child of the
+    // hook (git) ends with it. Where there is no group, or it cannot be signalled, the hook
+    // alone is.
+    const sendKill = (sig) => {
+      try {
+        if (grouped && child.pid > 1) return void process.kill(-child.pid, sig)
+      } catch (err) {
+        if (err?.code === "ESRCH") return markExited()
+      }
+      try {
+        child.kill(sig)
+      } catch (err) {
+        if (err?.code === "ESRCH") markExited()
+      }
+    }
+    const timer = setTimeout(() => {
+      if (!child) {
+        markExited()
+        return finish(false)
+      }
+      sendKill("SIGTERM")
+      killTimer = setTimeout(() => {
+        sendKill("SIGKILL")
+        child.unref?.()
+        finish(false)
+      }, HOOK_KILL_GRACE_MS)
+      killTimer.unref?.()
+    }, hookLimit(event))
+    timer.unref?.()
+    try {
+      // In a process group of its own: OpenCode 2 signals the group a tool step ran in when
+      // the step ends, which killed a hook started for that step (a file edit, the idle
+      // hook that starts the flush) wherever terma took longer than that to start. Windows
+      // has no process groups: before OpenCode is supported there, decide how a hook is kept
+      // apart from the step's signals and how a hung hook's children are ended.
+      child = spawn(argv[0], [...argv.slice(1), event], { stdio: ["pipe", "ignore", "ignore"], detached: grouped })
+      child.on("spawn", termaFound)
+      child.on("error", (err) => {
+        if (err?.code === "ENOENT" || err?.code === "EACCES") termaLost(argv[0], err.code)
+        if (!child?.pid || err?.code === "ESRCH") markExited()
+        finish(false)
+      })
+      child.on("close", (code) => {
+        markExited()
+        finish(code === 0)
+      })
+      child.stdin.on("error", () => {})
+      child.stdin.end(JSON.stringify(payload))
+    } catch (err) {
+      if (err?.code === "ENOENT" || err?.code === "EACCES") termaLost(argv[0], err.code)
+      markExited()
+      finish(false)
+    }
+  })
+  return { result, exit }
+}
+
+// termaLost stops every further hook for a while and says so once per config, in
+// OpenCode's own log: a session nobody claimed must not be exported, and a person should
+// learn why nothing arrives. The first hook after MISSING_RETRY_MS tries terma again.
+function termaLost(command, code) {
+  const h = state.hooks
+  h.missing = true
+  h.missingAt = Date.now()
+  if (h.warned) return
+  h.warned = true
+  const log = loggers[loggers.length - 1]
+  try {
+    log?.(`terma: cannot run ${command} (${code}). OpenCode sessions are not recorded until "terma setup" is run again.`)
+  } catch {}
+}
+
+// termaFound clears a missing terma once a hook starts again. Sessions that went dark
+// while it was missing stay dark; sessions seen from now on are claimed as usual.
+function termaFound() {
+  state.hooks.missing = false
+  state.hooks.missingAt = 0
+}
+
+// termaMissing is whether hooks are off now: terma could not be run, recently.
+function termaMissing() {
+  const h = state.hooks
+  return h.missing && Date.now() - h.missingAt < MISSING_RETRY_MS
+}
+
+// --- sessions -----------------------------------------------------------------------
+
+function newSession(id, owner) {
+  return {
+    id,
+    known: false,
+    latest: null, // a record that arrived before the first one was applied
+    recordArrived: null, // resolves firstSight's wait when a record arrives before the session is known
+    first: null, // the session's first sight (its record and its claim), as a promise
+    parentID: "",
+    directory: "",
+    askedDirectory: "", // the directory most recently moved to, applied or still queued
+    movedAt: 0, // when the last move's claim finished; nothing after it is stamped earlier
+    version: "",
+    created: 0,
+    title: "",
+    sentTitle: "",
+    lastTitleTime: 0,
+    queue: Promise.resolve(),
+    busy: 0,
+    hookQueue: Promise.resolve(), // its hooks, one at a time, in the order they were asked for
+    hookPending: 0,
+    claimed: false,
+    dark: false,
+    policy: {},
+    owner,
+    messages: new Map(), // messageID -> { parentID, created, copied }
+    texts: new Map(), // messageID -> Map(partID -> text), first-seen order
+    doneCalls: new Set(),
+    doneTools: new Set(),
+    asked: new Map(), // permission request id -> qualified call id
+    rejected: new Set(),
+    guarded: new Map(), // provider call id -> { reachKey }
+    fenced: false, // terma marked the session's run Mixed after a reach check failed
+    fencing: false, // that request is running
+    pendingTitle: null,
+    entry: {}, // an entry point's own per-session data
+  }
+}
+
+// sight is called for every hook and event that names a session, before anything else.
+// The first time a process sees a session, its queue starts with "get the record, then
+// claim", so everything the session sends waits, in order, behind its claim.
+function sight(sessionID, { record, fetch, owner } = {}) {
+  if (typeof sessionID !== "string" || !sessionID) return null
+  let s = state.sessions.get(sessionID)
+  if (!s) {
+    s = newSession(sessionID, owner)
+    state.sessions.set(sessionID, s)
+    prune()
+    if (record) s.latest = record
+    s.first = run(s, () => firstSight(s, fetch))
+  } else {
+    // Kept in order of last use, so prune drops the session idle longest.
+    state.sessions.delete(sessionID)
+    state.sessions.set(sessionID, s)
+    if (record) {
+      if (s.known) update(s, record)
+      else {
+        s.latest = record
+        s.recordArrived?.()
+      }
+    }
+  }
+  return s
+}
+
+function prune() {
+  if (state.sessions.size <= MAX_SESSIONS) return
+  for (const [id, s] of state.sessions) {
+    if (s.busy === 0 && s.hookPending === 0) {
+      state.sessions.delete(id)
+      if (state.sessions.size <= MAX_SESSIONS) return
+    }
+  }
+}
+
+async function firstSight(s, lookup) {
+  let rec = s.latest
+  // No record yet: wait, RECORD_WAIT_MS at most, for OpenCode's answer to the lookup or an
+  // event that carries one, whichever first; an answer with no record does not end the wait,
+  // and an event's record wins. Without one the session's directory and parent are unknown,
+  // so it is never claimed and never exported.
+  if (!rec) {
+    let timer
+    let fetched = null
+    await new Promise((r) => {
+      s.recordArrived = r
+      timer = setTimeout(r, RECORD_WAIT_MS)
+      Promise.resolve()
+        .then(lookup)
+        .then((f) => f?.id === s.id && r((fetched = f)), () => {})
+    })
+    clearTimeout(timer)
+    s.recordArrived = null
+    rec = s.latest ?? fetched
+  }
+  if (!rec) {
+    darken(s)
+    return
+  }
+  s.latest = null
+  s.known = true
+  adopt(s, str(rec.parentID))
+  s.directory = str(rec.directory)
+  s.askedDirectory = s.directory
+  s.version = str(rec.version)
+  s.created = num(rec.created) ?? 0
+  const titled = (s.title = str(rec.title))
+  s.policy = repoPolicy(s.directory)
+  s.claimed = await runHook(s, "opencode-session-start", base(s))
+  // A timeout or a refusal is not fatal: the relay holds an unclaimed session and the
+  // next prompt claims it again. A terma that cannot be run is.
+  if (!s.claimed && termaMissing()) {
+    darken(s)
+    return
+  }
+  // The title the session came with, which is what titles a resumed session. One that
+  // arrived during the claim is not sent here: it has its own place in the queue, behind
+  // whatever was queued before it, a call still to be checked included.
+  if (!s.parentID && isRealTitle(titled)) {
+    s.sentTitle = titled
+    emitTitle(s, titled)
+  }
+}
+
+// adopt notes which session opened s, on the session and in parents.
+function adopt(s, parentID) {
+  s.parentID = parentID
+  if (parentID && parentID !== s.id) remember(state.parents, s.id, parentID, MAX_PARENTS)
+}
+
+function update(s, rec) {
+  // Compared with the last move asked for, not the last one applied: a move back while an
+  // earlier move still waits in the queue is a move too.
+  if (rec.directory && rec.directory !== (s.askedDirectory || s.directory)) {
+    // A session that moved is under the policy of the repository it is in now. The move
+    // takes its place in the queue: what was said before it leaves under the old one.
+    const directory = rec.directory
+    s.askedDirectory = directory
+    run(s, async () => {
+      s.directory = directory
+      s.policy = repoPolicy(directory)
+      // The relay files a record under the claim in force at its time: claim the session
+      // in its new directory before anything more of it leaves, and stamp nothing earlier.
+      await guardReach(s, { tool: "list", lists: [directory] })
+      s.movedAt = Date.now() + 1 // strictly after the claim, never the same millisecond
+    })
+  }
+  if (rec.parentID) adopt(s, rec.parentID)
+  if (rec.title && rec.title !== s.title) {
+    s.title = rec.title
+    const time = Date.now()
+    run(s, () => title(s, { title: rec.title, time }))
+  }
+}
+
+// run appends fn to the session's queue. Everything a session emits or calls goes through
+// it. Whether the session may still send is decided when fn runs, not when it was queued.
+function run(s, fn) {
+  if (!s) return Promise.resolve()
+  s.busy++
+  s.queue = s.queue.then(async () => {
+    try {
+      await state.checking.get(familyOf(s))
+      if (!blocked(s)) await fn()
+    } catch {
+      // A telemetry failure must never surface in the agent.
+    } finally {
+      s.busy--
+    }
+  })
+  return s.queue
+}
+
+// beside runs a check that OpenCode itself waits for (before a tool runs, or before its
+// result is handed on) once the session's first sight is done, outside its queue. Such a
+// check sends nothing, so it waits neither behind what the session has queued to send nor
+// for a late check elsewhere in the family: the plugin's waits may delay what terma sends,
+// never OpenCode's own work beyond the check that work needs. What the tool itself sends
+// later goes through the queue as ever, and is held there. A session that failed closed is
+// judged here (blocked), as run judges it for queued work.
+async function beside(s, fn) {
+  await s.first
+  try {
+    if (!blocked(s)) await fn()
+  } catch {
+    // A telemetry failure must never surface in the agent.
+  }
+}
+
+function blocked(s) {
+  if (!s.claimed && termaMissing()) darken(s)
+  return s.dark || isTainted(s)
+}
+
+// darken gives up on a session that could not be claimed: nothing of it is exported.
+function darken(s) {
+  s.dark = true
+  state.dark.add(s.id)
+}
+
+// A failed reach hook taints the session and every session above it: their content could
+// now include what the child read across organizations, so none of them exports more. A
+// taint is one short id and is never dropped: dropping one would let a session that failed
+// closed export again.
+function taint(s) {
+  let id = s.id
+  for (let i = 0; i < 16 && id; i++) {
+    state.tainted.add(id)
+    id = state.parents.get(id)
+  }
+}
+// familyOf names s's family by the topmost session above it, whether or not the sessions
+// between are still kept. A session and its subagents share one run in terma, and so one
+// Mixed cutoff: a reach check made after its tool ran, anywhere in the family, holds the
+// whole family's times (checked, checkFloor).
+function familyOf(s) {
+  let id = s.id
+  for (let i = 0, parent; i < 16 && (parent = state.parents.get(id)); i++) id = parent
+  return id
+}
+
+// checked notes that a reach check made after its tool ran has just finished in s's
+// family, a millisecond on so that nothing shares its time, and returns that time.
+function checked(s) {
+  const at = Date.now() + 1
+  remember(state.floors, familyOf(s), at, MAX_SESSIONS)
+  return at
+}
+
+// lateCheck is guardReach for a call that has already run, with nothing waiting for its
+// check. While it runs, the queued work of every session in the family waits for it (run),
+// so nothing that may derive from the call is sent before the check is done, and what is
+// sent afterwards is held to its time. A check is bounded by its hook's limits.
+async function lateCheck(s, reach) {
+  const family = familyOf(s)
+  let done
+  const mine = Promise.all([state.checking.get(family), new Promise((r) => (done = r))])
+  state.checking.set(family, mine)
+  try {
+    const ok = await guardReach(s, reach)
+    if (ok) checked(s)
+    return ok
+  } finally {
+    if (state.checking.get(family) === mine) state.checking.delete(family)
+    done()
+  }
+}
+
+// checkFloor is the time nothing s sends may end or be stamped before: its family's last
+// such check, or 0.
+function checkFloor(s) {
+  return state.floors.get(familyOf(s)) ?? 0
+}
+
+// isTainted is whether a session, or one above it, failed closed: tainted, or never given
+// its record (dark), so nothing it read was checked and what is below it derives from it.
+function isTainted(s) {
+  let id = s.id
+  for (let i = 0; i < 16 && id; i++) {
+    if (state.tainted.has(id) || state.dark.has(id)) return true
+    id = state.parents.get(id)
+  }
+  return false
+}
+
+// repoPolicy reads the repository's own overlay (.opencode/terma.json at the root of the
+// session's checkout): which signals ship from it, and whether content is captured.
+function repoPolicy(directory) {
+  if (!directory) return {}
+  let root = directory
+  for (let d = directory, i = 0; d && i < 64; i++) {
+    if (existsSync(join(d, ".git"))) {
+      root = d
+      break
+    }
+    const parent = dirname(d)
+    if (parent === d) break
+    d = parent
+  }
+  try {
+    const local = JSON.parse(readFileSync(join(root, ".opencode", "terma.json"), "utf8"))
+    const out = {}
+    if (Array.isArray(local.signals)) out.signals = local.signals.filter((x) => typeof x === "string")
+    if (typeof local.includePrompts === "boolean") out.includePrompts = local.includePrompts
+    if (typeof local.includeToolContent === "boolean") out.includeToolContent = local.includeToolContent
+    return out
+  } catch {
+    // No local policy, or one this plugin cannot read: the global settings stand.
+    return {}
+  }
+}
+
+function policyOf(s) {
+  const c = state.config
+  const p = s.policy ?? {}
+  return {
+    signals: p.signals ?? c.signals,
+    includePrompts: p.includePrompts ?? c.includePrompts,
+    includeToolContent: p.includeToolContent ?? c.includeToolContent,
+  }
+}
+
+function isRealTitle(t) {
+  return typeof t === "string" && t.trim() !== "" && !PLACEHOLDER_TITLE.test(t)
+}
+
+// --- emitter ------------------------------------------------------------------------
+//
+// The only place a wire name appears. Entries call these from inside run(session, ...).
+
+function base(s) {
+  return { session_id: s.id, cwd: s.directory, parent_session_id: s.parentID || undefined }
+}
+
+function common(s) {
+  return {
+    "session.id": s.id,
+    "opencode.version": s.version,
+    "opencode.parent_session.id": s.parentID || undefined,
+  }
+}
+
+function emitSpan(s, span) {
+  if (!state.config.endpoint || !policyOf(s).signals.includes("traces")) return
+  exportItem("spans", { traceId: traceId(s.id), ...span })
+}
+
+function emitRecord(s, name, body, extra, time) {
+  if (!state.config.endpoint || !policyOf(s).signals.includes("logs")) return
+  exportItem("records", {
+    timeUnixNano: nanos(time),
+    severityNumber: 9,
+    severityText: "INFO",
+    body: { stringValue: body ?? "" },
+    attributes: attrs({ "event.name": name, ...extra, ...common(s) }),
+    traceId: traceId(s.id),
+  })
+}
+
+// call is one model call: c = { id, kind?, messageID?, turn?, model, provider, agent?,
+// start, end, tokens?: { input, output, reasoning, cacheRead, cacheWrite }, cost?,
+// finish?, text?, error?: { type, message }, compactionReason? }.
+function call(s, c) {
+  const p = policyOf(s)
+  const a = {
+    "gen_ai.operation.name": "chat",
+    "opencode.call.id": c.id,
+    "opencode.call.kind": c.kind,
+    "opencode.message.id": c.messageID,
+    // An auxiliary call (title, compaction) belongs to no turn.
+    "opencode.parent_message.id": c.kind ? undefined : c.turn,
+    "gen_ai.request.model": c.model,
+    "gen_ai.provider.name": c.provider,
+    "opencode.agent": c.agent,
+    "opencode.compaction.reason": c.compactionReason,
+  }
+  // A failed call reports what it was billed, and nothing where it was billed nothing:
+  // OpenCode gives a call that never reached the model zeros, which are not a usage.
+  const used = c.error ? (v) => (num(v) > 0 ? v : undefined) : num
+  const t = c.tokens ?? {}
+  a["gen_ai.usage.input_tokens"] = used(t.input)
+  a["gen_ai.usage.output_tokens"] = used(t.output)
+  a["opencode.usage.reasoning_tokens"] = used(t.reasoning)
+  a["gen_ai.usage.cache_read.input_tokens"] = used(t.cacheRead)
+  a["gen_ai.usage.cache_write.input_tokens"] = used(t.cacheWrite)
+  a["gen_ai.usage.total_cost"] = used(c.cost)
+  if (c.error) {
+    a["error.type"] = c.error.type
+    // A provider's error can quote a prompt or a tool's arguments.
+    if (p.includePrompts && p.includeToolContent) a["opencode.error.message"] = truncate(str(c.error.message), MAX_ERROR)
+  } else {
+    a["gen_ai.response.finish_reasons"] = typeof c.finish === "string" ? c.finish : undefined
+    const text = str(c.text)
+    if (text) {
+      // The length always ships, so a reply withheld by policy still counts as one.
+      a["opencode.completion.length"] = text.length
+      if (p.includePrompts) a["gen_ai.completion"] = truncate(text, MAX_TEXT)
+    }
+  }
+  emitSpan(s, {
+    spanId: spanId("call", c.id),
+    name: "chat " + str(c.model),
+    kind: 3,
+    startTimeUnixNano: nanos(c.start),
+    endTimeUnixNano: nanos(endAfterCheck(s, c.end)),
+    attributes: attrs({ ...a, ...common(s) }),
+    status: c.error ? { code: 2 } : { code: 1 },
+  })
+}
+
+// tool is one tool call that ended, including one that never ran: t = { messageID, callID,
+// name, turn?, start, end, status, denial?, exitCode?, input?, output?, title?, files?,
+// mcp?: { server, tool }, subagentSession? }.
+function tool(s, t) {
+  const p = policyOf(s)
+  const id = qualify(t.messageID, t.callID)
+  const output = str(t.output)
+  const files = Array.isArray(t.files) ? t.files.filter((f) => typeof f === "string" && f) : []
+  const a = {
+    "gen_ai.operation.name": "execute_tool",
+    "gen_ai.tool.name": t.name,
+    "gen_ai.tool.call.id": id,
+    "opencode.parent_message.id": t.turn,
+    "opencode.tool.status": t.status,
+    "opencode.tool.denial": t.status === "denied" ? t.denial : undefined,
+    "opencode.tool.exit_code": Number.isInteger(t.exitCode) ? t.exitCode : undefined,
+    "opencode.tool.output_bytes": output.length,
+    "opencode.mcp.server": t.mcp?.server,
+    "opencode.mcp.tool": t.mcp?.tool,
+    "opencode.tool.subagent_session.id": t.subagentSession,
+  }
+  if (p.includeToolContent) {
+    a["gen_ai.tool.call.arguments"] = t.input === undefined ? undefined : truncate(JSON.stringify(t.input), MAX_TOOL_CONTENT)
+    a["gen_ai.tool.call.result"] = truncate(output, MAX_TOOL_CONTENT)
+    a["opencode.tool.files"] = files
+    a["opencode.tool.title"] = truncate(str(t.title), MAX_TOOL_TITLE)
+  }
+  emitSpan(s, {
+    spanId: spanId("tool", id),
+    name: "execute_tool " + str(t.name),
+    kind: 1,
+    startTimeUnixNano: nanos(t.start),
+    endTimeUnixNano: nanos(endAfterCheck(s, t.end)),
+    attributes: attrs({ ...a, ...common(s) }),
+    status: t.status === "completed" ? { code: 1 } : { code: 2 },
+  })
+  // The touch names the call, so the platform joins it to this span; only a completed
+  // edit changed a file. The hook has its own policy, so it runs whatever content says.
+  if (EDIT_TOOLS.has(t.name) && t.status === "completed" && files.length > 0) {
+    runHook(s, "opencode-file-edit", { ...base(s), tool: t.name, tool_call_id: id, files })
+  }
+}
+
+// endAfterCheck is a model or tool call's end, no earlier than the last reach check made
+// after its tool ran in the session's family. The relay forwards a record that ends before
+// the run went Mixed, and a call that overlapped that check may carry what the checked call
+// read or wrote. When OpenCode waits for the check nothing overlaps it, and no time changes.
+function endAfterCheck(s, end) {
+  const floor = checkFloor(s)
+  return floor && num(end) !== undefined && end < floor ? floor : end
+}
+
+// prompt is one prompt: p = { messageID, text, agent?, model?, provider?, time? }. No
+// prompt text ever goes to a hook.
+function prompt(s, pr) {
+  const text = str(pr.text)
+  // No earlier than the session's last move or its last check made after a tool ran: the
+  // relay files a record by its time, under the claim and the Mixed cutoff in force then.
+  const floor = Math.max(s.movedAt, checkFloor(s))
+  const time = floor ? Math.max(num(pr.time) ?? 0, floor) : pr.time
+  emitRecord(s, "opencode.user_prompt", policyOf(s).includePrompts ? truncate(text, MAX_TEXT) : "", {
+    "opencode.message.id": pr.messageID,
+    "opencode.prompt.length": text.length,
+    "opencode.agent": pr.agent,
+    "gen_ai.request.model": pr.model,
+    "gen_ai.provider.name": pr.provider,
+  }, time)
+  runHook(s, "opencode-prompt", base(s))
+}
+
+// title records a root session's new title: never the placeholder, never for a subagent
+// (its title would replace the parent's), never the same text twice in a row.
+function title(s, t) {
+  if (s.parentID || !isRealTitle(t.title) || t.title === s.sentTitle) return
+  s.sentTitle = t.title
+  emitTitle(s, t.title, t.time)
+}
+
+// emitTitle stamps the moment the plugin saw the title, made strictly later than the
+// session's previous title, so two titles of a session never share an identity, and no
+// earlier than its last move or its last check made after a tool ran, as a prompt is.
+function emitTitle(s, text, time) {
+  const at = Math.max(num(time) ?? Date.now(), s.lastTitleTime + 1, s.movedAt, checkFloor(s))
+  s.lastTitleTime = at
+  emitRecord(s, "opencode.session.title", policyOf(s).includePrompts ? text : "", {}, at)
+}
+
+function titleCallStarted(s, c) {
+  if (s.pendingTitle) titleCallEnded(s, { end: num(c.start) ?? Date.now() })
+  s.pendingTitle = { ...c }
+}
+
+function titleCallEnded(s, { end, tokens, cost } = {}) {
+  const c = s.pendingTitle
+  if (!c) return
+  s.pendingTitle = null
+  call(s, { ...c, kind: "title", end: num(end) ?? Date.now(), tokens, cost })
+}
+
+function idle(s) {
+  runHook(s, "opencode-idle", base(s))
+}
+
+function end(s, reason) {
+  if (s.pendingTitle) titleCallEnded(s, { end: Date.now() })
+  runHook(s, "opencode-session-end", { session_id: s.id, cwd: s.directory, reason })
+  if (state.sessions.get(s.id) === s) state.sessions.delete(s.id)
+}
+
+// endUnknown ends a session this process never kept, as when an old one is deleted from a
+// list: it is not claimed, titled or exported, only ended.
+function endUnknown(rec, reason) {
+  if (isTainted(rec)) return
+  runHook(state.hooks.unowned, "opencode-session-end", { session_id: rec.id, cwd: rec.directory, reason })
+}
+
+// shutdown sends the pending title call of every session this entry first saw, then waits
+// in three steps, each with its own limit: for those sessions' queues (EXIT_QUEUE_MS, 8 s),
+// for the hooks still running, any entry's (HOOK_TIMEOUT_MS and the kill grace, 2.25 s),
+// and for the flush (EXIT_FLUSH_MS, 4 s). At worst the exit is held for their sum, about 14 s.
+async function shutdown(owner) {
+  const now = Date.now()
+  for (const s of state.sessions.values()) {
+    if (s.owner === owner) run(s, () => s.pendingTitle && titleCallEnded(s, { end: now }))
+  }
+  const queues = async () => {
+    for (let i = 0; i < 32; i++) {
+      const busy = [...state.sessions.values()].filter((s) => s.owner === owner && s.busy > 0)
+      if (busy.length === 0) break
+      await Promise.all(busy.map((s) => s.queue))
+    }
+  }
+  await Promise.race([queues(), sleep(EXIT_QUEUE_MS, true)])
+  const hooks = [...state.hooks.running].map((lane) => lane.hookQueue)
+  await Promise.race([Promise.all(hooks), sleep(HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS, true)])
+  await Promise.race([flush(), sleep(EXIT_FLUSH_MS, true)])
+}
+
+// --- reach --------------------------------------------------------------------------
+//
+// Where anything leaves, and what it passes. "queued" is a step of the session's queue
+// (run), where a session that failed closed is skipped and a late check in the family is
+// waited for; the floor is checkFloor, applied as the span or record is built.
+//   a model or tool call's span        queued; its end is held to the floor
+//   a prompt or title record           queued; its time is held to the floor
+//   the file-edit, prompt, idle and    queued, from the step that sends what they belong to;
+//   session-end hooks                  they carry no content
+//   the claim (session-start hook)     the queue's first step; nothing precedes it
+//   a reach check, and the request     beside the queue or in it: they are the guard, carry
+//   to mark a run Mixed                no content, and must not wait for what they protect
+//   the end of a session never kept    its own hook queue; an id and a folder only
+//
+// Where a reach is checked:
+//   site                 checks                         when                         waits  sets
+//   tool.execute.before  a read, search, list, shell    before the tool runs         yes    nothing
+//                        command, write or edit
+//   tool.execute.after   what a call reaches known      after the tool ran, before   yes    the family's floor
+//                        once it ran (a patch's files)  its result is handed on
+//   onToolPart1          a call no hook saw (a shell    when its completed part      no     the family's floor,
+//                        command the person runs, one   arrives                             call's end
+//                        finished in an earlier run)
+//   chat.message         the files attached to a        before the prompt is sent    yes    the prompt's time,
+//                        prompt                         on                                  after the check
+//   update (a move)      the directory moved into       at the move's turn in the    no     movedAt
+//                                                       session's queue
+// "waits" is whether OpenCode waits for the check.
+
+// Each major's name for a tool that reads, changes or runs something, mapped to one
+// vocabulary. An edit is checked on the file it changes, as a read is on the file it reads.
+const REACH_TOOLS = { read: "read", write: "write", edit: "edit", grep: "grep", glob: "glob", list: "list", bash: "bash", shell: "bash" }
+
+// toolReach describes what a read, edit, search, list or shell call can reach, or null.
+function toolReach(name, args) {
+  const kind = REACH_TOOLS[name]
+  if (!kind || !args || typeof args !== "object") return null
+  const out = {}
+  const path = typeof args.filePath === "string" && args.filePath ? args.filePath : typeof args.path === "string" && args.path ? args.path : ""
+  switch (kind) {
+    case "read":
+    case "write":
+    case "edit":
+      if (path) out.paths = [path]
+      break
+    case "grep":
+      out.paths = [path || "."]
+      if (typeof args.include === "string" && args.include) out.globs = [args.include]
+      break
+    case "glob":
+      out.paths = [path || "."]
+      if (typeof args.pattern === "string" && args.pattern) out.globs = [args.pattern]
+      break
+    case "list":
+      if (path) out.lists = [path]
+      break
+    case "bash": {
+      if (typeof args.command === "string" && args.command) out.command = args.command
+      const dir = typeof args.workdir === "string" && args.workdir ? args.workdir : typeof args.cwd === "string" && args.cwd ? args.cwd : ""
+      if (dir) out.dir = dir
+      break
+    }
+  }
+  return Object.keys(out).length > 0 ? { tool: kind, ...out } : null
+}
+
+// guardReach runs the reach hook for a call; one that fails taints the session (fails
+// closed, failClosed). Resolves false when the session may not export the call.
+async function guardReach(s, reach) {
+  const { tool: name, ...rest } = reach
+  const ok = await runHook(s, "opencode-tool-reach", { ...base(s), tool: name, ...rest })
+  if (!ok) failClosed(s)
+  return ok
+}
+
+// failClosed taints a session whose reach could not be checked, says so once in OpenCode's
+// log and fences its run, unless terma cannot be run, which has its own warning.
+function failClosed(s) {
+  const fresh = !isTainted(s)
+  taint(s)
+  if (termaMissing()) return
+  if (fresh) {
+    const log = loggers[loggers.length - 1]
+    try {
+      log?.(`terma: could not check what a tool reaches in session ${s.id}; nothing more of this session is recorded.`)
+    } catch {}
+  }
+  fence(s)
+}
+
+// subagentChecked is whether the session a call opened for a subagent, id, ran under the
+// guard. One that never got its record (dark) or that failed closed ran unchecked, and its
+// answer is the call's result, so the session that opened it, s, fails closed too. A
+// subagent still waiting for its record is judged once that wait is over. An entry calls
+// this before it sends the call that opened a subagent.
+async function subagentChecked(s, id) {
+  if (typeof id !== "string" || id === s.id) return true
+  const child = state.sessions.get(id)
+  if (child) await child.queue
+  // By id too: a subagent that has ended or been forgotten is still known to have failed.
+  if (!state.dark.has(id) && !state.tainted.has(id) && !(child && isTainted(child))) return true
+  failClosed(s)
+  return false
+}
+
+// fence asks terma to mark the run of a session that failed closed Mixed, as OMP's
+// extension does: with a shell reach terma cannot place, so the relay drops what is
+// exported of the run from then on and `terma doctor` names it. Nothing waits for it. One
+// that fails is tried again at the session's next tool call; it goes straight to the hook
+// queue, since run() skips a tainted session's work.
+function fence(s) {
+  if (s.fenced || s.fencing || termaMissing()) return
+  s.fencing = true
+  runHook(s, "opencode-tool-reach", { ...base(s), tool: "bash", command: REACH_FAILED_COMMAND }).then((ok) => {
+    s.fencing = false
+    if (ok) s.fenced = true
+  })
+}
+
+// --- OpenCode 1 entry ---------------------------------------------------------------
+
+function recordOf(info) {
+  if (!info || typeof info !== "object" || typeof info.id !== "string" || !info.id) return null
+  return {
+    id: info.id,
+    parentID: str(info.parentID),
+    directory: str(info.directory),
+    version: str(info.version),
+    created: num(info.time?.created) ?? 0,
+    title: str(info.title),
+  }
+}
+
+// reachOf1 is what a completed OpenCode 1 call reached: what its arguments name, or for
+// an edit, the files it changed (a patch's are known only once it ran). Null if nothing.
+function reachOf1(s, tool, input, metadata) {
+  const reach = toolReach(tool, input)
+  if (reach || !EDIT_TOOLS.has(tool)) return reach
+  const files = filesOf1(s, tool, { input, metadata })
+  return files.length > 0 ? { tool, paths: files } : null
+}
+
+// The files a file tool read or changed, absolute.
+function filesOf1(s, name, st) {
+  let list = []
+  if (name === "read" || name === "write" || name === "edit") list = [st.input?.filePath]
+  // A patch that moves a file wrote the new path and removed the old one.
+  else if (name === "apply_patch" && Array.isArray(st.metadata?.files)) list = st.metadata.files.flatMap((f) => [f?.filePath, f?.movePath])
+  const files = list
+    .filter((f) => typeof f === "string" && f)
+    .map((f) => (isAbsolute(f) || !s.directory ? f : resolve(s.directory, f)))
+  return [...new Set(files)]
+}
+
+// OpenCode 1 names an MCP tool <server>_<tool>, the server's name with anything but
+// letters, digits, "-" and "_" made "_". Each name is tried as configured, as OpenCode
+// writes it, and with every non-alphanumeric made "_"; the longest match wins, then the
+// earlier form. OpenCode's own tools are never a server's. servers is the names the
+// tool's own directory configured.
+function mcpOf1(name, servers) {
+  if (BUILTIN_UNDERSCORE_TOOLS.has(name)) return undefined
+  let best = null
+  for (const server of servers) {
+    const forms = [server, server.replace(/[^A-Za-z0-9_-]/g, "_"), server.replace(/[^A-Za-z0-9]/g, "_")]
+    forms.forEach((prefix, rank) => {
+      if (name.length <= prefix.length + 1 || !name.startsWith(prefix + "_")) return
+      if (!best || prefix.length > best.prefix.length || (prefix.length === best.prefix.length && rank < best.rank)) {
+        best = { prefix, server, rank }
       }
     })
-    return this.inflight
+  }
+  return best ? { server: best.server, tool: name.slice(best.prefix.length + 1) } : undefined
+}
+
+// entry1 is a session's OpenCode 1 data, made once with its whole shape: steps, the
+// assistant messages a model step was seen for; prompts, the user messages that were real
+// prompts; lastPrompt, the last real prompt's id, the turn a self-started message joins;
+// subagents, the session each task call opened, by qualified call id.
+function entry1(s) {
+  const e = s.entry
+  if (!e.steps) {
+    e.steps = new Set()
+    e.prompts = new Set()
+    e.lastPrompt = ""
+    e.subagents = new Map()
+  }
+  return e
+}
+
+// The turn a message belongs to is the prompt that opened it. OpenCode also starts turns
+// itself, under a user message no person sent (the call after a command's subagent returns,
+// a shell command the person ran): those join the last prompt's turn, when there is one.
+function turnOf1(s, parentID) {
+  const e = entry1(s)
+  if (!parentID || e.prompts.has(parentID)) return parentID || undefined
+  return e.lastPrompt || parentID
+}
+
+function onAssistant1(s, info) {
+  let m = s.messages.get(info.id)
+  if (!m) {
+    const created = num(info.time?.created)
+    // A fork copies its parent's messages with their original times: a message older
+    // than its session is a copy, and its cost was the parent's.
+    m = { parentID: str(info.parentID), created, copied: created !== undefined && created < s.created }
+    remember(s.messages, info.id, m)
+  }
+  if (m.copied || s.doneCalls.has(info.id)) return
+  if (!num(info.time?.completed) && !info.error) return
+  remember(s.doneCalls, info.id)
+  const parts = s.texts.get(info.id)
+  s.texts.delete(info.id)
+  const { steps } = entry1(s)
+  const stepped = steps.has(info.id)
+  steps.delete(info.id)
+  // Every model call has step parts. A shell command the person ran, or the message that
+  // launches a command's subagent, has none, no error and no usage: no model answered it,
+  // whatever its finish says. It is not a call.
+  const t = info.tokens ?? {}
+  const usage = [info.cost, t.input, t.output, t.reasoning, t.cache?.read, t.cache?.write]
+  if (!info.error && !stepped && !usage.some((v) => num(v) > 0)) return
+  const text = parts ? [...parts.values()].filter((t) => t).join("\n\n") : ""
+  const tokens = info.tokens && typeof info.tokens === "object" ? info.tokens : null
+  const compaction = info.summary === true
+  call(s, {
+    id: info.id,
+    kind: compaction ? "compaction" : undefined,
+    messageID: info.id,
+    turn: turnOf1(s, m.parentID),
+    model: str(info.modelID),
+    provider: str(info.providerID),
+    agent: info.mode ?? info.agent,
+    start: num(info.time?.created),
+    end: num(info.time?.completed) ?? Date.now(),
+    tokens: tokens && {
+      input: tokens.input,
+      output: tokens.output,
+      reasoning: tokens.reasoning,
+      cacheRead: tokens.cache?.read,
+      cacheWrite: tokens.cache?.write,
+    },
+    cost: info.cost,
+    finish: info.finish,
+    text,
+    error: info.error ? { type: info.error.name, message: info.error.data?.message ?? info.error.name } : undefined,
+  })
+}
+
+function keepText1(s, part) {
+  let parts = s.texts.get(part.messageID)
+  if (!parts) {
+    parts = new Map()
+    remember(s.texts, part.messageID, parts, MAX_SMALL)
+  }
+  if (!parts.has(part.id) && parts.size >= MAX_SMALL) return
+  parts.set(part.id, str(part.text))
+}
+
+async function onToolPart1(s, part, servers) {
+  const st = part.state ?? {}
+  const id = qualify(part.messageID, part.callID)
+  // A task's part names the session it opened from when it starts to run; one that ends in
+  // error may not, so the name is kept from the first part that carries it.
+  const { subagents } = entry1(s)
+  if (part.tool === "task" && typeof st.metadata?.sessionId === "string") remember(subagents, id, st.metadata.sessionId, MAX_SMALL)
+  if (st.status !== "completed" && st.status !== "error") return
+  const subagent = subagents.get(id)
+  subagents.delete(id)
+  if (s.doneTools.has(id)) return
+  remember(s.doneTools, id)
+  // Pruning republishes an old call it compacted; it is not a new one.
+  if (st.time?.compacted) return
+  if (s.messages.get(part.messageID)?.copied) return
+  if (num(st.time?.end) !== undefined && st.time.end < s.created) return
+  // A call no hook saw (a shell command the person runs, a call finished in an earlier
+  // process) is checked now; one checked before or after it ran is not checked again.
+  const reach = reachOf1(s, part.tool, st.input, st.metadata)
+  const guarded = s.guarded.get(part.callID)
+  s.guarded.delete(part.callID)
+  let end = num(st.time?.end)
+  if (reach && guarded?.reachKey !== JSON.stringify(reach)) {
+    if (!(await lateCheck(s, reach))) return
+    // The relay judges a record by its time: a call checked only after it ran must not end
+    // before its check.
+    end = Math.max(end ?? 0, checkFloor(s))
+  }
+  if (part.tool === "task" && !(await subagentChecked(s, subagent))) return
+  if (isTainted(s)) return
+  let status = "completed"
+  let denial
+  if (st.status === "error") {
+    if (s.rejected.has(id)) {
+      status = "denied"
+      denial = "ask"
+    } else if (str(st.error).startsWith(RULE_REFUSAL)) {
+      status = "denied"
+      denial = "rule"
+    } else {
+      status = "error"
+    }
+  }
+  tool(s, {
+    messageID: part.messageID,
+    callID: part.callID,
+    name: part.tool,
+    turn: turnOf1(s, s.messages.get(part.messageID)?.parentID),
+    start: num(st.time?.start),
+    end,
+    status,
+    denial,
+    exitCode: num(st.metadata?.exit),
+    input: st.input,
+    output: st.status === "completed" ? st.output : st.error,
+    title: st.title,
+    files: filesOf1(s, part.tool, st),
+    mcp: mcpOf1(str(part.tool), servers),
+    subagentSession: subagent,
+  })
+}
+
+// server is OpenCode 1's entry: called once per directory, in the process serving it.
+async function server(input) {
+  if (!CONFIG || typeof CONFIG.endpoint !== "string" || !CONFIG.endpoint) return {}
+  const owner = "opencode1:" + ++state.owners
+  // The MCP servers this directory configured; another directory's names are not its.
+  const mcpServers = new Set()
+  const client = input?.client
+  let warnedAt = 0
+  loggers.push((message) => {
+    warnedAt = Date.now()
+    const r = client?.app?.log?.({ body: { service: "terma", level: "warn", message } })
+    r?.catch?.(() => {})
+  })
+  if (loggers.length > 8) loggers.shift()
+  // A resumed session's first event is often a hook: ask OpenCode for its record.
+  const lookup = typeof client?.session?.get === "function"
+    ? (id) => async () => recordOf((await client.session.get({ path: { id } }))?.data)
+    : () => null
+  const see = (id, record) => sight(id, { record, fetch: lookup(id), owner })
+  const guard = (fn) => async (...args) => {
+    try {
+      await fn(...args)
+    } catch {
+      // A telemetry failure must never surface in the agent.
+    }
   }
 
-  async post(path, body) {
-    const payload = JSON.stringify(body)
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        const auth = await this.authHeaders()
-        const res = await fetch(this.base + path, {
-          method: "POST",
-          headers: { "content-type": "application/json", ...auth },
-          body: payload,
-        })
-        if (res.ok) return
-        // A rejected credential will not fix itself by retrying; a 5xx or 429 might.
-        if (res.status === 401 || res.status === 403) {
-          this.headers = null
+  function onEvent(event) {
+    const eventID = event?.id
+    if (typeof eventID === "string" && eventID) {
+      if (state.seenEvents.has(eventID)) return
+      remember(state.seenEvents, eventID, undefined, MAX_EVENTS)
+    }
+    const p = event?.properties ?? {}
+    switch (event?.type) {
+      case "session.created":
+      case "session.updated": {
+        const rec = recordOf(p.info)
+        if (!rec) return
+        // The title call ends when its title arrives; its span goes before the title.
+        const known = state.sessions.get(rec.id)
+        if (known?.known && isRealTitle(rec.title) && rec.title !== known.title) {
+          const at = Date.now()
+          run(known, () => known.pendingTitle && titleCallEnded(known, { end: at }))
+        }
+        see(rec.id, rec)
+        return
+      }
+      case "session.deleted": {
+        const rec = recordOf(p.info)
+        if (!rec) return
+        if (!state.sessions.has(rec.id)) {
+          endUnknown(rec, "deleted")
           return
         }
-        if (res.status < 500 && res.status !== 429) return
-      } catch {
-        // Network error: retry below.
+        const s = see(rec.id, rec)
+        run(s, () => end(s, "deleted"))
+        return
       }
-      await new Promise((r) => setTimeout(r, Math.min(30000, 1000 * 2 ** attempt)))
-    }
-  }
-}
-
-// --- attribution hooks --------------------------------------------------------------
-
-// hookRunner hands session and file events to `terma hook <event>` in FIFO order so
-// session-start always finishes before tool-reach. A timed-out child is terminated and the
-// queue only advances once child exit is confirmed. Returns true iff the hook exited 0.
-const HOOK_TIMEOUT_MS = 2000, HOOK_KILL_GRACE_MS = 250, MAX_HOOK_QUEUE = 64
-
-function hookRunner(cfg) {
-  const argv = Array.isArray(cfg.hookCommand) && cfg.hookCommand.length > 0 ? cfg.hookCommand : ["terma", "hook"]
-  let missing = false, queue = Promise.resolve(), pending = 0
-  const runOnce = (event, payload) => {
-    if (missing) return { result: Promise.resolve(false), exit: Promise.resolve() }
-    let resolveExit
-    const exit = new Promise((r) => { resolveExit = r })
-    const result = new Promise((resolve) => {
-      let settled = false, exited = false, child = null, killTimer
-      const finish = (ok) => { if (!settled) { settled = true; clearTimeout(timer); clearTimeout(killTimer); resolve(ok) } }
-      const markExited = () => { if (!exited) { exited = true; clearTimeout(timer); clearTimeout(killTimer); resolveExit() } }
-      const sendKill = (sig) => { try { child.kill(sig) } catch (err) { if (err && err.code === "ESRCH") markExited() } }
-      const timer = setTimeout(() => {
-        if (!child) { markExited(); return finish(false) }
-        sendKill("SIGTERM")
-        killTimer = setTimeout(() => { sendKill("SIGKILL"); if (typeof child.unref === "function") child.unref(); finish(false) }, HOOK_KILL_GRACE_MS)
-        if (typeof killTimer.unref === "function") killTimer.unref()
-      }, HOOK_TIMEOUT_MS)
-      if (typeof timer.unref === "function") timer.unref()
-      try {
-        child = spawn(argv[0], [...argv.slice(1), event], { stdio: ["pipe", "ignore", "ignore"] })
-        child.on("error", (err) => { if (err && err.code === "ENOENT") missing = true; if (!child?.pid || err?.code === "ESRCH") markExited(); finish(false) })
-        child.on("close", (code) => { markExited(); finish(code === 0) })
-        child.stdin.on("error", () => {})
-        child.stdin.end(JSON.stringify(payload))
-      } catch { markExited(); finish(false) }
-    })
-    return { result, exit }
-  }
-  return function run(event, payload) {
-    if (missing || pending >= MAX_HOOK_QUEUE) return Promise.resolve(false)
-    pending++
-    const slot = queue.then(() => runOnce(event, payload))
-    queue = slot.then((s) => s.exit, () => undefined).finally(() => { pending-- })
-    return new Promise((resolve) => {
-      let done = false
-      const settle = (ok) => { if (!done) { done = true; clearTimeout(wait); resolve(ok) } }
-      const wait = setTimeout(() => settle(false), HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS + 500)
-      if (typeof wait.unref === "function") wait.unref()
-      slot.then((s) => s.result, () => false).then(settle, () => settle(false))
-    })
-  }
-}
-
-// --- the plugin ---------------------------------------------------------------------
-
-export const TermaPlugin = async ({ directory, worktree }) => {
-  const cfg = effectiveConfig(worktree || directory)
-  // No config, or per-repo mode in a repository bound to no Terma project: stay inert,
-  // exporting nothing and firing no hooks.
-  if (!CONFIG || !cfg.endpoint) return {}
-  const exporter = new Exporter(cfg)
-  const hook = hookRunner(cfg)
-
-  // Per-process bookkeeping, bounded so a long session cannot grow it without limit.
-  const seenMessages = new Set() // assistant messages already exported
-  const tainted = new Set() // sessions whose reach hook failed (fail closed)
-  const texts = new Map() // messageID -> latest assistant text (only when prompts are on)
-  const tools = new Map() // callID -> { sessionID, start, reachKey, reachPromise }
-  let lastSession = "" // the session the most recent activity belonged to
-  const remember = (set, key) => {
-    set.add(key)
-    if (set.size > 4096) set.delete(set.values().next().value)
-  }
-
-  function sessionOf(id) {
-    if (id) lastSession = id
-    return lastSession
-  }
-
-  // Sessions the task tool opened for a subagent, by id -> parent id. A child's spans
-  // carry the parent too, so the link survives a traces-only policy, which drops the
-  // session.created record that is the only other place it is written. Bounded: a
-  // long-lived OpenCode opens subagent sessions for as long as it runs.
-  const parents = new Map()
-  function parentOf(sessionID) {
-    return sessionID ? parents.get(sessionID) : undefined
-  }
-  function taint(sessionID) {
-    let cur = sessionID
-    for (let i = 0; i < 16 && cur; i++) {
-      remember(tainted, cur)
-      const p = parents.get(cur)
-      if (!p || p === cur) break
-      cur = p
-    }
-  }
-  function isTainted(sessionID) {
-    let cur = sessionID
-    for (let i = 0; i < 16 && cur; i++) {
-      if (tainted.has(cur)) return true
-      const p = parents.get(cur)
-      if (!p || p === cur) break
-      cur = p
-    }
-    return false
-  }
-
-  function record(sessionID, name, body, extra = {}, severity = 9, time = Date.now()) {
-    if (isTainted(sessionID)) return
-    exporter.record({
-      timeUnixNano: nanos(time),
-      severityNumber: severity,
-      severityText: severity >= 17 ? "ERROR" : "INFO",
-      body: { stringValue: body ?? "" },
-      attributes: attrs({ "event.name": name, "session.id": sessionID, ...extra }),
-      traceId: sessionID ? traceId(sessionID) : undefined,
-    })
-  }
-
-  function modelCall(info) {
-    if (!info || info.role !== "assistant" || !info.time || !info.time.completed) return
-    if (seenMessages.has(info.id)) return
-    remember(seenMessages, info.id)
-    const sid = sessionOf(info.sessionID)
-    if (isTainted(sid)) return
-    const tokens = info.tokens ?? {}
-    const cache = tokens.cache ?? {}
-    const attributes = {
-      "gen_ai.operation.name": "chat",
-      "gen_ai.provider.name": info.providerID,
-      "gen_ai.system": info.providerID,
-      "gen_ai.request.model": info.modelID,
-      "gen_ai.usage.input_tokens": tokens.input,
-      "gen_ai.usage.output_tokens": tokens.output,
-      "gen_ai.usage.cache_read.input_tokens": cache.read,
-      "gen_ai.usage.cache_write.input_tokens": cache.write,
-      "gen_ai.usage.total_cost": info.cost,
-      "gen_ai.response.finish_reasons": info.finish,
-      "opencode.usage.reasoning_tokens": tokens.reasoning,
-      "opencode.agent": info.mode,
-      "opencode.message.id": info.id,
-      "opencode.parent_message.id": info.parentID,
-      "opencode.parent_session.id": parentOf(sid),
-      "session.id": sid,
-    }
-    if (cfg.includePrompts) attributes["gen_ai.completion"] = truncate(texts.get(info.id), MAX_TEXT)
-    texts.delete(info.id)
-    const status = info.error ? { code: 2, message: truncate(info.error.data?.message ?? info.error.name ?? "error", 1024) } : { code: 1 }
-    if (info.error) attributes["error.type"] = info.error.name
-    exporter.span({
-      traceId: traceId(sid),
-      spanId: spanId("message:" + info.id),
-      name: "chat " + (info.modelID ?? ""),
-      kind: 3,
-      startTimeUnixNano: nanos(info.time.created ?? info.time.completed),
-      endTimeUnixNano: nanos(info.time.completed),
-      attributes: attrs(attributes),
-      status,
-    })
-  }
-
-  // toolReach describes what a read, search, glob, list or shell tool call can reach.
-  function toolReach(tool, args) {
-    if (!args || typeof args !== "object") return null
-    const out = {}
-    const path = typeof args.filePath === "string" && args.filePath ? args.filePath : typeof args.path === "string" && args.path ? args.path : ""
-    switch (tool) {
-      case "read":
-        if (path) out.paths = [path]
-        break
-      case "grep":
-        out.paths = [path || "."]
-        if (typeof args.include === "string" && args.include) out.globs = [args.include]
-        break
-      case "glob":
-        out.paths = [path || "."]
-        if (typeof args.pattern === "string" && args.pattern) out.globs = [args.pattern]
-        break
-      case "list":
-        if (path) out.lists = [path]
-        break
-      case "bash": {
-        if (typeof args.command === "string" && args.command) out.command = args.command
-        const dir = typeof args.workdir === "string" && args.workdir ? args.workdir : typeof args.cwd === "string" && args.cwd ? args.cwd : ""
-        if (dir) out.dir = dir
-        break
+      case "session.idle": {
+        const s = see(p.sessionID)
+        run(s, () => idle(s))
+        return
       }
-      default:
-        return null
+      case "message.updated": {
+        const info = p.info
+        if (info?.role !== "assistant" || typeof info.id !== "string") return
+        const s = see(info.sessionID)
+        run(s, () => onAssistant1(s, info))
+        return
+      }
+      case "message.part.updated": {
+        const part = p.part
+        if (!part || typeof part.messageID !== "string") return
+        if (part.type === "text") {
+          const s = see(part.sessionID)
+          run(s, () => keepText1(s, part))
+        } else if (part.type === "tool") {
+          const s = see(part.sessionID)
+          run(s, () => onToolPart1(s, part, mcpServers))
+        } else if (part.type === "step-start" || part.type === "step-finish") {
+          const s = see(part.sessionID)
+          run(s, () => remember(entry1(s).steps, part.messageID))
+        }
+        return
+      }
+      case "permission.asked": {
+        const s = see(p.sessionID)
+        if (typeof p.id === "string" && p.tool?.messageID && p.tool?.callID) {
+          const id = qualify(p.tool.messageID, p.tool.callID)
+          run(s, () => remember(s.asked, p.id, id, MAX_SMALL))
+        }
+        return
+      }
+      case "permission.replied": {
+        const s = see(p.sessionID)
+        if ((p.reply ?? p.response) === "reject") {
+          run(s, () => {
+            const id = s.asked.get(p.requestID)
+            if (id) remember(s.rejected, id, undefined, MAX_SMALL)
+          })
+        }
+        return
+      }
     }
-    return Object.keys(out).length > 0 ? out : null
   }
 
   return {
-    event: async ({ event }) => {
-      try {
-        const p = event?.properties ?? {}
-        switch (event?.type) {
-          case "session.created": {
-            const info = p.info ?? {}
-            sessionOf(info.id)
-            if (info.id && info.parentID) {
-              parents.set(info.id, info.parentID)
-              if (parents.size > 256) parents.delete(parents.keys().next().value)
-            }
-            record(info.id, "opencode.session.created", cfg.includePrompts ? info.title : "", {
-              "opencode.project.id": info.projectID,
-              "opencode.session.directory": info.directory,
-              "opencode.version": info.version,
-              // Set when the task tool opened this session for a subagent.
-              "opencode.parent_session.id": info.parentID,
-            })
-            hook("opencode-session-start", { session_id: info.id, cwd: info.directory, parent_session_id: info.parentID })
-            break
-          }
-          case "session.deleted": {
-            const info = p.info ?? {}
-            record(info.id, "opencode.session.deleted", "")
-            hook("opencode-session-end", { session_id: info.id, cwd: info.directory, reason: "deleted" })
-            break
-          }
-          case "session.idle":
-            record(sessionOf(p.sessionID), "opencode.session.idle", "")
-            break
-          case "session.error": {
-            const err = p.error ?? {}
-            record(sessionOf(p.sessionID), "opencode.session.error", truncate(err.data?.message ?? err.name ?? "error", 4096), {
-              "error.type": err.name,
-            }, 17)
-            break
-          }
-          case "file.edited":
-            if (p.file && !isTainted(lastSession)) hook("opencode-file-edit", { session_id: lastSession, cwd: worktree || directory, file: p.file, parent_session_id: parentOf(lastSession) })
-            break
-          case "message.updated":
-            modelCall(p.info)
-            break
-          case "message.part.updated": {
-            const part = p.part
-            if (cfg.includePrompts && part && part.type === "text" && part.messageID) {
-              texts.set(part.messageID, part.text)
-              if (texts.size > 256) texts.delete(texts.keys().next().value)
-            }
-            break
-          }
+    event: guard(async ({ event } = {}) => onEvent(event)),
+
+    config: guard(async (cfg) => {
+      for (const name of Object.keys(cfg?.mcp ?? {})) remember(mcpServers, name, undefined, MAX_SMALL)
+    }),
+
+    "chat.message": guard(async (inp, out) => {
+      const s = see(inp?.sessionID)
+      if (!s) return
+      const msg = out?.message ?? {}
+      const parts = Array.isArray(out?.parts) ? out.parts : []
+      // An attached file (or folder) is read into synthetic text parts with no tool call:
+      // reach-check it as a read or a list, and keep its content out of the prompt.
+      const reaches = []
+      const taken = new Set()
+      for (const x of parts) {
+        if (x?.type !== "file" || typeof x.url !== "string" || !x.url.startsWith("file:")) continue
+        let path
+        try {
+          path = fileURLToPath(x.url)
+        } catch {
+          continue
         }
-      } catch {
-        // A telemetry failure must never surface in the agent.
+        reaches.push(x.mime === "application/x-directory" ? { tool: "list", lists: [path] } : { tool: "read", paths: [path] })
+        taken.add(path)
       }
-    },
+      // An attached image or PDF arrives as a data: URL; where it came from is only in the
+      // synthetic part that says OpenCode read it. OpenCode may write that path unescaped
+      // (a Windows path), so a marker that is not JSON is read for the path as written, and
+      // one that names no path at all is a reach no one can place.
+      let unplaced = false
+      for (const x of parts) {
+        if (x?.type !== "text" || x.synthetic !== true || !str(x.text).startsWith(READ_ATTACHMENT)) continue
+        const raw = x.text.slice(READ_ATTACHMENT.length)
+        let path
+        try {
+          path = JSON.parse(raw)?.filePath
+        } catch {}
+        if (typeof path !== "string" || !path) path = /^\{"filePath":"([\s\S]*)"\}$/.exec(raw)?.[1]
+        if (!path) {
+          unplaced = true
+          continue
+        }
+        if (taken.has(path)) continue
+        reaches.push({ tool: "read", paths: [path] })
+        taken.add(path)
+      }
+      if (unplaced) reaches.push({ tool: "read", paths: [UNPLACED_ATTACHMENT] })
+      // Under `opencode run` the hook's own input names no agent or model; the message does.
+      const pr = {
+        messageID: msg.id ?? inp?.messageID,
+        text: parts.filter((x) => x?.type === "text" && x.synthetic !== true).map((x) => str(x.text)).join("\n"),
+        agent: msg.agent ?? inp?.agent ?? undefined,
+        model: msg.model?.modelID ?? inp?.model?.modelID,
+        provider: msg.model?.providerID ?? inp?.model?.providerID,
+        time: num(msg.time?.created),
+      }
+      const sent = run(s, async () => {
+        for (const reach of reaches) if (!(await guardReach(s, reach))) return
+        // A reach that crosses organizations marks the run from the moment its hook did; the
+        // prompt is stamped after it, and OpenCode goes on only once the checks are done.
+        if (reaches.length > 0) pr.time = Math.max(pr.time ?? 0, Date.now() + 1)
+        if (isTainted(s)) return
+        if (pr.messageID) {
+          const e = entry1(s)
+          remember(e.prompts, pr.messageID)
+          e.lastPrompt = pr.messageID
+        }
+        prompt(s, pr)
+      })
+      if (reaches.length > 0) await sent
+    }),
 
-    // OpenRouter's trace export carries the request body's `trace` object as
-    // trace.metadata.*, and nothing else a subagent's request sends names its parent. The
-    // SDK spreads these options over the provider's extraBody, so its trace keys are kept.
-    "chat.params": async (input, output) => {
-      try {
-        const parent = parentOf(input?.sessionID)
-        if (!parent || input?.model?.api?.npm !== "@openrouter/ai-sdk-provider" || !output?.options) return
-        output.options.trace = {
-          ...input.provider?.options?.extraBody?.trace,
-          ...output.options.trace,
-          parent_session_id: parent,
-          agent: input.agent,
-        }
-      } catch {}
-    },
+    // Only to see the title call start. It writes nothing to the request.
+    "chat.params": guard(async (inp) => {
+      if (inp?.agent !== "title" || typeof inp?.message?.id !== "string") return
+      const s = see(inp.sessionID)
+      const c = { id: "title:" + inp.message.id, model: inp.model?.id, provider: inp.model?.providerID, agent: "title", start: Date.now() }
+      run(s, () => titleCallStarted(s, c))
+    }),
 
-    "chat.message": async (input, output) => {
-      try {
-        const sid = sessionOf(input?.sessionID)
-        const parts = Array.isArray(output?.parts) ? output.parts : []
-        const text = parts.filter((x) => x && x.type === "text").map((x) => x.text ?? "").join("\n")
-        record(sid, "opencode.user_prompt", cfg.includePrompts ? truncate(text, MAX_TEXT) : "", {
-          "opencode.message.id": input?.messageID ?? output?.message?.id,
-          "opencode.agent": input?.agent,
-          "gen_ai.request.model": input?.model?.modelID,
-          "gen_ai.provider.name": input?.model?.providerID,
-          "opencode.prompt.length": text.length,
-        })
-      } catch {}
-    },
+    // The reach guard: the tool waits for the hook, and a failure taints the session.
+    "tool.execute.before": guard(async (inp, out) => {
+      const s = see(inp?.sessionID)
+      if (!s || typeof inp?.callID !== "string") return
+      // A session that failed closed asks again, if it must, for its run to be fenced; the
+      // tool does not wait for it.
+      if (isTainted(s)) fence(s)
+      const reach = toolReach(inp.tool, out?.args ?? inp.args)
+      if (!reach) return
+      remember(s.guarded, inp.callID, { reachKey: JSON.stringify(reach) }, MAX_SMALL)
+      await beside(s, () => guardReach(s, reach))
+    }),
 
-    "tool.execute.before": async (input, output) => {
-      try {
-        if (!input?.callID) return
-        const sid = sessionOf(input.sessionID)
-        const reach = toolReach(input.tool, output?.args ?? input.args)
-        const reachKey = reach && sid ? JSON.stringify(reach) : ""
-        const reachPromise = reach && sid
-          ? hook("opencode-tool-reach", {
-              session_id: sid,
-              cwd: worktree || directory,
-              tool: input.tool,
-              parent_session_id: parentOf(sid),
-              ...reach,
-            }).then((ok) => {
-              if (!ok) taint(sid)
-              return ok
-            })
-          : null
-        tools.set(input.callID, { sessionID: sid, start: Date.now(), reachKey, reachPromise })
-        if (tools.size > 1024) tools.delete(tools.keys().next().value)
-        if (reachPromise) await reachPromise
-      } catch {}
-    },
+    // The guard for what a call is known to reach only once it ran (a patch's files):
+    // OpenCode waits for this hook before it hands the result on, sets the call's end and
+    // starts the next model step, so nothing that saw the result ends before the check.
+    "tool.execute.after": guard(async (inp, out) => {
+      const s = see(inp?.sessionID)
+      if (!s || typeof inp?.callID !== "string") return
+      const callID = inp.callID
+      // A call that reaches nothing, or that was checked before it ran, does not wait.
+      const before = toolReach(inp.tool, inp.args)
+      if (before ? s.guarded.get(callID)?.reachKey === JSON.stringify(before) : !EDIT_TOOLS.has(inp.tool)) return
+      // After its first sight: a relative path resolves against the session's directory.
+      await beside(s, async () => {
+        const reach = reachOf1(s, inp.tool, inp.args, out?.metadata)
+        if (!reach) return
+        const reachKey = JSON.stringify(reach)
+        if (s.guarded.get(callID)?.reachKey === reachKey) return
+        if (!(await guardReach(s, reach))) return
+        checked(s)
+        remember(s.guarded, callID, { reachKey }, MAX_SMALL)
+      })
+    }),
 
-    "tool.execute.after": async (input, output) => {
-      try {
-        if (!input?.callID) return
-        const started = tools.get(input.callID)
-        tools.delete(input.callID)
-        const sid = sessionOf(input.sessionID || started?.sessionID)
-        const args = input.args ?? {}
-        if (started?.reachPromise && !(await started.reachPromise)) {
-          taint(sid)
-          return
-        }
-        if (sid) {
-          const reach = toolReach(input.tool, args)
-          if (reach && JSON.stringify(reach) !== started?.reachKey) {
-            const ok = await hook("opencode-tool-reach", {
-              session_id: sid,
-              cwd: worktree || directory,
-              tool: input.tool,
-              parent_session_id: parentOf(sid),
-              ...reach,
-            })
-            if (!ok) {
-              taint(sid)
-              return
-            }
-          }
-          if (isTainted(sid)) return
-        }
-        const end = Date.now()
-        const start = started?.start ?? end
-        const attributes = {
-          "gen_ai.operation.name": "execute_tool",
-          "gen_ai.tool.name": input.tool,
-          "gen_ai.tool.call.id": input.callID,
-          "opencode.tool.title": truncate(output?.title, 512),
-          "opencode.tool.output_bytes": typeof output?.output === "string" ? output.output.length : 0,
-          "opencode.parent_session.id": parentOf(sid),
-          "session.id": sid,
-        }
-        if (cfg.includeToolContent) {
-          attributes["gen_ai.tool.call.arguments"] = truncate(JSON.stringify(args), MAX_TOOL_CONTENT)
-          attributes["gen_ai.tool.call.result"] = truncate(output?.output, MAX_TOOL_CONTENT)
-          if (typeof args.filePath === "string") attributes["opencode.tool.file_path"] = args.filePath
-        }
-        exporter.span({
-          traceId: traceId(sid),
-          spanId: spanId("tool:" + input.callID),
-          name: "execute_tool " + (input.tool ?? ""),
-          kind: 1,
-          startTimeUnixNano: nanos(start),
-          endTimeUnixNano: nanos(end),
-          attributes: attrs(attributes),
-          status: { code: 1 },
-        })
-        // The edit tools name their file in the arguments, which is the reliable route
-        // to attribution: unlike file.edited, this event knows its session.
-        if ((input.tool === "edit" || input.tool === "write") && typeof args.filePath === "string") {
-          hook("opencode-file-edit", { session_id: sid, cwd: worktree || directory, file: args.filePath, tool: input.tool })
-        }
-      } catch {}
-    },
-
-    dispose: async () => {
-      try {
-        await exporter.flush()
-      } catch {}
-    },
+    dispose: guard(async () => {
+      await shutdown(owner)
+      // A short `opencode run` would otherwise end before OpenCode wrote the warning down.
+      const left = warnedAt ? LOG_SETTLE_MS - (Date.now() - warnedAt) : 0
+      if (left > 0) await sleep(left)
+    }),
   }
 }
+
+// --- OpenCode 2 entry ---------------------------------------------------------------
+
+// OpenCode 1.18 and later call setup too, with a context that has no app, event or session.
+function isOpenCode2(ctx) {
+  return typeof ctx?.event?.subscribe === "function" && typeof ctx?.session?.hook === "function" && /^[2-9]\d*\./.test(String(ctx?.app?.version ?? ""))
+}
+
+async function setup(ctx) {
+  if (!isOpenCode2(ctx)) return
+  // OpenCode 2 support is not in this build.
+}
+
+configure(state, CONFIG)
+
+export default { id: "terma", server, setup }

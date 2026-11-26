@@ -61,11 +61,13 @@ type LogRecord struct {
 
 // Span is one OTLP span, flattened.
 type Span struct {
-	Proto    *tracepb.Span
-	Scope    string
-	Name     string
-	Attrs    map[string]string
-	Resource map[string]string
+	Proto *tracepb.Span
+	Scope string
+	// ScopeVersion is the instrumentation scope's version: the wire contract a plugin sends.
+	ScopeVersion string
+	Name         string
+	Attrs        map[string]string
+	Resource     map[string]string
 }
 
 // Metric retains values, point attributes, temporality, buckets and exemplars.
@@ -169,7 +171,7 @@ func (r *Receiver) handleTraces(w http.ResponseWriter, req *http.Request) {
 		res := flatten(rs.GetResource().GetAttributes())
 		for _, ss := range rs.ScopeSpans {
 			for _, sp := range ss.Spans {
-				r.span = append(r.span, Span{Proto: sp, Scope: ss.GetScope().GetName(), Name: sp.GetName(), Attrs: flatten(sp.GetAttributes()), Resource: res})
+				r.span = append(r.span, Span{Proto: sp, Scope: ss.GetScope().GetName(), ScopeVersion: ss.GetScope().GetVersion(), Name: sp.GetName(), Attrs: flatten(sp.GetAttributes()), Resource: res})
 			}
 		}
 	}

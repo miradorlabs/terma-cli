@@ -1,0 +1,558 @@
+{
+ "case": "denied-rule",
+ "opencode": "1.19.6",
+ "requests": [
+  {
+   "path": "/v1/traces",
+   "body": {
+    "resourceSpans": [
+     {
+      "resource": {
+       "attributes": [
+        {
+         "key": "service.name",
+         "value": {
+          "stringValue": "opencode"
+         }
+        }
+       ]
+      },
+      "scopeSpans": [
+       {
+        "scope": {
+         "name": "terma-opencode",
+         "version": "2"
+        },
+        "spans": [
+         {
+          "traceId": "e2ad51ef7524deed8f64f1477fcc841e",
+          "spanId": "93e16face7e13cdd",
+          "name": "chat m",
+          "kind": 3,
+          "startTimeUnixNano": "1795617995372000000",
+          "endTimeUnixNano": "1795617995397000000",
+          "attributes": [
+           {
+            "key": "gen_ai.operation.name",
+            "value": {
+             "stringValue": "chat"
+            }
+           },
+           {
+            "key": "opencode.call.id",
+            "value": {
+             "stringValue": "title:msg_2132c38fc001jNI9J8m9dUTuYJ"
+            }
+           },
+           {
+            "key": "opencode.call.kind",
+            "value": {
+             "stringValue": "title"
+            }
+           },
+           {
+            "key": "gen_ai.request.model",
+            "value": {
+             "stringValue": "m"
+            }
+           },
+           {
+            "key": "gen_ai.provider.name",
+            "value": {
+             "stringValue": "fake"
+            }
+           },
+           {
+            "key": "opencode.agent",
+            "value": {
+             "stringValue": "title"
+            }
+           },
+           {
+            "key": "session.id",
+            "value": {
+             "stringValue": "ses_decd3c740ffef7Sk3bvdVVPh0f"
+            }
+           },
+           {
+            "key": "opencode.version",
+            "value": {
+             "stringValue": "1.19.6"
+            }
+           }
+          ],
+          "status": {
+           "code": 1
+          }
+         },
+         {
+          "traceId": "e2ad51ef7524deed8f64f1477fcc841e",
+          "spanId": "908b56868827837f",
+          "name": "execute_tool bash",
+          "kind": 1,
+          "startTimeUnixNano": "1795617995846000000",
+          "endTimeUnixNano": "1795617995874000000",
+          "attributes": [
+           {
+            "key": "gen_ai.operation.name",
+            "value": {
+             "stringValue": "execute_tool"
+            }
+           },
+           {
+            "key": "gen_ai.tool.name",
+            "value": {
+             "stringValue": "bash"
+            }
+           },
+           {
+            "key": "gen_ai.tool.call.id",
+            "value": {
+             "stringValue": "msg_2132c3a64001llHx3MyLEsq2rj:call_s0_0_95835"
+            }
+           },
+           {
+            "key": "opencode.parent_message.id",
+            "value": {
+             "stringValue": "msg_2132c38fc001jNI9J8m9dUTuYJ"
+            }
+           },
+           {
+            "key": "opencode.tool.status",
+            "value": {
+             "stringValue": "denied"
+            }
+           },
+           {
+            "key": "opencode.tool.denial",
+            "value": {
+             "stringValue": "rule"
+            }
+           },
+           {
+            "key": "opencode.tool.output_bytes",
+            "value": {
+             "intValue": "287"
+            }
+           },
+           {
+            "key": "gen_ai.tool.call.arguments",
+            "value": {
+             "stringValue": "{\"command\":\"cat secret.txt\",\"description\":\"denied\"}"
+            }
+           },
+           {
+            "key": "gen_ai.tool.call.result",
+            "value": {
+             "stringValue": "The user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules [{\"permission\":\"*\",\"action\":\"allow\",\"pattern\":\"*\"},{\"permission\":\"bash\",\"pattern\":\"*\",\"action\":\"allow\"},{\"permission\":\"bash\",\"pattern\":\"cat secret*\",\"action\":\"deny\"}]"
+            }
+           },
+           {
+            "key": "session.id",
+            "value": {
+             "stringValue": "ses_decd3c740ffef7Sk3bvdVVPh0f"
+            }
+           },
+           {
+            "key": "opencode.version",
+            "value": {
+             "stringValue": "1.19.6"
+            }
+           }
+          ],
+          "status": {
+           "code": 2
+          }
+         },
+         {
+          "traceId": "e2ad51ef7524deed8f64f1477fcc841e",
+          "spanId": "fecfb3f5eecf7ba2",
+          "name": "chat m",
+          "kind": 3,
+          "startTimeUnixNano": "1795617995364000000",
+          "endTimeUnixNano": "1795617995931000000",
+          "attributes": [
+           {
+            "key": "gen_ai.operation.name",
+            "value": {
+             "stringValue": "chat"
+            }
+           },
+           {
+            "key": "opencode.call.id",
+            "value": {
+             "stringValue": "msg_2132c3a64001llHx3MyLEsq2rj"
+            }
+           },
+           {
+            "key": "opencode.message.id",
+            "value": {
+             "stringValue": "msg_2132c3a64001llHx3MyLEsq2rj"
+            }
+           },
+           {
+            "key": "opencode.parent_message.id",
+            "value": {
+             "stringValue": "msg_2132c38fc001jNI9J8m9dUTuYJ"
+            }
+           },
+           {
+            "key": "gen_ai.request.model",
+            "value": {
+             "stringValue": "m"
+            }
+           },
+           {
+            "key": "gen_ai.provider.name",
+            "value": {
+             "stringValue": "fake"
+            }
+           },
+           {
+            "key": "opencode.agent",
+            "value": {
+             "stringValue": "build"
+            }
+           },
+           {
+            "key": "gen_ai.usage.input_tokens",
+            "value": {
+             "intValue": "100"
+            }
+           },
+           {
+            "key": "gen_ai.usage.output_tokens",
+            "value": {
+             "intValue": "20"
+            }
+           },
+           {
+            "key": "opencode.usage.reasoning_tokens",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.usage.cache_read.input_tokens",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.usage.cache_write.input_tokens",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.usage.total_cost",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.response.finish_reasons",
+            "value": {
+             "stringValue": "tool-calls"
+            }
+           },
+           {
+            "key": "session.id",
+            "value": {
+             "stringValue": "ses_decd3c740ffef7Sk3bvdVVPh0f"
+            }
+           },
+           {
+            "key": "opencode.version",
+            "value": {
+             "stringValue": "1.19.6"
+            }
+           }
+          ],
+          "status": {
+           "code": 1
+          }
+         },
+         {
+          "traceId": "e2ad51ef7524deed8f64f1477fcc841e",
+          "spanId": "37c2e7e5627eae6f",
+          "name": "chat m",
+          "kind": 3,
+          "startTimeUnixNano": "1795617995936000000",
+          "endTimeUnixNano": "1795617996019000000",
+          "attributes": [
+           {
+            "key": "gen_ai.operation.name",
+            "value": {
+             "stringValue": "chat"
+            }
+           },
+           {
+            "key": "opencode.call.id",
+            "value": {
+             "stringValue": "msg_2132c3ca00012r8tGf80P9f8tJ"
+            }
+           },
+           {
+            "key": "opencode.message.id",
+            "value": {
+             "stringValue": "msg_2132c3ca00012r8tGf80P9f8tJ"
+            }
+           },
+           {
+            "key": "opencode.parent_message.id",
+            "value": {
+             "stringValue": "msg_2132c38fc001jNI9J8m9dUTuYJ"
+            }
+           },
+           {
+            "key": "gen_ai.request.model",
+            "value": {
+             "stringValue": "m"
+            }
+           },
+           {
+            "key": "gen_ai.provider.name",
+            "value": {
+             "stringValue": "fake"
+            }
+           },
+           {
+            "key": "opencode.agent",
+            "value": {
+             "stringValue": "build"
+            }
+           },
+           {
+            "key": "gen_ai.usage.input_tokens",
+            "value": {
+             "intValue": "12"
+            }
+           },
+           {
+            "key": "gen_ai.usage.output_tokens",
+            "value": {
+             "intValue": "4"
+            }
+           },
+           {
+            "key": "opencode.usage.reasoning_tokens",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.usage.cache_read.input_tokens",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.usage.cache_write.input_tokens",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.usage.total_cost",
+            "value": {
+             "intValue": "0"
+            }
+           },
+           {
+            "key": "gen_ai.response.finish_reasons",
+            "value": {
+             "stringValue": "stop"
+            }
+           },
+           {
+            "key": "opencode.completion.length",
+            "value": {
+             "intValue": "4"
+            }
+           },
+           {
+            "key": "gen_ai.completion",
+            "value": {
+             "stringValue": "DONE"
+            }
+           },
+           {
+            "key": "session.id",
+            "value": {
+             "stringValue": "ses_decd3c740ffef7Sk3bvdVVPh0f"
+            }
+           },
+           {
+            "key": "opencode.version",
+            "value": {
+             "stringValue": "1.19.6"
+            }
+           }
+          ],
+          "status": {
+           "code": 1
+          }
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "path": "/v1/logs",
+   "body": {
+    "resourceLogs": [
+     {
+      "resource": {
+       "attributes": [
+        {
+         "key": "service.name",
+         "value": {
+          "stringValue": "opencode"
+         }
+        }
+       ]
+      },
+      "scopeLogs": [
+       {
+        "scope": {
+         "name": "terma-opencode",
+         "version": "2"
+        },
+        "logRecords": [
+         {
+          "timeUnixNano": "1795617995004000000",
+          "severityNumber": 9,
+          "severityText": "INFO",
+          "body": {
+           "stringValue": "\"SCRIPT[/home/user/work/t-denied-rule]: bashdeny ; Follow the script.\""
+          },
+          "attributes": [
+           {
+            "key": "event.name",
+            "value": {
+             "stringValue": "opencode.user_prompt"
+            }
+           },
+           {
+            "key": "opencode.message.id",
+            "value": {
+             "stringValue": "msg_2132c38fc001jNI9J8m9dUTuYJ"
+            }
+           },
+           {
+            "key": "opencode.prompt.length",
+            "value": {
+             "intValue": "132"
+            }
+           },
+           {
+            "key": "opencode.agent",
+            "value": {
+             "stringValue": "build"
+            }
+           },
+           {
+            "key": "gen_ai.request.model",
+            "value": {
+             "stringValue": "m"
+            }
+           },
+           {
+            "key": "gen_ai.provider.name",
+            "value": {
+             "stringValue": "fake"
+            }
+           },
+           {
+            "key": "session.id",
+            "value": {
+             "stringValue": "ses_decd3c740ffef7Sk3bvdVVPh0f"
+            }
+           },
+           {
+            "key": "opencode.version",
+            "value": {
+             "stringValue": "1.19.6"
+            }
+           }
+          ],
+          "traceId": "e2ad51ef7524deed8f64f1477fcc841e"
+         },
+         {
+          "timeUnixNano": "1795617995397000000",
+          "severityNumber": 9,
+          "severityText": "INFO",
+          "body": {
+           "stringValue": "Scripted session title"
+          },
+          "attributes": [
+           {
+            "key": "event.name",
+            "value": {
+             "stringValue": "opencode.session.title"
+            }
+           },
+           {
+            "key": "session.id",
+            "value": {
+             "stringValue": "ses_decd3c740ffef7Sk3bvdVVPh0f"
+            }
+           },
+           {
+            "key": "opencode.version",
+            "value": {
+             "stringValue": "1.19.6"
+            }
+           }
+          ],
+          "traceId": "e2ad51ef7524deed8f64f1477fcc841e"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "hooks": [
+  {
+   "at": 1795617994964,
+   "event": "opencode-session-start",
+   "payload": {
+    "session_id": "ses_decd3c740ffef7Sk3bvdVVPh0f",
+    "cwd": "/home/user/work/t-denied-rule"
+   }
+  },
+  {
+   "at": 1795617995273,
+   "event": "opencode-prompt",
+   "payload": {
+    "session_id": "ses_decd3c740ffef7Sk3bvdVVPh0f",
+    "cwd": "/home/user/work/t-denied-rule"
+   }
+  },
+  {
+   "at": 1795617995850,
+   "event": "opencode-tool-reach",
+   "payload": {
+    "session_id": "ses_decd3c740ffef7Sk3bvdVVPh0f",
+    "cwd": "/home/user/work/t-denied-rule",
+    "tool": "bash",
+    "command": "cat secret.txt"
+   }
+  },
+  {
+   "at": 1795617996302,
+   "event": "opencode-idle",
+   "payload": {
+    "session_id": "ses_decd3c740ffef7Sk3bvdVVPh0f",
+    "cwd": "/home/user/work/t-denied-rule"
+   }
+  }
+ ]
+}
