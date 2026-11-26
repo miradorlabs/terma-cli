@@ -133,3 +133,39 @@ func (sb *Sandbox) CopilotRun(dir, prompt string) (session, output string) {
 	}
 	return session, out.String()
 }
+
+// copilotAttempts is how many sessions a scenario runs before it fails because the model
+// never ran the tool its prompt asks for.
+const copilotAttempts = 3
+
+// CopilotRunTool runs, as CopilotRun does, the prompt that setup returns with a fresh
+// sandbox, in that sandbox's repository, until ran reports that the tool the prompt asks
+// for ran. The model behind the token now and then answers without running it, which
+// says nothing about terma, so that session is set aside, its relay stopped, and the
+// scenario starts again in another sandbox, whose receiver, relay and spool hold only the
+// new session. A tool that never runs in copilotAttempts sessions fails the test.
+func CopilotRunTool(t *testing.T, setup func() (*Sandbox, string), ran func(*Sandbox) bool) (sb *Sandbox, session, output string) {
+	t.Helper()
+	for attempt := 1; ; attempt++ {
+		var prompt string
+		sb, prompt = setup()
+		session, output = sb.CopilotRun(sb.Repo, prompt)
+		if ran(sb) {
+			return sb, session, output
+		}
+		tools := sb.CopilotTools(session)
+		if attempt == copilotAttempts {
+			t.Fatalf("in %d sessions the model never ran the tool the prompt asks for; the last ran %s:\n%s", attempt, tools, tail(output, 2000))
+		}
+		t.Logf("session %d: the model answered without running the tool the prompt asks for (it ran %s); starting again in a fresh sandbox", attempt, tools)
+		sb.StopRelay()
+	}
+}
+
+// fileIn reports whether name exists in sb's repository.
+func fileIn(name string) func(*Sandbox) bool {
+	return func(sb *Sandbox) bool {
+		_, err := os.Stat(filepath.Join(sb.Repo, name))
+		return err == nil
+	}
+}
