@@ -80,6 +80,10 @@ func TestFindSenderNamesTheConnectingProcess(t *testing.T) {
 const (
 	connectEnv = "PROCINFO_TEST_CONNECT"
 	decoyEnv   = "PROCINFO_TEST_DECOY"
+	// inheritEnv makes the connecting child start a child of its own holding the connection
+	// too, print its pid, and wait as it does; holdEnv makes the test binary that child.
+	inheritEnv = "PROCINFO_TEST_INHERIT"
+	holdEnv    = "PROCINFO_TEST_HOLD"
 )
 
 // A newer process holding a connection with the sender's two port numbers, between other
@@ -148,6 +152,45 @@ func TestFindSenderMatchesTheWholeConnection(t *testing.T) {
 	}
 }
 
+// A process the sender started while its connection was open holds the socket too,
+// inherited, as OpenCode's `terma hook` can: the sender is still the one that connected,
+// though the child is newer and macOS lists it first.
+func TestFindSenderNamesTheConnectingProcessNotAChildThatInheritedIt(t *testing.T) {
+	t.Parallel()
+	if !Supported || runtime.GOOS == "windows" {
+		t.Skip("no inherited sockets to tell apart here")
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = ln.Close() }()
+	sender := exec.Command(os.Args[0], "-test.run=^$")
+	sender.Env = append(os.Environ(), connectEnv+"="+ln.Addr().String(), inheritEnv+"=1")
+	stdin, _ := sender.StdinPipe()
+	stdout, _ := sender.StdoutPipe()
+	if err := sender.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = stdin.Close(); _ = sender.Process.Kill(); _ = sender.Wait() }()
+	accepted, err := ln.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = accepted.Close() }()
+	var child int
+	if _, err := fmt.Fscan(stdout, &child); err != nil || child == 0 {
+		t.Fatalf("the sender started no child holding its connection: %v", err)
+	}
+	client, server := accepted.RemoteAddr().(*net.TCPAddr).AddrPort(), accepted.LocalAddr().(*net.TCPAddr).AddrPort()
+	if ownsConnForTest != nil && !ownsConnForTest(child, conn{client: client, server: server}) {
+		t.Fatalf("the child %d does not hold the connection it was given", child)
+	}
+	if pid, ok := FindSender(client, server); !ok || pid != sender.Process.Pid {
+		t.Fatalf("FindSender(%v, %v) = %d, %v; want the sender %d, not its child %d", client, server, pid, ok, sender.Process.Pid, child)
+	}
+}
+
 // ownsConnForTest is ownsConn, where the platform asks each process (procinfo_scan_test.go).
 var ownsConnForTest func(pid int, c conn) bool
 
@@ -208,10 +251,28 @@ func TestMain(m *testing.M) {
 		_ = c.Close()
 		os.Exit(0)
 	}
+	if os.Getenv(holdEnv) != "" {
+		_, _ = io.Copy(io.Discard, os.Stdin)
+		os.Exit(0)
+	}
 	if addr := os.Getenv(connectEnv); addr != "" {
 		conn, err := net.Dial("tcp", addr)
 		if err != nil {
 			os.Exit(2)
+		}
+		if os.Getenv(inheritEnv) != "" {
+			f, err := conn.(*net.TCPConn).File()
+			if err != nil {
+				os.Exit(2)
+			}
+			child := exec.Command(os.Args[0], "-test.run=^$")
+			child.Env = append(os.Environ(), holdEnv+"=1")
+			child.Stdin, child.ExtraFiles = os.Stdin, []*os.File{f}
+			if err := child.Start(); err != nil {
+				os.Exit(2)
+			}
+			// It leaves when stdin closes, as this process does.
+			fmt.Println(child.Process.Pid)
 		}
 		_, _ = io.Copy(io.Discard, os.Stdin)
 		_ = conn.Close()
