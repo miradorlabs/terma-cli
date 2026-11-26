@@ -130,18 +130,20 @@ func refusedNote(c routing.ErrorClass) string {
 
 // collected are the entry lines under each team, by enrollment: every repository entry its
 // policy lists. One a team earlier in routing order also lists, which Route sends there,
-// is marked and names that team. A refused team is passed over, so it collects nothing;
+// is marked and names that team, as is one such a team lists part of. A refused team is passed over, so it collects nothing;
 // a global Personal collects everything else.
 func (r Routing) collected(order []routing.Team) map[string][]Line {
 	out := map[string][]Line{}
 	for i, t := range order {
 		for _, e := range policyEntries(t) {
-			at := slices.IndexFunc(order[:i+1], func(o routing.Team) bool {
-				return slices.ContainsFunc(policyEntries(o), func(oe routing.Entry) bool { return oe.Contains(e) })
-			})
+			first := func(covers func(routing.Entry) bool) int {
+				return slices.IndexFunc(order[:i], func(o routing.Team) bool { return slices.ContainsFunc(policyEntries(o), covers) })
+			}
 			l := Line{Depth: 1, Text: e.Raw}
-			if at < i {
+			if at := first(func(oe routing.Entry) bool { return oe.Contains(e) }); at >= 0 {
 				l.Mark, l.Note = MarkWarn, "collected by "+r.short(order[at])
+			} else if at := first(e.Overlaps); at >= 0 {
+				l.Mark, l.Note = MarkWarn, "partly collected by "+r.short(order[at])
 			}
 			out[t.EnrollmentID] = append(out[t.EnrollmentID], l)
 		}
@@ -181,7 +183,7 @@ func (r Routing) pausedSection(now time.Time) (Section, bool) {
 		mixed := slices.Clone(r.Mixed)
 		slices.SortStableFunc(mixed, func(a, b runs.MixedRun) int { return b.At.Compare(a.At) })
 		var lines []Line
-		for _, m := range mixed {
+		for _, m := range mixed[:min(len(mixed), maxListed)] {
 			l := Line{Depth: 1, Text: pausedWords(m.Why.Reason)}
 			if !m.At.IsZero() {
 				l.Note = pausedAt(m.At, now)
@@ -191,7 +193,10 @@ func (r Routing) pausedSection(now time.Time) (Section, bool) {
 				lines = append(lines, Line{Depth: 2, Text: "e.g. a command reading files outside the repository", Quiet: true})
 			}
 		}
-		s.Lines = append(s.Lines, capEntries(lines, maxListed)...)
+		if more := n - maxListed; more > 0 {
+			lines = append(lines, Line{Depth: 1, Text: fmt.Sprintf("+ %d more", more), Quiet: true})
+		}
+		s.Lines = append(s.Lines, lines...)
 	}
 	if d := r.MixedDropped; d > 0 {
 		s.Lines = append(s.Lines, Line{Mark: MarkWarn, Text: fmt.Sprintf("%d %s from paused sessions dropped", d, pick(d == 1, "record", "records"))})

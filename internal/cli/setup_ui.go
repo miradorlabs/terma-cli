@@ -60,7 +60,7 @@ func (u *setupUI) Caution(label, what string) { u.keep(u.p.Warn("!"), label, wha
 // keep adds a checklist line, wrapping what under itself.
 func (u *setupUI) keep(mark, label, what string) {
 	const indent = 2 + 1 + 1 + stepLabelWidth + 1
-	lines := wrapStep(what, cmp.Or(style.Columns(u.out), 80)-indent)
+	lines := wrapStep(what, style.Columns(u.out)-indent)
 	u.lines = append(u.lines, fmt.Sprintf("  %s %-*s %s", mark, stepLabelWidth, label, u.p.Commands(lines[0])))
 	for _, l := range lines[1:] {
 		u.lines = append(u.lines, strings.Repeat(" ", indent)+u.p.Commands(l))
@@ -136,19 +136,27 @@ const conflictStep = "Run `terma doctor` to see which team collects each reposit
 
 // conflictLine names the teams in st whose policies overlap, or is "" when none do.
 func conflictLine(st routing.State, names teamNames) string {
-	// Each name is quoted, as a team name may hold commas, "and" or "›".
-	var labels []string
+	var ids, labels []string
 	for _, o := range routing.Overlaps(st) {
 		for _, t := range []routing.Team{o.Winner, o.Other} {
+			if slices.Contains(ids, t.EnrollmentID) {
+				continue
+			}
+			ids = append(ids, t.EnrollmentID)
+			// Each name is quoted, as a team name may hold commas, "and" or "›".
 			if l := "'" + teamLabel(names, t) + "'"; !slices.Contains(labels, l) {
 				labels = append(labels, l)
 			}
 		}
 	}
-	switch len(labels) {
-	case 0:
+	switch {
+	case len(ids) == 0:
 		return ""
-	case 2:
+	case len(labels) == 1 && len(ids) == 2:
+		return "Two teams named " + labels[0] + " list the same repository."
+	case len(labels) == 1:
+		return fmt.Sprintf("%d teams named %s list the same repositories.", len(ids), labels[0])
+	case len(labels) == 2:
 		return labels[0] + " and " + labels[1] + " list the same repository."
 	}
 	return strings.Join(labels[:len(labels)-1], ", ") + " and " + labels[len(labels)-1] + " list the same repositories."
@@ -193,7 +201,7 @@ func (u *setupUI) finish() {
 		return
 	}
 	fmt.Fprintf(u.out, "\n%s\n", u.p.Bold("Next steps:"))
-	width := cmp.Or(style.Columns(u.out), 80) - 4
+	width := style.Columns(u.out) - 4
 	for _, step := range u.next {
 		lines := wrapStep(step, width)
 		fmt.Fprintf(u.out, "  %s %s\n", u.p.Brand("•"), u.p.Commands(lines[0]))

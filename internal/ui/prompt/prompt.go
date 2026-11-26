@@ -394,7 +394,7 @@ func (it Item) aside() string {
 // plain drops escape sequences and control characters, so text from elsewhere, such as a
 // team's description, can neither style the frame nor break a line.
 func plain(s string) string {
-	s = ansiSGR.ReplaceAllString(s, "")
+	s = csiEscape.ReplaceAllString(s, "")
 	s = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) {
 			return ' '
@@ -416,11 +416,11 @@ func truncate(s string, n int) string {
 	return strings.TrimRight(string(r[:n-1]), " ") + "…"
 }
 
-// ansiSGR matches a CSI escape: the colours the palette emits, or any other.
-var ansiSGR = regexp.MustCompile("\x1b\\[[0-9;?]*[ -/]*[@-~]")
+// csiEscape matches a CSI escape: the colours the palette emits, or any other.
+var csiEscape = regexp.MustCompile("\x1b\\[[0-9;?]*[ -/]*[@-~]")
 
 func visibleWidth(s string) int {
-	return utf8.RuneCountInString(ansiSGR.ReplaceAllString(s, ""))
+	return utf8.RuneCountInString(csiEscape.ReplaceAllString(s, ""))
 }
 
 // rows is how many physical rows a rendered line occupies once wrapped.

@@ -9,17 +9,17 @@ import (
 	"golang.org/x/term"
 )
 
-// Columns is w's width when it is a terminal, else 0: output that is not watched is never
-// wrapped, so a copied line stays whole.
+// Columns is w's width when a person watches it as a terminal, else 0: output that is not
+// watched, or that an agent or a dumb terminal reads, is never wrapped, so a copied line
+// stays whole.
 func Columns(w io.Writer) int {
+	if !Terminal(w) {
+		return 0
+	}
 	if h, ok := w.(highlighter); ok {
 		w = h.w
 	}
-	f, ok := w.(*os.File)
-	if !ok {
-		return 0
-	}
-	cols, _, err := term.GetSize(int(f.Fd()))
+	cols, _, err := term.GetSize(int(w.(*os.File).Fd()))
 	if err != nil {
 		return 0
 	}

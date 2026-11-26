@@ -104,8 +104,9 @@ type Team struct {
 // TeamState is whether a team can send now, and if not, why it blocks.
 type TeamState string
 
-// Team states. Every state but Active blocks: the records its last list matches are
-// held, then dropped, and never passed to the next team.
+// Team states. Every state but Active blocks. Route passes a Refused team over, so the
+// next team gets what its list matches; under any other state those records are held,
+// then dropped, and never passed on.
 const (
 	Active       TeamState = "active"
 	Expired      TeamState = "expired"

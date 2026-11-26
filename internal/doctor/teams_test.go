@@ -306,7 +306,7 @@ func render(ss []Section, cols int) string {
 }
 
 // The teams read in routing order, each with its state and its own list beneath it: an
-// entry a newer policy also lists is marked on the older team and names the newer one, a
+// entry a newer policy also lists, or lists part of, is marked on the older team and names the newer one, a
 // refused team is skipped and collects nothing, and Personal comes last.
 func TestTeamSectionsShowWhatEachTeamCollects(t *testing.T) {
 	t.Parallel()
@@ -317,7 +317,7 @@ func TestTeamSectionsShowWhatEachTeamCollects(t *testing.T) {
        github.com/acme/one
        github.com/shared/tool
   ✓ 2. Beta Labs › Core  updated 26 Nov 08:30
-       github.com/acme/*
+     ! github.com/acme/*  partly collected by Platform
      ! github.com/shared/tool  collected by Platform
        github.com/beta/core
   ✓ 3. Personal  always last
@@ -453,6 +453,20 @@ func TestRoutedRepositoryAndDoctorCombineMixedWithOutboxLosses(t *testing.T) {
 
 // A long list shows its first five repositories and how many more, marked when a
 // hidden one goes to a newer team; with no colour the mark is a plain "!".
+// The paused list stops at five sessions, however many lines each takes, and counts the rest.
+func TestPausedSectionCapsSessions(t *testing.T) {
+	t.Parallel()
+	now := time.Now()
+	r := routedFixture(t)
+	for i := range 7 {
+		r.Mixed = append(r.Mixed, runs.MixedRun{Session: fmt.Sprint(i), Why: runs.Why{Reason: runs.UnknownReach}})
+	}
+	got := render(r.teamSections(now), 80)
+	if strings.Count(got, "ran a command terma could not trace") != 5 || !strings.Contains(got, "+ 2 more") {
+		t.Errorf("paused sessions not capped at five sessions:\n%s", got)
+	}
+}
+
 func TestTeamSectionsCapLongLists(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 11, 26, 9, 30, 0, 0, time.Local)

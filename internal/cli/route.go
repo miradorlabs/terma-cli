@@ -188,7 +188,7 @@ func buildRouteExplain(path string, st routing.State, names teamNames, loc routi
 		Reason:            string(d.Reason),
 		Blocked:           d.Blocked,
 		Entry:             d.Entry,
-		Notes:             routeReasons(st, names, loc, d),
+		Notes:             routeReasons(st, names, loc, d, now),
 		Unknown:           unknownRule(st, now),
 		UnknownToPersonal: routing.UnknownToPersonal(st, now),
 		ServerKey:         serverKey,
@@ -274,7 +274,7 @@ func routeRefusalWords(c routing.ErrorClass) string {
 
 // routeReasons names each other ticked team whose policy lists the location, and why
 // the team Route chose collects it instead: that team is refused, or its policy is older.
-func routeReasons(st routing.State, names teamNames, loc routing.Location, d routing.Decision) []string {
+func routeReasons(st routing.State, names teamNames, loc routing.Location, d routing.Decision, now time.Time) []string {
 	repo := routing.Normalize(loc.Repository)
 	if loc.Kind != routing.Repository || routing.Owner(repo) == "" {
 		return nil
@@ -295,7 +295,7 @@ func routeReasons(st routing.State, names teamNames, loc routing.Location, d rou
 					// Neither is newer: the team ticked first keeps it.
 					why = ", but its policy is no newer, so the team ticked first collects it"
 				}
-				if t.StateAt(time.Now()) == routing.Refused {
+				if t.StateAt(now) == routing.Refused {
 					why = ", but it is refused (" + routeRefusalWords(t.LastError) + "), so it is passed over"
 				}
 				out = append(out, teamLabel(names, t)+" lists "+raw+why)

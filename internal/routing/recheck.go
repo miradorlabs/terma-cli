@@ -45,8 +45,8 @@ func (r *Router) Recheck(d Destination, now time.Time) (Verdict, Decision) {
 	if got.Outcome == Hold && got.Reason == ReasonUnknown && !d.Location.Narrow &&
 		r.s.unknownToPersonalEligible() && r.s.Teams[0].EnrollmentID == d.EnrollmentID {
 		// Route returns unpinned ReasonUnknown while Personal is blocked; normalize it to a
-		// pinned blocking Decision so the switch below returns Wait (recoverable) or Discard
-		// (Refused) with the blocking reason preserved for doctor/counters.
+		// pinned blocking Decision so the switch below returns Wait with the blocking reason
+		// preserved for doctor/counters.
 		got = Decision{Outcome: Hold, EnrollmentID: d.EnrollmentID, Reason: ReasonBlocked, Blocked: st}
 	}
 	switch {
@@ -54,7 +54,7 @@ func (r *Router) Recheck(d Destination, now time.Time) (Verdict, Decision) {
 		return Discard, got
 	case got.Outcome == Send:
 		return SendNow, got
-	case got.Outcome == Hold && st != Refused:
+	case got.Outcome == Hold:
 		return Wait, got
 	}
 	return Discard, got

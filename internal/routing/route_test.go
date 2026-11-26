@@ -297,6 +297,36 @@ func TestOverlapsNameOnlyTheRealWinner(t *testing.T) {
 	}
 }
 
+// On a tie among three teams, Overlaps names the team Route picks, the first ticked.
+func TestOverlapsOnATieNameTheTeamTickedFirst(t *testing.T) {
+	t.Parallel()
+	s := fixture(t,
+		team("a", "a-team", "github.com/shared/api"),
+		team("b", "b-team", "github.com/shared/api"),
+		team("c", "c-team", "github.com/shared/api"), personal())
+	got := Overlaps(*s)
+	for _, o := range got {
+		if o.Winner.TeamID != "a-team" {
+			t.Errorf("Overlaps reports %s winning %s over %s, but a-team collects it", o.Winner.TeamID, o.Entry, o.Other.TeamID)
+		}
+	}
+	if len(got) != 2 {
+		t.Fatalf("Overlaps = %+v, want a-team over b-team and over c-team", got)
+	}
+	expect(t, s, repo("github.com/shared/api"), Send, "a-team")
+}
+
+// A team listing both o/* and o/x against another's o/x is one conflict, not two.
+func TestOverlapsListEachConflictOnce(t *testing.T) {
+	t.Parallel()
+	s := fixture(t,
+		updated(team("a", "a-team", "github.com/o/*", "github.com/o/x"), now.Add(-time.Hour)),
+		updated(team("b", "b-team", "github.com/o/x"), now.Add(-48*time.Hour)), personal())
+	if got := Overlaps(*s); len(got) != 1 || got[0].Entry != "github.com/o/x" || got[0].Winner.TeamID != "a-team" {
+		t.Fatalf("Overlaps = %+v, want a-team over b-team on github.com/o/x once", got)
+	}
+}
+
 // Order is newest policy first, equal or unknown ages in ticked order, refused teams out,
 // and personal last.
 func TestOrder(t *testing.T) {

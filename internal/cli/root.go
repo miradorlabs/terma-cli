@@ -55,7 +55,7 @@ func (app *App) NewRootCommand() *cobra.Command {
                    is written into a repository's files.
                    Run it again to repair the machine.
   terma teams      chooses the teams this machine sends telemetry to, across all
-                   your organizations, and which organization owns a repository.
+                   your organizations.
   terma doctor     verifies the whole chain end to end; every failure names its fix.
   terma update     installs the latest release and refreshes what terma installed.
   terma teardown   undoes setup on this machine (--sign-out also signs out).

@@ -33,10 +33,11 @@ func (app *App) newTeamsCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "teams",
 		Short: "Choose which teams this machine sends telemetry to",
-		Long: `List every organization and team your sign-in belongs to and choose which ones
-this machine sends telemetry to. Each team's policy decides which repositories it
-collects. Where two teams' policies list the same repository, the most recently
-updated policy collects it; Personal collects what no ticked team does.`,
+		Long: `Summarize the organizations and teams your sign-in belongs to, and choose which
+ones this machine sends telemetry to; --json lists each one by name. Each team's policy
+decides which repositories it collects. Where two teams' policies list the same
+repository, the most recently updated policy collects it; Personal collects what no
+ticked team does.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return app.runTeams(cmd, f) },
 	}
