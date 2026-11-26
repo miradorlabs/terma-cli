@@ -346,6 +346,9 @@ func codexToolReachPaths(name, args, cwd string) []string {
 	}
 	for _, k := range []string{"file_path", "path"} {
 		if p := strField(k); p != "" {
+			if !filepath.IsAbs(p) && dir != "" {
+				p = filepath.Join(dir, p) // the call's own working directory, not the session's
+			}
 			out = append(out, hookrun.Alone(p)...)
 		}
 	}

@@ -369,6 +369,10 @@ func classifyReachedPath(cand, baseRoot string) reachedClass {
 			if origin, _ := gitx.OriginFS(gitDir); routing.Owner(origin) != "" {
 				return reachedClass{loc: routing.Location{Kind: routing.Repository, Repository: origin}}
 			}
+		} else if _, _, place := gitx.PlaceFolderFS(dir); place == gitx.Unplaced {
+			// A .git marker that does not resolve (a stale linked worktree whose main
+			// repository moved or was deleted): whose checkout this was is not known.
+			return reachedClass{unknown: true}
 		}
 		if hookrun.IsNobodyDir(dir) {
 			return reachedClass{nobody: true}
@@ -376,6 +380,9 @@ func classifyReachedPath(cand, baseRoot string) reachedClass {
 		return reachedClass{loc: routing.Location{Kind: routing.OutsideGit}}
 	}
 	if root, gitDir, ok := gitx.LocateFS(cand); ok && gitDir != "" {
+		if linkLeavesRoot(cand, root) {
+			return reachedClass{unknown: true}
+		}
 		if baseRoot != "" && sameCleanPath(root, baseRoot) {
 			return reachedClass{nobody: true}
 		}
@@ -389,6 +396,37 @@ func classifyReachedPath(cand, baseRoot string) reachedClass {
 		return reachedClass{nobody: true}
 	}
 	return reachedClass{unknown: true}
+}
+
+// linkLeavesRoot reports whether a missing path, which LocateFS placed in root by its name,
+// passes on the way through a symlink that does not resolve or resolves outside root: where
+// the path led is then not root's to say.
+func linkLeavesRoot(cand, root string) bool {
+	realRoot, err := filepath.EvalSymlinks(root)
+	rel, relErr := filepath.Rel(root, cand)
+	if err != nil || relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return true
+	}
+	cur := root
+	for part := range strings.SplitSeq(rel, string(filepath.Separator)) {
+		cur = filepath.Join(cur, part)
+		fi, err := os.Lstat(cur)
+		if errors.Is(err, fs.ErrNotExist) {
+			return false
+		} else if err != nil {
+			return true
+		} else if fi.Mode()&fs.ModeSymlink == 0 {
+			continue
+		}
+		target, err := filepath.EvalSymlinks(cur)
+		if err != nil {
+			return true
+		}
+		if in, err := filepath.Rel(realRoot, target); err != nil || in == ".." || strings.HasPrefix(in, ".."+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
 }
 
 func sameCleanPath(a, b string) bool {

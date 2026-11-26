@@ -295,7 +295,7 @@ func (sc *scan) assign(a *syntax.Assign) {
 		prior, hadPrior := sc.lookup(a.Name.Value)
 		fields, err := sc.fields(a.Value)
 		v := pick(a.Append && hadPrior, prior, "") + strings.Join(fields, " ")
-		sc.setVar(a.Name.Value, pick(err == nil && (!a.Append || !sc.isUnresolvedVar(a.Name.Value)), &v, nil))
+		sc.setVar(a.Name.Value, pick(err == nil && (!a.Append || !sc.isUnresolvedVar(a.Name.Value) && !sc.isHistoricalUnknownVar(a.Name.Value)), &v, nil))
 	}
 }
 func (sc *scan) repeatLoop(do []*syntax.Stmt) {

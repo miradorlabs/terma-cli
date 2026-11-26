@@ -416,8 +416,9 @@ func (p *codexHistoryParser) handleResponseItem(raw json.RawMessage, ts time.Tim
 		call, hadCall := p.pendingCalls[pl.CallID]
 		delete(p.pendingCalls, pl.CallID)
 		// Drop delayed tool outputs whose originating call started under a different cwd
-		// so neither arguments nor returned file contents ever cross organization boundaries.
-		if p.priorCwdCalls[pl.CallID] || (hadCall && call.Cwd != p.cwd) {
+		// so neither arguments nor returned file contents ever cross organization boundaries,
+		// and outputs with no known call (a turn's end clears them): their call's cwd is unknown.
+		if p.priorCwdCalls[pl.CallID] || !hadCall || call.Cwd != p.cwd {
 			delete(p.priorCwdCalls, pl.CallID)
 			return nil
 		}

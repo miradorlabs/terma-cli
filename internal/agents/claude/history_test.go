@@ -443,3 +443,56 @@ func kvBoolTrue(attrs []*commonpb.KeyValue, key string) bool {
 	}
 	return false
 }
+
+// A tool_result whose tool_use was never seen is dropped: its call's working directory is
+// unknown. One whose tool_use came before the bounded mid-session flush is kept.
+func TestClaudeToolResultWithNoKnownCallIsDropped(t *testing.T) {
+	t.Parallel()
+	lines := []string{
+		`{"type":"assistant","uuid":"a1","sessionId":"sess-or","cwd":"/work/repo-a","timestamp":"2026-11-20T10:00:00Z","requestId":"r1","message":{"id":"m1","role":"assistant","model":"claude-opus-5-5","content":[{"type":"tool_use","id":"tu-long","name":"Bash","input":{"command":"echo hi"}}],"usage":{"input_tokens":10,"output_tokens":5}}}`,
+	}
+	t0 := time.Date(2026, 11, 20, 10, 1, 0, 0, time.UTC)
+	for i := range 270 {
+		lines = append(lines, `{"type":"user","uuid":"ub-`+string(rune('a'+(i%26)))+`","sessionId":"sess-or","cwd":"/work/repo-a","timestamp":"`+t0.Add(time.Duration(i)*time.Second).Format(time.RFC3339)+`","message":{"role":"user","content":"msg"}}`)
+	}
+	lines = append(lines,
+		`{"type":"user","uuid":"u2","sessionId":"sess-or","cwd":"/work/repo-a","timestamp":"2026-11-20T11:00:00Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu-never","content":"ORPHAN_OUTPUT"}]}}`,
+		`{"type":"user","uuid":"u3","sessionId":"sess-or","cwd":"/work/repo-a","timestamp":"2026-11-20T11:00:01Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu-long","content":"KEPT_LONG_OUTPUT"}]}}`,
+	)
+	path := filepath.Join(t.TempDir(), "sess-or.jsonl")
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	results := map[string]bool{}
+	segs := 0
+	if err := (Agent{}).ReadHistory(context.Background(), agents.HistoryFile{
+		SourceSystem: "claude", SessionID: "sess-or", Path: path,
+	}, agents.HistoryReadOptions{IncludeSupplemental: true}, func(seg agents.HistorySegment) error {
+		segs++
+		for _, rl := range seg.NativeLogs.GetResourceLogs() {
+			for _, sl := range rl.GetScopeLogs() {
+				for _, lr := range sl.GetLogRecords() {
+					attrs := map[string]string{}
+					for _, kv := range lr.GetAttributes() {
+						attrs[kv.GetKey()] = kv.GetValue().GetStringValue()
+					}
+					if attrs["event.name"] == "tool_result" {
+						results[attrs["tool_use_id"]] = true
+					}
+				}
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if segs < 2 {
+		t.Fatalf("got %d segments, want the bounded flush to split the session", segs)
+	}
+	if results["tu-never"] {
+		t.Errorf("a tool_result with no known tool_use was emitted")
+	}
+	if !results["tu-long"] {
+		t.Errorf("a tool_result after the bounded flush was dropped")
+	}
+}

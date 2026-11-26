@@ -121,6 +121,11 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 		} else if err != nil {
 			dot, missing := slices.Contains(parts, "..") || slices.Contains(parts, "."), filepath.Join(curPath, part)
 			sc.unknown = sc.unknown || dot && sc.created[pick(filepath.Separator == '\\', strings.ToLower(missing), missing)]
+			if sc.historical {
+				// The component may have existed when the command ran: where a ".." after it
+				// led is not knowable (it might have been a symlink), while "." changes nothing.
+				sc.unknown, dot = sc.unknown || slices.Contains(parts, ".."), false
+			}
 			return pick(dot, "", filepath.Join(append([]string{curPath, part}, parts...)...)), pick(dot, "", curPath), nil, nil, false
 		} else if openMode == 3 && !isSysBin(filepath.Join(curPath, part), fi) {
 			return "", "", nil, nil, false

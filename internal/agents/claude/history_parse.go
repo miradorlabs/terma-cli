@@ -271,8 +271,9 @@ func (p *claudeHistoryParser) handleUser(rec *claudeTranscriptLine, defaultAgent
 			}
 			tool, seenTool := p.tools[blk.ToolUseID]
 			delete(p.tools, blk.ToolUseID)
-			// Never carry a tool call's arguments or delayed output across a working-directory boundary.
-			if seenTool && tool.Cwd != rec.Cwd {
+			// Never carry a tool call's arguments or delayed output across a working-directory
+			// boundary, and drop a result whose call was never seen: its working directory is unknown.
+			if !seenTool || tool.Cwd != rec.Cwd {
 				continue
 			}
 			promptID := cmp.Or(p.promptID, tool.PromptID)
