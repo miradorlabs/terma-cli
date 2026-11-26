@@ -22,13 +22,8 @@ func (app *App) chooseSetupTeams(cmd *cobra.Command, disc *setupDiscovery, assum
 	}
 	rerun := disc.baseline.found && disc.baseline.sameAccount && len(disc.baseline.state.Teams) > 0
 	keep := make([]bool, len(disc.teams))
-	personal := false
 	for i, dt := range disc.teams {
 		keep[i] = !rerun || slices.ContainsFunc(disc.baseline.state.Teams, func(t routing.Team) bool { return t.TeamID == dt.team.TeamID })
-		// Routing takes one personal team, so a first setup offers only the first ticked.
-		if dt.team.Personal && keep[i] {
-			keep[i], personal = !personal, true
-		}
 	}
 	canAsk := app.canAsk
 	if canAsk == nil {
@@ -76,15 +71,6 @@ func (app *App) chooseSetupTeams(cmd *cobra.Command, disc *setupDiscovery, assum
 		}
 		for k, i := range order {
 			keep[i] = k < len(result) && result[k].Selected
-		}
-		n := 0
-		for i, dt := range disc.teams {
-			if dt.team.Personal && keep[i] {
-				n++
-			}
-		}
-		if n > 1 {
-			return errors.New("more than one Personal team ticked: run `terma setup` again and tick one")
 		}
 	}
 	disc.untick = map[string]bool{}
