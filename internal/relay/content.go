@@ -52,6 +52,11 @@ func (ru *rules) withhold(p *part, prompts, toolContent bool, unclassified map[s
 			case contains(checkoutSafeKeys, key), contains(userSafeKeys, key):
 				// The relay's own stamps (stampCheckout, nameUser), safe on the resource alone: on
 				// a record they would be an agent's, unchecked.
+			case !prompts && contains(ru.promptDropFields, key):
+				// A key that is content of both kinds (an exception's message) goes with
+				// prompts withheld, whatever tool content does.
+				changed++
+				continue
 			case contains(checkoutContentKeys, key), contains(ru.toolContentFields, key):
 				// The relay's own stamps that leave only with tool content, and an agent's tool
 				// content where it puts it on the resource.

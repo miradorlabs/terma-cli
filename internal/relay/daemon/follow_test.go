@@ -141,8 +141,9 @@ func TestAFollowerTakesOverOnceTheRelayIsGone(t *testing.T) {
 	}
 	gone := time.Now()
 	follower.await(t, "the follower")
-	// It polls every followPoll; the rest is starting to listen.
-	if took := time.Since(gone); took > 300*time.Millisecond {
+	// It polls every followPoll; the rest is starting to listen, which a loaded Windows
+	// runner has taken more than half a second to do.
+	if took := time.Since(gone); took > 2*time.Second {
 		t.Errorf("the follower listened %v after the relay it follows was gone", took)
 	}
 }

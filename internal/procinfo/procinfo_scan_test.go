@@ -2,4 +2,4 @@
 
 package procinfo
 
-func init() { ownsConnForTest = ownsConn }
+func init() { ownsConnForTest, eldestOwnerForTest = ownsConn, eldestOwner }

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
 
@@ -163,6 +164,23 @@ func unclassified(r *Relay) []string {
 	return keys
 }
 
+// What some Copilot sessions' ends carry leaves only when prompts and tool content both
+// do, on a record or a resource alike, as when no rule named it.
+func TestCopilotsEndKeysLeaveOnlyWithBothKindsOfContent(t *testing.T) {
+	t.Parallel()
+	text := &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "EXCEPTION-MESSAGE"}}
+	for _, key := range []string{"exception.message", "github.copilot.shutdown_type"} {
+		for _, site := range []FieldSite{SiteRecord, SiteResource} {
+			for _, policy := range [][2]bool{{false, false}, {true, false}, {false, true}, {true, true}} {
+				kv, _ := testRules.apply(FieldQuery{Key: key, Site: site}, text, policy[0], policy[1])
+				if left, want := kv != nil, policy[0] && policy[1]; left != want {
+					t.Errorf("%s on a %s with prompts %v and tool content %v: left %v, want %v", key, site, policy[0], policy[1], left, want)
+				}
+			}
+		}
+	}
+}
+
 // With content withheld, how a call failed still leaves: its code and class, and what the
 // permission it was denied was for. The failure's own words, the path the tool was given
 // and the status message stay here.
@@ -202,8 +220,8 @@ func TestRelayKeepsHowACopilotCallFailed(t *testing.T) {
 			t.Errorf("%s left as %q, want %q", kept.where, kept.got, kept.want)
 		}
 	}
-	if got := unclassified(r); !slices.Equal(got, []string{"exception.message"}) {
-		t.Errorf("the relay withheld %q as no rule's, want only the exception's message", got)
+	if got := unclassified(r); len(got) != 0 {
+		t.Errorf("the relay withheld %q as no rule's, want none: the exception's message is content", got)
 	}
 }
 

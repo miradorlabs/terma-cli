@@ -21,7 +21,13 @@ func (Agent) CaptureRules() shape.CaptureRules {
 			// custom agents: content, the cautious side, though the names of their MCP servers
 			// below are safe.
 			"github.copilot.git.repository", "github.copilot.github.org", "github.copilot.git.branch", "github.copilot.git.commit_sha",
-			"github.copilot.context.skills", "github.copilot.context.custom_agent_names"},
+			"github.copilot.context.skills", "github.copilot.context.custom_agent_names",
+			// What some sessions' ends carry, seen in CI's exports in November 2026 with no value
+			// read: an exception's own words, which a failed call fills with what its tool was
+			// given, and the kind of shutdown. Content of both kinds (PromptDropFields too), so
+			// they leave only when prompts and tool content both do.
+			"exception.message", "github.copilot.shutdown_type"},
+		PromptDropFields: []string{"exception.message", "github.copilot.shutdown_type"},
 		// Strings only: a number or a flag passes whatever its key (a request's AI credits,
 		// its billing multiplier), and a key no rule names is withheld with the content.
 		// Each is one CLI 1.0.96 sends, read from its own export, unless its comment says
@@ -44,7 +50,7 @@ func (Agent) CaptureRules() shape.CaptureRules {
 			"github.copilot.sandbox.enforcement_point", "github.copilot.sandbox.outcome", "github.copilot.sandbox.platform",
 			// How a call failed, as a code and a class (a tool denied its permission sends
 			// "denied" and "ToolError"), and what a permission was asked for and came to. The
-			// failure's own words, exception.message, are no rule's and stay withheld.
+			// failure's own words, exception.message, are content (above).
 			"error.type", "exception.type", "github.copilot.error_code",
 			"github.copilot.permission.kind", "github.copilot.permission.result",
 			// Named by the runtime, on no captured span: an MCP tool's server and tool, which

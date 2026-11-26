@@ -24,7 +24,7 @@ func initRepo(t *testing.T) string {
 		{"config", "user.name", "Test"},
 		{"config", "commit.gpgsign", "false"},
 	} {
-		if _, err := run(ctx, dir, args...); err != nil {
+		if _, err := Git(ctx, dir, args...); err != nil {
 			t.Fatalf("git %v: %v", args, err)
 		}
 	}
@@ -40,14 +40,14 @@ func TestStagedFiles(t *testing.T) {
 	}
 	_ = os.WriteFile(filepath.Join(dir, "src", "a.go"), []byte("package a\n"), 0o644)
 	_ = os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b\n"), 0o644)
-	if _, err := run(ctx, dir, "add", "src/a.go"); err != nil {
+	if _, err := Git(ctx, dir, "add", "src/a.go"); err != nil {
 		t.Fatal(err)
 	}
 	staged, err := StagedFiles(ctx, dir)
 	if err != nil || len(staged) != 1 || staged[0] != (StagedFile{Path: "src/a.go"}) {
 		t.Fatalf("staged %v (%v)", staged, err)
 	}
-	if _, err := run(ctx, dir, "commit", "-q", "-m", "first\n\nAgent-Session-Id: s1"); err != nil {
+	if _, err := Git(ctx, dir, "commit", "-q", "-m", "first\n\nAgent-Session-Id: s1"); err != nil {
 		t.Fatal(err)
 	}
 	if staged, _ := StagedFiles(ctx, dir); len(staged) != 0 {
@@ -66,13 +66,13 @@ func TestStagedFilesNamesARenamesOldPath(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(dir, "src", "store.ts"), []byte("one\ntwo\nthree\nfour\nfive\n"), 0o644)
 	_ = os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b\n"), 0o644)
 	for _, args := range [][]string{{"add", "-A"}, {"commit", "-q", "-m", "first"}, {"config", "diff.renames", "false"}, {"mv", "src/store.ts", "src/storage.ts"}} {
-		if _, err := run(ctx, dir, args...); err != nil {
+		if _, err := Git(ctx, dir, args...); err != nil {
 			t.Fatal(err)
 		}
 	}
 	_ = os.WriteFile(filepath.Join(dir, "src", "storage.ts"), []byte("one\ntwo\nthree\nfour\nfive\nsix\n"), 0o644)
 	_ = os.WriteFile(filepath.Join(dir, "b.txt"), []byte("b\nb\n"), 0o644)
-	if _, err := run(ctx, dir, "add", "-A"); err != nil {
+	if _, err := Git(ctx, dir, "add", "-A"); err != nil {
 		t.Fatal(err)
 	}
 	staged, err := StagedFiles(ctx, dir)

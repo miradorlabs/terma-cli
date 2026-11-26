@@ -35,6 +35,32 @@ func TestLockExcludesAndReleases(t *testing.T) {
 	again()
 }
 
+// A free lock is taken even when opening its file outlasted the caller's wait, as a virus
+// scan of a new file can on a loaded Windows runner: there is nothing to wait for.
+func TestAFreeLockIsTakenHoweverLongItsFileTookToOpen(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "x.lock")
+	unlock, err := Lock(slowOpen{path}, path)
+	if err != nil {
+		t.Fatalf("a free lock was not taken: %v", err)
+	}
+	unlock()
+}
+
+// slowOpen is a context whose wait ran out while the lock file at path was opened: done
+// from the moment the file exists.
+type slowOpen struct{ path string }
+
+func (slowOpen) Deadline() (time.Time, bool) { return time.Time{}, false }
+func (slowOpen) Done() <-chan struct{}       { return nil }
+func (slowOpen) Value(any) any               { return nil }
+func (c slowOpen) Err() error {
+	if _, err := os.Stat(c.path); err == nil {
+		return context.DeadlineExceeded
+	}
+	return nil
+}
+
 // A record fn deletes leaves no lock behind; one it keeps keeps its lock.
 func TestLockedRemovesTheLockOfADeletedFile(t *testing.T) {
 	t.Parallel()
