@@ -13,6 +13,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
+// maxConsecutiveRejections is how many sessions in a row the server may reject on a route
+// before the rest of that route waits for the next run.
+const maxConsecutiveRejections = 5
+
 type preAttemptStopError struct {
 	skipReason string
 	reason     string
@@ -215,7 +219,15 @@ func uploadOneSession(
 			return stopRouteWithIssue(b, remaining, SkipSendFailed, routeErr.Error(), report, sum), nil
 		}
 		if perm, ok := errors.AsType[*PermanentError](streamErr); ok {
-			return false, markSessionFailed(opts.StateDir, st, b, sp, perm, nowFn(), report, sum)
+			if err := markSessionFailed(opts.StateDir, st, b, sp, perm, nowFn(), report, sum); err != nil || perm.Status == 0 {
+				return err != nil, err
+			}
+			// A server that rejects session after session will likely reject the rest too.
+			if b.rejected++; b.rejected >= maxConsecutiveRejections {
+				reason := fmt.Sprintf("the server rejected %d sessions in a row (last: %s); fix the cause and run `terma history upload --retry-failed`", b.rejected, perm.Reason)
+				return stopRouteWithIssue(b, remaining-1, SkipSendFailed, reason, report, sum), nil
+			}
+			return false, nil
 		}
 		if !markedInProgress {
 			if errors.Is(streamErr, fs.ErrNotExist) {
@@ -230,8 +242,9 @@ func uploadOneSession(
 
 	sum.WithheldRecords += mixedDropped
 	if totalRecs == 0 {
-		if st.IsInProgress(sp.key) {
+		if _, failed := st.IsFailed(sp.key); failed || st.IsInProgress(sp.key) {
 			delete(st.InProgress, sp.key)
+			delete(st.Failed, sp.key)
 			if err := SaveState(opts.StateDir, *st); err != nil {
 				return true, fmt.Errorf("save history state: %w", err)
 			}
@@ -261,6 +274,7 @@ func uploadOneSession(
 	if err := SaveState(opts.StateDir, *st); err != nil {
 		return true, fmt.Errorf("save history state: %w", err)
 	}
+	b.rejected = 0
 	sum.SentSessions++
 	sum.SentRecords += totalRecs
 	sum.SentBytes += totalBytes

@@ -351,3 +351,52 @@ func TestRenderHistorySummaryNamesUnreadablePaths(t *testing.T) {
 		t.Errorf("summary output:\n%s\nwant it to contain:\n%s", b.String(), want)
 	}
 }
+
+// A failed session, from this run or an earlier one, comes with how to try it again; a run
+// with none does not mention it.
+func TestRenderHistorySummaryNamesRetryFailed(t *testing.T) {
+	t.Parallel()
+	const hint = "Run `terma history upload --retry-failed` to try failed sessions again."
+	for name, sum := range map[string]history.Summary{
+		"failed now":        {Failed: []history.FailedSession{{SessionID: "s-1", Reason: "HTTP 400"}}},
+		"failed previously": {SkippedSessions: map[string]int{history.SkipFailedPreviously: 1}},
+	} {
+		var b strings.Builder
+		renderHistorySummary(&b, sum)
+		if !strings.Contains(b.String(), hint) {
+			t.Errorf("%s: summary does not say how to retry:\n%s", name, b.String())
+		}
+	}
+	var b strings.Builder
+	renderHistorySummary(&b, history.Summary{SentSessions: 1})
+	if strings.Contains(b.String(), "--retry-failed") {
+		t.Errorf("summary without failures mentions --retry-failed:\n%s", b.String())
+	}
+}
+
+func TestHistoryUploadHasRetryFailedFlag(t *testing.T) {
+	useDirs(t, t.TempDir(), t.TempDir())
+	help, _, err := termaRun{}.exec(t, "history", "upload", "--help")
+	if err != nil || !strings.Contains(help, "--retry-failed") {
+		t.Fatalf("`terma history upload --help` (%v) does not list --retry-failed:\n%s", err, help)
+	}
+}
+
+// Rechecks during an upload read the routing state of the profile the upload began with:
+// a switch of the active profile stops them.
+func TestReloadHistoryStateFailsWhenProfileChanges(t *testing.T) {
+	useDirs(t, t.TempDir(), t.TempDir())
+	t.Setenv("TERMA_PROFILE", "")
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	lane := testApp.profileLane(cfg)
+	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane); err == nil || strings.Contains(err.Error(), "profile changed") {
+		t.Fatalf("same profile, no routing state: %v, want a routing-state error", err)
+	}
+	t.Setenv("TERMA_PROFILE", "other")
+	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane); err == nil || !strings.Contains(err.Error(), "active profile changed") {
+		t.Fatalf("after a profile switch: %v, want active profile changed", err)
+	}
+}

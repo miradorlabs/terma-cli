@@ -39,8 +39,9 @@ selected team's collection and content policy.`,
 
 func (app *App) newHistoryUploadCommand() *cobra.Command {
 	var (
-		sinceSpec string
-		dryRun    bool
+		sinceSpec   string
+		dryRun      bool
+		retryFailed bool
 	)
 	cmd := &cobra.Command{
 		Use:   "upload",
@@ -55,15 +56,16 @@ Press Ctrl-C to stop safely; running the command again resumes unfinished
 sessions first.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return app.runHistoryUpload(cmd, sinceSpec, dryRun)
+			return app.runHistoryUpload(cmd, sinceSpec, dryRun, retryFailed)
 		},
 	}
 	cmd.Flags().StringVar(&sinceSpec, "since", defaultHistorySince, "include sessions modified within this window (e.g. 90d, 48h, or 2026-08-01)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "list what would be uploaded, to which team, and its estimated size without sending or writing state")
+	cmd.Flags().BoolVar(&retryFailed, "retry-failed", false, "try again the sessions a team rejected in an earlier run")
 	return cmd
 }
 
-func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun bool) error {
+func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, retryFailed bool) error {
 	// git answers for the repository these name whatever folder is asked about, so every
 	// session's working directory would route as that one repository.
 	for _, name := range []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR"} {
@@ -156,19 +158,7 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun bo
 		Version:          app.version,
 		State:            st,
 		ReloadState: func() (routing.State, error) {
-			freshCfg, err := app.loadConfig()
-			if err != nil {
-				return routing.State{}, err
-			}
-			freshLane := app.profileLane(freshCfg)
-			if freshLane != lane {
-				return routing.State{}, errors.New("active sign-in account changed during upload")
-			}
-			fresh, found, loadErr := routing.Load(app.stateDir, freshCfg.ProfileName)
-			if reason, detail := routingStateProblem(fresh, found, loadErr, lane); reason != "" {
-				return routing.State{}, errors.New(detail)
-			}
-			return fresh, nil
+			return app.reloadHistoryState(cfg.ProfileName, lane)
 		},
 		OnOrgAccessLost: func(orgID, authURL string, epochs map[string]int64, at time.Time) {
 			if serverKey || len(epochs) == 0 {
@@ -195,10 +185,11 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun bo
 			}
 			return ""
 		},
-		TeamLabel: func(team routing.Team) string { return teamLabel(names, team) },
-		Since:     since,
-		DryRun:    dryRun,
-		Progress:  progress,
+		TeamLabel:   func(team routing.Team) string { return teamLabel(names, team) },
+		Since:       since,
+		DryRun:      dryRun,
+		RetryFailed: retryFailed,
+		Progress:    progress,
 	})
 
 	if asJSON {
@@ -222,6 +213,27 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun bo
 		return exitWith(1)
 	}
 	return nil
+}
+
+// reloadHistoryState rereads the routing state an upload rechecks against, failing when the
+// active profile or its sign-in changed since the upload began: resume state is written
+// under the first profile, so it must not be checked against another's routing.
+func (app *App) reloadHistoryState(profile, lane string) (routing.State, error) {
+	freshCfg, err := app.loadConfig()
+	if err != nil {
+		return routing.State{}, err
+	}
+	if freshCfg.ProfileName != profile {
+		return routing.State{}, errors.New("active profile changed during upload")
+	}
+	if app.profileLane(freshCfg) != lane {
+		return routing.State{}, errors.New("active sign-in account changed during upload")
+	}
+	fresh, found, loadErr := routing.Load(app.stateDir, freshCfg.ProfileName)
+	if reason, detail := routingStateProblem(fresh, found, loadErr, lane); reason != "" {
+		return routing.State{}, errors.New(detail)
+	}
+	return fresh, nil
 }
 
 func hasNewHistoryFailures(sum history.Summary) bool {
@@ -342,6 +354,9 @@ func renderHistorySummary(w io.Writer, sum history.Summary) {
 			}
 			fmt.Fprintf(w, "  - %s %s:%s%s: %s\n", f.TeamLabel, f.SourceSystem, f.SessionID, prev, f.Reason)
 		}
+	}
+	if len(sum.Failed) > 0 || sum.SkippedSessions[history.SkipFailedPreviously] > 0 {
+		fmt.Fprintln(w, "Run `terma history upload --retry-failed` to try failed sessions again.")
 	}
 }
 

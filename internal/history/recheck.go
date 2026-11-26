@@ -304,7 +304,7 @@ func measureDryRunSession(
 		}
 		st, hasState := existingStates[eid]
 		_, prevFailed := st.IsFailed(key)
-		if hasState && (st.IsDone(key) || prevFailed) {
+		if hasState && (st.IsDone(key) || prevFailed && !opts.RetryFailed) {
 			cur := byRoute[eid]
 			cur.team = target.Team
 			cur.records += seg.RecordCount

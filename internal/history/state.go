@@ -191,6 +191,7 @@ func (s *RouteState) MarkInProgress(sourceSystem, sessionID string, at time.Time
 		s.InProgress = map[string]SessionRecord{}
 	}
 	k := SessionKey(sourceSystem, sessionID)
+	delete(s.Failed, k) // a failed session tried again (--retry-failed) is in progress now
 	var mod time.Time
 	if prev, ok := s.InProgress[k]; ok && !prev.SourceModTime.IsZero() {
 		mod = prev.SourceModTime
@@ -207,13 +208,15 @@ func (s *RouteState) MarkInProgress(sourceSystem, sessionID string, at time.Time
 	}
 }
 
-// MarkDone moves a session from in_progress to done after all requests succeed with zero rejections.
+// MarkDone moves a session from in_progress (or failed, when tried again) to done after all
+// requests succeed with zero rejections.
 func (s *RouteState) MarkDone(sourceSystem, sessionID string, at time.Time, records int, bytes int64) {
 	if s.Done == nil {
 		s.Done = map[string]SessionRecord{}
 	}
 	k := SessionKey(sourceSystem, sessionID)
 	delete(s.InProgress, k)
+	delete(s.Failed, k)
 	s.Done[k] = SessionRecord{
 		SourceSystem: sourceSystem,
 		SessionID:    sessionID,
@@ -267,11 +270,17 @@ func preloadStates(opts Options) (map[string]RouteState, map[string]map[string]b
 			return nil, nil, nil, err
 		}
 		existing[t.EnrollmentID] = st
-		if len(st.InProgress) > 0 {
-			m := make(map[string]bool, len(st.InProgress))
+		retry := map[string]FailedRecord{}
+		if opts.RetryFailed {
+			retry = st.Failed
+		}
+		if len(st.InProgress)+len(retry) > 0 {
+			m := make(map[string]bool, len(st.InProgress)+len(retry))
 			for k := range st.InProgress {
-				m[k] = true
-				resumable[k] = true
+				m[k], resumable[k] = true, true
+			}
+			for k := range retry {
+				m[k], resumable[k] = true, true
 			}
 			byRoute[t.EnrollmentID] = m
 		}

@@ -38,6 +38,7 @@ type Options struct {
 	ActiveWindow     time.Duration
 	MaxReqBytes      int
 	DryRun           bool
+	RetryFailed      bool // re-send sessions a team rejected before, with the in-progress ones
 	Now              func() time.Time
 	Progress         func(ProgressEvent)
 }
@@ -56,6 +57,7 @@ type routeBucket struct {
 	team     routing.Team
 	label    string
 	sessions map[string]*routeSessionPlan
+	rejected int // sessions the server rejected permanently in a row
 }
 
 // Upload discovers past local sessions across all registered HistorySource agents, splits
@@ -332,7 +334,10 @@ func processRoute(
 			sum.addSkippedSession(SkipAlreadyDone, 1)
 			continue
 		}
-		if frec, failed := st.IsFailed(sp.key); failed {
+		if frec, failed := st.IsFailed(sp.key); failed && opts.RetryFailed {
+			resumeQueue = append(resumeQueue, sp) // no holdings check: part may be held already
+			continue
+		} else if failed {
 			sum.addSkippedSession(SkipFailedPreviously, 1)
 			sum.Failed = append(sum.Failed, FailedSession{
 				EnrollmentID:    eid,
