@@ -106,7 +106,9 @@ func (pr *Printer) Sections(ss []Section) {
 			pr.Line(l)
 		}
 		if s.Footnote != "" {
-			pr.block("    ", "    ", s.Footnote, pr.P.Dim)
+			for f := range strings.SplitSeq(s.Footnote, "\n") {
+				pr.block("    ", "    ", f, pr.P.Dim)
+			}
 		}
 	}
 }
@@ -115,6 +117,10 @@ func (pr *Printer) Sections(ss []Section) {
 // the same line when both fit, else beneath the text.
 func (pr *Printer) Line(l Line) {
 	lead := "  " + pr.glyph(l.Mark) + " " + strings.Repeat("   ", l.Depth)
+	if l.Depth > 0 && l.Mark != NoMark {
+		// A nested line's mark sits just before its text.
+		lead = strings.Repeat(" ", 2+3*l.Depth) + pr.glyph(l.Mark) + " "
+	}
 	hang := strings.Repeat(" ", 4+3*l.Depth)
 	if l.Key != "" {
 		lead += pr.P.Dim(pad(l.Key, keyWidth)) + " "

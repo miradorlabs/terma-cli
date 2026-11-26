@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -237,8 +238,8 @@ func TestTeamsCheckAndSectionsShowPausedSessionsAndDroppedRecords(t *testing.T) 
 	now := time.Now()
 	r := routedFixture(t)
 	r.Mixed = []runs.MixedRun{
-		{Session: "s-1", Why: runs.Why{Reason: runs.Crossed, Where: "github.com/acme/api"}, Recent: true},
-		{Session: "s-2", Why: runs.Why{Reason: runs.Crossed, Where: "github.com/acme/web"}, Recent: true},
+		{Session: "s-1", Why: runs.Why{Reason: runs.Crossed, Where: "github.com/acme/api"}, At: now.Add(-time.Hour), Recent: true},
+		{Session: "s-2", Why: runs.Why{Reason: runs.Crossed, Where: "github.com/acme/web"}, At: now.Add(-50 * time.Hour), Recent: true},
 		{Session: "s-3", Why: runs.Why{Reason: runs.UnknownReach, Where: `cd "$(cat p)" && cat …`}, Recent: false},
 	}
 	r.MixedDropped = 7
@@ -253,11 +254,13 @@ func TestTeamsCheckAndSectionsShowPausedSessionsAndDroppedRecords(t *testing.T) 
 		"  ! 2 records for Acme › Platform could not be sent\n",
 		"Paused sessions\n" +
 			"  ! 3 sessions are paused\n" +
-			"       2 worked in another organization's repository\n" +
-			"       1 ran a command terma could not trace\n" +
+			"       worked in another organization's repository  paused " + now.Add(-time.Hour).Local().Format("15:04") + "\n" +
+			"       worked in another organization's repository  paused " + now.Add(-50*time.Hour).Local().Format("2 Jan 15:04") + "\n" +
+			"       ran a command terma could not trace\n" +
+			"          e.g. a command reading files outside the repository\n" +
 			"  ! 7 records from paused sessions dropped\n" +
-			"    A session pauses when it may touch another organization's work. It sends\n" +
-			"    nothing until it resumes.\n",
+			"    Terma pauses a session that touches another organization's work, so nothing\n",
+		"    To send again, start a new session or resume this one. Keep each session to\n",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("sections lack %q:\n%s", want, got)
@@ -302,9 +305,9 @@ func render(ss []Section, cols int) string {
 	return b.String()
 }
 
-// The teams read in routing order, each with its state and what it collects beneath it:
-// the newer policy wins an overlap and names the loser, an entry listed twice shows once,
-// a refused team is skipped and collects nothing, and Personal comes last.
+// The teams read in routing order, each with its state and its own list beneath it: an
+// entry a newer policy also lists is marked on the older team and names the newer one, a
+// refused team is skipped and collects nothing, and Personal comes last.
 func TestTeamSectionsShowWhatEachTeamCollects(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 11, 26, 9, 30, 0, 0, time.Local)
@@ -312,11 +315,10 @@ func TestTeamSectionsShowWhatEachTeamCollects(t *testing.T) {
 	want := `Where your data goes
   ✓ 1. Acme › Platform  updated 26 Nov 09:30
        github.com/acme/one
-          Also listed by Core. This policy is newer.
        github.com/shared/tool
-          Also listed by Core. This policy is newer.
   ✓ 2. Beta Labs › Core  updated 26 Nov 08:30
        github.com/acme/*
+     ! github.com/shared/tool  collected by Platform
        github.com/beta/core
   ✓ 3. Personal  always last
        everything else
@@ -339,8 +341,7 @@ func TestTeamSectionsShowWhatEachTeamCollects(t *testing.T) {
 	own.Policy.Mode, own.Policy.Repositories = config.ModeRepo, []string{"github.com/me/dotfiles", "github.com/acme/one"}
 	got := render(r.teamSections(now), 80)
 	for _, w := range []string{
-		"       github.com/acme/one\n          Also listed by Core and Personal. This policy is newer.\n",
-		"  ✓ 3. Personal  always last\n       github.com/me/dotfiles\n  ✗ Gamma",
+		"  ✓ 3. Personal  always last\n       github.com/me/dotfiles\n     ! github.com/acme/one  collected by Platform\n  ✗ Gamma",
 	} {
 		if !strings.Contains(got, w) {
 			t.Errorf("sections lack %q:\n%s", w, got)
@@ -447,5 +448,27 @@ func TestRoutedRepositoryAndDoctorCombineMixedWithOutboxLosses(t *testing.T) {
 	}
 	if !strings.Contains(joined, "outbox was full") {
 		t.Errorf("Local rows dropped #152 outbox_full loss:\n%s", joined)
+	}
+}
+
+// A long list shows its first five repositories and how many more, marked when a
+// hidden one goes to a newer team; with no colour the mark is a plain "!".
+func TestTeamSectionsCapLongLists(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 26, 9, 30, 0, 0, time.Local)
+	r := collectsFixture(t, now)
+	many := make([]string, 50)
+	for i := range many {
+		many[i] = fmt.Sprintf("github.com/beta/repo%02d", i)
+	}
+	core := &r.State.Teams[1]
+	core.Policy.Repositories = append(many, "github.com/shared/tool")
+	got := render(r.teamSections(now), 80)
+	if !strings.Contains(got, "       github.com/beta/repo04\n     ! + 46 more\n  ✓ 3.") || strings.Contains(got, "repo05") {
+		t.Errorf("long list not capped at five with its hidden conflict marked:\n%s", got)
+	}
+	core.Policy.Repositories = many
+	if got := render(r.teamSections(now), 80); !strings.Contains(got, "       github.com/beta/repo04\n       + 45 more\n") {
+		t.Errorf("overflow without a conflict is marked:\n%s", got)
 	}
 }

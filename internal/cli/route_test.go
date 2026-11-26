@@ -97,6 +97,10 @@ func TestRouteExplainMatchesRouterAcrossAllCases(t *testing.T) {
 	if v.Outcome != routing.Send || v.Team == nil || v.Team.TeamID != betaCore {
 		t.Fatalf("overlap view = %+v", v)
 	}
+	// Neither policy is newer: the team ticked first collects, and the reason says so.
+	overlapSt.Teams[0].Policy.UpdatedAt, overlapSt.Teams[1].Policy.UpdatedAt = time.Time{}, time.Time{}
+	out, _ = explainText(overlapSt, names, "github.com/acme/api")
+	wantRouteLines(t, out, "Goes to:   Acme › Platform", "Beta Labs › Contractors lists github.com/acme/api, but its policy is no newer, so the team ticked first collects it")
 
 	// Blocked states: SignInNeeded (single terma setup fix), Suspended, Expired; a refused team is passed over.
 	signInSt, _ := routePlanState(t)

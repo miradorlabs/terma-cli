@@ -142,7 +142,7 @@ session that opened it where the agent's own telemetry does not (OMP's and grok'
 subagent (`terma.subagent.call`) and, when the parent waits on or kills a background one,
 how it ended (`terma.subagent.end`). The relay forwards only claimed sessions from claimed
 PIDs, pinned once routed: unclaimed records wait briefly in `unknownHold`, while
-pending/blocked records stay destination-pinned in `pinnedHold` (re-checked only, never
+blocked records stay destination-pinned in `pinnedHold` (re-checked only, never
 re-routed), and spans/logs/metrics straddling `MixedAt` drop. It sends each team's backlog
 with the person's single user token and `X-Mirador-Project: <team_id>` (a server-key profile
 uses its `keys.json` server key under `Account: "no_person"` with no `X-Mirador-Project`),

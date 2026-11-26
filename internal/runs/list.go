@@ -16,7 +16,9 @@ import (
 type MixedRun struct {
 	Session string
 	Why     Why
-	Recent  bool
+	// At is when the run went Mixed; zero when its ledger could not be read.
+	At     time.Time
+	Recent bool
 }
 
 // Mixed lists sessions whose run in force at now is Mixed (unreadable ledgers fail closed).
@@ -42,7 +44,7 @@ func Mixed(stateDir string, now time.Time, recent time.Duration) []MixedRun {
 			seen[canon] = MixedRun{Session: canon, Recent: true}
 		} else if found && len(l.Runs) > 0 {
 			if r := inForce(l.Runs, now); !r.MixedAt.IsZero() && !seen[canon].Recent {
-				seen[canon] = MixedRun{Session: canon, Why: r.why(), Recent: now.Sub(l.lastActive(at)) <= recent}
+				seen[canon] = MixedRun{Session: canon, Why: r.why(), At: r.MixedAt, Recent: now.Sub(l.lastActive(at)) <= recent}
 			}
 		}
 	}

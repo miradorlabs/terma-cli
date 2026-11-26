@@ -87,9 +87,9 @@ even empty) to leave your shell's startup file alone. It is POSIX `sh`, so `| sh
 2. **Coding agents**: the ones installed on this machine are preselected.
 
 It then points your agents at terma's local relay, writes their machine-wide hooks, and tells
-you of any policy conflict: a repository two organizations' policies both list. Setup,
-`terma teams` and `terma doctor` then show the routing order, most recently updated policy
-first and Personal last, which changes whenever a team updates its policy.
+you of any policy conflict: a repository two teams' policies both list. `terma doctor`
+shows the routing order, most recently updated policy first and Personal last, which
+changes whenever a team updates its policy.
 Restart any agent that was already running so it loads the new configuration, then check
 the result:
 

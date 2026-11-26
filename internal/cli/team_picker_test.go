@@ -114,3 +114,16 @@ func TestSendingToGroupsTeamsByOrganization(t *testing.T) {
 		t.Errorf("personal only = %q", got)
 	}
 }
+
+// A refused team sends nothing, so "Sending to" leaves it out; with nothing left, the
+// headline says nothing is sent.
+func TestRenderTeamsLeavesOutRefusedTeams(t *testing.T) {
+	t.Parallel()
+	v := teamsView{Organizations: []orgRow{{ID: "o1", Name: "Acme", Teams: []teamRow{{ID: "t1", Name: "Web"}}}}}
+	v.state = routing.State{Teams: []routing.Team{{TeamID: "t1", OrganizationID: "o1", Refusals: 2}}}
+	var out bytes.Buffer
+	renderTeams(&out, v)
+	if text := flat(out.String()); !strings.HasPrefix(text, "! Nothing is sent from this machine.") || !strings.Contains(text, "Sending to Nowhere.") || strings.Contains(text, "Acme › Web") {
+		t.Errorf("refused team listed as a destination:\n%s", out.String())
+	}
+}

@@ -262,16 +262,14 @@ func TestUpdate(t *testing.T) {
 	}
 	var wg sync.WaitGroup
 	for i := range 20 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, err := Update(dir, "default", exp, func(s *State) error {
 				return tick(s, "acme", fmt.Sprintf("team%d", i))
 			})
 			if err != nil {
 				t.Error(err)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	s, ok, err := Load(dir, "default")

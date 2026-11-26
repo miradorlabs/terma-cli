@@ -146,7 +146,12 @@ func (e Entry) Overlaps(o Entry) bool {
 	return e.key == o.key && e.wildcard == o.wildcard || e.covers(o) || o.covers(e)
 }
 
-// covers reports whether every repository o matches, e matches too.
+// Contains reports whether every repository o matches, e matches too.
+func (e Entry) Contains(o Entry) bool {
+	return e.key == o.key && e.wildcard == o.wildcard || e.covers(o)
+}
+
+// covers reports whether every repository o matches, e matches too, o not being e.
 func (e Entry) covers(o Entry) bool { return e.wildcard && strings.HasPrefix(o.key, e.key+"/") }
 
 // Wildcard reports whether the entry covers every repository below its prefix.

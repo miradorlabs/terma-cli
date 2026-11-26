@@ -317,3 +317,43 @@ func TestOrder(t *testing.T) {
 		t.Fatalf("Order = %v, want %v", got, want)
 	}
 }
+
+// Route and Order agree: the team Route picks for a repository every team lists is the
+// first in Order, whatever the mix of dated, equal, undated and refused policies.
+func TestRouteFollowsOrder(t *testing.T) {
+	t.Parallel()
+	old := now.Add(-48 * time.Hour)
+	for name, teams := range map[string][]Team{
+		"newest first":      {updated(team("a", "old", "github.com/x/*"), old), updated(team("b", "new", "github.com/x/*"), now)},
+		"equal ages":        {updated(team("a", "first", "github.com/x/*"), old), updated(team("b", "second", "github.com/x/*"), old)},
+		"undated last":      {team("a", "undated", "github.com/x/*"), updated(team("b", "dated", "github.com/x/*"), old)},
+		"all undated":       {team("a", "u1", "github.com/x/*"), team("b", "u2", "github.com/x/*")},
+		"refused passed by": {updated(team("a", "refused", "github.com/x/*"), now), updated(team("b", "kept", "github.com/x/*"), old)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := fixture(t, append(teams, personal())...)
+			if name == "refused passed by" {
+				s.Teams[0].Refusals = 2
+			}
+			first := Order(*s)[0]
+			expect(t, s, repo("github.com/x/api"), Send, first.TeamID)
+		})
+	}
+}
+
+// A newer policy that takes only part of an overlap leaves the rest of it contested: two
+// wildcards still conflict when a third, newer team lists one repository beneath them.
+func TestOverlapsKeepAPartlyTakenConflict(t *testing.T) {
+	t.Parallel()
+	s := fixture(t,
+		updated(team("a", "mid", "github.com/x/*"), now.Add(-time.Hour)),
+		updated(team("b", "old", "github.com/x/*"), now.Add(-48*time.Hour)),
+		updated(team("c", "new", "github.com/x/one"), now),
+		personal())
+	o := Overlaps(*s)
+	if !slices.ContainsFunc(o, func(v Overlap) bool {
+		return v.Entry == "github.com/x/*" && v.Winner.TeamID == "mid" && v.Other.TeamID == "old"
+	}) {
+		t.Fatalf("Overlaps = %+v, want mid over old on github.com/x/*", o)
+	}
+}

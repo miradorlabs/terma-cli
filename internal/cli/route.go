@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -278,6 +279,10 @@ func routeReasons(st routing.State, names teamNames, loc routing.Location, d rou
 	if loc.Kind != routing.Repository || routing.Owner(repo) == "" {
 		return nil
 	}
+	var winner routing.Team
+	if i := slices.IndexFunc(st.Teams, func(t routing.Team) bool { return t.EnrollmentID == d.EnrollmentID }); i >= 0 {
+		winner = st.Teams[i]
+	}
 	var out []string
 	for _, t := range st.Teams {
 		if t.Personal || t.EnrollmentID == d.EnrollmentID || t.Policy.Global() {
@@ -286,6 +291,10 @@ func routeReasons(st routing.State, names teamNames, loc routing.Location, d rou
 		for _, raw := range t.Policy.Repositories {
 			if e, ok := routing.ParseEntry(raw, t.Policy.Wildcards); ok && e.Matches(repo) {
 				why := ", but a more recently updated policy collects it"
+				if !winner.Policy.UpdatedAt.After(t.Policy.UpdatedAt) {
+					// Neither is newer: the team ticked first keeps it.
+					why = ", but its policy is no newer, so the team ticked first collects it"
+				}
 				if t.StateAt(time.Now()) == routing.Refused {
 					why = ", but it is refused (" + routeRefusalWords(t.LastError) + "), so it is passed over"
 				}

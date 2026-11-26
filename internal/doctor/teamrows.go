@@ -75,7 +75,7 @@ func (r Routing) teamSections(now time.Time) []Section {
 	numbered := len(order) > 1
 	for i, t := range order {
 		teams.Lines = append(teams.Lines, r.teamLine(t, pick(numbered, fmt.Sprintf("%d. ", i+1), ""), now))
-		teams.Lines = append(teams.Lines, collected[t.EnrollmentID]...)
+		teams.Lines = append(teams.Lines, capEntries(collected[t.EnrollmentID], maxListed)...)
 	}
 	for _, t := range r.State.Teams {
 		if !slices.ContainsFunc(order, func(o routing.Team) bool { return o.EnrollmentID == t.EnrollmentID }) {
@@ -87,7 +87,7 @@ func (r Routing) teamSections(now time.Time) []Section {
 		teams.Footnote = orderNote
 	}
 	out := []Section{teams}
-	if s, ok := r.pausedSection(); ok {
+	if s, ok := r.pausedSection(now); ok {
 		out = append(out, s)
 	}
 	return out
@@ -128,39 +128,22 @@ func refusedNote(c routing.ErrorClass) string {
 	return "refused, skipped"
 }
 
-// collected are the entry lines under each team, by enrollment: every repository entry,
-// under the team Route sends it to, the first in routing order whose policy lists it or
-// a wildcard covering it. An entry listed again, word for word, later in the order shows
-// once, and the teams that list it too but lose it are named. A refused team is passed
-// over, so it collects nothing; a global Personal collects everything else.
+// collected are the entry lines under each team, by enrollment: every repository entry its
+// policy lists. One a team earlier in routing order also lists, which Route sends there,
+// is marked and names that team. A refused team is passed over, so it collects nothing;
+// a global Personal collects everything else.
 func (r Routing) collected(order []routing.Team) map[string][]Line {
-	type entry struct {
-		e      routing.Entry
-		by     routing.Team
-		alsoBy []routing.Team
-	}
-	var seen []entry
 	out := map[string][]Line{}
 	for i, t := range order {
 		for _, e := range policyEntries(t) {
-			if slices.ContainsFunc(seen, func(s entry) bool { return contains(s.e, e) && contains(e, s.e) }) {
-				continue
-			}
 			at := slices.IndexFunc(order[:i+1], func(o routing.Team) bool {
-				return slices.ContainsFunc(policyEntries(o), func(oe routing.Entry) bool { return contains(oe, e) })
+				return slices.ContainsFunc(policyEntries(o), func(oe routing.Entry) bool { return oe.Contains(e) })
 			})
-			en := entry{e: e, by: order[at]}
-			for _, o := range order[at+1:] {
-				if slices.ContainsFunc(policyEntries(o), func(oe routing.Entry) bool { return contains(oe, e) }) {
-					en.alsoBy = append(en.alsoBy, o)
-				}
+			l := Line{Depth: 1, Text: e.Raw}
+			if at < i {
+				l.Mark, l.Note = MarkWarn, "collected by "+r.short(order[at])
 			}
-			seen = append(seen, en)
-			id := en.by.EnrollmentID
-			out[id] = append(out[id], Line{Depth: 1, Text: e.Raw})
-			if note := r.conflict(en.by, en.alsoBy); note != "" {
-				out[id] = append(out[id], Line{Depth: 2, Text: note, Quiet: true})
-			}
+			out[t.EnrollmentID] = append(out[t.EnrollmentID], l)
 		}
 	}
 	if n := len(order); n > 0 && order[n-1].Personal && order[n-1].Policy.Global() {
@@ -170,43 +153,63 @@ func (r Routing) collected(order []routing.Team) map[string][]Line {
 	return out
 }
 
-// conflict says who else lists an entry winner collects.
-func (r Routing) conflict(winner routing.Team, others []routing.Team) string {
-	if len(others) == 0 {
-		return ""
+// maxListed is how many repositories doctor lists under a team before summing up the rest.
+const maxListed = 5
+
+// capEntries keeps the first n lines and says how many more there are, marked when one
+// of those is another team's.
+func capEntries(lines []Line, n int) []Line {
+	if len(lines) <= n {
+		return lines
 	}
-	names := make([]string, len(others))
-	org := false
-	for i, o := range others {
-		names[i] = r.short(o)
-		org = org || !o.Personal
+	more := Line{Depth: 1, Text: fmt.Sprintf("+ %d more", len(lines)-n), Quiet: true}
+	if slices.ContainsFunc(lines[n:], func(l Line) bool { return l.Mark == MarkWarn }) {
+		more.Mark = MarkWarn
 	}
-	return "Also listed by " + strings.Join(names, " and ") + pick(org, ". This policy is newer.", ", which comes last.")
+	return append(lines[:n:n], more)
 }
 
-// pausedSection is the sessions the relay stopped sending, when there are any.
-func (r Routing) pausedSection() (Section, bool) {
+// pausedSection is the sessions the relay stopped sending, when there are any: each with
+// when it paused and why, and what the developer can do.
+func (r Routing) pausedSection(now time.Time) (Section, bool) {
 	if len(r.Mixed) == 0 && r.MixedDropped == 0 {
 		return Section{}, false
 	}
-	s := Section{Title: "Paused sessions",
-		Footnote: "A session pauses when it may touch another organization's work. It sends nothing until it resumes."}
+	s := Section{Title: "Paused sessions", Footnote: pausedNote}
 	if n := len(r.Mixed); n > 0 {
 		s.Lines = append(s.Lines, Line{Mark: MarkWarn, Text: fmt.Sprintf("%d %s", n, pick(n == 1, "session is paused", "sessions are paused"))})
-		by := map[runs.Reason]int{}
-		for _, m := range r.Mixed {
-			by[m.Why.Reason]++
+		mixed := slices.Clone(r.Mixed)
+		slices.SortStableFunc(mixed, func(a, b runs.MixedRun) int { return b.At.Compare(a.At) })
+		var lines []Line
+		for _, m := range mixed {
+			l := Line{Depth: 1, Text: pausedWords(m.Why.Reason)}
+			if !m.At.IsZero() {
+				l.Note = pausedAt(m.At, now)
+			}
+			lines = append(lines, l)
+			if m.Why.Reason == runs.UnknownReach {
+				lines = append(lines, Line{Depth: 2, Text: "e.g. a command reading files outside the repository", Quiet: true})
+			}
 		}
-		reasons := slices.Collect(maps.Keys(by))
-		slices.SortFunc(reasons, func(a, b runs.Reason) int { return cmp.Or(by[b]-by[a], strings.Compare(string(a), string(b))) })
-		for _, why := range reasons {
-			s.Lines = append(s.Lines, Line{Depth: 1, Text: fmt.Sprintf("%d %s", by[why], pausedWords(why))})
-		}
+		s.Lines = append(s.Lines, capEntries(lines, maxListed)...)
 	}
 	if d := r.MixedDropped; d > 0 {
 		s.Lines = append(s.Lines, Line{Mark: MarkWarn, Text: fmt.Sprintf("%d %s from paused sessions dropped", d, pick(d == 1, "record", "records"))})
 	}
 	return s, true
+}
+
+// pausedNote says why sessions pause and how to send again: only a new run ends a pause.
+const pausedNote = "Terma pauses a session that touches another organization's work, so nothing leaks between them.\n" +
+	"To send again, start a new session or resume this one. Keep each session to one organization's repositories."
+
+// pausedAt is when a session paused, as a reader says it.
+func pausedAt(at, now time.Time) string {
+	at = at.Local()
+	if y1, m1, d1 := at.Date(); y1 == now.Local().Year() && m1 == now.Local().Month() && d1 == now.Local().Day() {
+		return "paused " + at.Format("15:04")
+	}
+	return "paused " + at.Format("2 Jan 15:04")
 }
 
 // pausedWords says, for a reader, why a session paused.
@@ -254,20 +257,6 @@ func policyEntries(t routing.Team) []routing.Entry {
 		}
 	}
 	return out
-}
-
-// contains reports whether every repository b matches, a matches too.
-func contains(a, b routing.Entry) bool {
-	if !a.Overlaps(b) {
-		return false
-	}
-	switch {
-	case !a.Wildcard():
-		return !b.Wildcard()
-	case b.Wildcard():
-		return a.Fixed() <= b.Fixed()
-	}
-	return true
 }
 
 func pick[T any](cond bool, a, b T) T {

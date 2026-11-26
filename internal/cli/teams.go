@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -34,8 +35,8 @@ func (app *App) newTeamsCommand() *cobra.Command {
 		Short: "Choose which teams this machine sends telemetry to",
 		Long: `List every organization and team your sign-in belongs to and choose which ones
 this machine sends telemetry to. Each team's policy decides which repositories it
-collects. Where two organizations' policies list the same repository, the most
-recently updated policy collects it; personal collects what no ticked organization does.`,
+collects. Where two teams' policies list the same repository, the most recently
+updated policy collects it; Personal collects what no ticked team does.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return app.runTeams(cmd, f) },
 	}
@@ -132,8 +133,12 @@ func renderTeams(w io.Writer, v teamsView) {
 	}
 	u := newSetupUI(w, false)
 	var dests []orgTeam
+	now := time.Now()
 	for _, t := range v.state.Teams {
-		dests = append(dests, orgTeam{names.Orgs[t.OrganizationID], cmp.Or(names.Teams[t.TeamID], t.TeamID), t.Personal})
+		if t.StateAt(now) == routing.Refused {
+			continue // nothing goes there; its Blocked row says what to do
+		}
+		dests = append(dests, orgTeam{cmp.Or(names.Orgs[t.OrganizationID], t.OrganizationID), cmp.Or(names.Teams[t.TeamID], t.TeamID), t.Personal})
 	}
 	if len(dests) == 0 {
 		u.Warn("Sending to", "Nowhere. Nothing is sent.")
@@ -162,6 +167,9 @@ func renderTeams(w io.Writer, v teamsView) {
 	u.title, u.warnTitle = "All set. Nothing changed.", "Nothing changed. Some teams need you."
 	if len(v.Changes) > 0 {
 		u.title, u.warnTitle = "Changes applied", "Changes applied. Some teams need you."
+	}
+	if len(dests) == 0 {
+		u.warnTitle = "Nothing is sent from this machine."
 	}
 	u.headline()
 	u.printLines()

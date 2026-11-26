@@ -69,14 +69,15 @@ func Overlaps(s State) []Overlap {
 	return out
 }
 
-// outranked reports whether another organization team with a newer policy also covers e.
+// outranked reports whether another team with a newer policy covers all of e, so winner
+// collects none of it.
 func outranked(s State, e Entry, winner Team) bool {
 	for _, t := range s.Teams {
 		if t.Personal || t.refused() || t.EnrollmentID == winner.EnrollmentID || !newer(t.Policy, winner.Policy) {
 			continue
 		}
 		for _, te := range entries(t) {
-			if te.Overlaps(e) {
+			if te.Contains(e) {
 				return true
 			}
 		}
