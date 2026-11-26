@@ -358,3 +358,78 @@ func TestASignInWithNoUserIsUnreadable(t *testing.T) {
 		}
 	}
 }
+
+// The generation counts the changes of whose sign-in a profile holds, in the same write as
+// each: a switch to B and back to A reads as A at another generation, a rotation of the
+// same sign-in at the same one, and a sign-out keeps it, so the sign-in after carries on
+// from it. Another profile's is its own.
+func TestTheGenerationCountsChangesOfWhoseSignInItIs(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	const profile = config.DefaultProfile
+	as := func(user, session string) *Credential {
+		c := sessionCredential(session)
+		c.UserID = user
+		return c
+	}
+	step := func(what string, write func() error, wantAccount string, wantGen uint64) {
+		t.Helper()
+		if err := write(); err != nil {
+			t.Fatalf("%s: %v", what, err)
+		}
+		if account, gen := AccountAt(dir, profile); account != wantAccount || gen != wantGen {
+			t.Fatalf("after %s: AccountAt = %q at %d, want %q at %d", what, account, gen, wantAccount, wantGen)
+		}
+	}
+	a, b := as("user-a", "s-a").Account(), as("user-b", "s-b").Account()
+	save := func(c *Credential) func() error {
+		return func() error { _, err := SaveCredential(dir, profile, c); return err }
+	}
+	if account, gen := AccountAt(dir, profile); account != "" || gen != 0 {
+		t.Fatalf("with no file: AccountAt = %q at %d, want signed out at 0", account, gen)
+	}
+	step("signing in as A", save(as("user-a", "s-a")), a, 1)
+	step("signing in as B", save(as("user-b", "s-b")), b, 2)
+	step("signing in as A again", save(as("user-a", "s-a2")), a, 3)
+	step("a rotation of A's", func() error {
+		c := as("user-a", "s-a2")
+		c.AccessToken, c.RefreshToken = c.AccessToken+"-rotated", c.RefreshToken+"-rotated"
+		return UpdateCredential(dir, profile, c)
+	}, a, 3)
+	step("a new session of A's", save(as("user-a", "s-a3")), a, 3)
+	step("signing out", func() error { return DeleteCredential(dir, profile) }, "", 4)
+	if _, err := LoadCredential(dir, profile); !errors.Is(err, ErrNotLoggedIn) {
+		t.Fatalf("LoadCredential after signing out: %v, want ErrNotLoggedIn", err)
+	}
+	step("signing in as A after signing out", save(as("user-a", "s-a4")), a, 5)
+	if _, err := SaveCredential(dir, "other", as("user-b", "s-other")); err != nil {
+		t.Fatal(err)
+	}
+	if account, gen := AccountAt(dir, "other"); account != b || gen != 1 {
+		t.Fatalf("another profile: AccountAt = %q at %d, want B at 1", account, gen)
+	}
+	if _, gen := AccountAt(dir, profile); gen != 5 {
+		t.Fatalf("another profile's sign-in moved this one's generation to %d", gen)
+	}
+}
+
+// A file written before generations, or by a terma that drops them, reads at generation 0,
+// and the next change counts on from there.
+func TestASignInWithNoGenerationReadsAtZero(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	c := sessionCredential("s1")
+	data := `{"default":{"expires_at":"2030-01-01T00:00:00Z","session_id":"s1","auth_url":"` + c.AuthURL + `","user_id":"user-1"}}`
+	if err := os.WriteFile(config.CredentialsPath(dir), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if account, gen := AccountAt(dir, config.DefaultProfile); account != c.Account() || gen != 0 {
+		t.Fatalf("AccountAt = %q at %d, want the sign-in's at 0", account, gen)
+	}
+	if err := DeleteCredential(dir, config.DefaultProfile); err != nil {
+		t.Fatal(err)
+	}
+	if account, gen := AccountAt(dir, config.DefaultProfile); account != "" || gen != 1 {
+		t.Fatalf("after signing out: AccountAt = %q at %d, want signed out at 1", account, gen)
+	}
+}

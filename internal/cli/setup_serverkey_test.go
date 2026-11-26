@@ -477,7 +477,11 @@ func TestServerKeySetupAndSignInTakeTurns(t *testing.T) {
 		t.Fatal("a profile set up with a server key refreshed its policy with the login")
 	}
 
-	setupWithKey(t)
+	// The key's organization and team were chosen under no person's sign-in, so signing in
+	// as a person again chooses them anew (#163).
+	if out, err := runTerma(t, "setup", "--yes", "--harness", "claude", "--org", orgA().ID, "--team", team); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
 	if cfg, err := testApp.loadConfig(); err != nil || cfg.ServerKeySignIn || cfg.Team != team {
 		t.Fatalf("after signing in as a person: %+v, %v", cfg, err)
 	}

@@ -70,8 +70,8 @@ func (r *Relay) heartbeat(ctx context.Context, reason, exit string) error {
 	if unclassified != 0 {
 		attrs = append(attrs, counterAttr(unclassifiedPrefix, unclassified))
 	}
-	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
-	defer cancel()
+	// No sendTimeout here: HeartbeatSend bounds its own request, never the sign-in's token
+	// refresh, which may run past it (#165).
 	if err := r.opts.HeartbeatSend(ctx, r.heartbeatData(reason, attrs)); err != nil {
 		r.stats.untake(delta)
 		r.stats.add("heartbeats_failed", 1)

@@ -1,14 +1,11 @@
 package auth
 
 import (
-	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"strings"
 	"time"
-
-	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
 // AccountKeyLen is the length of an account key, in hex digits.
@@ -41,16 +38,8 @@ func (c *Credential) Account() string { return AccountKey(c.AuthURL, c.UserID) }
 // what is collected under it is that person's, never no one's. It reads only that file,
 // never the keychain, so a hook can afford it.
 func Account(dir, profile, authURL string) string {
-	cred, err := LoadIdentity(dir, profile)
-	switch {
-	case errors.Is(err, ErrNotLoggedIn):
-		return ""
-	case err != nil:
-		return sendas.AccountUnreadable
-	}
-	// A sign-in there is someone's: one with no account to key it by (no user id) is the
-	// unreadable account, never the "" of a signed-out profile.
-	return cmp.Or(AccountKey(cred.AuthURL, cred.UserID), sendas.AccountUnreadable)
+	account, _ := AccountAt(dir, profile)
+	return account
 }
 
 // ErrSignInRetired is the server's answer that it no longer accepts this kind of sign-in:

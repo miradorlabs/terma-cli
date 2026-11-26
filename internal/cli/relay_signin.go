@@ -35,6 +35,7 @@ type signInSource struct {
 	// at every part it accepts, and another process (setup, a sign-in or sign-out) may
 	// change either file at any moment.
 	account      string
+	generation   uint64 // the sign-in's generation, read with account
 	accountFiles [2]os.FileInfo
 	accountRead  bool // account was read, and may be kept while the files are unchanged
 	// betweenReads, in tests, runs between Account's read of config.json and of the sign-in.
@@ -70,16 +71,28 @@ func (app *App) signInSource(cfg *config.Config) *signInSource {
 // sendas.AccountUnreadable while config.json or the sign-in can't be read, or the two changed
 // while they were read.
 func (s *signInSource) Account() string {
+	account, _ := s.Lane()
+	return account
+}
+
+// Lane is Account with the generation of the sign-in it was read from
+// (auth.Credential.Generation), taken from the same read of user-credentials.json.
+func (s *signInSource) Lane() (account string, generation uint64) {
 	s.accountMu.Lock()
 	defer s.accountMu.Unlock()
 	if s.accountRead && sameFiles(s.accountFiles, profileFiles(s.cfg.Dir)) {
-		return s.account
+		return s.account, s.generation
 	}
-	s.account, s.accountFiles = readLaneAsOne(s.cfg.Dir, s.readAccount)
+	var gen uint64
+	s.account, s.accountFiles = readLaneAsOne(s.cfg.Dir, func() (lane string) {
+		lane, gen = s.readAccount()
+		return lane
+	})
+	s.generation = gen
 	// An unreadable one is not kept: a file made readable again (its permissions) need not
 	// look changed.
 	s.accountRead = s.account != sendas.AccountUnreadable
-	return s.account
+	return s.account, s.generation
 }
 
 // readLaneAsOne runs read, which reads config.json in dir and then the profile's sign-in,
@@ -105,25 +118,32 @@ func sameFiles(was, now [2]os.FileInfo) bool {
 	return unchanged(was[0], now[0]) && unchanged(was[1], now[1])
 }
 
-// readAccount reads the profile's mode and pairing, then its sign-in. A profile whose mode
-// can't be read may be a server key's, which keeps an earlier person's sign-in on disk, or a
-// person's: neither's, so the unreadable account.
-func (s *signInSource) readAccount() string {
+// readAccount reads the profile's mode and pairing, then its sign-in, with the generation
+// of the lane: the sign-in's (auth.Credential.Generation) plus the profile's switches
+// between the server key and a person (config.Profile.ServerKeyGeneration). Each only
+// grows, so the sum moves whenever either does: a switch to another person, to the key or
+// back. A profile whose mode can't be read may be a server key's, which keeps an earlier
+// person's sign-in on disk, or a person's: neither's, so the unreadable account. A sign-in
+// or sign-out behind the key moves the generation all the same, so an export's retry that
+// meets one is lost, though its lane is the key's throughout.
+func (s *signInSource) readAccount() (string, uint64) {
 	file, err := config.LoadFile(s.cfg.Dir)
 	if err != nil {
-		return sendas.AccountUnreadable
+		return sendas.AccountUnreadable, 0
 	}
 	p := file.Profiles[s.cfg.ProfileName]
 	if p == nil {
 		p = &config.Profile{}
 	}
 	if p.ServerKeySignIn {
-		return sendas.NoPersonLane
+		_, gen := auth.AccountAt(s.cfg.Dir, s.cfg.ProfileName)
+		return sendas.NoPersonLane, gen + p.ServerKeyGeneration
 	}
 	if s.betweenReads != nil {
 		s.betweenReads()
 	}
-	return pairedLane(auth.Account(s.cfg.Dir, s.cfg.ProfileName, s.cfg.AuthURL), p.Account)
+	account, gen := auth.AccountAt(s.cfg.Dir, s.cfg.ProfileName)
+	return pairedLane(account, p.Account), gen + p.ServerKeyGeneration
 }
 
 func statOrNil(path string) os.FileInfo {

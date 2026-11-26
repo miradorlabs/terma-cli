@@ -120,8 +120,11 @@ func (tx *Tx) mutateIf(mutate func(credentialFile) bool) error {
 	if err != nil {
 		return err
 	}
+	was := file.signedInAs()
 	if !mutate(file) {
 		return nil
 	}
+	// The generations go in the same write as the change they count.
+	file.stampGenerations(was)
 	return saveCredentialFile(config.CredentialsPath(tx.dir), file)
 }

@@ -608,7 +608,8 @@ type fakeSignIn struct {
 	retired atomic.Int32
 }
 
-func (f *fakeSignIn) Account() string { return f.account }
+func (f *fakeSignIn) Account() string        { return f.account }
+func (f *fakeSignIn) Lane() (string, uint64) { return f.account, 1 }
 func (f *fakeSignIn) Token(ctx context.Context, account string) (string, error) {
 	if f.tokenFn != nil {
 		return f.tokenFn(ctx, account)

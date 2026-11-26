@@ -215,12 +215,15 @@ func (app *App) keepServerKey(cfg *config.Config, insecure bool) error {
 
 // applyServerKey records a server key's organization and team, and the environment it
 // belongs to, as applyLogin does for a login, and marks the profile as signed in with it.
+// It unpairs the profile from any person's sign-in (config.Profile.Account): the key's team
+// was chosen under none, so a later login or sign-out never keeps it for that person.
 func applyServerKey(p *config.Profile, cfg *config.Config) {
+	p.Account = ""
 	p.SelectOrganization(cfg.OrganizationID, "")
 	p.PinEnvironment(cfg.Environment)
 	if p.Team != cfg.Team {
 		p.TeamName = ""
 	}
 	p.Team = cfg.Team
-	p.ServerKeySignIn, p.ServerKeyAuthURL = true, cfg.AuthURL
+	p.SetServerKeySignIn(true, cfg.AuthURL)
 }

@@ -1343,6 +1343,8 @@ func TestReviewEdgeCases(t *testing.T) {
 				}, true
 			},
 		})
+		// The senders route starts write to the outbox: stop them before its folder goes.
+		t.Cleanup(func() { r.cancelSend(); r.wg.Wait() })
 		spans := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{
 			Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("session.id", "s_aba")}},
 			ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{
