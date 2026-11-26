@@ -406,3 +406,35 @@ func oStrArrayKV(k string, vals []string) *commonpb.KeyValue {
 	}
 	return &commonpb.KeyValue{Key: k, Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_ArrayValue{ArrayValue: &commonpb.ArrayValue{Values: out}}}}
 }
+
+func boundOmpToolArgs(raw json.RawMessage) string {
+	compact := compactRawJSON(raw)
+	if len(compact) <= ompMaxToolArgs {
+		return compact
+	}
+	// Preserve small path/command metadata for target-resource extraction while capping huge
+	// write/edit bodies so a single span stays well beneath the 3.5 MiB OTLP ceiling.
+	var in ompToolInput
+	if json.Unmarshal(raw, &in) == nil {
+		proj := map[string]any{"_truncated": true}
+		if in.Path != "" {
+			proj["path"] = in.Path
+		}
+		if len(in.Paths) > 0 {
+			proj["paths"] = in.Paths
+		}
+		if in.Move != "" {
+			proj["move"] = in.Move
+		}
+		if in.Cwd != "" {
+			proj["cwd"] = in.Cwd
+		}
+		if in.Command != "" {
+			proj["command"] = cutUTF8(in.Command, 4096)
+		}
+		if s := marshalCompactJSON(proj); s != "" && len(s) <= ompMaxToolArgs {
+			return s
+		}
+	}
+	return `{"_truncated":true}`
+}

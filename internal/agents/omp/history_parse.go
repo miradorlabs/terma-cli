@@ -214,8 +214,10 @@ func (p *ompHistoryParser) handleSessionHeader(rec *ompLine, ts time.Time) error
 	// session start, so crossing into another organization fails closed at header time.
 	var extraDirs []string
 	for _, d := range rec.AdditionalDirectories {
-		if d = strings.TrimSpace(d); d != "" && d != p.cwd {
-			extraDirs = append(extraDirs, hookrun.Alone(d)...)
+		if resolved, unknown := resolveReachPath(d); unknown {
+			extraDirs = append(extraDirs, hookrun.UnknownReach+"\x00"+d)
+		} else if resolved != "" && resolved != p.cwd {
+			extraDirs = append(extraDirs, hookrun.Alone(resolved)...)
 		}
 	}
 	if len(extraDirs) > 0 {
@@ -368,17 +370,7 @@ func (p *ompHistoryParser) handleToolResult(rec *ompLine, msg *ompMessage, entry
 	}
 	tool, seen := p.pendingTools[msg.ToolCallID]
 	delete(p.pendingTools, msg.ToolCallID)
-	if !seen {
-		return nil
-	}
 	end := messageTime(msg.Timestamp, entryTS)
-	start := tool.At
-	if start.IsZero() || (!end.IsZero() && start.After(end)) {
-		start = end
-	}
-	if end.IsZero() {
-		end = start
-	}
 	toolName := cmp.Or(msg.ToolName, tool.Name)
 	var details *ompToolDetails
 	if len(bytes.TrimSpace(msg.Details)) > 0 && !bytes.Equal(bytes.TrimSpace(msg.Details), []byte("null")) {
@@ -390,8 +382,15 @@ func (p *ompHistoryParser) handleToolResult(rec *ompLine, msg *ompMessage, entry
 	if paths := ompToolResultReachPaths(toolName, details); len(paths) > 0 {
 		p.segReaches = append(p.segReaches, agents.HistoryToolReach{At: end, Cwd: p.cwd, Paths: paths})
 	}
-	if tool.Copied || p.isCopiedPrefix(end) {
+	if !seen || tool.Copied || p.isCopiedPrefix(end) {
 		return p.maybeFlushSegment()
+	}
+	start := tool.At
+	if start.IsZero() || (!end.IsZero() && start.After(end)) {
+		start = end
+	}
+	if end.IsZero() {
+		end = start
 	}
 	p.toolSeq++
 	p.segSpans = append(p.segSpans, p.makeExecuteToolSpan(rec.ID, msg, tool, toolName, details, start, end))

@@ -194,24 +194,27 @@ func indexBySession(files []agents.HistoryFile) map[string]agents.HistoryFile {
 func buildChildrenMap(files []agents.HistoryFile) map[string][]agents.HistoryFile {
 	out := map[string][]agents.HistoryFile{}
 	for _, f := range files {
-		if f.ParentSessionID != "" && f.ParentSessionID != f.SessionID {
+		if f.ParentSessionID != "" && f.ParentSessionID != f.SessionID && !f.OneWayParent {
 			out[f.ParentSessionID] = append(out[f.ParentSessionID], f)
 		}
 	}
 	return out
 }
 
-// collectFamily resolves the full connected spawn tree containing f (walking up
-// ParentSessionID to the root, then collecting root and all descendants except f itself).
-// If f's ancestor chain references a parent session whose transcript is absent from disk,
-// missingParent returns that parent session ID so the caller fails closed.
+// collectFamily resolves the spawn and ancestor tree relevant to f: walking up
+// ParentSessionID through every ancestor (both bidirectional subagents and one-way
+// forks/continuations), then collecting each ancestor and its bidirectional subagent tree
+// except f itself. One-way forks inherit their ancestors' cutoffs without propagating back
+// into the original parent. If f's ancestor chain references a parent session whose
+// transcript is absent from disk, missingParent returns that parent session ID so the caller
+// fails closed.
 func collectFamily(
 	f agents.HistoryFile,
 	bySession map[string]agents.HistoryFile,
 	childrenByParent map[string][]agents.HistoryFile,
 ) (companions []agents.HistoryFile, missingParent string) {
-	rootID := f.SessionID
-	seenUp := map[string]bool{rootID: true}
+	queue := []agents.HistoryFile{f}
+	seenUp := map[string]bool{f.SessionID: true}
 	for cur := f; cur.ParentSessionID != ""; {
 		pid := cur.ParentSessionID
 		if seenUp[pid] {
@@ -223,14 +226,10 @@ func collectFamily(
 			missingParent = pid
 			break
 		}
-		rootID = pid
+		queue = append(queue, parent)
 		cur = parent
 	}
 	visited := map[string]bool{}
-	var queue []agents.HistoryFile
-	if rootFile, ok := bySession[rootID]; ok {
-		queue = append(queue, rootFile)
-	}
 	for len(queue) > 0 {
 		cur := queue[0]
 		queue = queue[1:]

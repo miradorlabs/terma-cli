@@ -827,3 +827,123 @@ func TestOmpCouncilR2TildeFileMentionForkFromAndUndatedTitle(t *testing.T) {
 		}
 	}
 }
+
+func TestOmpCouncilR3CommaGrepSinceAncestryOneWayForkAndUnparseableParent(t *testing.T) {
+	repoA := initTestGitRepo(t, "https://github.com/org-a/repo-a.git")
+	repoB := initTestGitRepo(t, "https://github.com/org-b/repo-b.git")
+	_ = os.WriteFile(filepath.Join(repoA, "a.go"), []byte("package a\n"), 0o600)
+	_ = os.WriteFile(filepath.Join(repoB, "b.go"), []byte("package b\n"), 0o600)
+
+	agentDir := t.TempDir()
+	t.Setenv("PI_CODING_AGENT_DIR", agentDir)
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	since := now.Add(-7 * 24 * time.Hour)
+	projDir := filepath.Join(agentDir, "sessions", "--r3--")
+	if err := os.MkdirAll(projDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeSess := func(name, content string, mtime time.Time) {
+		t.Helper()
+		full := filepath.Join(projDir, name)
+		if err := os.WriteFile(full, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		_ = os.Chtimes(full, mtime, mtime)
+	}
+	inWindow := now.Add(-2 * 24 * time.Hour)
+	outWindow := now.Add(-14 * 24 * time.Hour)
+
+	// 1. Comma-separated grep path (".,<repoB>") from repoA must trigger cross-org Mixed cutoff.
+	writeSess("2026-11-23T10-00-00-000Z_s-comma.jsonl", strings.Join([]string{
+		`{"type":"session","version":3,"id":"s-comma","timestamp":"2026-11-23T10:00:00Z","cwd":` + mustJSONTest(repoA) + `}`,
+		`{"type":"message","id":"cu1","timestamp":"2026-11-23T10:00:01Z","message":{"role":"user","content":"search","timestamp":1795428001000}}`,
+		`{"type":"message","id":"ca1","timestamp":"2026-11-23T10:00:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","duration":100,"timestamp":1795428001900,"usage":{"input":5,"output":5},"content":[{"type":"toolCall","id":"cg1","name":"grep","arguments":{"pattern":"package","path":` + mustJSONTest(".,"+repoB) + `}}]}}`,
+		`{"type":"message","id":"ctr1","timestamp":"2026-11-23T10:00:03Z","message":{"role":"toolResult","toolCallId":"cg1","toolName":"grep","content":[{"type":"text","text":"LEAKED-COMMA-GREP"}],"isError":false,"timestamp":1795428003000}}`,
+	}, "\n")+"\n", inWindow)
+
+	// 2. 2-hop ancestry across --since: gp-b (Org B, old) -> mid-a (Org A, old/OutsideSince) -> leaf-a (Org A, in window).
+	writeSess("2026-11-10T10-00-00-000Z_gp-b.jsonl",
+		`{"type":"session","version":3,"id":"gp-b","timestamp":"2026-11-10T10:00:00Z","cwd":`+mustJSONTest(repoB)+`}`+"\n"+
+			`{"type":"message","id":"ga1","timestamp":"2026-11-10T10:00:01Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","timestamp":1794304801000,"usage":{"input":1,"output":1},"content":[{"type":"text","text":"b"}]}}`+"\n",
+		outWindow)
+	writeSess("2026-11-11T10-00-00-000Z_mid-a.jsonl",
+		`{"type":"session","version":3,"id":"mid-a","timestamp":"2026-11-11T10:00:00Z","cwd":`+mustJSONTest(repoA)+`,"parentSession":"gp-b"}`+"\n",
+		outWindow)
+	writeSess("2026-11-23T09-00-00-000Z_leaf-a.jsonl",
+		`{"type":"session","version":3,"id":"leaf-a","timestamp":"2026-11-23T09:00:00Z","cwd":`+mustJSONTest(repoA)+`,"continuationOf":"mid-a"}`+"\n"+
+			`{"type":"message","id":"la1","timestamp":"2026-11-23T09:00:01Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","timestamp":1795424401000,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"LEAKED-2HOP-SINCE"}]}}`+"\n",
+		inWindow)
+
+	// 3. One-way fork: clean parent orig-a (Org A) forked into cross-fork-b (Org B) at 08:05,
+	// then orig-a continues with a clean post-fork reply at 08:10 -> orig-a MUST still upload,
+	// while cross-fork-b MUST be withheld.
+	writeSess("2026-11-23T08-00-00-000Z_orig-a.jsonl", strings.Join([]string{
+		`{"type":"session","version":3,"id":"orig-a","timestamp":"2026-11-23T08:00:00Z","cwd":` + mustJSONTest(repoA) + `}`,
+		`{"type":"message","id":"ou1","timestamp":"2026-11-23T08:00:01Z","message":{"role":"user","content":"before fork","timestamp":1795420801000}}`,
+		`{"type":"message","id":"oa1","timestamp":"2026-11-23T08:00:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","timestamp":1795420802000,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"CLEAN-BEFORE"}]}}`,
+		`{"type":"message","id":"ou2","timestamp":"2026-11-23T08:10:00Z","message":{"role":"user","content":"after fork","timestamp":1795421400000}}`,
+		`{"type":"message","id":"oa2","timestamp":"2026-11-23T08:10:01Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","timestamp":1795421401000,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"CLEAN-POST-FORK-PARENT"}]}}`,
+	}, "\n")+"\n", inWindow)
+	writeSess("2026-11-23T08-05-00-000Z_cross-fork-b.jsonl",
+		`{"type":"session","version":3,"id":"cross-fork-b","timestamp":"2026-11-23T08:05:00Z","cwd":`+mustJSONTest(repoB)+`,"parentSession":"orig-a"}`+"\n"+
+			`{"type":"message","id":"fb1","timestamp":"2026-11-23T08:05:01Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","timestamp":1795421101000,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"LEAKED-CROSS-FORK"}]}}`+"\n",
+		inWindow)
+
+	// 4. Unparseable non-empty parentSession path must fail closed (not fail open as rootless).
+	writeSess("2026-11-23T07-00-00-000Z_bad-parent.jsonl",
+		`{"type":"session","version":3,"id":"bad-parent","timestamp":"2026-11-23T07:00:00Z","cwd":`+mustJSONTest(repoA)+`,"parentSession":"/nonexistent/custom-name.jsonl"}`+"\n"+
+			`{"type":"message","id":"bp1","timestamp":"2026-11-23T07:00:01Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","timestamp":1795417201000,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"LEAKED-UNPARSEABLE-PARENT"}]}}`+"\n",
+		inWindow)
+
+	stA := singleTeamRoutingState(now, "acc1", "org-a", "team-a", "github.com/org-a/repo-a", true, true)
+	stB := singleTeamRoutingState(now, "acc1", "org-b", "team-b", "github.com/org-b/repo-b", true, true)
+	st := stA
+	st.Teams = append(st.Teams, stB.Teams...)
+
+	reg := builtin.Agents("")
+	var ompSrc agents.HistorySource
+	for _, s := range reg.With[agents.HistorySource]() {
+		if s.SourceSystem() == "omp" {
+			ompSrc = s
+			break
+		}
+	}
+	var mu sync.Mutex
+	var payloads [][]byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		payloads = append(payloads, b)
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	_, err := Upload(context.Background(), Options{
+		StateDir: t.TempDir(), Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "0.4.0-test",
+		State: st, Sources: []agents.HistorySource{ompSrc}, Filter: relay.NewContentFilter(reg.With[shape.Capturer]()),
+		Holdings: stubHoldings{},
+		Transport: &Transport{
+			Version: "0.4.0-test", HTTP: srv.Client(), SignIn: &fakeSignIn{account: "acc1", tokens: []string{"tok1"}}, BytesPerSec: 1 << 30,
+		},
+		EndpointFor: func(string) string { return srv.URL },
+		Since:       since,
+		Now:         func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundCleanPostFork := false
+	for _, b := range payloads {
+		s := string(b)
+		if strings.Contains(s, "LEAKED-") {
+			t.Fatalf("Round 3 security regression: leaked data in uploaded payload: %q", s)
+		}
+		if strings.Contains(s, "CLEAN-POST-FORK-PARENT") {
+			foundCleanPostFork = true
+		}
+	}
+	if !foundCleanPostFork {
+		t.Errorf("clean post-fork reply on original parent orig-a was wrongly withheld by cross-org fork")
+	}
+}

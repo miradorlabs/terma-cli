@@ -2,10 +2,13 @@ package omp
 
 import (
 	"cmp"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"unicode"
@@ -110,13 +113,9 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 			}
 		}
 		addSplit := func(p string) {
-			if strings.Contains(p, ";") {
-				for seg := range strings.SplitSeq(p, ";") {
-					addDir(seg)
-				}
-				return
+			for _, seg := range splitOmpDelimitedPaths(p, cwd) {
+				addDir(seg)
 			}
-			addDir(p)
 		}
 		if in.Path != "" {
 			addSplit(in.Path)
@@ -130,13 +129,9 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 		return dirs
 	}
 	addDelimited := func(p string) {
-		if strings.Contains(p, ";") {
-			for seg := range strings.SplitSeq(p, ";") {
-				addAlone(seg)
-			}
-			return
+		for _, seg := range splitOmpDelimitedPaths(p, cwd) {
+			addAlone(seg)
 		}
-		addAlone(p)
 	}
 	switch toolName {
 	case "read":
@@ -221,8 +216,81 @@ func resolveReachPath(raw string) (string, bool) {
 	return filepath.Join(home, p[2:]), false
 }
 
+// splitOmpDelimitedPaths mirrors OMP's splitDelimitedPathEntry: existing literal paths stay
+// intact (so filenames with spaces/commas/semicolons stay whole); otherwise entries split on
+// top-level ';' or ',' outside '{...}' braces, and on top-level whitespace when any part
+// resolves on disk.
+func splitOmpDelimitedPaths(entry, cwd string) []string {
+	entry = strings.TrimSpace(entry)
+	if entry == "" {
+		return nil
+	}
+	if statReachExists(entry, cwd) {
+		return []string{entry}
+	}
+	if parts := splitTopLevel(entry, false); len(parts) >= 2 {
+		return parts
+	}
+	if parts := splitTopLevel(entry, true); len(parts) >= 2 {
+		for _, p := range parts {
+			if statReachExists(p, cwd) {
+				return parts
+			}
+		}
+	}
+	return []string{entry}
+}
+
+func splitTopLevel(s string, whitespace bool) []string {
+	var parts []string
+	depth, start := 0, 0
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if ch == '\\' && runtime.GOOS != "windows" && i+1 < len(s) {
+			i++
+			continue
+		}
+		if ch == '{' {
+			depth++
+			continue
+		}
+		if ch == '}' && depth > 0 {
+			depth--
+			continue
+		}
+		if depth != 0 {
+			continue
+		}
+		sep := ch == ';' || ch == ',' || (whitespace && (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'))
+		if sep {
+			if seg := strings.TrimSpace(s[start:i]); seg != "" {
+				parts = append(parts, seg)
+			}
+			start = i + 1
+		}
+	}
+	if seg := strings.TrimSpace(s[start:]); seg != "" {
+		parts = append(parts, seg)
+	}
+	return parts
+}
+
+func statReachExists(raw, cwd string) bool {
+	p, unknown := resolveReachPath(raw)
+	if unknown || p == "" {
+		return false
+	}
+	if !isAbsToolPath(p) && cwd != "" {
+		p = filepath.Join(cwd, p)
+	}
+	_, err := os.Stat(p)
+	return err == nil
+}
+
 // ompParentSessionID extracts a parent session ID from header.parentSession or
-// header.continuationOf (which may be a bare session ID or a transcript path).
+// header.continuationOf (a bare ID, a standard transcript path, or a custom transcript path).
+// A non-empty reference that cannot be resolved returns a deterministic sentinel so
+// collectFamily fails closed rather than dropping the ancestor link.
 func ompParentSessionID(ref string) string {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
@@ -231,7 +299,14 @@ func ompParentSessionID(ref string) string {
 	if session.ValidID(ref) {
 		return ref
 	}
-	return ompSessionIDFromFilename(filepath.Base(strings.ReplaceAll(ref, `\`, "/")))
+	if id := ompSessionIDFromFilename(filepath.Base(strings.ReplaceAll(ref, `\`, "/"))); id != "" {
+		return id
+	}
+	if hdr, err := peekOmpSessionHeader(ref); err == nil && hdr.Type == "session" && session.ValidID(hdr.ID) {
+		return hdr.ID
+	}
+	sum := sha256.Sum256([]byte(ref))
+	return "missing-parent-" + hex.EncodeToString(sum[:8])
 }
 
 // sameParentSessionPath reports whether headerParent names parentPath (the parent transcript
@@ -279,8 +354,11 @@ func ompToolResultReachPaths(toolName string, d *ompToolDetails) []string {
 	}
 	var out []string
 	add := func(p string) {
-		if p = strings.TrimSpace(p); p != "" {
-			out = append(out, hookrun.Alone(p)...)
+		resolved, unknown := resolveReachPath(p)
+		if unknown {
+			out = append(out, hookrun.UnknownReach+"\x00"+p)
+		} else if resolved != "" {
+			out = append(out, hookrun.Alone(resolved)...)
 		}
 	}
 	switch toolName {
@@ -360,36 +438,4 @@ func ompEditedFiles(toolName string, rawArgs json.RawMessage, d *ompToolDetails,
 		}
 	}
 	return files
-}
-
-func boundOmpToolArgs(raw json.RawMessage) string {
-	compact := compactRawJSON(raw)
-	if len(compact) <= ompMaxToolArgs {
-		return compact
-	}
-	// Preserve small path/command metadata for target-resource extraction while capping huge
-	// write/edit bodies so a single span stays well beneath the 3.5 MiB OTLP ceiling.
-	var in ompToolInput
-	if json.Unmarshal(raw, &in) == nil {
-		proj := map[string]any{"_truncated": true}
-		if in.Path != "" {
-			proj["path"] = in.Path
-		}
-		if len(in.Paths) > 0 {
-			proj["paths"] = in.Paths
-		}
-		if in.Move != "" {
-			proj["move"] = in.Move
-		}
-		if in.Cwd != "" {
-			proj["cwd"] = in.Cwd
-		}
-		if in.Command != "" {
-			proj["command"] = cutUTF8(in.Command, 4096)
-		}
-		if s := marshalCompactJSON(proj); s != "" && len(s) <= ompMaxToolArgs {
-			return s
-		}
-	}
-	return `{"_truncated":true}`
 }

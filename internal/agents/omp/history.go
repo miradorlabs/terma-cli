@@ -122,18 +122,16 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 				outside := !opts.Since.IsZero() && modTime.Before(opts.Since)
 				sid := ompSessionIDFromFilename(ent.Name())
 				var parentID string
-				if !outside && !active {
-					hdr, peekErr := peekOmpSessionHeader(mainPath)
-					if peekErr != nil && !errors.Is(peekErr, fs.ErrNotExist) && subErr == "" {
-						subErr = mainPath
+				hdr, peekErr := peekOmpSessionHeader(mainPath)
+				if peekErr != nil && !errors.Is(peekErr, fs.ErrNotExist) && subErr == "" {
+					subErr = mainPath
+				}
+				if hdr.Type == "session" {
+					if !session.ValidID(sid) && session.ValidID(hdr.ID) {
+						sid = hdr.ID
 					}
-					if hdr.Type == "session" {
-						if !session.ValidID(sid) && session.ValidID(hdr.ID) {
-							sid = hdr.ID
-						}
-						if ref := cmp.Or(strings.TrimSpace(hdr.ParentSession), strings.TrimSpace(hdr.ContinuationOf)); ref != "" {
-							parentID = ompParentSessionID(ref)
-						}
+					if ref := cmp.Or(strings.TrimSpace(hdr.ParentSession), strings.TrimSpace(hdr.ContinuationOf)); ref != "" {
+						parentID = ompParentSessionID(ref)
 					}
 				}
 				if !session.ValidID(sid) {
@@ -143,6 +141,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 					SourceSystem:       ompSourceSystem,
 					SessionID:          sid,
 					ParentSessionID:    parentID,
+					OneWayParent:       parentID != "",
 					Path:               mainPath,
 					ExtraPaths:         extras,
 					WatchDirs:          watchDirs,

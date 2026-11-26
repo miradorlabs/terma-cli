@@ -15,8 +15,13 @@ type HistoryFile struct {
 	// SessionID is the agent's native session identifier.
 	SessionID string
 	// ParentSessionID is the optional parent session identifier for spawned subagent
-	// transcripts stored as separate files (so cross-org reach in a child taints its parent).
+	// transcripts stored as separate files (so cross-org reach in a child taints its parent),
+	// or a fork/continuation ancestor when OneWayParent is true.
 	ParentSessionID string
+	// OneWayParent reports that ParentSessionID is a one-directional lineage ancestor (such
+	// as a forked or continued transcript) whose history flowed into this session, rather
+	// than a bidirectional subagent whose activity flows back into the parent.
+	OneWayParent bool
 	// Path is the main transcript file path on disk.
 	Path string
 	// ExtraPaths lists companion transcript files belonging to the same session, such as
