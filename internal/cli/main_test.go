@@ -66,6 +66,8 @@ func runIsolated(m *testing.M) int {
 		"GIT_CONFIG_NOSYSTEM": "1",
 		// Offline; policy integration tests clear this and use the real HTTP path.
 		"TERMA_POLICY_STUB": `{"mode":"repo","repositories":["github.com/acme/app"],"include_prompts":true,"include_tool_content":true,"default_project_id":"team"}`,
+		// Offline: no active remediation campaign; the remediation tests set their own.
+		"TERMA_REMEDIATION_STUB": `{"campaign":null}`,
 	} {
 		_ = os.Setenv(k, v)
 	}

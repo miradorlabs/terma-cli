@@ -39,6 +39,7 @@ internal/delivery/      sends the spool to each project, from a detached flush
 internal/session/       session manifests and commit attribution
 internal/doctor/        `terma doctor` checks (teams, routing state, Mixed runs, outbox/spool losses)
 internal/setup/         `terma setup`; internal/globalmode/ writes the machine-wide hooks
+internal/remediation/   the platform's active remediation campaign, which only doctor and setup read
 internal/repohooks/     the commit hooks a claimed session installs in a repository's own
                         .git/hooks, chained to whatever was there
 internal/shellrc/        the developer's shell startup files: install.sh's PATH line, and the

@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/routing"
@@ -250,5 +251,9 @@ func TestDescribeFlushNamesEveryReasonOnce(t *testing.T) {
 	}
 	if strings.Join(undelivered, "|") != strings.Join(want, "|") {
 		t.Errorf("undelivered =\n  %q\nwant\n  %q", undelivered, want)
+	}
+	// A retired sign-in's fix quotes its own commands: never twice.
+	if _, undelivered = describeFlush(delivery.Result{Held: 1}, doctor.RetiredFix); undelivered[0] != "holding 1 for a sign-in that may send them (run `terma update`, then `terma setup`)" {
+		t.Errorf("retired = %q", undelivered[0])
 	}
 }

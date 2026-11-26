@@ -149,6 +149,10 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 
 	ui := newSetupUI(out, f.verbose)
 	ui.title, ui.warnTitle = "Setup complete", "Almost done — finish the steps marked ! below"
+	// Terma Desktop reads stdout's first line as the grant's, and no one reads the rest.
+	if !f.desktopGrant {
+		app.cautionRemediation(cmd.Context(), ui, cfg)
+	}
 	recorded := false
 	team := ""
 	var chosenOrg *organization

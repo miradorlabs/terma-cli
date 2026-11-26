@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 
 	"github.com/spf13/cobra"
 
@@ -140,7 +141,7 @@ organizations.`,
 func describeFlush(res delivery.Result, signInFix string) (delivered string, undelivered []string) {
 	delivered = fmt.Sprintf("%d event%s", res.Sent, plural(res.Sent))
 	if forSignIn := res.Held - res.Blocked - res.Unrouted; forSignIn > 0 {
-		undelivered = append(undelivered, fmt.Sprintf("holding %d for a sign-in that may send them (run `%s`)", forSignIn, signInFix))
+		undelivered = append(undelivered, fmt.Sprintf("holding %d for a sign-in that may send them (run %s)", forSignIn, doctor.Quoted(signInFix)))
 	}
 	if res.Blocked > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("holding %d until their team can send again (run `terma doctor`)", res.Blocked))

@@ -44,7 +44,7 @@ func Account(dir, profile, authURL string) string {
 
 // ErrSignInRetired is the server's answer that it no longer accepts this kind of sign-in:
 // only a newer terma, signed in again, sends again.
-var ErrSignInRetired = errors.New("this sign-in is retired: update terma and run `terma login`")
+var ErrSignInRetired = errors.New("this sign-in is retired: run `terma update`, then `terma setup`")
 
 // MarkRetired records, on the profile's stored sign-in of session, that the server refused
 // it as retired, for doctor and status to say what fixes it. "" marks whatever sign-in is
