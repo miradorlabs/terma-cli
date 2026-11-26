@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -384,5 +385,119 @@ func TestDryRunLeavesOutSessionWithRecordOverRequestLimit(t *testing.T) {
 	}
 	if len(sum.Planned) != 0 || sum.SkippedSessions[SkipRecordTooLarge] != 1 {
 		t.Errorf("planned = %+v, skipped = %v; want nothing planned and record_too_large=1", sum.Planned, sum.SkippedSessions)
+	}
+}
+
+// refusedOverlapState selects team-a (org-a, Active, lists app and shared) and team-b
+// (org-b, lists shared and secret, newer policy) with refusals as team-b's count.
+func refusedOverlapState(now time.Time, refusals int) routing.State {
+	st := twoOrgState(now, false)
+	st.Teams[0].Policy.Repositories = []string{"github.com/org-a/app", "github.com/org-x/shared"}
+	st.Teams[0].Policy.UpdatedAt = now.Add(-2 * time.Hour)
+	st.Teams[1].Policy.Repositories = []string{"github.com/org-x/shared", "github.com/org-b/secret"}
+	st.Teams[1].Policy.UpdatedAt = now.Add(-time.Hour)
+	st.Teams[1].Refusals = refusals
+	return st
+}
+
+// A Refused team is passed over, as the live hooks' routing does: what it lists goes to the
+// next team that lists it, or nowhere, and reaching it crosses into no organization. A
+// Suspended team still holds what it lists, so the same reach cuts the session.
+func TestRefusedTeamIsPassedOverAndSuspendedTeamStillHolds(t *testing.T) {
+	t.Parallel()
+	repoA := initTestGitRepo(t, "https://github.com/org-a/app.git")
+	shared := initTestGitRepo(t, "https://github.com/org-x/shared.git")
+	repoB := initTestGitRepo(t, "https://github.com/org-b/secret.git")
+	secretB := filepath.Join(repoB, "secret.go")
+	if err := os.WriteFile(secretB, []byte("package secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	t0 := now.Add(-4 * time.Hour)
+	reach := makeNativeSegment("claude", "s-reach", repoA, "AFTER_REACH_INTO_B", t0.Add(2*time.Minute))
+	reach.ToolReaches = []agents.HistoryToolReach{{At: t0.Add(time.Minute), Cwd: repoA, Paths: []string{secretB}}}
+	src := &stubHistorySource{
+		source: "claude",
+		files: []agents.HistoryFile{
+			{SourceSystem: "claude", SessionID: "s-reach", ModTime: now.Add(-3 * time.Hour)},
+			{SourceSystem: "claude", SessionID: "s-shared", ModTime: now.Add(-3 * time.Hour)},
+			{SourceSystem: "claude", SessionID: "s-secret", ModTime: now.Add(-3 * time.Hour)},
+		},
+		segments: map[string][]agents.HistorySegment{
+			"s-reach":  {makeNativeSegment("claude", "s-reach", repoA, "BEFORE_REACH_OK", t0), reach},
+			"s-shared": {makeNativeSegment("claude", "s-shared", shared, "IN_SHARED", t0)},
+			"s-secret": {makeNativeSegment("claude", "s-secret", repoB, "IN_SECRET", t0)},
+		},
+	}
+
+	srv, got := captureServer(t)
+	sum, err := Upload(context.Background(), uploadOpts(t.TempDir(), refusedOverlapState(now, 2), srv, now, src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sent := got()
+	checkSent(t, sent["team-a"], []string{"BEFORE_REACH_OK", "AFTER_REACH_INTO_B", "IN_SHARED"}, []string{"IN_SECRET"})
+	if sent["team-b"] != "" {
+		t.Errorf("a Refused team was sent to: %q", sent["team-b"])
+	}
+	if sum.SkippedSegments[SkipNotCollected] != 1 || sum.SkippedSegments[SkipTeamBlockedPrefix+string(routing.Refused)] != 0 {
+		t.Errorf("Refused team-b: want only s-secret not collected, got %+v", sum.SkippedSegments)
+	}
+
+	srv, got = captureServer(t)
+	sum, err = Upload(context.Background(), uploadOpts(t.TempDir(), refusedOverlapState(now, 1), srv, now, src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sent = got()
+	checkSent(t, sent["team-a"], []string{"BEFORE_REACH_OK"}, []string{"AFTER_REACH_INTO_B", "IN_SHARED", "IN_SECRET"})
+	if sent["team-b"] != "" {
+		t.Errorf("a Suspended team was sent to: %q", sent["team-b"])
+	}
+	if sum.SkippedSegments[SkipTeamBlockedPrefix+string(routing.Suspended)] != 2 {
+		t.Errorf("Suspended team-b: want s-shared and s-secret held, got %+v", sum.SkippedSegments)
+	}
+}
+
+// Two Active organization teams that list the same repository: it goes to the one whose
+// policy was updated most recently, whatever order the teams were selected in.
+func TestRepositoryListedByTwoTeamsGoesToTheNewerPolicy(t *testing.T) {
+	t.Parallel()
+	shared := initTestGitRepo(t, "https://github.com/org-x/shared.git")
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	for _, newer := range []int{0, 1} {
+		st := twoOrgState(now, false)
+		for i := range st.Teams {
+			st.Teams[i].Policy.Repositories = append(st.Teams[i].Policy.Repositories, "github.com/org-x/shared")
+			st.Teams[i].Policy.UpdatedAt = now.Add(-2 * time.Hour)
+		}
+		st.Teams[newer].Policy.UpdatedAt = now.Add(-time.Hour)
+		r := newCwdResolver(st, "https://auth.example.com", false, "", "", now)
+		target, ok, reason := r.resolve(context.Background(), shared, "", "")
+		if !ok || target.Team.TeamID != st.Teams[newer].TeamID {
+			t.Errorf("newer policy %s: routed to %q (%v, %q)", st.Teams[newer].TeamID, target.Team.TeamID, ok, reason)
+		}
+	}
+}
+
+// A new UpdatedAt can move a repository to another team, so it stops an upload's route; a
+// refresh that only ticks FetchedAt and Generation does not.
+func TestRoutingPoliciesMatchComparesUpdatedAtNotFetchedAt(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	a := twoOrgState(now, false)
+	for i := range a.Teams {
+		a.Teams[i].Policy.UpdatedAt = now.Add(-time.Hour)
+	}
+	b := twoOrgState(now, false)
+	b.Teams = slices.Clone(a.Teams)
+	b.Generation++
+	b.Teams[1].Policy.FetchedAt = now.Add(time.Minute)
+	if !routingPoliciesMatch(a, b, now) {
+		t.Error("a FetchedAt and Generation tick reads as a routing change")
+	}
+	b.Teams[1].Policy.UpdatedAt = now
+	if routingPoliciesMatch(a, b, now) {
+		t.Error("a new UpdatedAt on one team reads as no routing change")
 	}
 }

@@ -16,6 +16,7 @@ import (
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/history"
 	"github.com/miradorlabs/terma-cli/internal/routing"
@@ -386,11 +387,53 @@ func TestReloadHistoryStateFailsWhenProfileChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	lane := testApp.profileLane(cfg)
-	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane); err == nil || strings.Contains(err.Error(), "profile changed") {
+	_, gen := testApp.signInSource(cfg).Lane()
+	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen); err == nil || strings.Contains(err.Error(), "profile changed") {
 		t.Fatalf("same profile, no routing state: %v, want a routing-state error", err)
 	}
 	t.Setenv("TERMA_PROFILE", "other")
-	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane); err == nil || !strings.Contains(err.Error(), "active profile changed") {
+	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen); err == nil || !strings.Contains(err.Error(), "active profile changed") {
 		t.Fatalf("after a profile switch: %v, want active profile changed", err)
+	}
+}
+
+// A switch to another person and back between two rechecks leaves the lane the same but
+// moves the sign-in's generation, so the upload stops, as the relay loses a retry that
+// spans one.
+func TestReloadHistoryStateFailsWhenTheSignInChangedAndCameBack(t *testing.T) {
+	f := newFakeAuth(t)
+	authSandbox(t, f)
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := testApp.loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	lane := testApp.profileLane(cfg)
+	_, gen := testApp.signInSource(cfg).Lane()
+	if lane != auth.AccountKey(f.srv.URL, "u-1") {
+		t.Fatalf("lane = %q, want u-1's", lane)
+	}
+	if _, err := routing.Replace(testApp.stateDir, cfg.ProfileName, nil, lane, func(*routing.State) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen); err != nil {
+		t.Fatalf("nothing changed: %v, want the routing state", err)
+	}
+	if err := saveSignIn(testApp.dir, storedSessionOf(f, "u-2")); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
+		t.Fatal(err)
+	}
+	if cfg, err = testApp.loadConfig(); err != nil {
+		t.Fatal(err)
+	}
+	if got := testApp.profileLane(cfg); got != lane {
+		t.Fatalf("after a switch and back, lane = %q, want %q", got, lane)
+	}
+	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen); err == nil || err.Error() != "active sign-in changed during upload" {
+		t.Fatalf("after a switch and back: %v, want active sign-in changed during upload", err)
 	}
 }

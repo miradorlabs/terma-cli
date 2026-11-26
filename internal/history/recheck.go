@@ -112,6 +112,9 @@ func statSessionFiles(f agents.HistoryFile, descendants []agents.HistoryFile) (f
 	return snap, ""
 }
 
+// policyContentMatches reports whether two policies collect and send the same. UpdatedAt
+// counts too: among teams listing the same repository, the most recently updated policy
+// wins it, so a new UpdatedAt alone can move a repository to another team.
 func policyContentMatches(a, b config.Policy) bool {
 	ap, at := a.Content()
 	bp, bt := b.Content()
@@ -120,7 +123,8 @@ func policyContentMatches(a, b config.Policy) bool {
 		a.Unset == b.Unset &&
 		a.Mode == b.Mode &&
 		a.Wildcards == b.Wildcards &&
-		slices.Equal(a.Repositories, b.Repositories)
+		slices.Equal(a.Repositories, b.Repositories) &&
+		a.UpdatedAt.Equal(b.UpdatedAt)
 }
 
 // routingPoliciesMatch reports whether two routing snapshots have identical routing

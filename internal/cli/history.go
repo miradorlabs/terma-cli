@@ -110,6 +110,7 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, r
 	names := loadTeamNames(app.stateDir, cfg.ProfileName)
 	deliv := app.delivery()
 	signIn := app.signInSource(cfg)
+	_, laneGen := signIn.Lane()
 
 	holdings := &history.APIHoldingsChecker{
 		ClientFor: func(teamID string) (*api.Client, error) {
@@ -158,7 +159,7 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, r
 		Version:          app.version,
 		State:            st,
 		ReloadState: func() (routing.State, error) {
-			return app.reloadHistoryState(cfg.ProfileName, lane)
+			return app.reloadHistoryState(cfg.ProfileName, lane, laneGen)
 		},
 		OnOrgAccessLost: func(orgID, authURL string, epochs map[string]int64, at time.Time) {
 			if serverKey || len(epochs) == 0 {
@@ -217,8 +218,10 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, r
 
 // reloadHistoryState rereads the routing state an upload rechecks against, failing when the
 // active profile or its sign-in changed since the upload began: resume state is written
-// under the first profile, so it must not be checked against another's routing.
-func (app *App) reloadHistoryState(profile, lane string) (routing.State, error) {
+// under the first profile, so it must not be checked against another's routing. The
+// sign-in's generation is compared as well as its lane, since a switch to someone else and
+// back leaves the lane the same.
+func (app *App) reloadHistoryState(profile, lane string, laneGen uint64) (routing.State, error) {
 	freshCfg, err := app.loadConfig()
 	if err != nil {
 		return routing.State{}, err
@@ -228,6 +231,9 @@ func (app *App) reloadHistoryState(profile, lane string) (routing.State, error) 
 	}
 	if app.profileLane(freshCfg) != lane {
 		return routing.State{}, errors.New("active sign-in account changed during upload")
+	}
+	if _, gen := app.signInSource(freshCfg).Lane(); gen != laneGen {
+		return routing.State{}, errors.New("active sign-in changed during upload")
 	}
 	fresh, found, loadErr := routing.Load(app.stateDir, freshCfg.ProfileName)
 	if reason, detail := routingStateProblem(fresh, found, loadErr, lane); reason != "" {
