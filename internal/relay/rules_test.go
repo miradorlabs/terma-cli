@@ -29,7 +29,9 @@ var (
 		"request_text", "response_text",
 		// Free text that may restate what was said, and keys too generic to vouch for.
 		"error", "reason", "reasoning", "routing.reasoning", "metadata", "value", "key", "from", "db", "query_script",
-		"gen_ai.tool.description", "gen_ai.agent.description", "gen_ai.request.stop_sequences"}
+		"gen_ai.tool.description", "gen_ai.agent.description", "gen_ai.request.stop_sequences",
+		// Copilot's, content of both kinds: they leave only when prompts and tool content both do.
+		"exception.message", "github.copilot.shutdown_type"}
 	pinnedResourcePromptFields = []string{"process.command_args", "process.command_line"}
 	pinnedPromptBodyEvents     = []string{"opencode.user_prompt", "opencode.session.created", "pi.user_prompt", "omp.user_prompt", "hermes.user_prompt", "hermes.assistant_response", "dsh.user_prompt", "dsh.assistant_response"}
 	pinnedToolContentFields    = []string{"tool_parameters", "tool_input", "full_command", "bash_command", "arguments", "output",
@@ -38,6 +40,7 @@ var (
 		"github.copilot.tool.parameters.command", "github.copilot.tool.parameters.file_path",
 		"github.copilot.git.repository", "github.copilot.github.org", "github.copilot.git.branch", "github.copilot.git.commit_sha",
 		"github.copilot.context.skills", "github.copilot.context.custom_agent_names",
+		"exception.message", "github.copilot.shutdown_type",
 		"omp.gen_ai.request.messages", "omp.gen_ai.response.tool_calls",
 		"tool_output", "error_message",
 		"file_path", "result", "cwd"}

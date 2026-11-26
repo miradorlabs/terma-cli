@@ -25,8 +25,6 @@ const (
 	SkipUnreadable        = "unreadable"
 	SkipUnroutable        = "unroutable"
 	SkipNotCollected      = "not_collected"
-	SkipBoundNotCollected = "bound_not_collected"
-	SkipPendingBinding    = "pending_binding"
 	SkipWrongEnvironment  = "wrong_environment"
 	SkipEmptyAfterFilter  = "empty_after_filter"
 	SkipRecordTooLarge    = "record_too_large"

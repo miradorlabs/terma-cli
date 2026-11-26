@@ -1,35 +1,77 @@
 package cli
 
 import (
-	"errors"
-	"io"
+	"slices"
 	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
-
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 )
 
-// With no terminal to ask on, setup keeps the stored sign-in's organization, but never
-// silently: it says the developer belongs to others and how to set one of them up.
-func TestSetupWithoutATerminalSaysItKeptOneOfSeveralOrganizations(t *testing.T) {
+// Without --org, setup automatically discovers and enrolls teams across all organizations
+// the signed-in user belongs to, binding repositories without prompting.
+func TestSetupAutomaticallyEnrollsAllOrganizations(t *testing.T) {
 	gateway := newFakeAuth(t)
+	gateway.policyBodies = map[string]string{
+		projectsIn(orgA().ID)[0].ID: `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/acme/web"]},"git_hooks":false,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
+		projectsIn(orgB().ID)[0].ID: `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/beta/core"]},"git_hooks":false,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
+	}
 	authSandbox(t, gateway)
 	sandboxMachine(t)
 	t.Setenv("CODEX_HOME", t.TempDir())
+	t.Setenv("TERMA_POLICY_STUB", "")
 	signInTo(t, gateway, orgA())
+
 	out, err := runTerma(t, "setup", "--harness", "codex")
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	want := "! Organization  kept Acme, one of your 2: `terma setup --org <name>` sets up another"
-	if !strings.Contains(out, want) {
-		t.Fatalf("setup did not say it kept one of several organizations (%d listings):\n%s", gateway.orgLists.Load(), out)
+	for _, want := range []string{"Organizations Acme, Beta Labs", "Acme Web", "Beta Core"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("setup output missing %q:\n%s", want, out)
+		}
 	}
-	if org, _, _ := selected(t); org != orgA().ID {
-		t.Fatalf("Acme should still be chosen: %s", org)
+	st, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+	if err != nil || !found {
+		t.Fatalf("routing.Load = %v, found=%v", err, found)
+	}
+	var ids []string
+	for _, tm := range st.Teams {
+		ids = append(ids, tm.TeamID)
+	}
+	if !slices.Contains(ids, projectsIn(orgA().ID)[0].ID) || !slices.Contains(ids, projectsIn(orgB().ID)[0].ID) {
+		t.Fatalf("enrolled teams = %v, want both orgs' teams", ids)
+	}
+}
+
+// --org narrows setup to the named organization without prompting.
+func TestSetupOrgFlagScopesDiscovery(t *testing.T) {
+	gateway := newFakeAuth(t)
+	gateway.policyBodies = map[string]string{
+		projectsIn(orgA().ID)[0].ID: `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/acme/web"]},"git_hooks":false,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
+		projectsIn(orgB().ID)[0].ID: `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/beta/core"]},"git_hooks":false,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
+	}
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	t.Setenv("CODEX_HOME", t.TempDir())
+	t.Setenv("TERMA_POLICY_STUB", "")
+	signInTo(t, gateway, orgA())
+
+	out, err := runTerma(t, "setup", "--org", "beta", "--harness", "codex")
+	if err != nil {
+		t.Fatalf("setup --org beta: %v\n%s", err, out)
+	}
+	st, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+	if err != nil || !found {
+		t.Fatalf("routing.Load = %v, found=%v", err, found)
+	}
+	if len(st.Teams) != 1 || st.Teams[0].OrganizationID != orgB().ID {
+		t.Fatalf("teams = %+v, want only Beta Labs", st.Teams)
+	}
+	if org, _, _ := selected(t); org != orgB().ID {
+		t.Fatalf("Beta Labs should be recorded on profile: %s", org)
 	}
 }
 
@@ -42,79 +84,6 @@ func signInTo(t *testing.T, f *fakeAuth, org organization) {
 	}
 	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.SelectOrganization(org.ID, org.Name) }); err != nil {
 		t.Fatal(err)
-	}
-}
-
-// setup asks which organization only when the person belongs to several and --org named
-// none; the answer, or the current one, is what the profile keeps. One sign-in serves all.
-func TestSetupSignInChoosesAmongSeveralOrganizations(t *testing.T) {
-	pickB := func(orgs []organization, _ string) (*organization, error) { return &orgs[1], nil }
-	keep := func(orgs []organization, current string) (*organization, error) {
-		return matchOrganization(orgs, current)
-	}
-	cancel := func([]organization, string) (*organization, error) { return nil, errCancelled }
-	for _, tc := range []struct {
-		name       string
-		orgs       []organization
-		org        string
-		ask        orgAsker
-		wantAsked  bool
-		wantActive organization
-		wantKept   int
-		wantErr    error
-	}{
-		{name: "several, picks another", ask: pickB, wantAsked: true, wantActive: orgB()},
-		{name: "several, keeps the current", ask: keep, wantAsked: true, wantActive: orgA()},
-		{name: "several, cancelled", ask: cancel, wantAsked: true, wantErr: errCancelled},
-		{name: "several, no terminal", wantActive: orgA(), wantKept: 2},
-		{name: "only one", orgs: []organization{orgA()}, ask: pickB, wantActive: orgA()},
-		{name: "--org names one", org: "beta", ask: pickB, wantActive: orgB()},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			gateway := newFakeAuth(t)
-			gateway.orgs = tc.orgs
-			authSandbox(t, gateway)
-			signInTo(t, gateway, orgA())
-			cfg, err := testApp.loadConfig()
-			if err != nil {
-				t.Fatal(err)
-			}
-			asked := false
-			var ask orgAsker
-			if tc.ask != nil {
-				ask = func(orgs []organization, current string) (*organization, error) {
-					asked = true
-					if current != orgA().ID || len(orgs) != 2 {
-						t.Errorf("asked with current %q among %d organizations", current, len(orgs))
-					}
-					return tc.ask(orgs, current)
-				}
-			}
-			cmd := &cobra.Command{}
-			cmd.SetContext(t.Context())
-			cmd.SetOut(io.Discard)
-			cmd.SetErr(io.Discard)
-			cmd.SetIn(strings.NewReader(""))
-			got, _, kept, err := testApp.setupSignIn(cmd, cfg, signInOptions{org: parseOrgRef(tc.org), noBrowser: true}, ask)
-			if asked != tc.wantAsked {
-				t.Errorf("asked = %v, want %v", asked, tc.wantAsked)
-			}
-			if tc.wantErr != nil {
-				if !errors.Is(err, tc.wantErr) {
-					t.Fatalf("err = %v, want %v", err, tc.wantErr)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			if kept != tc.wantKept {
-				t.Errorf("kept = %d, want %d", kept, tc.wantKept)
-			}
-			if got.OrganizationID != tc.wantActive.ID || got.OrganizationName != tc.wantActive.Name {
-				t.Errorf("config organization = %s %q, want %s", got.OrganizationID, got.OrganizationName, tc.wantActive.Name)
-			}
-		})
 	}
 }
 

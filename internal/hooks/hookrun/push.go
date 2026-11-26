@@ -207,7 +207,7 @@ func (e Env) unparkPushes(r *Repo) {
 			if json.Unmarshal(line, &rec) != nil || rec.ID == "" {
 				continue
 			}
-			if e.Routing != nil && rec.Event.Enrollment == "" && rec.Event.HoldKey == "" {
+			if e.Routing != nil && rec.Event.Enrollment == "" {
 				noDest += max(len(rec.Refs), 1)
 			} else {
 				kept = append(kept, rec)
@@ -325,7 +325,7 @@ func reportPush(ctx context.Context, env Env, path string, rec pushRecord) {
 			env.CountLost(nil, sendas.LostAmbiguousPush, 1)
 			rec.Refs[i].Reported = true
 		default:
-			if env.Routing != nil && ev.Enrollment == "" && ev.HoldKey == "" {
+			if env.Routing != nil && ev.Enrollment == "" {
 				env.CountLost(nil, LostNoDestination, 1)
 				rec.Refs[i].Reported = true
 				continue

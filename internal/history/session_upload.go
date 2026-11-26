@@ -128,7 +128,7 @@ func uploadOneSession(
 			return &preAttemptStopError{skipReason: checkSkip, reason: checkReason}
 		}
 		if checkState.StateID != freshState.StateID || checkState.ConsentGeneration != freshState.ConsentGeneration {
-			return &preAttemptStopError{skipReason: SkipDeselected, reason: "routing selections or repository bindings changed during upload; re-run to apply"}
+			return &preAttemptStopError{skipReason: SkipDeselected, reason: "team selections changed during upload; re-run to apply"}
 		}
 		if !routingPoliciesMatch(freshState, checkState, curNow) {
 			return &preAttemptStopError{skipReason: SkipPolicyChanged, reason: "routing or content policy changed during upload; re-run to apply updated policy"}

@@ -2,6 +2,8 @@ package doctor
 
 import (
 	"errors"
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
+	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
 const (
@@ -22,6 +25,8 @@ const (
 	testTeamPlat = "platform"
 	testTeamCore = "core"
 	testTeamOwn  = "personal"
+	testOrgGamma = "44444444-4444-4444-8444-444444444444"
+	testTeamOps  = "ops"
 )
 
 func routedFixture(t *testing.T) Routing {
@@ -45,9 +50,6 @@ func routedFixture(t *testing.T) Routing {
 		if _, err := st.Select(tm); err != nil {
 			t.Fatal(err)
 		}
-	}
-	if err := st.Bind("github.com/acme", testOrgAcme, false); err != nil {
-		t.Fatal(err)
 	}
 	return Routing{
 		State:         st,
@@ -113,7 +115,7 @@ func TestTeamsCheckFailsClosedOnUnusableState(t *testing.T) {
 			if c, team := RoutedRepository(r, "", nil, now); c.Status != Fail || team != nil || c.Fix != tc.fix {
 				t.Errorf("RoutedRepository = %+v, %v", c, team)
 			}
-			if rows := TeamRows(r, now); len(rows) != 1 || !strings.Contains(rows[0].Value, "nothing is sent") {
+			if rows := TeamRows(r, now); len(rows) != 1 || !strings.Contains(rows[0].Value, tc.want) {
 				t.Errorf("TeamRows = %+v", rows)
 			}
 		})
@@ -129,7 +131,7 @@ func TestTeamsCheckEnrollmentHealthAndSingleSignInRemediation(t *testing.T) {
 	r.State.Teams[0].Refusals = 2
 	r.State.Teams[0].LastError = routing.OrgAccessLost
 	c := TeamsCheck(r, now)
-	if c.Status != Fail || !strings.Contains(c.Detail, "refused (you no longer have access to its organization)") ||
+	if c.Status != Fail || !strings.Contains(c.Detail, "and is skipped") || strings.Contains(c.Detail, "blocks") || !strings.Contains(c.Detail, "refused (you no longer have access to its organization)") ||
 		!strings.Contains(c.Fix, "terma teams --release Platform") {
 		t.Fatalf("OrgAccessLost check = %+v", c)
 	}
@@ -139,7 +141,7 @@ func TestTeamsCheckEnrollmentHealthAndSingleSignInRemediation(t *testing.T) {
 	r.State.Teams[0].Refusals = 1
 	r.State.Teams[0].LastError = routing.Terminal
 	c = TeamsCheck(r, now)
-	if c.Status != Fail || !strings.Contains(c.Detail, "suspended (its organization says the team is gone)") {
+	if c.Status != Fail || !strings.Contains(c.Detail, "suspended (its organization says the team is gone)") || !strings.Contains(c.Detail, "blocks what it lists") {
 		t.Fatalf("Terminal suspended check = %+v", c)
 	}
 
@@ -158,17 +160,6 @@ func TestTeamsCheckEnrollmentHealthAndSingleSignInRemediation(t *testing.T) {
 	c = TeamsCheck(r, now)
 	if c.Status != Warn || !strings.Contains(c.Detail, "over a week") {
 		t.Fatalf("Expired check = %+v", c)
-	}
-
-	// Pending binding fails with `terma teams --bind` fix.
-	r = routedFixture(t)
-	if err := r.State.Unbind("github.com/acme"); err != nil {
-		t.Fatal(err)
-	}
-	c = TeamsCheck(r, now)
-	if c.Status != Fail || !strings.Contains(c.Detail, "github.com/acme is undecided") ||
-		!strings.Contains(c.Fix, "terma teams --bind github.com/acme=Acme") {
-		t.Fatalf("Pending check = %+v", c)
 	}
 
 	// SignInNeeded always wins the recommended fix regardless of enrollment order
@@ -228,17 +219,6 @@ func TestTeamsCheckEnrollmentHealthAndSingleSignInRemediation(t *testing.T) {
 			status: Fail,
 			fix:    "terma teams --release 'R&D' (or wait for its policy to come back)",
 		},
-		{
-			name: "shell_metachars_bind",
-			mutate: func(r *Routing) {
-				r.Orgs[r.State.Teams[0].OrganizationID] = "A's $Org"
-				if err := r.State.Unbind("github.com/acme"); err != nil {
-					t.Fatal(err)
-				}
-			},
-			status: Fail,
-			fix:    `terma teams --bind github.com/acme='A'\''s $Org' (or --refuse github.com/acme)`,
-		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := routedFixture(t)
@@ -251,59 +231,151 @@ func TestTeamsCheckEnrollmentHealthAndSingleSignInRemediation(t *testing.T) {
 	}
 }
 
-func TestTeamsCheckAndRowsShowMixedRunsAndBlockedCounts(t *testing.T) {
+// The paused sessions get a section of their own, counted by why, never named; what the
+// relay dropped is counted under the teams.
+func TestTeamsCheckAndSectionsShowPausedSessionsAndDroppedRecords(t *testing.T) {
 	t.Parallel()
 	now := time.Now()
 	r := routedFixture(t)
 	r.Mixed = []runs.MixedRun{
-		{Session: "s-1", Why: runs.Why{Reason: runs.Crossed, Where: "github.com/acme/api"}, Recent: true},
-		{Session: "s-2", Why: runs.Why{Reason: runs.UnknownReach, Where: `cd "$(cat p)" && cat …`}, Recent: true},
-		{Session: "s-3", Why: runs.Why{Reason: runs.LocationBound}, Recent: true},
-		{Session: "s-4", Why: runs.Why{Reason: runs.Aside}, Recent: false},
-		{Session: "s-5", Recent: true},
+		{Session: "s-1", Why: runs.Why{Reason: runs.Crossed, Where: "github.com/acme/api"}, At: now.Add(-time.Hour), Recent: true},
+		{Session: "s-2", Why: runs.Why{Reason: runs.Crossed, Where: "github.com/acme/web"}, At: now.Add(-50 * time.Hour), Recent: true},
+		{Session: "s-3", Why: runs.Why{Reason: runs.UnknownReach, Where: `cd "$(cat p)" && cat …`}, Recent: false},
 	}
 	r.MixedDropped = 7
-	r.Blocked = map[string]int{
-		"pending:github.com/torvalds/linux":     3,
-		"team:" + r.State.Teams[0].EnrollmentID: 2,
-		"team:ended":                            1,
-	}
+	r.Blocked = map[string]int{"team:" + r.State.Teams[0].EnrollmentID: 2}
 
 	c := TeamsCheck(r, now)
-	if c.Status != Pass || !strings.Contains(c.Detail, "5 session run(s) Mixed") ||
-		!strings.Contains(c.Detail, "(1 idle for over a day)") ||
-		!strings.Contains(c.Detail, "dropped 7 record(s)") {
+	if c.Status != Pass || !strings.Contains(c.Detail, "3 session run(s) Mixed") || !strings.Contains(c.Detail, "dropped 7 record(s)") {
 		t.Fatalf("TeamsCheck = %+v", c)
 	}
-
-	var lines []string
-	for _, row := range TeamRows(r, now) {
-		lines = append(lines, row.Label+"|"+row.Value)
-	}
-	joined := strings.Join(lines, "\n")
+	got := render(r.teamSections(now), 80)
 	for _, want := range []string{
-		"Teams|Acme Platform — active: github.com/acme/*",
-		"Bindings|github.com/acme → Acme",
-		"Mixed|5 session run(s) Mixed",
-		"|session s-1 crossed organizations, into github.com/acme/api",
-		`|session s-2 ran a shell command whose reach is not known: cd "$(cat p)" && cat …`,
-		"|session s-3 touched more places than the run ledger keeps",
-		"|session s-5 with a run ledger that cannot be read",
-		"Relay held|3 record(s) for github.com/torvalds/linux, undecided",
-		"|2 record(s) for Acme Platform, which could not send",
-		"|1 record(s) for ended, no longer ticked",
+		"  ! 2 records for Acme › Platform could not be sent\n",
+		"Paused sessions\n" +
+			"  ! 3 sessions are paused\n" +
+			"       worked in another organization's repository  paused " + now.Add(-time.Hour).Local().Format("15:04") + "\n" +
+			"       worked in another organization's repository  paused " + now.Add(-50*time.Hour).Local().Format("2 Jan 15:04") + "\n" +
+			"       ran a command terma could not trace\n" +
+			"          e.g. a command reading files outside the repository\n" +
+			"  ! 7 records from paused sessions dropped\n" +
+			"    Terma pauses a session that touches another organization's work, so nothing\n",
+		"    To send again, start a new session or resume this one. Keep each session to\n",
 	} {
-		if !strings.Contains(joined, want) {
-			t.Errorf("TeamRows lacks %q:\n%s", want, joined)
+		if !strings.Contains(got, want) {
+			t.Errorf("sections lack %q:\n%s", want, got)
 		}
 	}
-	// Single-user-token architecture must never mention per-team minted keys.
-	if strings.Contains(joined, "ter_srv_") || strings.Contains(joined, "no key yet") {
-		t.Errorf("TeamRows mentions stale per-team key:\n%s", joined)
+	if strings.Contains(got, "s-1") || strings.Contains(got, "cat p") {
+		t.Errorf("sections name a session or its command:\n%s", got)
 	}
-	// Older idle session s-4 is counted, not named individually.
-	if strings.Contains(joined, "session s-4") {
-		t.Errorf("TeamRows named an older idle Mixed session:\n%s", joined)
+}
+
+// collectsFixture is routedFixture plus an older Beta Labs Core whose list overlaps Acme
+// Platform's, and a Gamma Ops that lost access to its organization.
+func collectsFixture(t *testing.T, now time.Time) Routing {
+	t.Helper()
+	r := routedFixture(t)
+	r.Teams[testTeamOps], r.Orgs[testOrgGamma] = "Ops", "Gamma"
+	r.State.Teams[0].Policy.Repositories = []string{"github.com/acme/one", "github.com/shared/tool"}
+	r.State.Teams[0].Policy.UpdatedAt = now
+	team := func(org, id string, age time.Duration, repos ...string) routing.Team {
+		return routing.Team{OrganizationID: org, AuthURL: testAuthURL, TeamID: id, Policy: config.Policy{
+			Mode: config.ModeRepo, Repositories: repos, Revision: 1, FetchedAt: now, UpdatedAt: now.Add(-age), Wildcards: true,
+			OrganizationID: org, AuthURL: testAuthURL, TeamID: id,
+		}}
+	}
+	for _, tm := range []routing.Team{
+		team(testOrgBeta, testTeamCore, time.Hour, "github.com/acme/*", "github.com/shared/tool", "github.com/beta/core"),
+		team(testOrgGamma, testTeamOps, 0, "github.com/gamma/*", "github.com/beta/core"),
+	} {
+		if _, err := r.State.Select(tm); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ops := &r.State.Teams[slices.IndexFunc(r.State.Teams, func(t routing.Team) bool { return t.TeamID == testTeamOps })]
+	ops.Refusals, ops.LastError = 2, routing.OrgAccessLost
+	return r
+}
+
+// render draws sections as doctor does, plain, wrapped to cols.
+func render(ss []Section, cols int) string {
+	var b strings.Builder
+	(&Printer{W: &b, P: style.Plain(), Cols: cols}).Sections(ss)
+	return b.String()
+}
+
+// The teams read in routing order, each with its state and its own list beneath it: an
+// entry a newer policy also lists, or lists part of, is marked on the older team and names the newer one, a
+// refused team is skipped and collects nothing, and Personal comes last.
+func TestTeamSectionsShowWhatEachTeamCollects(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 26, 9, 30, 0, 0, time.Local)
+	r := collectsFixture(t, now)
+	want := `Where your data goes
+  ✓ 1. Acme › Platform  updated 26 Nov 09:30
+       github.com/acme/one
+       github.com/shared/tool
+  ✓ 2. Beta Labs › Core  updated 26 Nov 08:30
+     ! github.com/acme/*  partly collected by Platform
+     ! github.com/shared/tool  collected by Platform
+       github.com/beta/core
+  ✓ 3. Personal  always last
+       everything else
+  ✗ Gamma › Ops  no access to this organization, skipped
+    Teams are tried top to bottom. The newest policy wins a shared repository.
+`
+	if got := render(r.teamSections(now), 80); got != want {
+		t.Errorf("sections =\n%s\nwant\n%s", got, want)
+	}
+
+	// A winner that cannot send says so; what it lists waits rather than passing on.
+	r.State.Teams[0].SignInNeeded = true
+	if got := render(r.teamSections(now), 80); !strings.Contains(got, "  ! 1. Acme › Platform  sign in again to send\n       github.com/acme/one\n") {
+		t.Errorf("held winner:\n%s", got)
+	}
+
+	// Personal with its own list shows it; an entry an organization also lists stays there.
+	r.State.Teams[0].SignInNeeded = false
+	own := &r.State.Teams[len(r.State.Teams)-1]
+	own.Policy.Mode, own.Policy.Repositories = config.ModeRepo, []string{"github.com/me/dotfiles", "github.com/acme/one"}
+	got := render(r.teamSections(now), 80)
+	for _, w := range []string{
+		"  ✓ 3. Personal  always last\n       github.com/me/dotfiles\n     ! github.com/acme/one  collected by Platform\n  ✗ Gamma",
+	} {
+		if !strings.Contains(got, w) {
+			t.Errorf("sections lack %q:\n%s", w, got)
+		}
+	}
+	if strings.Contains(got, "everything else") || strings.Contains(got, "gamma") {
+		t.Errorf("sections collect everything else or a refused team's list:\n%s", got)
+	}
+
+	// A team that lists nothing says so.
+	r.State.Teams[0].Policy.Repositories = nil
+	if got := render(r.teamSections(now), 80); !strings.Contains(got, "  ✓ 1. Acme › Platform  no repositories yet\n  ✓ 2.") {
+		t.Errorf("empty list:\n%s", got)
+	}
+}
+
+// TeamName says each team once: Personal alone, no organization repeated, no generic name.
+func TestTeamName(t *testing.T) {
+	t.Parallel()
+	for _, tc := range [][3]string{
+		{"Mirador Dev", "Engineering", "Mirador Dev › Engineering"},
+		{"Terma Demo", "Demo", "Terma Demo"},
+		{"Acme", "Default", "Acme"},
+		{"Acme", "Acme Web", "Acme Web"},
+		{"Beta Labs", "Beta Core", "Beta Core"},
+		{"", "Core", "Core"},
+	} {
+		if got := TeamName(tc[0], tc[1]); got != tc[2] {
+			t.Errorf("TeamName(%q, %q) = %q, want %q", tc[0], tc[1], got, tc[2])
+		}
+	}
+	r := routedFixture(t)
+	if got := r.label(r.State.Teams[1]); got != "Personal" {
+		t.Errorf("personal label = %q", got)
 	}
 }
 
@@ -317,7 +389,7 @@ func TestRoutedRepositoryAndDoctorCombineMixedWithOutboxLosses(t *testing.T) {
 
 	c, team := RoutedRepository(r, gitDir, nil, now)
 	if c.Status != Pass || team == nil || team.TeamID != testTeamPlat ||
-		!strings.Contains(c.Detail, "github.com/acme/one goes to Acme Platform (github.com/acme/*)") {
+		!strings.Contains(c.Detail, "github.com/acme/one goes to Acme › Platform (github.com/acme/*)") {
 		t.Fatalf("RoutedRepository = %+v, %v", c, team)
 	}
 
@@ -341,7 +413,7 @@ func TestRoutedRepositoryAndDoctorCombineMixedWithOutboxLosses(t *testing.T) {
 	if tc := check(rep, KeyTeams); tc.Status != Pass || !strings.Contains(tc.Detail, "1 session run(s) Mixed") || !strings.Contains(tc.Detail, "dropped 4 record(s)") {
 		t.Errorf("KeyTeams = %+v", tc)
 	}
-	if pc := check(rep, KeyProject); pc.Status != Pass || !strings.Contains(pc.Detail, "goes to Acme Platform") {
+	if pc := check(rep, KeyProject); pc.Status != Pass || !strings.Contains(pc.Detail, "goes to Acme › Platform") {
 		t.Errorf("KeyProject = %+v", pc)
 	}
 	if hc := check(rep, KeyHooks); !strings.Contains(hc.Detail, "installed the first time an agent session is claimed here") {
@@ -364,9 +436,9 @@ func TestRoutedRepositoryAndDoctorCombineMixedWithOutboxLosses(t *testing.T) {
 	}
 	joined := strings.Join(rowText, "\n")
 	for _, want := range []string{
-		"Teams|Acme Platform — active",
-		"Mixed|1 session run(s) Mixed",
-		"Repository|github.com/acme/one goes to Acme Platform",
+		"Where your data goes|1. Acme › Platform (",
+		"Paused sessions|1 session is paused",
+		"Repository|github.com/acme/one goes to Acme › Platform",
 		"Records lost|terma dropped records it could not send",
 		"5 with no routed destination",
 	} {
@@ -376,5 +448,41 @@ func TestRoutedRepositoryAndDoctorCombineMixedWithOutboxLosses(t *testing.T) {
 	}
 	if !strings.Contains(joined, "outbox was full") {
 		t.Errorf("Local rows dropped #152 outbox_full loss:\n%s", joined)
+	}
+}
+
+// A long list shows its first five repositories and how many more, marked when a
+// hidden one goes to a newer team; with no colour the mark is a plain "!".
+// The paused list stops at five sessions, however many lines each takes, and counts the rest.
+func TestPausedSectionCapsSessions(t *testing.T) {
+	t.Parallel()
+	now := time.Now()
+	r := routedFixture(t)
+	for i := range 7 {
+		r.Mixed = append(r.Mixed, runs.MixedRun{Session: fmt.Sprint(i), Why: runs.Why{Reason: runs.UnknownReach}})
+	}
+	got := render(r.teamSections(now), 80)
+	if strings.Count(got, "ran a command terma could not trace") != 5 || !strings.Contains(got, "+ 2 more") {
+		t.Errorf("paused sessions not capped at five sessions:\n%s", got)
+	}
+}
+
+func TestTeamSectionsCapLongLists(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 26, 9, 30, 0, 0, time.Local)
+	r := collectsFixture(t, now)
+	many := make([]string, 50)
+	for i := range many {
+		many[i] = fmt.Sprintf("github.com/beta/repo%02d", i)
+	}
+	core := &r.State.Teams[1]
+	core.Policy.Repositories = append(many, "github.com/shared/tool")
+	got := render(r.teamSections(now), 80)
+	if !strings.Contains(got, "       github.com/beta/repo04\n     ! + 46 more\n  ✓ 3.") || strings.Contains(got, "repo05") {
+		t.Errorf("long list not capped at five with its hidden conflict marked:\n%s", got)
+	}
+	core.Policy.Repositories = many
+	if got := render(r.teamSections(now), 80); !strings.Contains(got, "       github.com/beta/repo04\n       + 45 more\n") {
+		t.Errorf("overflow without a conflict is marked:\n%s", got)
 	}
 }

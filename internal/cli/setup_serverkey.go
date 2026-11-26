@@ -69,17 +69,6 @@ func (app *App) useServerKey(s *setup.Steps, ui *setupUI, org orgRef, team *stri
 			Personal:       false,
 			Policy:         pol,
 		}
-		// Only reuse existing bindings when updating the same server-key team in place;
-		// switching to a different server-key team replaces routing.State with blank
-		// bindings, so all bindings for the new team must be computed fresh.
-		var existingBindings map[string]routing.Binding
-		if baseline.sameAccount && sameSingleTeam(baseline.state, target) {
-			existingBindings = baseline.state.Bindings
-		}
-		bindings, err := decideSetupBindings(target, cmp.Or(cfg.OrganizationName, cfg.OrganizationID), existingBindings, false)
-		if err != nil {
-			return config.Policy{}, err
-		}
 		var committed routing.State
 		var switched bool
 		err = daemon.WithRoutingRelayGate(app.stateDir, app.version, func() error {
@@ -92,7 +81,7 @@ func (app *App) useServerKey(s *setup.Steps, ui *setupUI, org orgRef, team *stri
 				return err
 			}
 			var cerr error
-			committed, switched, cerr = app.commitRoutingStateLocked(cfg.ProfileName, sendas.NoPersonLane, baseline, target, nil, bindings, true)
+			committed, switched, cerr = app.commitRoutingStateLocked(cfg.ProfileName, sendas.NoPersonLane, baseline, []routing.Team{target}, nil, nil, true)
 			return cerr
 		})
 		if err != nil {
@@ -228,5 +217,5 @@ func applyServerKey(p *config.Profile, cfg *config.Config) {
 		p.TeamName = ""
 	}
 	p.Team = cfg.Team
-	p.ServerKeySignIn, p.ServerKeyAuthURL = true, cfg.AuthURL
+	p.SetServerKeySignIn(true, cfg.AuthURL)
 }

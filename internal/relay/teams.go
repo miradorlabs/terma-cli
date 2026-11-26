@@ -67,7 +67,6 @@ type (
 		Kind       string    `json:"kind"`
 		Repository string    `json:"repository,omitempty"`
 		Narrow     bool      `json:"narrow,omitempty"`
-		HoldKey    string    `json:"hold_key,omitempty"`
 		Session    string    `json:"session,omitempty"`
 		Run        string    `json:"run,omitempty"`
 		At         time.Time `json:"at,omitzero"`
@@ -103,7 +102,6 @@ const (
 	Discard
 	WhyUnknown    Why = "unknown_location"
 	WhyMixed      Why = "mixed_run"
-	WhyPending    Why = "pending_binding"
 	WhyBlocked    Why = "team_blocked"
 	WhyNoTeam     Why = "no_team"
 	WhyNoState    Why = "no_routing_state"

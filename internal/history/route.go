@@ -103,17 +103,11 @@ func (r *cwdResolver) resolveUncached(ctx context.Context, cwd, fallbackRepoURL,
 		}
 		return RouteTarget{Team: team, Location: loc, Checkout: checkout}, true, ""
 	case routing.Hold:
-		if d.Reason == routing.ReasonPending {
-			return baseTarget, false, SkipPendingBinding
-		}
 		if d.Blocked != "" {
 			return baseTarget, false, SkipTeamBlockedPrefix + string(d.Blocked)
 		}
 		return baseTarget, false, SkipTeamBlockedPrefix + string(d.Reason)
 	default:
-		if d.Reason == routing.ReasonBoundNotCollected {
-			return baseTarget, false, SkipBoundNotCollected
-		}
 		return baseTarget, false, SkipNotCollected
 	}
 }

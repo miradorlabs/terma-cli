@@ -2,9 +2,28 @@ package spinner
 
 import (
 	"bytes"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 )
+
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
 
 // Captured output never sees a frame.
 func TestSpinnerIsInertOffATerminal(t *testing.T) {
@@ -20,17 +39,49 @@ func TestSpinnerIsInertOffATerminal(t *testing.T) {
 	}
 }
 
-// The mark is the eight quadrant glyphs sweeping around one cell.
+// Updating the text on a running spinner redraws promptly with the new message.
+func TestSpinnerUpdatesTextWithoutStopping(t *testing.T) {
+	t.Parallel()
+	var buf syncBuffer
+	s := &Spinner{w: &buf}
+	s.Start("Fetching organizations…")
+	deadline := time.Now().Add(time.Second)
+	for !strings.Contains(buf.String(), "Fetching organizations…") {
+		if time.Now().After(deadline) {
+			s.Stop()
+			t.Fatalf("initial frame not drawn: %q", buf.String())
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	s.Start("Fetching teams…")
+	deadline = time.Now().Add(time.Second)
+	for !strings.Contains(buf.String(), "Fetching teams…") {
+		if time.Now().After(deadline) {
+			s.Stop()
+			t.Fatalf("updated frame not drawn: %q", buf.String())
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	s.Stop()
+	if !strings.HasSuffix(buf.String(), "\r\x1b[2K") {
+		t.Fatalf("spinner did not clear line on stop: %q", buf.String())
+	}
+}
+
+// The mark sweeps clockwise across the two half-block cells without repeating a frame.
 func TestFramesSweepTheFourSquares(t *testing.T) {
 	t.Parallel()
 	if len(frames) != 8 {
 		t.Fatalf("want 8 frames, got %d", len(frames))
 	}
-	seen := map[string]bool{}
+	seen := map[frame]bool{}
 	for _, f := range frames {
 		if seen[f] {
-			t.Fatalf("frame %q repeats", f)
+			t.Fatalf("frame %+v repeats", f)
 		}
 		seen[f] = true
+	}
+	if frames[0].left != "▀" || frames[0].right != "▄" {
+		t.Fatalf("first frame should show Terma's diagonal mark (▀▄), got %q%q", frames[0].left, frames[0].right)
 	}
 }

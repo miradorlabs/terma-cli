@@ -27,6 +27,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 	"github.com/miradorlabs/terma-cli/internal/ui/prompt"
+	"github.com/miradorlabs/terma-cli/internal/ui/spinner"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
@@ -48,13 +49,13 @@ func (app *App) NewRootCommand() *cobra.Command {
 		Short: "Attribute AI coding spend to the sessions, files, and commits that produced it",
 		Long: `terma connects your coding agents to Terma and stamps the commits they produce.
 
-  terma setup      once per developer: signs you in, chooses your team and coding
-                   agents, and writes machine-wide hooks. Your team's policy lists
-                   the repositories it collects; nothing is written into a
-                   repository's files.
+  terma setup      once per developer: signs you in, loads your organizations and
+                   teams, chooses your coding agents, and writes machine-wide hooks.
+                   Your teams' policies list the repositories they collect; nothing
+                   is written into a repository's files.
                    Run it again to repair the machine.
   terma teams      chooses the teams this machine sends telemetry to, across all
-                   your organizations, and which organization owns a repository.
+                   your organizations.
   terma history    uploads past coding agent sessions to your selected teams.
   terma doctor     verifies the whole chain end to end; every failure names its fix.
   terma update     installs the latest release and refreshes what terma installed.
@@ -205,6 +206,12 @@ func quietCommand(args []string) bool {
 	return len(args) > 0 && slices.Contains([]string{"hook", "spool"}, args[0])
 }
 
+// progressSpinner animates a status line while a command waits on network calls.
+type progressSpinner interface {
+	Start(text string)
+	Stop()
+}
+
 // App is terma's command line: what every command reads, held for one run.
 type App struct {
 	// dir is terma's config directory and stateDir its state directory, resolved once by
@@ -232,6 +239,8 @@ type App struct {
 	// runForm runs an interactive checkbox form; defaults to prompt.Run.
 	runForm func(*prompt.Form) ([]prompt.Item, error)
 	pickOne func(*cobra.Command, string, []pickRow, func(string) (int, error)) (int, error)
+	// newSpinner creates a Terma-branded loading spinner writing to w.
+	newSpinner func(io.Writer) progressSpinner
 	// binary is the executable as this process started from it, for the updater: a command
 	// that ran a while, or the relay, may outlive its version, once another install
 	// replaces the binary.
@@ -247,12 +256,20 @@ func New(agentsFor func(configDir string) *agents.Registry, version string) *App
 	app := &App{agentsFor: agentsFor, version: version, binDirs: doctor.WellKnownBinDirs, hookExecutable: procinfo.AbsExecutable,
 		managedRoot: "/", runUpdateStep: runUpdateStep, nateRemoveBinary: removeNateBinary, spawnRelay: daemon.SpawnFrom,
 		backgroundStep: runBackgroundStep,
-		canAsk:         canPrompt, runForm: prompt.Run, pickOne: pick}
+		canAsk:         canPrompt, runForm: prompt.Run, pickOne: pick,
+		newSpinner: func(w io.Writer) progressSpinner { return spinner.New(w) }}
 	app.nateBinaryCandidates = app.installedTermaBinaries
 	if exe, err := os.Executable(); err == nil {
 		app.binary, _ = os.Stat(exe)
 	}
 	return app
+}
+
+func (app *App) startSpinner(w io.Writer) progressSpinner {
+	if app.newSpinner != nil {
+		return app.newSpinner(w)
+	}
+	return spinner.New(w)
 }
 
 // updateClient is the release updater as this process: its version, and the executable it

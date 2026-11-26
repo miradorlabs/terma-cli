@@ -14,7 +14,7 @@ func TestForABufferIsPlain(t *testing.T) {
 	if p.Enabled() {
 		t.Fatal("a buffer is not a terminal")
 	}
-	for _, got := range []string{p.Brand("x"), p.Bold("x"), p.Dim("x"), p.OK("x"), p.Warn("x"), p.Fail("x")} {
+	for _, got := range []string{p.Brand("x"), p.BrandBright("x"), p.BrandMuted("x"), p.Bold("x"), p.Dim("x"), p.OK("x"), p.Warn("x"), p.Fail("x")} {
 		if got != "x" {
 			t.Fatalf("plain palette altered text: %q", got)
 		}

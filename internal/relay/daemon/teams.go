@@ -119,7 +119,7 @@ func (t *Teams) Route(rec relay.Record) relay.Routed {
 	queuedFor := func(tm routing.Team) relay.Queued {
 		return relay.Queued{
 			Profile: pr.st.Profile, Enrollment: tm.EnrollmentID, Project: tm.TeamID, Account: pr.st.Account,
-			Kind: string(loc.Kind), Repository: loc.Repository, Narrow: loc.Narrow, HoldKey: d.Authority.Key,
+			Kind: string(loc.Kind), Repository: loc.Repository, Narrow: loc.Narrow,
 			Session: rec.Session, Run: rec.Placement.Run, At: rec.At, EndAt: rec.EndAt,
 		}
 	}
@@ -343,8 +343,6 @@ func (t *Teams) user(cfg *config.Config, account string, tm routing.Team, endpoi
 
 func held(d routing.Decision) (relay.Why, string) {
 	switch d.Reason {
-	case routing.ReasonPending:
-		return relay.WhyPending, "pending:" + d.Authority.Key
 	case routing.ReasonBlocked:
 		return relay.WhyBlocked, "team:" + d.EnrollmentID
 	}

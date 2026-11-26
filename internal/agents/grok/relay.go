@@ -26,7 +26,7 @@ const (
 	sandboxOff      = "off"
 	sandboxKey      = "profile"
 	setupFix        = "terma setup"
-	trustPromptNote = "terma's hooks file is a user hook to grok: in a folder grok does not trust yet, its TUI asks \"Do you trust the contents of this directory?\" before anything else, and No quits grok. Headless runs (grok -p) do not ask."
+	trustPromptNote = "Grok asks \"Do you trust the contents of this directory?\" the first time it opens a folder; answer Yes, as No quits grok."
 )
 
 // ConfigureRelay refuses a grok too old for terma's hooks, and one whose shell or config

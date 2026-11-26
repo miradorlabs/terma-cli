@@ -207,9 +207,6 @@ func singleTeamRoutingState(now time.Time, account, orgID, teamID, repo string, 
 				FetchedAt:          now,
 			},
 		}},
-		Bindings: map[string]routing.Binding{
-			repo: {Organization: orgID},
-		},
 	}
 }
 

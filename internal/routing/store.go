@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -122,8 +123,8 @@ func load(path, profile string) (State, bool, error) {
 
 // Update applies change to profile's existing routing state under its one lock if on-disk
 // state satisfies expect: read, verify expect, change, check, and write atomically with
-// the next generation (and next ConsentGeneration when Teams membership/order/identity or
-// Bindings changed). ErrNoState when there is none; ErrAccountMismatch or
+// the next generation (and next ConsentGeneration when Teams membership/order/identity
+// changed). ErrNoState when there is none; ErrAccountMismatch or
 // ErrStaleGeneration when expect is not met. A change that returns an error, alters
 // Profile/Account/StateID/Generation/ConsentGeneration, leaves the state broken, or
 // changes nothing writes nothing.
@@ -297,18 +298,12 @@ type teamConsent struct {
 	Personal       bool
 }
 
-type consentState struct {
-	teams    []teamConsent
-	bindings map[string]Binding
-}
+type consentState []teamConsent
 
 func consentFingerprint(s State) consentState {
-	cs := consentState{
-		teams:    make([]teamConsent, len(s.Teams)),
-		bindings: make(map[string]Binding, len(s.Bindings)),
-	}
+	cs := make(consentState, len(s.Teams))
 	for i, t := range s.Teams {
-		cs.teams[i] = teamConsent{
+		cs[i] = teamConsent{
 			EnrollmentID:   t.EnrollmentID,
 			OrganizationID: t.OrganizationID,
 			AuthURL:        t.AuthURL,
@@ -316,28 +311,10 @@ func consentFingerprint(s State) consentState {
 			Personal:       t.Personal,
 		}
 	}
-	for k, v := range s.Bindings {
-		cs.bindings[k] = v
-	}
 	return cs
 }
 
-func (a consentState) equal(b consentState) bool {
-	if len(a.teams) != len(b.teams) || len(a.bindings) != len(b.bindings) {
-		return false
-	}
-	for i := range a.teams {
-		if a.teams[i] != b.teams[i] {
-			return false
-		}
-	}
-	for k, v := range a.bindings {
-		if bv, ok := b.bindings[k]; !ok || bv != v {
-			return false
-		}
-	}
-	return true
-}
+func (a consentState) equal(b consentState) bool { return slices.Equal(a, b) }
 
 // Delete removes profile's routing state under the lock if the on-disk state matches
 // expect. Returns ErrNoState if absent, or ErrAccountMismatch/ErrStaleGeneration if

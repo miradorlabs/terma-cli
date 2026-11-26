@@ -81,7 +81,7 @@ func serverKeyProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) {
-		p.ServerKeySignIn, p.ServerKeyAuthURL = true, cfg.AuthURL
+		p.SetServerKeySignIn(true, cfg.AuthURL)
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -128,10 +128,8 @@ func routeProject(t *testing.T, projectID, key, endpoint string) {
 				break
 			}
 		}
-		if _, err := s.Select(tm); err != nil {
-			return err
-		}
-		return s.Bind(repo, orgID, false)
+		_, err := s.Select(tm)
+		return err
 	}
 	st, found, err := routing.Load(testApp.stateDir, profile)
 	switch {

@@ -138,14 +138,9 @@ func TestHistoryUploadCLIDryRunAndEndToEndBothHarnesses(t *testing.T) {
 				},
 			},
 		},
-		Bindings: map[string]routing.Binding{
-			"github.com/acme/repo-a": {Organization: "org-a"},
-			"github.com/beta/repo-b": {Organization: "org-b"},
-		},
 	}
 	if _, err := routing.Replace(stateDir, config.DefaultProfile, nil, cred.Account(), func(s *routing.State) error {
 		s.Teams = rtState.Teams
-		s.Bindings = rtState.Bindings
 		return nil
 	}); err != nil {
 		t.Fatal(err)
@@ -306,7 +301,6 @@ func TestHistoryUploadExitsNonZeroOnHoldingsFailure(t *testing.T) {
 			EnrollmentID: "enr-a", TeamID: "team-a", OrganizationID: "org-a", AuthURL: apiSrv.URL,
 			Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-a/repo-a"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-a", TeamID: "team-a", AuthURL: apiSrv.URL, FetchedAt: now},
 		}}
-		s.Bindings = map[string]routing.Binding{"github.com/org-a/repo-a": {Organization: "org-a"}}
 		return nil
 	}); err != nil {
 		t.Fatal(err)

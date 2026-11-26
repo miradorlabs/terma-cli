@@ -268,7 +268,7 @@ func TestPinnedHoldNeverReroutesAndPolicyTimeout(t *testing.T) {
 
 	u := newSignInUpstream(t)
 	si := &testSignIn{account: accountA}
-	var verdict atomic.Int32 // 0=Wait(Pending), 1=SendNow, 2=Wait(Blocked)
+	var verdict atomic.Int32 // 0=Wait(Blocked), 1=SendNow, 2=Wait(Blocked, another blocker)
 	var recheckCalls atomic.Int32
 	router := &stubRouter{
 		active:      true,
@@ -277,15 +277,11 @@ func TestPinnedHoldNeverReroutesAndPolicyTimeout(t *testing.T) {
 			if !rec.Placed {
 				return Routed{Outcome: Hold, Why: WhyUnknown}
 			}
-			why := WhyPending
-			if verdict.Load() == 2 {
-				why = WhyBlocked
-			}
 			return Routed{
 				Outcome: Hold,
-				Why:     why,
-				Blocker: "pending:b1",
-				Queued:  Queued{Enrollment: "enr_team", Project: "proj_team", Account: accountA, Kind: "team", HoldKey: "b1", Session: rec.Session},
+				Why:     WhyBlocked,
+				Blocker: "team:enr_team",
+				Queued:  Queued{Enrollment: "enr_team", Project: "proj_team", Account: accountA, Kind: "team", Session: rec.Session},
 			}
 		},
 		recheckFn: func(enrollment, _ string) Rechecker {
@@ -299,7 +295,7 @@ func TestPinnedHoldNeverReroutesAndPolicyTimeout(t *testing.T) {
 					case 2:
 						return Rechecked{Verdict: Wait, Why: WhyBlocked, Blocker: "team:" + enrollment}
 					default:
-						return Rechecked{Verdict: Wait, Why: WhyPending, Blocker: "pending:" + q.HoldKey}
+						return Rechecked{Verdict: Wait, Why: WhyBlocked, Blocker: "team:enr_team"}
 					}
 				},
 			}
@@ -330,7 +326,7 @@ func TestPinnedHoldNeverReroutesAndPolicyTimeout(t *testing.T) {
 		t.Fatalf("routeCalls = %d, want 1", routesAfterFirst)
 	}
 
-	// Sweep while still Wait(Pending): must call ONLY Recheck, NEVER Route again!
+	// Sweep while still Wait(Blocked): must call ONLY Recheck, NEVER Route again!
 	r.sweep()
 	router.mu.Lock()
 	routesAfterSweep := router.routeCalls
@@ -724,12 +720,12 @@ func TestReviewEdgeCases(t *testing.T) {
 		router := &stubRouter{
 			active: true,
 			routeFn: func(rec Record) Routed {
-				return Routed{Outcome: Hold, Why: WhyPending, Queued: Queued{Enrollment: "enr_pin", Project: "proj_pin", Account: rec.Account, Kind: "team", Session: rec.Session}}
+				return Routed{Outcome: Hold, Why: WhyBlocked, Queued: Queued{Enrollment: "enr_pin", Project: "proj_pin", Account: rec.Account, Kind: "team", Session: rec.Session}}
 			},
 			recheckFn: func(_, _ string) Rechecker {
 				return stubRechecker{entryFn: func(q Queued) Rechecked {
 					if state.Load() == 0 {
-						return Rechecked{Verdict: Wait, Why: WhyPending}
+						return Rechecked{Verdict: Wait, Why: WhyBlocked}
 					}
 					if !q.EffectiveEnd().Before(mixedAt) {
 						return Rechecked{Verdict: Discard, Why: WhyMixed, Blocker: "mixed:s1", MixedAt: mixedAt}
@@ -1023,7 +1019,7 @@ func TestReviewEdgeCases(t *testing.T) {
 					if q.Session == "go" {
 						return Rechecked{Verdict: SendNow}
 					}
-					return Rechecked{Verdict: Wait, Why: WhyPending}
+					return Rechecked{Verdict: Wait, Why: WhyBlocked}
 				}}
 			},
 			resolveFn: func(_, _, account string) (Policy, error) {
@@ -1343,6 +1339,8 @@ func TestReviewEdgeCases(t *testing.T) {
 				}, true
 			},
 		})
+		// The senders route starts write to the outbox: stop them before its folder goes.
+		t.Cleanup(func() { r.cancelSend(); r.wg.Wait() })
 		spans := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{
 			Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{kv("session.id", "s_aba")}},
 			ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{

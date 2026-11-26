@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
-	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -18,7 +17,6 @@ import (
 )
 
 type teamsChange struct {
-	ops               []bindingOp
 	untick            []routing.Team
 	released          map[string]bool
 	ticks             []*tick
@@ -26,12 +24,11 @@ type teamsChange struct {
 }
 
 // applyTeamsWithView makes f's changes against st as one CAS routing-state write
-// (st.ExpectConsent): bindings, then unticks/releases, then ticks. No keys are minted.
+// (st.ExpectConsent): unticks/releases, then ticks. No keys are minted.
 func (app *App) applyTeamsWithView(cmd *cobra.Command, cfg *config.Config, st routing.State, v teamsView, listed bool, f teamsFlags) (teamsView, error) {
 	ctx := cmd.Context()
 	names := loadTeamNames(app.stateDir, cfg.ProfileName)
 	ch := &teamsChange{released: map[string]bool{}}
-	ask := !f.json && !f.assumeYes && app.canAsk()
 
 	getClient := sync.OnceValues(func() (*api.Client, error) {
 		return app.teamsAPIClient(cfg, st.Account)
@@ -45,11 +42,6 @@ func (app *App) applyTeamsWithView(cmd *cobra.Command, cfg *config.Config, st ro
 		return v
 	}
 
-	planned := st
-	planned.Bindings = maps.Clone(st.Bindings)
-	if err := resolveBindingFlags(cmd, &planned, f, ask, &names, list, ch); err != nil {
-		return teamsView{}, err
-	}
 	for _, g := range []struct {
 		refs []string
 		rel  bool
@@ -84,9 +76,6 @@ func (app *App) applyTeamsWithView(cmd *cobra.Command, cfg *config.Config, st ro
 			if err != nil {
 				return teamsView{}, err
 			}
-			if err := decideBindings(&planned, tk, tickAsker{cmd: cmd, ask: ask, assumeYes: f.assumeYes, names: names, pick: app.pickOne}); err != nil {
-				return teamsView{}, err
-			}
 			ch.ticks = append(ch.ticks, tk)
 		}
 	}
@@ -107,9 +96,6 @@ func (app *App) applyTeamsWithView(cmd *cobra.Command, cfg *config.Config, st ro
 			}
 		}
 		ch.changes = append(ch.changes, "ticked "+orgTeamLabel(tk.orgName, tk.teamName))
-		for _, op := range tk.ops {
-			ch.changes = append(ch.changes, describeOp(op, tk.orgName))
-		}
 		ch.warnings = append(ch.warnings, tk.notes...)
 	}
 	if listed {
@@ -118,7 +104,7 @@ func (app *App) applyTeamsWithView(cmd *cobra.Command, cfg *config.Config, st ro
 		c, cerr := getClient()
 		v = app.listTeamsWithClient(ctx, cfg, next, c, cerr)
 	}
-	app.finishUnticks(next, ch, loadTeamNames(app.stateDir, cfg.ProfileName))
+	app.finishUnticks(ch, loadTeamNames(app.stateDir, cfg.ProfileName))
 	v.Changes, v.Warnings, v.state = append(v.Changes, ch.changes...), append(v.Warnings, ch.warnings...), next
 	return v, nil
 }
@@ -128,17 +114,12 @@ func formatCASConflict(err error) error {
 	case errors.Is(err, routing.ErrAccountMismatch):
 		return fmt.Errorf("%w: this machine signed in as another account while `terma teams` was running; nothing was changed — run `terma setup`", err)
 	case errors.Is(err, routing.ErrStaleGeneration):
-		return fmt.Errorf("%w: teams or bindings changed while `terma teams` was running; nothing was changed — run `terma teams` again", err)
+		return fmt.Errorf("%w: teams changed while `terma teams` was running; nothing was changed — run `terma teams` again", err)
 	}
 	return err
 }
 
 func (ch *teamsChange) write(s *routing.State, now time.Time) error {
-	for _, op := range ch.ops {
-		if err := op.apply(s); err != nil {
-			return err
-		}
-	}
 	for _, t := range ch.untick {
 		if live, ok := s.Team(t.EnrollmentID); !ok {
 			return fmt.Errorf("team %s was unticked meanwhile", t.TeamID)
@@ -148,11 +129,6 @@ func (ch *teamsChange) write(s *routing.State, now time.Time) error {
 		s.Deselect(t.EnrollmentID)
 	}
 	for _, tk := range ch.ticks {
-		for _, op := range tk.ops {
-			if err := op.apply(s); err != nil {
-				return err
-			}
-		}
 		var err error
 		if tk.enrollment, err = s.Select(tk.team); err != nil {
 			return err
@@ -161,36 +137,14 @@ func (ch *teamsChange) write(s *routing.State, now time.Time) error {
 	return nil
 }
 
-func (app *App) finishUnticks(next routing.State, ch *teamsChange, names teamNames) {
+func (app *App) finishUnticks(ch *teamsChange, names teamNames) {
 	for _, t := range ch.untick {
 		verb := "unticked "
 		if ch.released[t.EnrollmentID] {
 			verb = "released "
 		}
 		ch.changes = append(ch.changes, verb+teamLabel(names, t)+": what was queued for it will be discarded")
-		if slices.ContainsFunc(next.Teams, func(o routing.Team) bool { return o.OrganizationID == t.OrganizationID }) {
-			continue
-		}
-		for _, k := range slices.Sorted(maps.Keys(next.Bindings)) {
-			if b := next.Bindings[k]; !b.Refused && b.Organization == t.OrganizationID {
-				ch.warnings = append(ch.warnings, fmt.Sprintf("%s stays bound to %s, so it collects nowhere until you unbind it: `terma teams --unbind %s`",
-					k, cmp.Or(names.Orgs[t.OrganizationID], t.OrganizationID), quoteArg(k)))
-			}
-		}
 	}
-	if len(ch.untick) > 0 && len(next.Teams) == 1 && next.Teams[0].Personal && slices.ContainsFunc(slices.Collect(maps.Values(next.Bindings)), func(b routing.Binding) bool { return !b.Refused }) {
-		ch.warnings = append(ch.warnings, "while anything stays bound to an organization, a record whose location is unknown never goes to personal")
-	}
-}
-
-func describeOp(op bindingOp, orgName string) string {
-	switch {
-	case op.refuse:
-		return "refused " + op.key + " to every organization"
-	case op.org != "":
-		return "bound " + op.key + " to " + cmp.Or(orgName, op.org)
-	}
-	return "unbound " + op.key
 }
 
 func matchUniqueRef[T any](k matchKind[T], items []T, ref string, label func(T) string) (int, error) {

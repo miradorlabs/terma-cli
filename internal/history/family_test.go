@@ -37,10 +37,6 @@ func twoOrgState(now time.Time, personal bool) routing.State {
 			team("enr-a", "team-a", "org-a", config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-a/app"}}),
 			team("enr-b", "team-b", "org-b", config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-b/secret"}}),
 		},
-		Bindings: map[string]routing.Binding{
-			"github.com/org-a/app":    {Organization: "org-a"},
-			"github.com/org-b/secret": {Organization: "org-b"},
-		},
 	}
 	if personal {
 		p := team("enr-p", "team-p", "org-p", config.Policy{Mode: config.ModeGlobal})

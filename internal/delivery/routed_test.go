@@ -240,9 +240,7 @@ func TestRoutedStateAccountPairingFailsClosed(t *testing.T) {
 		t.Parallel()
 		m := newRoutedMachine(t)
 		// Routing state belongs to Bob, while Alice is signed in.
-		enr := m.createState(config.DefaultProfile, bobLane, []routing.Team{orgTeam("org-a", "team-a", "github.com/acme/app")}, func(s *routing.State, _ map[string]string) error {
-			return s.Bind("github.com/acme/app", "org-a", false)
-		})
+		enr := m.createState(config.DefaultProfile, bobLane, []routing.Team{orgTeam("org-a", "team-a", "github.com/acme/app")}, nil)
 		srv, sent := recordingIngest(t, http.StatusOK)
 		ev := routedEvent(aliceLane, config.DefaultProfile, enr["team-a"], "github.com/acme/app", semconv.TermaToolCallEvent)
 		ev.Attrs[hookrun.AttrProjectID] = "team-fallback"
@@ -258,9 +256,7 @@ func TestRoutedStateAccountPairingFailsClosed(t *testing.T) {
 	t.Run("user event against no_person state fails closed", func(t *testing.T) {
 		t.Parallel()
 		m := newRoutedMachine(t)
-		enr := m.createState(config.DefaultProfile, sendas.NoPersonLane, []routing.Team{orgTeam("org-a", "team-a", "github.com/acme/app")}, func(s *routing.State, _ map[string]string) error {
-			return s.Bind("github.com/acme/app", "org-a", false)
-		})
+		enr := m.createState(config.DefaultProfile, sendas.NoPersonLane, []routing.Team{orgTeam("org-a", "team-a", "github.com/acme/app")}, nil)
 		srv, sent := recordingIngest(t, http.StatusOK)
 		m.queueRaw(routedEvent(aliceLane, config.DefaultProfile, enr["team-a"], "github.com/acme/app", semconv.TermaToolCallEvent))
 
@@ -274,9 +270,7 @@ func TestRoutedStateAccountPairingFailsClosed(t *testing.T) {
 	t.Run("server-key event against user state fails closed", func(t *testing.T) {
 		t.Parallel()
 		m := newRoutedMachine(t)
-		enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{orgTeam("org-a", "team-a", "github.com/acme/app")}, func(s *routing.State, _ map[string]string) error {
-			return s.Bind("github.com/acme/app", "org-a", false)
-		})
+		enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{orgTeam("org-a", "team-a", "github.com/acme/app")}, nil)
 		if err := keystore.Set(m.config, "team-a", testKey, keystore.Hosts{}); err != nil {
 			t.Fatal(err)
 		}
@@ -386,22 +380,15 @@ func TestRoutedDestinationLessEventsDroppedAndCounted(t *testing.T) {
 }
 
 // Invariant 4a: Pinned enrollments are rechecked via Router.Recheck (never re-routed),
-// HoldKey events wait while pending, send only once bound to the holding org, and discard
-// if bound elsewhere or refused; content policy withholds disallowed attributes/events.
-func TestRoutedRecheckNeverReroutesAndEnforcesHoldKey(t *testing.T) {
+// and content policy withholds disallowed attributes/events.
+func TestRoutedRecheckNeverReroutes(t *testing.T) {
 	t.Parallel()
 	m := newRoutedMachine(t)
 	enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{
 		orgTeam("org-a", "team-a", "github.com/acme/*"),
 		orgTeam("org-b", "team-b", "github.com/beta/*"),
 		personalTeam(),
-	}, func(s *routing.State, _ map[string]string) error {
-		if err := s.Bind("github.com/acme", "org-a", false); err != nil {
-			return err
-		}
-		// Leave github.com/beta/pending unbound (Pending).
-		return nil
-	})
+	}, nil)
 
 	srv, sent := recordingIngest(t, http.StatusOK)
 	signIn := &fakeSignIn{account: aliceLane, token: "tok-alice"}
@@ -410,46 +397,19 @@ func TestRoutedRecheckNeverReroutesAndEnforcesHoldKey(t *testing.T) {
 
 	// Queue:
 	// - active event for team-a (delivers)
-	// - pending-binding event for team-b with HoldKey (blocked/held)
 	// - event for an ended enrollment (discarded, NOT re-routed to personal!)
 	// - event for team-a outside git (no longer covered -> discarded, NOT re-routed to personal!)
 	activeEv := routedEvent(aliceLane, config.DefaultProfile, enr["team-a"], "github.com/acme/api", semconv.TermaToolCallEvent)
-	pendingEv := routedEvent(aliceLane, config.DefaultProfile, enr["team-b"], "github.com/beta/repo", semconv.TermaToolCallEvent)
-	pendingEv.HoldKey = "github.com/beta"
 	endedEv := routedEvent(aliceLane, config.DefaultProfile, "enr-deselected", "github.com/acme/api", semconv.TermaToolCallEvent)
 	outsideEv := routedEvent(aliceLane, config.DefaultProfile, enr["team-a"], "", semconv.TermaToolCallEvent)
-	m.queueRaw(activeEv, pendingEv, endedEv, outsideEv)
+	m.queueRaw(activeEv, endedEv, outsideEv)
 
 	res := r.Flush(t.Context(), m.spool, cfg, true, 0)
-	if res.Sent != 1 || res.Blocked != 1 || res.Held != 1 || res.Discarded != 2 || res.Lost() {
+	if res.Sent != 1 || res.Blocked != 0 || res.Held != 0 || res.Discarded != 2 || res.Lost() {
 		t.Fatalf("pass 1 = %+v", res)
 	}
 	if got := sent(); len(got) != 1 || got[0].project != "team-a" {
 		t.Fatalf("pass 1 sent = %+v, want only team-a", got)
-	}
-
-	// Bind github.com/beta to org-b -> held pending event now delivers to team-b!
-	m.updateState(config.DefaultProfile, aliceLane, func(s *routing.State) error {
-		return s.Bind("github.com/beta", "org-b", false)
-	})
-	res2 := r.Flush(t.Context(), m.spool, cfg, true, 0)
-	if res2.Sent != 1 || res2.Held != 0 || res2.Blocked != 0 || res2.Discarded != 0 {
-		t.Fatalf("pass 2 after bind = %+v", res2)
-	}
-	if got := sent(); len(got) != 2 || got[1].project != "team-b" {
-		t.Fatalf("pass 2 sent = %+v, want team-b", got)
-	}
-
-	// HoldKey event when binding is refused -> discarded (never re-routed to personal!).
-	m.updateState(config.DefaultProfile, aliceLane, func(s *routing.State) error {
-		return s.Refuse("github.com/beta/refused")
-	})
-	refusedHold := routedEvent(aliceLane, config.DefaultProfile, enr["team-b"], "github.com/beta/refused", semconv.TermaToolCallEvent)
-	refusedHold.HoldKey = "github.com/beta/refused"
-	m.queueRaw(refusedHold)
-	res3 := r.Flush(t.Context(), m.spool, cfg, true, 0)
-	if res3.Sent != 0 || res3.Discarded != 1 || res3.Held != 0 {
-		t.Fatalf("pass 3 refused binding = %+v", res3)
 	}
 
 	// Refused team discards (never re-routes to personal); Suspended team blocks (waits).
@@ -502,12 +462,7 @@ func TestRoutedMixedDropsContentButKeepsOwnLocationLocational(t *testing.T) {
 	enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{
 		orgTeam("org-a", "team-a", "github.com/acme/app"),
 		orgTeam("org-b", "team-b", "github.com/beta/lib"),
-	}, func(s *routing.State, _ map[string]string) error {
-		if err := s.Bind("github.com/acme/app", "org-a", false); err != nil {
-			return err
-		}
-		return s.Bind("github.com/beta/lib", "org-b", false)
-	})
+	}, nil)
 
 	t0 := time.Now().Add(-10 * time.Minute)
 	mixedAt := t0.Add(2 * time.Minute)
@@ -599,9 +554,7 @@ func TestRoutedAuthHeadersUserTokenVsServerKey(t *testing.T) {
 		enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{
 			orgTeam("org-a", "team-a", "github.com/acme/app"),
 			personalTeam(),
-		}, func(s *routing.State, _ map[string]string) error {
-			return s.Bind("github.com/acme/app", "org-a", false)
-		})
+		}, nil)
 		srv, sent := recordingIngest(t, http.StatusOK)
 		signIn := &fakeSignIn{account: aliceLane, token: "user-tok-1"}
 		r := m.router(signIn)
@@ -654,9 +607,7 @@ func TestRoutedAuthHeadersUserTokenVsServerKey(t *testing.T) {
 		m := newRoutedMachine(t)
 		enr := m.createState(config.DefaultProfile, sendas.NoPersonLane, []routing.Team{
 			orgTeam("org-a", "team-srv", "github.com/acme/app"),
-		}, func(s *routing.State, _ map[string]string) error {
-			return s.Bind("github.com/acme/app", "org-a", false)
-		})
+		}, nil)
 		keyHost, keySent := recordingIngest(t, http.StatusOK)
 		if err := keystore.Set(m.config, "team-srv", testKey, keystore.Hosts{OTLP: keyHost.URL}); err != nil {
 			t.Fatal(err)
@@ -734,12 +685,7 @@ func TestRoutedIngest403OrgNotAccessibleBacksOffOnlyFailingEnrollment(t *testing
 	enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{
 		orgTeam("org-a", "team-a", "github.com/acme/app"),
 		orgTeam("org-b", "team-b", "github.com/beta/app"),
-	}, func(s *routing.State, _ map[string]string) error {
-		if err := s.Bind("github.com/acme/app", "org-a", false); err != nil {
-			return err
-		}
-		return s.Bind("github.com/beta/app", "org-b", false)
-	})
+	}, nil)
 
 	var mu sync.Mutex
 	hits := map[string]int{}
@@ -851,12 +797,7 @@ func TestRoutedRevalidatesBeforePostWhenRoutingChangesMidPass(t *testing.T) {
 		enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{
 			orgTeam("org-a", "team-a", "github.com/acme/app"),
 			orgTeam("org-b", "team-b", "github.com/beta/app"),
-		}, func(s *routing.State, _ map[string]string) error {
-			if err := s.Bind("github.com/acme/app", "org-a", false); err != nil {
-				return err
-			}
-			return s.Bind("github.com/beta/app", "org-b", false)
-		})
+		}, nil)
 		// Determine deterministic parcel order (enrollment IDs are sorted lexicographically).
 		secondEnr := enr["team-b"]
 		firstTeam, secondTeam := "team-a", "team-b"
@@ -909,12 +850,7 @@ func TestRoutedRevalidatesBeforePostWhenRoutingChangesMidPass(t *testing.T) {
 		enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{
 			orgTeam("org-a", "team-a", "github.com/acme/app"),
 			orgTeam("org-b", "team-b", "github.com/beta/app"),
-		}, func(s *routing.State, _ map[string]string) error {
-			if err := s.Bind("github.com/acme/app", "org-a", false); err != nil {
-				return err
-			}
-			return s.Bind("github.com/beta/app", "org-b", false)
-		})
+		}, nil)
 		firstEnr, secondEnr := enr["team-a"], enr["team-b"]
 		firstTeam, secondTeam := "team-a", "team-b"
 		secondRepo := "github.com/beta/app"
@@ -978,9 +914,7 @@ func TestRoutedRevalidatesBeforePostWhenRoutingChangesMidPass(t *testing.T) {
 		tm := orgTeam("org-a", "team-a", "github.com/acme/app")
 		// Valid at initial admission, but expires if the clock advances by 10s during token refresh.
 		tm.Policy.FetchedAt = now.Add(-config.MaxPolicyAge + 5*time.Second)
-		enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{tm}, func(s *routing.State, _ map[string]string) error {
-			return s.Bind("github.com/acme/app", "org-a", false)
-		})
+		enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{tm}, nil)
 		ev := routedEvent(aliceLane, config.DefaultProfile, enr["team-a"], "github.com/acme/app", semconv.TermaToolCallEvent)
 		ev.Time = now
 		m.queueRaw(ev)
@@ -1035,20 +969,7 @@ func TestRoutedSlowEnrollmentsDoNotStarveHealthySibling(t *testing.T) {
 		orgTeam("org-c", "team-fast-2", "github.com/acme/fast2"),
 		orgTeam("org-d", "team-fast-3", "github.com/acme/fast3"),
 		orgTeam("org-e", "team-fast-4", "github.com/acme/fast4"),
-	}, func(s *routing.State, _ map[string]string) error {
-		for _, pair := range [][2]string{
-			{"github.com/acme/slow", "org-a"},
-			{"github.com/acme/fast1", "org-b"},
-			{"github.com/acme/fast2", "org-c"},
-			{"github.com/acme/fast3", "org-d"},
-			{"github.com/acme/fast4", "org-e"},
-		} {
-			if err := s.Bind(pair[0], pair[1], false); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+	}, nil)
 
 	var mu sync.Mutex
 	var fastHits, inFlight, peakInFlight int
@@ -1118,47 +1039,6 @@ func TestRoutedSlowEnrollmentsDoNotStarveHealthySibling(t *testing.T) {
 	}
 }
 
-// HoldKey exact binding check: an event held for a wildcard owner binding (github.com/beta)
-// must NOT leave if policy changes to an exact repository entry and only github.com/beta/repo
-// is bound while the original owner binding remains pending or refused.
-func TestRoutedHoldKeyRequiresPinnedOwnerBinding(t *testing.T) {
-	t.Parallel()
-	for _, tc := range []struct {
-		name        string
-		refuseOwner bool
-	}{
-		{"owner still pending", false},
-		{"owner refused with repo override", true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			m := newRoutedMachine(t)
-			enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{
-				orgTeam("org-b", "team-b", "github.com/beta/repo"),
-			}, func(s *routing.State, _ map[string]string) error {
-				if tc.refuseOwner {
-					if err := s.Refuse("github.com/beta"); err != nil {
-						return err
-					}
-					return s.Bind("github.com/beta/repo", "org-b", true)
-				}
-				return s.Bind("github.com/beta/repo", "org-b", false)
-			})
-			ev := routedEvent(aliceLane, config.DefaultProfile, enr["team-b"], "github.com/beta/repo", semconv.TermaToolCallEvent)
-			ev.HoldKey = "github.com/beta" // held for the wildcard owner binding, NOT the exact repo
-			m.queueRaw(ev)
-
-			srv, sent := recordingIngest(t, http.StatusOK)
-			res := m.router(&fakeSignIn{account: aliceLane, token: "tok"}).Flush(
-				t.Context(), m.spool, &config.Config{OTLPURL: srv.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth}, true, 0,
-			)
-			if res.Sent != 0 || res.Discarded != 1 || len(sent()) != 0 {
-				t.Fatalf("unsatisfied owner HoldKey must discard without sending: res=%+v sent=%d", res, len(sent()))
-			}
-		})
-	}
-}
-
 // Loss-recording failure: if spool/losses/ cannot be written, destination-less events stay
 // queued as undelivered and surface the storage error instead of disappearing uncounted.
 func TestRoutedCountLostFailureRetainsDestinationLessEvents(t *testing.T) {
@@ -1201,19 +1081,13 @@ func TestRoutedCrossProfileUsesEventProfileEndpoint(t *testing.T) {
 	}
 	enrDefault := m.createState(config.DefaultProfile, aliceLane, []routing.Team{
 		orgTeam("org-a", "team-default", "github.com/acme/default"),
-	}, func(s *routing.State, _ map[string]string) error {
-		return s.Bind("github.com/acme/default", "org-a", false)
-	})
+	}, nil)
 	enrWork := m.createState("work", aliceLane, []routing.Team{
 		orgTeam("org-b", "team-work", "github.com/acme/work"),
-	}, func(s *routing.State, _ map[string]string) error {
-		return s.Bind("github.com/acme/work", "org-b", false)
-	})
+	}, nil)
 	enrMissing := m.createState("deleted", aliceLane, []routing.Team{
 		orgTeam("org-c", "team-deleted", "github.com/acme/deleted"),
-	}, func(s *routing.State, _ map[string]string) error {
-		return s.Bind("github.com/acme/deleted", "org-c", false)
-	})
+	}, nil)
 
 	m.queueRaw(
 		routedEvent(aliceLane, config.DefaultProfile, enrDefault["team-default"], "github.com/acme/default", semconv.TermaToolCallEvent),
@@ -1279,9 +1153,7 @@ func TestRoutedNoDestinationLossIsIdempotentOnCanceledFlush(t *testing.T) {
 	m := newRoutedMachine(t)
 	enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{
 		orgTeam("org-a", "team-slow", "github.com/acme/app"),
-	}, func(s *routing.State, _ map[string]string) error {
-		return s.Bind("github.com/acme/app", "org-a", false)
-	})
+	}, nil)
 
 	release := make(chan struct{})
 	stalledEntered := make(chan struct{}, 1)
@@ -1428,14 +1300,7 @@ func TestRoutedFullSlotSaturationAndEarly403Backoff(t *testing.T) {
 			orgTeam("org-4", "team-4", "github.com/acme/r4"),
 			orgTeam("org-5", "team-5", "github.com/acme/r5"),
 		}
-		enr := m.createState(config.DefaultProfile, aliceLane, teams, func(s *routing.State, _ map[string]string) error {
-			for i, tm := range teams {
-				if err := s.Bind(fmt.Sprintf("github.com/acme/r%d", i+1), tm.OrganizationID, false); err != nil {
-					return err
-				}
-			}
-			return nil
-		})
+		enr := m.createState(config.DefaultProfile, aliceLane, teams, nil)
 		// Pick the lexicographically last enrollment ID as the healthy team so the 4
 		// stalled enrollments acquire all 4 FIFO semaphore slots first.
 		fastTeam := ""
@@ -1513,12 +1378,7 @@ func TestRoutedFullSlotSaturationAndEarly403Backoff(t *testing.T) {
 		enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{
 			orgTeam("org-403", "team-403", "github.com/acme/denied"),
 			orgTeam("org-stall", "team-stall", "github.com/acme/stall"),
-		}, func(s *routing.State, _ map[string]string) error {
-			if err := s.Bind("github.com/acme/denied", "org-403", false); err != nil {
-				return err
-			}
-			return s.Bind("github.com/acme/stall", "org-stall", false)
-		})
+		}, nil)
 
 		got403 := make(chan struct{}, 1)
 		stallEntered := make(chan struct{}, 1)

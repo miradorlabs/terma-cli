@@ -397,7 +397,7 @@ func BackendCheck(ctx context.Context, p Probes, projectID string) Check {
 	}
 	flushDetail := "flushed " + delivered + " to " + strings.Join(hosts, ", ")
 	if res.Sent == 0 && len(undelivered) == 0 {
-		flushDetail = "nothing queued at verification time (hooks may already have flushed)"
+		flushDetail = "nothing was waiting to send, so delivery was not tested"
 	}
 	detail := strings.Join(append(append([]string{flushDetail}, undelivered...), others...), "; ")
 	if len(others) > 0 {

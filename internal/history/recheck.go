@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"io/fs"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -125,13 +124,13 @@ func policyContentMatches(a, b config.Policy) bool {
 }
 
 // routingPoliciesMatch reports whether two routing snapshots have identical routing
-// semantics (selections, bindings, team availability, and policy rules/content switches),
+// semantics (selections, team availability, and policy rules/content switches),
 // ignoring FetchedAt-only Generation ticks from routine background policy refreshes.
 func routingPoliciesMatch(a, b routing.State, now time.Time) bool {
 	if a.StateID != b.StateID || a.Account != b.Account || a.ConsentGeneration != b.ConsentGeneration {
 		return false
 	}
-	if len(a.Teams) != len(b.Teams) || !maps.Equal(a.Bindings, b.Bindings) {
+	if len(a.Teams) != len(b.Teams) {
 		return false
 	}
 	for _, ta := range a.Teams {

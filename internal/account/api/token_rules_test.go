@@ -205,7 +205,9 @@ func TestAnUnavailableRefreshIsRetried(t *testing.T) {
 // Past the budget the sign-in ends: retrying later could present a spent token after the
 // server's grace, which revokes the whole family.
 func TestAnUnavailableRefreshStopsAtTheBudget(t *testing.T) {
-	shortRetries(t, 300*time.Millisecond, 100*time.Millisecond)
+	// Long enough for the first attempt to be sent: one a loaded Windows runner could not
+	// even connect within the budget was never in doubt, and ends nothing.
+	shortRetries(t, 2*time.Second, 100*time.Millisecond)
 	script := &refreshScript{answers: []string{"503", "503", "503", "503", "503", "503", "503", "503"}}
 	c := expiredClient(t, script)
 	start := time.Now()

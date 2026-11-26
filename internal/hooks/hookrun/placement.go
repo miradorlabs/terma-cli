@@ -303,21 +303,18 @@ func (rt *Routing) crossing(prev claim.Claim, havePrev bool, run string, locs []
 		all = append(all, loc)
 	}
 	type org struct {
-		id, repo    string
-		pending, ok bool
+		id string
+		ok bool
 	}
 	classes := make([]org, len(all))
 	for i, l := range all {
-		id, pending, ok := rt.router.OrganizationOf(l, now)
-		classes[i] = org{id: id, pending: pending, ok: ok}
-		if l.Kind == routing.Repository {
-			classes[i].repo = routing.Normalize(l.Repository)
-		}
+		id, ok := rt.router.OrganizationOf(l, now)
+		classes[i] = org{id: id, ok: ok}
 	}
 	for i, a := range classes {
 		for j := i + 1; j < len(classes); j++ {
 			b := classes[j]
-			if !a.ok || !b.ok || ((a.pending || b.pending) && a.repo != "" && a.repo == b.repo) || (!a.pending && !b.pending && a.id == b.id) {
+			if !a.ok || !b.ok || a.id == b.id {
 				continue
 			}
 			at := j

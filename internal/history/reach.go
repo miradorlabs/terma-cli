@@ -35,10 +35,10 @@ type reachedClass struct {
 }
 
 // orgClass is the organization a location belongs to, as routing.Router.OrganizationOf
-// reports it, plus the repository so a pending binding compares equal to itself.
+// reports it.
 type orgClass struct {
-	org, repo   string
-	pending, ok bool
+	org string
+	ok  bool
 }
 
 func mergeMixedCutoff(cur time.Time, hasCur bool, at time.Time, hasAt bool) (time.Time, bool) {
@@ -55,23 +55,13 @@ func (r *cwdResolver) orgOf(loc routing.Location) orgClass {
 	if loc.Kind == "" {
 		return orgClass{}
 	}
-	org, pending, ok := r.router.OrganizationOf(loc, r.now)
-	repo := ""
-	if loc.Kind == routing.Repository {
-		repo = routing.Normalize(loc.Repository)
-	}
-	return orgClass{org: org, repo: repo, pending: pending, ok: ok}
+	org, ok := r.router.OrganizationOf(loc, r.now)
+	return orgClass{org: org, ok: ok}
 }
 
 // crosses mirrors Routing.crossing in internal/hooks/hookrun/placement.go.
 func crosses(a, b orgClass) bool {
-	if !a.ok || !b.ok {
-		return false
-	}
-	if (a.pending || b.pending) && a.repo != "" && a.repo == b.repo {
-		return false
-	}
-	return a.pending || b.pending || a.org != b.org
+	return a.ok && b.ok && a.org != b.org
 }
 
 // familyVerdict is what a spawn family's transcripts say about its Mixed cutoff, for the

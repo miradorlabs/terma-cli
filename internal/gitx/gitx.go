@@ -208,10 +208,15 @@ func RepositoryID(raw string) string {
 	return strings.ToLower(u.Hostname()) + "/" + path
 }
 
-// Git runs an arbitrary git command in dir, bounded by Timeout.
+// Git runs an arbitrary git command in dir, bounded by setupTimeout: it sets repositories
+// up, as tests do, and no hook calls it, so it is not held to a hook's Timeout. A loaded
+// CI runner can take longer than that to start git.
 func Git(ctx context.Context, dir string, args ...string) (string, error) {
-	return run(ctx, dir, args...)
+	return runWithin(ctx, setupTimeout, dir, args...)
 }
+
+// setupTimeout bounds a git call that is not on a hook's path.
+const setupTimeout = time.Minute
 
 // Origin is a repository as OpenTelemetry's vcs attributes name it.
 type Origin struct {

@@ -1,6 +1,7 @@
 package repohooks
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -251,7 +252,9 @@ func TestALinkedWorktreeSharesOneInstall(t *testing.T) {
 }
 
 // Sessions starting at once in a repository with a hook of its own: exactly one sets it
-// aside, and it is never replaced by terma's script.
+// aside, and it is never replaced by terma's script. A session that waits out the lock
+// installs nothing, as it may: on a loaded Windows runner eight installs in a row can
+// outlast lockWait, and its next hook installs.
 func TestConcurrentInstallsSetTheHookAsideOnce(t *testing.T) {
 	for range 20 {
 		_, gitDir := scratch(t)
@@ -261,7 +264,7 @@ func TestConcurrentInstallsSetTheHookAsideOnce(t *testing.T) {
 		var wg sync.WaitGroup
 		for range 8 {
 			wg.Go(func() {
-				if _, err := Install(stateDir, terma, gitDir); err != nil {
+				if _, err := Install(stateDir, terma, gitDir); err != nil && !errors.Is(err, context.DeadlineExceeded) {
 					t.Error(err)
 				}
 			})

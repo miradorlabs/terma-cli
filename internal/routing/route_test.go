@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -35,8 +36,7 @@ func personal(entries ...string) Team {
 	return t
 }
 
-// fixture is the plan's scenario team list: Acme Platform, ClientCo Contractors and
-// Personal, with github.com/acme bound to Acme and github.com/clientco/app to ClientCo.
+// fixture is the scenario team list: Acme Platform, ClientCo Contractors and Personal.
 func fixture(t *testing.T, teams ...Team) *State {
 	t.Helper()
 	if teams == nil {
@@ -48,9 +48,13 @@ func fixture(t *testing.T, teams ...Team) *State {
 			t.Fatal(err)
 		}
 	}
-	must(t, s.Bind("github.com/acme", "acme", false))
-	must(t, s.Bind("github.com/clientco/app", "clientco", false))
 	return s
+}
+
+// updated is tm with its policy last updated at.
+func updated(tm Team, at time.Time) Team {
+	tm.Policy.UpdatedAt = at
+	return tm
 }
 
 func must(t *testing.T, err error) {
@@ -87,7 +91,6 @@ func expect(t *testing.T, s *State, loc Location, outcome Outcome, want string) 
 	}
 }
 
-// The plan's scenario table, row by row.
 func TestRouteScenarios(t *testing.T) {
 	t.Parallel()
 	t.Run("matched", func(t *testing.T) {
@@ -98,16 +101,10 @@ func TestRouteScenarios(t *testing.T) {
 		expect(t, s, repo("github.com/dawson/side"), Send, "personal")
 		expect(t, s, Location{Kind: OutsideGit}, Send, "personal")
 	})
-	t.Run("a bound owner's unlisted repository goes nowhere", func(t *testing.T) {
-		s := fixture(t, team("acme", "acme-platform", "github.com/acme/api"), personal())
-		must(t, s.Bind("github.com/acme", "acme", false))
-		expect(t, s, repo("github.com/acme/secret"), Drop, "")
-	})
-	t.Run("an expired, suspended or refused team holds, never passes on", func(t *testing.T) {
+	t.Run("an expired, suspended or signed-out team holds, never passes on", func(t *testing.T) {
 		for _, block := range []func(*Team){
 			func(tm *Team) { tm.Policy.FetchedAt = now.Add(-config.MaxPolicyAge - time.Hour) },
 			func(tm *Team) { tm.Refusals = 1 },
-			func(tm *Team) { tm.Refusals = 2 },
 			func(tm *Team) { tm.SignInNeeded = true },
 		} {
 			s := fixture(t)
@@ -115,38 +112,10 @@ func TestRouteScenarios(t *testing.T) {
 			expect(t, s, repo("github.com/acme/api"), Hold, "acme-platform")
 		}
 	})
-	t.Run("unticking leaves the binding, so nothing until it is unbound", func(t *testing.T) {
+	t.Run("unticking a team hands its repositories to personal", func(t *testing.T) {
 		s := fixture(t)
 		s.Deselect(enrollment(t, s, "acme-platform"))
-		expect(t, s, repo("github.com/acme/api"), Drop, "")
-		must(t, s.Unbind("github.com/acme"))
 		expect(t, s, repo("github.com/acme/api"), Send, "personal")
-	})
-	t.Run("another organization listing a bound owner changes nothing", func(t *testing.T) {
-		s := fixture(t)
-		s.Teams[1].Policy.Repositories = append(s.Teams[1].Policy.Repositories, "github.com/acme/*")
-		expect(t, s, repo("github.com/acme/api"), Send, "acme-platform")
-	})
-	t.Run("an exact entry under an undecided owner binds only its repository", func(t *testing.T) {
-		s := fixture(t)
-		s.Teams[0].Policy.Repositories = append(s.Teams[0].Policy.Repositories, "github.com/torvalds/linux")
-		expect(t, s, repo("github.com/torvalds/linux"), Hold, "acme-platform")
-		expect(t, s, repo("github.com/torvalds/other"), Send, "personal")
-		must(t, s.Bind("github.com/torvalds/linux", "acme", false))
-		expect(t, s, repo("github.com/torvalds/linux"), Send, "acme-platform")
-		expect(t, s, repo("github.com/torvalds/other"), Send, "personal")
-	})
-	t.Run("an organization claiming the developer's owner blocks until refused", func(t *testing.T) {
-		s := fixture(t)
-		s.Teams[1].Policy.Repositories = append(s.Teams[1].Policy.Repositories, "github.com/dawson/*")
-		expect(t, s, repo("github.com/dawson/side"), Hold, "clientco-contractors")
-		must(t, s.Refuse("github.com/dawson"))
-		expect(t, s, repo("github.com/dawson/side"), Send, "personal")
-	})
-	t.Run("an exact entry beats a wildcard within an organization", func(t *testing.T) {
-		s := fixture(t, team("acme", "acme-platform", "github.com/acme/*"), team("acme", "acme-mobile", "github.com/acme/api"), personal())
-		expect(t, s, repo("github.com/acme/api"), Send, "acme-mobile")
-		expect(t, s, repo("github.com/acme/web"), Send, "acme-platform")
 	})
 	t.Run("a mixed run sends nothing", func(t *testing.T) {
 		expect(t, fixture(t), Location{Kind: Mixed}, Drop, "")
@@ -162,10 +131,94 @@ func TestRouteScenarios(t *testing.T) {
 		expect(t, s, repo("github.com/dawson/side"), Drop, "")
 		expect(t, s, Location{Kind: OutsideGit}, Drop, "")
 	})
+	t.Run("an organization's collect-everything policy collects nothing", func(t *testing.T) {
+		s := fixture(t)
+		_, err := s.ApplyRefresh(Refresh{EnrollmentID: s.Teams[0].EnrollmentID, Policy: &config.Policy{
+			Mode: config.ModeGlobal, TeamID: "acme-platform", OrganizationID: "acme", AuthURL: authURL, Revision: 2, FetchedAt: now,
+		}})
+		must(t, err)
+		expect(t, s, repo("github.com/acme/api"), Send, "personal")
+		expect(t, s, Location{Kind: OutsideGit}, Send, "personal")
+	})
 }
 
-// An unknown location reaches personal only as the only team, Active, collecting
-// everything, with nothing bound to an organization, and eligible when it arrived.
+// When several organizations' policies match a repository, the most recently updated
+// policy wins it, whatever the entries' specificity; equal ages keep the order the teams
+// were ticked in.
+func TestNewestPolicyWins(t *testing.T) {
+	t.Parallel()
+	older, newer := now.Add(-48*time.Hour), now.Add(-time.Hour)
+	t.Run("the newer policy wins an overlap", func(t *testing.T) {
+		s := fixture(t, updated(team("acme", "acme-platform", "github.com/shared/*"), newer),
+			updated(team("clientco", "clientco-contractors", "github.com/shared/*"), older), personal())
+		expect(t, s, repo("github.com/shared/api"), Send, "acme-platform")
+	})
+	t.Run("age beats specificity", func(t *testing.T) {
+		s := fixture(t, updated(team("acme", "acme-platform", "github.com/shared/*"), newer),
+			updated(team("clientco", "clientco-contractors", "github.com/shared/api"), older), personal())
+		expect(t, s, repo("github.com/shared/api"), Send, "acme-platform")
+	})
+	t.Run("updating a policy moves it ahead of the others", func(t *testing.T) {
+		s := fixture(t, updated(team("acme", "acme-platform", "github.com/shared/*"), older),
+			updated(team("clientco", "clientco-contractors", "github.com/shared/*"), newer), personal())
+		expect(t, s, repo("github.com/shared/api"), Send, "clientco-contractors")
+		s.Teams[0].Policy.UpdatedAt = now
+		expect(t, s, repo("github.com/shared/api"), Send, "acme-platform")
+	})
+	t.Run("a policy of unknown age never takes a dated one's repository", func(t *testing.T) {
+		s := fixture(t, team("acme", "acme-platform", "github.com/shared/*"),
+			updated(team("clientco", "clientco-contractors", "github.com/shared/*"), older), personal())
+		expect(t, s, repo("github.com/shared/api"), Send, "clientco-contractors")
+		if o := Overlaps(*s); len(o) != 1 || o[0].Winner.TeamID != "clientco-contractors" {
+			t.Fatalf("Overlaps = %+v, want clientco-contractors to win", o)
+		}
+	})
+	t.Run("equal ages keep the order the teams were ticked in", func(t *testing.T) {
+		s := fixture(t, team("acme", "acme-first", "github.com/acme/*"), team("acme", "acme-second", "github.com/acme/*"), personal())
+		expect(t, s, repo("github.com/acme/api"), Send, "acme-first")
+	})
+	t.Run("an expired, signed-out or suspended winner holds instead of passing on", func(t *testing.T) {
+		for _, block := range []func(*Team){
+			func(tm *Team) { tm.Policy.FetchedAt = now.Add(-config.MaxPolicyAge - time.Hour) },
+			func(tm *Team) { tm.SignInNeeded = true },
+			func(tm *Team) { tm.Refusals = 1 },
+		} {
+			s := fixture(t, updated(team("acme", "acme-platform", "github.com/shared/*"), newer),
+				updated(team("clientco", "clientco-contractors", "github.com/shared/*"), older), personal())
+			block(&s.Teams[0])
+			expect(t, s, repo("github.com/shared/api"), Hold, "acme-platform")
+		}
+	})
+	t.Run("a refused winner is passed over for the next policy, then personal", func(t *testing.T) {
+		s := fixture(t, updated(team("acme", "acme-platform", "github.com/shared/*"), newer),
+			updated(team("clientco", "clientco-contractors", "github.com/shared/*"), older), personal())
+		s.Teams[0].Refusals = 2
+		expect(t, s, repo("github.com/shared/api"), Send, "clientco-contractors")
+		if o := Overlaps(*s); len(o) != 0 {
+			t.Errorf("Overlaps names a refused team: %+v", o)
+		}
+		s.Teams[1].Refusals = 2
+		expect(t, s, repo("github.com/shared/api"), Send, "personal")
+	})
+	t.Run("a team that stops listing a repository gives it up", func(t *testing.T) {
+		s := fixture(t, updated(team("acme", "acme-platform", "github.com/shared/*"), newer),
+			updated(team("clientco", "clientco-contractors", "github.com/shared/*"), older), personal())
+		s.Teams[0].Policy.Repositories = []string{"github.com/acme/*"}
+		expect(t, s, repo("github.com/shared/api"), Send, "clientco-contractors")
+	})
+	t.Run("GitLab subgroups match within a team", func(t *testing.T) {
+		s := fixture(t, team("acme", "acme-platform", "gitlab.com/acme/platform/*"), personal())
+		expect(t, s, repo("gitlab.com/acme/platform/api"), Send, "acme-platform")
+		expect(t, s, repo("gitlab.com/acme/other"), Send, "personal")
+	})
+	t.Run("one normaliser for origins and entries", func(t *testing.T) {
+		s := fixture(t, team("acme", "acme-platform", "GitHub.com/Acme/*"), personal())
+		expect(t, s, repo("github.com/ACME/Api"), Send, "acme-platform")
+	})
+}
+
+// An unknown location reaches personal only as the only team, Active and collecting
+// everything, and eligible when it arrived.
 func TestUnknownGoesToPersonalOnlyWhenNothingElseCouldClaimIt(t *testing.T) {
 	t.Parallel()
 	unknown := Location{Kind: Unknown}
@@ -178,79 +231,8 @@ func TestUnknownGoesToPersonalOnlyWhenNothingElseCouldClaimIt(t *testing.T) {
 	expect(t, alone, unknown, Send, "personal")
 	expect(t, alone, Location{Kind: Unknown, Narrow: true}, Hold, "")
 
-	must(t, alone.Bind("github.com/acme", "acme", false))
-	expect(t, alone, unknown, Hold, "")
-	must(t, alone.Refuse("github.com/acme"))
-	expect(t, alone, unknown, Send, "personal")
-
 	alone.Teams[0].SignInNeeded = true
 	expect(t, alone, unknown, Hold, "")
-}
-
-// The council's binding cases: authority and consent are separate checks, and an
-// organization's entry never overrides a decision the developer made.
-func TestAuthorityAndConsent(t *testing.T) {
-	t.Parallel()
-	t.Run("a refused repository under a bound owner", func(t *testing.T) {
-		s := fixture(t)
-		must(t, s.Refuse("github.com/acme/api"))
-		expect(t, s, repo("github.com/acme/api"), Send, "personal")
-		expect(t, s, repo("github.com/acme/web"), Send, "acme-platform")
-	})
-	t.Run("a repository bound to another organization than its owner", func(t *testing.T) {
-		s := fixture(t)
-		s.Teams[1].Policy.Repositories = append(s.Teams[1].Policy.Repositories, "github.com/acme/shared")
-		if err := s.Bind("github.com/acme/shared", "clientco", false); err == nil {
-			t.Fatal("bound a repository against its owner's binding without naming the conflict")
-		}
-		must(t, s.Bind("github.com/acme/shared", "clientco", true))
-		expect(t, s, repo("github.com/acme/shared"), Send, "clientco-contractors")
-		expect(t, s, repo("github.com/acme/api"), Send, "acme-platform")
-	})
-	t.Run("a wildcard needs its owner's binding, not a repository's", func(t *testing.T) {
-		s := fixture(t)
-		s.Teams[1].Policy.Repositories = []string{"github.com/acme/*"}
-		must(t, s.Bind("github.com/acme/shared", "clientco", true))
-		expect(t, s, repo("github.com/acme/shared"), Drop, "")
-	})
-	t.Run("unbinding a repository reveals its owner's decision", func(t *testing.T) {
-		s := fixture(t)
-		must(t, s.Refuse("github.com/acme/api"))
-		must(t, s.Unbind("github.com/acme/api"))
-		expect(t, s, repo("github.com/acme/api"), Send, "acme-platform")
-	})
-	t.Run("pending blocks only what its entry matches", func(t *testing.T) {
-		s := fixture(t, team("clientco", "clientco-contractors", "github.com/acme/api"), personal())
-		must(t, s.Unbind("github.com/acme"))
-		expect(t, s, repo("github.com/acme/api"), Hold, "clientco-contractors")
-		expect(t, s, repo("github.com/acme/web"), Send, "personal")
-	})
-	t.Run("a blocked team cannot block another organization's repository", func(t *testing.T) {
-		s := fixture(t)
-		s.Teams[1].Policy.Repositories = []string{"github.com/acme/*"}
-		s.Teams[1].Refusals = 2
-		expect(t, s, repo("github.com/acme/api"), Send, "acme-platform")
-	})
-	t.Run("GitLab subgroups: the more fixed segments, the earlier", func(t *testing.T) {
-		s := fixture(t, team("acme", "acme-all", "gitlab.com/acme/*"), team("acme", "acme-platform", "gitlab.com/acme/platform/*"), personal())
-		must(t, s.Bind("gitlab.com/acme", "acme", false))
-		expect(t, s, repo("gitlab.com/acme/platform/api"), Send, "acme-platform")
-		expect(t, s, repo("gitlab.com/acme/other"), Send, "acme-all")
-	})
-	t.Run("one normaliser for origins, entries and bindings", func(t *testing.T) {
-		s := fixture(t, team("acme", "acme-platform", "GitHub.com/Acme/*"), personal())
-		must(t, s.Bind("GITHUB.COM/ACME/", "acme", false))
-		expect(t, s, repo("github.com/ACME/Api"), Send, "acme-platform")
-	})
-	t.Run("an organization's collect-everything policy collects nothing", func(t *testing.T) {
-		s := fixture(t)
-		_, err := s.ApplyRefresh(Refresh{EnrollmentID: s.Teams[0].EnrollmentID, Policy: &config.Policy{
-			Mode: config.ModeGlobal, TeamID: "acme-platform", OrganizationID: "acme", AuthURL: authURL, Revision: 2, FetchedAt: now,
-		}})
-		must(t, err)
-		expect(t, s, repo("github.com/acme/api"), Drop, "")
-		expect(t, s, Location{Kind: OutsideGit}, Send, "personal")
-	})
 }
 
 // Which organization a location belongs to, for telling when a run crosses.
@@ -258,27 +240,150 @@ func TestOrganizationOf(t *testing.T) {
 	t.Parallel()
 	s := fixture(t)
 	for _, c := range []struct {
-		loc     Location
-		org     string
-		pending bool
-		ok      bool
+		loc Location
+		org string
+		ok  bool
 	}{
-		{repo("github.com/acme/api"), "acme", false, true},
-		{repo("github.com/acme/unlisted-but-bound"), "acme", false, true},
-		{repo("github.com/dawson/side"), "me", false, true},
-		{Location{Kind: OutsideGit}, "me", false, true},
+		{repo("github.com/acme/api"), "acme", true},
+		{repo("github.com/dawson/side"), "me", true},
+		{Location{Kind: OutsideGit}, "me", true},
 	} {
-		org, pending, ok := NewRouter(*s).OrganizationOf(c.loc, now)
-		if org != c.org || pending != c.pending || ok != c.ok {
-			t.Errorf("OrganizationOf(%+v) = %q, %v, %v; want %q, %v, %v", c.loc, org, pending, ok, c.org, c.pending, c.ok)
+		org, ok := NewRouter(*s).OrganizationOf(c.loc, now)
+		if org != c.org || ok != c.ok {
+			t.Errorf("OrganizationOf(%+v) = %q, %v; want %q, %v", c.loc, org, ok, c.org, c.ok)
 		}
 	}
-	s.Teams[1].Policy.Repositories = append(s.Teams[1].Policy.Repositories, "github.com/dawson/*")
-	if _, pending, ok := NewRouter(*s).OrganizationOf(repo("github.com/dawson/side"), now); !pending || !ok {
-		t.Error("a pending repository did not report pending")
-	}
 	narrowed := fixture(t, team("acme", "acme-platform", "github.com/acme/*"), personal("github.com/dawson/terma"))
-	if _, _, ok := NewRouter(*narrowed).OrganizationOf(repo("github.com/dawson/side"), now); ok {
-		t.Error("a location nothing collects or binds belongs to an organization")
+	if _, ok := NewRouter(*narrowed).OrganizationOf(repo("github.com/dawson/side"), now); ok {
+		t.Error("a location nothing collects belongs to an organization")
+	}
+}
+
+// Overlaps names every entry two teams both cover, in one organization or two, and the
+// team Route gives it.
+func TestOverlaps(t *testing.T) {
+	t.Parallel()
+	older, newer := now.Add(-48*time.Hour), now.Add(-time.Hour)
+	s := fixture(t,
+		updated(team("acme", "acme-platform", "github.com/shared/*", "github.com/acme/*"), older),
+		updated(team("acme", "acme-mobile", "github.com/acme/api"), older),
+		updated(team("clientco", "clientco-contractors", "github.com/shared/api", "github.com/clientco/*"), newer),
+		personal("github.com/shared/*"))
+	got := Overlaps(*s)
+	if len(got) != 2 ||
+		got[0].Entry != "github.com/acme/api" || got[0].Winner.TeamID != "acme-platform" || got[0].Other.TeamID != "acme-mobile" ||
+		got[1].Entry != "github.com/shared/api" || got[1].Winner.TeamID != "clientco-contractors" || got[1].Other.TeamID != "acme-platform" {
+		t.Fatalf("Overlaps = %+v", got)
+	}
+	for _, o := range got {
+		expect(t, s, repo(o.Entry), Send, o.Winner.TeamID)
+	}
+}
+
+// With three organizations on one repository, only the newest policy's wins are reported.
+func TestOverlapsNameOnlyTheRealWinner(t *testing.T) {
+	t.Parallel()
+	s := fixture(t,
+		updated(team("a", "a-team", "github.com/shared/api"), now.Add(-time.Hour)),
+		updated(team("b", "b-team", "github.com/shared/api"), now.Add(-48*time.Hour)),
+		updated(team("c", "c-team", "github.com/shared/api"), now.Add(-72*time.Hour)), personal())
+	for _, o := range Overlaps(*s) {
+		if o.Winner.TeamID != "a-team" {
+			t.Errorf("Overlaps reports %s winning %s, but a-team collects it", o.Winner.TeamID, o.Entry)
+		}
+	}
+	if n := len(Overlaps(*s)); n != 2 {
+		t.Fatalf("Overlaps = %d, want a-team over b-team and over c-team", n)
+	}
+}
+
+// On a tie among three teams, Overlaps names the team Route picks, the first ticked.
+func TestOverlapsOnATieNameTheTeamTickedFirst(t *testing.T) {
+	t.Parallel()
+	s := fixture(t,
+		team("a", "a-team", "github.com/shared/api"),
+		team("b", "b-team", "github.com/shared/api"),
+		team("c", "c-team", "github.com/shared/api"), personal())
+	got := Overlaps(*s)
+	for _, o := range got {
+		if o.Winner.TeamID != "a-team" {
+			t.Errorf("Overlaps reports %s winning %s over %s, but a-team collects it", o.Winner.TeamID, o.Entry, o.Other.TeamID)
+		}
+	}
+	if len(got) != 2 {
+		t.Fatalf("Overlaps = %+v, want a-team over b-team and over c-team", got)
+	}
+	expect(t, s, repo("github.com/shared/api"), Send, "a-team")
+}
+
+// A team listing both o/* and o/x against another's o/x is one conflict, not two.
+func TestOverlapsListEachConflictOnce(t *testing.T) {
+	t.Parallel()
+	s := fixture(t,
+		updated(team("a", "a-team", "github.com/o/*", "github.com/o/x"), now.Add(-time.Hour)),
+		updated(team("b", "b-team", "github.com/o/x"), now.Add(-48*time.Hour)), personal())
+	if got := Overlaps(*s); len(got) != 1 || got[0].Entry != "github.com/o/x" || got[0].Winner.TeamID != "a-team" {
+		t.Fatalf("Overlaps = %+v, want a-team over b-team on github.com/o/x once", got)
+	}
+}
+
+// Order is newest policy first, equal or unknown ages in ticked order, refused teams out,
+// and personal last.
+func TestOrder(t *testing.T) {
+	t.Parallel()
+	s := fixture(t,
+		team("a", "undated"),
+		updated(team("b", "old"), now.Add(-48*time.Hour)),
+		updated(team("c", "new"), now.Add(-time.Hour)),
+		updated(team("d", "old-too"), now.Add(-48*time.Hour)),
+		updated(team("e", "refused"), now),
+		personal())
+	s.Teams[4].Refusals = 2
+	var got []string
+	for _, tm := range Order(*s) {
+		got = append(got, tm.TeamID)
+	}
+	if want := []string{"new", "old", "old-too", "undated", "personal"}; !slices.Equal(got, want) {
+		t.Fatalf("Order = %v, want %v", got, want)
+	}
+}
+
+// Route and Order agree: the team Route picks for a repository every team lists is the
+// first in Order, whatever the mix of dated, equal, undated and refused policies.
+func TestRouteFollowsOrder(t *testing.T) {
+	t.Parallel()
+	old := now.Add(-48 * time.Hour)
+	for name, teams := range map[string][]Team{
+		"newest first":      {updated(team("a", "old", "github.com/x/*"), old), updated(team("b", "new", "github.com/x/*"), now)},
+		"equal ages":        {updated(team("a", "first", "github.com/x/*"), old), updated(team("b", "second", "github.com/x/*"), old)},
+		"undated last":      {team("a", "undated", "github.com/x/*"), updated(team("b", "dated", "github.com/x/*"), old)},
+		"all undated":       {team("a", "u1", "github.com/x/*"), team("b", "u2", "github.com/x/*")},
+		"refused passed by": {updated(team("a", "refused", "github.com/x/*"), now), updated(team("b", "kept", "github.com/x/*"), old)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := fixture(t, append(teams, personal())...)
+			if name == "refused passed by" {
+				s.Teams[0].Refusals = 2
+			}
+			first := Order(*s)[0]
+			expect(t, s, repo("github.com/x/api"), Send, first.TeamID)
+		})
+	}
+}
+
+// A newer policy that takes only part of an overlap leaves the rest of it contested: two
+// wildcards still conflict when a third, newer team lists one repository beneath them.
+func TestOverlapsKeepAPartlyTakenConflict(t *testing.T) {
+	t.Parallel()
+	s := fixture(t,
+		updated(team("a", "mid", "github.com/x/*"), now.Add(-time.Hour)),
+		updated(team("b", "old", "github.com/x/*"), now.Add(-48*time.Hour)),
+		updated(team("c", "new", "github.com/x/one"), now),
+		personal())
+	o := Overlaps(*s)
+	if !slices.ContainsFunc(o, func(v Overlap) bool {
+		return v.Entry == "github.com/x/*" && v.Winner.TeamID == "mid" && v.Other.TeamID == "old"
+	}) {
+		t.Fatalf("Overlaps = %+v, want mid over old on github.com/x/*", o)
 	}
 }

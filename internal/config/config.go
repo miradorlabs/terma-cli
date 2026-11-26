@@ -64,6 +64,23 @@ type Profile struct {
 	// ServerKeyAuthURL is the auth host setup checked the server key against, the one host the
 	// policy refresh sends it to; a profile pointed elsewhere refuses rather than disclose it.
 	ServerKeyAuthURL string `json:"server_key_auth_url,omitempty"`
+	// ServerKeyGeneration counts the switches between the server key and a person
+	// (ServerKeySignIn), each bumped in the same write as the switch (SetServerKeySignIn);
+	// missing reads as 0. With the sign-in's own generation it versions whose lane the profile
+	// sends in, so a switch to the key and back to the same person that no read saw reads as
+	// a change (the relay's arrivalLane). A terma that drops it from the file starts it at 0
+	// again, as one that drops the sign-in's generation does: the sum may then repeat a value a
+	// reader holds, which can cost or mis-keep at most the one retry that spans the rewrite.
+	ServerKeyGeneration uint64 `json:"server_key_generation,omitempty"`
+}
+
+// SetServerKeySignIn records whether the profile is signed in with its team's server key,
+// checked against authURL ("" when not), bumping ServerKeyGeneration when that changes.
+func (p *Profile) SetServerKeySignIn(on bool, authURL string) {
+	if p.ServerKeySignIn != on {
+		p.ServerKeyGeneration++
+	}
+	p.ServerKeySignIn, p.ServerKeyAuthURL = on, authURL
 }
 
 // SelectOrganization records the account scope, never a repository's project.

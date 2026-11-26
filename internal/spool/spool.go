@@ -45,7 +45,6 @@ type Event struct {
 	NoPerson    bool           `json:"no_person,omitempty"`
 	Profile     string         `json:"profile,omitempty"`      // profile whose routing state routed the event; local only
 	Enrollment  string         `json:"enrollment,omitempty"`   // destination enrollment sent to or holding the event; local only
-	HoldKey     string         `json:"hold_key,omitempty"`     // pending binding holding the event until bound to the team's org; local only
 	Run         string         `json:"run,omitempty"`          // session run the event belongs to (internal/runs); local only
 	OwnLocation bool           `json:"own_location,omitempty"` // event's own checkout/dir; still dropped on Mixed unless runs.Locational
 	Attrs       map[string]any `json:"attrs,omitempty"`

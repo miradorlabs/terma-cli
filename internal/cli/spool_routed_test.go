@@ -101,10 +101,7 @@ func TestCLISpoolFlushRoutedUserTokenAndEnrolledUser(t *testing.T) {
 		if enr["team-b"], err = s.Select(teamB); err != nil {
 			return err
 		}
-		if err := s.Bind("github.com/acme/app", "org-a", false); err != nil {
-			return err
-		}
-		return s.Bind("github.com/beta/lib", "org-b", false)
+		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -205,7 +202,7 @@ func TestCLISpoolFlushRoutedServerKeyOmitsProjectHeader(t *testing.T) {
 			return err
 		}
 		enrID = id
-		return s.Bind("github.com/acme/app", "org-s", false)
+		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -260,7 +257,7 @@ func TestCLISpoolFlushRoutedPolicyDropsSucceed(t *testing.T) {
 			return err
 		}
 		enrID = id
-		return s.Bind("github.com/acme/app", "org-a", false)
+		return nil
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -82,11 +82,14 @@ even empty) to leave your shell's startup file alone. It is POSIX `sh`, so `| sh
 
 `terma setup` signs you in once through your browser with your Terma account, then asks:
 
-1. **Coding agents**: the ones installed on this machine are preselected.
-2. **Teams**: one checklist across every organization you belong to (and Personal, if you want
-   it), with repository bindings confirmed for any shared organization teams.
+1. **Teams**: one checklist of your organizations' teams. With only a personal organization
+   there is nothing to ask; Personal is always kept.
+2. **Coding agents**: the ones installed on this machine are preselected.
 
-It then points your agents at terma's local relay and writes their machine-wide hooks.
+It then points your agents at terma's local relay, writes their machine-wide hooks, and tells
+you of any policy conflict: a repository two teams' policies both list. `terma doctor`
+shows the routing order, most recently updated policy first and Personal last, which
+changes whenever a team updates its policy.
 Restart any agent that was already running so it loads the new configuration, then check
 the result:
 
@@ -124,7 +127,7 @@ Every command is safe to run again:
 
 ```bash
 terma setup          # sign in once, choose agents and teams, write machine-wide hooks
-terma teams          # pick which teams collect across organizations and manage bindings
+terma teams          # pick which teams collect across organizations
 terma doctor         # check routing state, per-team health, Mixed runs, losses, and delivery
 terma update         # install the latest release, or refresh what terma installed
 terma teardown       # undo setup on this machine (--sign-out also signs out)
@@ -132,16 +135,22 @@ terma teardown       # undo setup on this machine (--sign-out also signs out)
 
 Run `terma setup` again to repair the machine or refresh a sign-in; it reuses a working
 sign-in and updates all selected teams. Run `terma teams` to tick or untick teams across
-your organizations, bind or refuse contested owners/repositories, or release a suspended team.
+your organizations, see policy conflicts, or release a suspended team.
 Run `terma route explain [path]` (or `--json`) to see which team a directory or repository
 routes to and why using the exact same router hooks and the relay use.
 
-`terma doctor` opens with your selected teams and what this repository has in progress (the
-active session, uncommitted agent edits), then checks every link: sign-in, `routing/<profile>.json`
-account ownership, per-team policy health (refused/suspended teams, lost organization access,
-expired policies, pending bindings), Mixed sessions, hooks, agent export, spool/outbox losses,
-and delivery. Every failure names its fix (including a single `terma setup` when your user
-sign-in needs re-authentication).
+`terma doctor` shows its report in sections:
+
+- **This machine**: the environment, terma's folders, and how terma last updated.
+- **Where your data goes**: your teams in the order they are tried, each with its state.
+  Under each team are the repositories it collects. A repository two teams list shows once,
+  under the team whose newer policy wins.
+- **Paused sessions**: sessions that may have touched another organization's work. They
+  send nothing until they resume.
+- **This repository**: which team collects it, and the agent work not yet committed.
+- **Checks**: sign-in, hooks, agent export, the event queue, and delivery.
+
+It ends with what needs you, each with the one command that fixes it.
 
 ### Managing teams and switching accounts
 
@@ -261,12 +270,13 @@ terma setup --org acme --team platform --harness claude,codex,copilot,omp --yes
   single Terma account sign-in covers every organization you belong to).
 - `--team <name-or-id>` selects that team alongside any already-selected teams for your
   account; with `--yes` and no `--team`, setup keeps your current selection (or picks the
-  only available team on a fresh machine). Use `terma teams` to tick, untick, bind, or refuse
-  teams at any time.
+  only available team on a fresh machine). Use `terma teams` to tick or untick teams at
+  any time.
 - `--harness <agents>` records those agents (`claude`, `codex`, `copilot`, `omp`, and on macOS and Linux `antigravity` and `grok`); with `--yes` or no
-  terminal and no `--harness`, setup records the agents recorded before and every
-  supported agent installed on this machine.
-- `--yes` skips interactive prompts and accepts binding defaults for the selected team(s).
+  terminal and no `--harness`, setup records the supported agents detected on this
+  machine. The picker ticks the same agents, marked "detected", and nothing else.
+- `--yes` skips interactive prompts, keeping the teams already ticked (all of them on a first
+  setup).
   On a fresh machine with several teams, pass `--team` (and `--org` if ambiguous).
 - `--no-browser` prints the sign-in URL instead of opening a browser.
 - `--relay-service off` starts the relay on demand from hooks instead of as a background
@@ -329,10 +339,11 @@ So a clone in any folder, a subdirectory of it, and a worktree of it at
 `~/.ssh/config`) normalises to host `github-work` and does not match
 `github.com/acme/api`: point origin at the real host and choose the key with
 `core.sshCommand`, as `terma doctor` shows. When you select teams across organizations, each
-organization collects only the owners or repositories you bind to it (`terma teams`), and an
-exact repository entry beats a wildcard entry within the bound organization. Personal's
-global policy collects everything outside any organization-bound repository (including
-folders outside git), and never collects an organization-bound repository. Each session
+team collects the repositories its policy lists. Where two policies list the same
+repository, the most recently updated policy collects it: policies are tried newest
+first, and the first that lists the repository wins. A team whose organization refused
+you (access lost, team deleted) is passed over. Personal's global policy collects everything no ticked
+organization's policy lists, including folders outside git. Each session
 reports to the matching team on your machine, so two developers on different teams in one
 repository each report to their own.
 

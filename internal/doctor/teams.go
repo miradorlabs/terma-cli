@@ -40,21 +40,35 @@ type Routing struct {
 	// records the relay dropped from Mixed runs.
 	Mixed        []runs.MixedRun
 	MixedDropped int
-	// Blocked counts records the relay held and dropped by blocker ("pending:<key>",
-	// "team:<enrollment>", "overflow").
+	// Blocked counts records the relay held and dropped by blocker ("team:<enrollment>",
+	// "overflow").
 	Blocked map[string]int
 }
 
-// label names t by its organization and team name, falling back to IDs.
+// label names t for a reader: Personal, or TeamName of its organization and team.
 func (r Routing) label(t routing.Team) string {
-	name := cmp.Or(r.Teams[t.TeamID], t.TeamID)
-	if org := r.Orgs[t.OrganizationID]; org != "" && org != name && !strings.HasPrefix(name, org) {
-		return org + " " + name
+	if t.Personal {
+		return "Personal"
 	}
-	return name
+	return TeamName(r.Orgs[t.OrganizationID], cmp.Or(r.Teams[t.TeamID], t.TeamID))
 }
 
-func (r Routing) org(id string) string { return cmp.Or(r.Orgs[id], id) }
+// TeamName names an organization's team: the team alone when its name already starts
+// with the organization's first word, the organization alone when the team's name adds
+// nothing to it, else both.
+func TeamName(org, team string) string {
+	first, _, _ := strings.Cut(org, " ")
+	switch {
+	case org == "" || team == org || strings.HasPrefix(team, first+" "):
+		return team
+	case strings.HasSuffix(org, " "+team) || genericTeams[strings.ToLower(team)]:
+		return org
+	}
+	return org + " › " + team
+}
+
+// genericTeams are team names that say nothing their organization's name does not.
+var genericTeams = map[string]bool{"default": true, "general": true, "main": true, "team": true}
 
 func (r Routing) setupFix() string {
 	if r.ServerKey {
@@ -76,8 +90,8 @@ func (r Routing) unusable() bool {
 }
 
 // TeamsCheck judges the profile's routing state and ticked enrollments. Missing, unreadable,
-// or wrong-account routing state fails closed. Suspended/refused enrollments and undecided
-// bindings fail; expired policies and SignInNeeded warn (remediated with a single `terma setup`).
+// or wrong-account routing state fails closed. Suspended/refused enrollments fail;
+// expired policies and SignInNeeded warn (remediated with a single `terma setup`).
 func TeamsCheck(r Routing, now time.Time) Check {
 	switch {
 	case r.Err != nil:
@@ -100,7 +114,8 @@ func TeamsCheck(r Routing, now time.Time) Check {
 		parts = append(parts, r.label(t)+" ("+words(string(st))+")")
 		switch st {
 		case routing.Suspended, routing.Refused:
-			failing = append(failing, r.label(t)+" is "+words(string(st))+" ("+refusalWords(t.LastError)+"), and blocks what it lists")
+			// Route passes a refused team over; a suspended one still holds what it lists.
+			failing = append(failing, r.label(t)+" is "+words(string(st))+" ("+refusalWords(t.LastError)+"), and "+pick(st == routing.Refused, "is skipped", "blocks what it lists"))
 			if r.ServerKey {
 				failFix = cmp.Or(failFix, r.setupFix())
 			} else {
@@ -112,14 +127,6 @@ func TeamsCheck(r Routing, now time.Time) Check {
 		case routing.Expired:
 			warning = append(warning, r.label(t)+"'s policy has not been refreshed for over a week, so it blocks what it lists")
 			warnFix = cmp.Or(warnFix, "check the network; the relay refreshes it every minute")
-		}
-	}
-	for _, p := range Pending(r.State) {
-		failing = append(failing, p.Key+" is undecided, so what "+p.Entry+" matches is held")
-		if r.ServerKey {
-			failFix = cmp.Or(failFix, r.setupFix())
-		} else {
-			failFix = cmp.Or(failFix, "terma teams --bind "+p.Key+"="+quoteWord(r.org(p.Organization))+" (or --refuse "+p.Key+")")
 		}
 	}
 	fix := cmp.Or(signInFix, failFix, warnFix)
@@ -190,18 +197,6 @@ func reasonWords(r runs.Reason) string {
 	return "with a run ledger that cannot be read"
 }
 
-func whyWords(w runs.Why) string {
-	s := reasonWords(w.Reason)
-	switch {
-	case w.Where == "":
-	case w.Reason == runs.Crossed:
-		s += ", into " + w.Where
-	case w.Reason == runs.UnknownReach:
-		s += ": " + w.Where
-	}
-	return s
-}
-
 func words(s string) string { return strings.ReplaceAll(s, "_", " ") }
 
 func quoteWord(s string) string {
@@ -223,38 +218,6 @@ func refusalWords(c routing.ErrorClass) string {
 	return "its refreshes were refused"
 }
 
-// PendingBinding is a binding a ticked organization's entry needs that no one has decided.
-type PendingBinding struct {
-	Key, Organization, TeamID, Entry string
-}
-
-// Pending lists the bindings st's ticked organizations' entries need with no decision
-// covering them, each once.
-func Pending(st routing.State) []PendingBinding {
-	var out []PendingBinding
-	for _, t := range st.Teams {
-		if t.Personal || t.Policy.Global() || t.Policy.Unset {
-			continue
-		}
-		for _, raw := range t.Policy.Repositories {
-			e, ok := routing.ParseEntry(raw, t.Policy.Wildcards)
-			if !ok || slices.ContainsFunc(out, func(p PendingBinding) bool { return p.Key == e.Key() }) || decided(st, e) {
-				continue
-			}
-			out = append(out, PendingBinding{Key: e.Key(), Organization: t.OrganizationID, TeamID: t.TeamID, Entry: raw})
-		}
-	}
-	return out
-}
-
-func decided(st routing.State, e routing.Entry) bool {
-	if _, ok := st.Bindings[e.Key()]; ok {
-		return true
-	}
-	_, ok := st.Bindings[routing.Owner(e.Key())]
-	return !e.Wildcard() && ok
-}
-
 // RoutedRepository is where Router.Route sends a session started in gitDir ("" outside
 // git), and the team it goes to when sent.
 func RoutedRepository(r Routing, gitDir string, repoErr error, now time.Time) (Check, *routing.Team) {
@@ -264,7 +227,7 @@ func RoutedRepository(r Routing, gitDir string, repoErr error, now time.Time) (C
 	if r.unusable() {
 		return Check{Status: Fail, Detail: "nothing is sent without a usable routing state", Fix: r.setupFix()}, nil
 	}
-	loc, where := routing.Location{Kind: routing.OutsideGit}, "outside any repository with a hosted origin"
+	loc, where := routing.Location{Kind: routing.OutsideGit}, "this folder"
 	if origin := gitx.RepositoryFS(gitDir); gitDir != "" && routing.Owner(origin) != "" {
 		loc, where = routing.Location{Kind: routing.Repository, Repository: origin}, origin
 	}
@@ -273,102 +236,20 @@ func RoutedRepository(r Routing, gitDir string, repoErr error, now time.Time) (C
 	switch {
 	case d.Outcome == routing.Send && hasTeam:
 		detail := where + " goes to " + r.label(team)
-		if d.Entry != "" {
+		if d.Entry != "" && routing.Normalize(d.Entry) != routing.Normalize(where) {
 			detail += " (" + d.Entry + ")"
 		}
 		return Check{Status: Pass, Detail: detail}, &team
-	case d.Reason == routing.ReasonPending:
-		fix := "terma teams --bind " + d.Authority.Key + "=<organization> (or --refuse " + d.Authority.Key + ")"
-		if r.ServerKey {
-			fix = r.setupFix()
-		}
-		return Check{Status: Warn, Detail: where + " is held: " + d.Authority.Key + " is undecided", Fix: fix}, nil
 	case hasTeam && d.Blocked == routing.SignInNeeded:
 		return Check{Status: Warn, Detail: where + " is held: " + r.label(team) + " would collect it, but needs you to sign in again", Fix: r.setupFix()}, nil
 	case hasTeam && (d.Blocked == routing.Suspended || d.Blocked == routing.Refused):
 		return Check{Status: Warn, Detail: where + " is held: " + r.label(team) + " would collect it, but is " + words(string(d.Blocked)) + " (" + refusalWords(team.LastError) + ")", Fix: r.teamsFix()}, nil
 	case hasTeam:
 		return Check{Status: Warn, Detail: where + " is held: " + r.label(team) + " would collect it, but is " + words(string(d.Blocked)), Fix: r.teamsFix()}, nil
-	case d.Reason == routing.ReasonBoundNotCollected:
-		return Check{Status: Warn, Detail: where + " is bound to " + r.org(d.Authority.Organization) + ", and no ticked team of it collects it, so nothing here is collected"}, nil
 	case len(r.State.Teams) == 1 && r.State.Teams[0].Policy.Unset:
 		return Check{Status: Warn, Detail: cmp.Or(r.SingleTeamLabel, r.label(r.State.Teams[0])) + " has no collection policy", Fix: NoPolicyStep}, nil
 	}
 	return Check{Status: Warn, Detail: where + ": no ticked team collects it, so nothing here is collected"}, nil
-}
-
-// TeamRows are doctor's context rows for a routed profile: each ticked team and its health,
-// bindings, undecided bindings, Mixed runs, and what the relay held.
-func TeamRows(r Routing, now time.Time) []Row {
-	if r.unusable() {
-		return []Row{{"Teams", "none: no usable routing state, so nothing is sent"}}
-	}
-	var rows []Row
-	label := "Teams"
-	for _, t := range r.State.Teams {
-		lists := strings.Join(t.Policy.Repositories, ", ")
-		switch {
-		case t.Personal && t.Policy.Global():
-			lists = "everything not bound to an organization"
-		case lists == "":
-			lists = "nothing until an admin chooses repositories"
-		}
-		state := words(string(t.StateAt(now)))
-		if t.LastError == routing.OrgAccessLost {
-			state += " (" + refusalWords(t.LastError) + ")"
-		} else if t.LastError != "" {
-			state += ", last refresh " + words(string(t.LastError))
-		}
-		rows = append(rows, Row{label, fmt.Sprintf("%s — %s: %s", r.label(t), state, lists)})
-		label = ""
-	}
-	if len(rows) == 0 {
-		rows = append(rows, Row{"Teams", "none ticked — run `" + r.teamsFix() + "`"})
-	}
-	label = "Bindings"
-	for _, k := range slices.Sorted(maps.Keys(r.State.Bindings)) {
-		b := r.State.Bindings[k]
-		who := r.org(b.Organization)
-		if b.Refused {
-			who = "refused to every organization"
-		}
-		rows = append(rows, Row{label, k + " → " + who})
-		label = ""
-	}
-	for _, p := range Pending(r.State) {
-		rows = append(rows, Row{"Undecided", p.Key + ", needed by " + p.Entry})
-	}
-	if len(r.Mixed) > 0 || r.MixedDropped > 0 {
-		rows = append(rows, Row{"Mixed", MixedSummary(r)})
-		for _, m := range r.Mixed {
-			if m.Recent {
-				rows = append(rows, Row{"", "session " + m.Session + " " + whyWords(m.Why)})
-			}
-		}
-	}
-	return append(rows, r.blockedRows()...)
-}
-
-func (r Routing) blockedRows() []Row {
-	var rows []Row
-	label := "Relay held"
-	for _, k := range slices.Sorted(maps.Keys(r.Blocked)) {
-		what := k
-		switch kind, name, _ := strings.Cut(k, ":"); kind {
-		case "pending":
-			what = name + ", undecided"
-		case "team":
-			what = name + ", no longer ticked"
-			if t, ok := r.State.Team(name); ok {
-				what = r.label(t) + ", which could not send"
-			}
-		case "overflow":
-			what = "other blockers"
-		}
-		rows = append(rows, Row{label, fmt.Sprintf("%d record(s) for %s", r.Blocked[k], what)})
-		label = ""
-	}
-	return rows
 }
 
 // routedProjectID is the team ID doctor checks against for relay/spool/backend when

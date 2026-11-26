@@ -25,6 +25,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
+	"github.com/miradorlabs/terma-cli/internal/ui/prompt"
 )
 
 // After teardown removes the policies, setup without a terminal reuses the team the profile
@@ -126,12 +127,12 @@ func TestSetupFetchesThePolicyAndPointsAgentsAtTheRelay(t *testing.T) {
 	if p := loaded.Policy; err != nil || !p.Validated() || p.Mode != config.ModeRepo || !p.IncludePrompts || p.FetchedAt.IsZero() {
 		t.Fatalf("policy not recorded: %+v", p)
 	}
-	if !strings.Contains(out, "Collects      sessions in the team's repositories (github.com/acme/app)") {
-		t.Fatalf("setup did not say the policy:\n%s", out)
+	if strings.Contains(out, "Collects") {
+		t.Fatalf("setup listed what the team collects:\n%s", out)
 	}
-	// The test binary is no release, so it is never updated; setup says so.
-	if !strings.Contains(out, "Updates       never for a development build") {
-		t.Fatalf("setup did not say how terma updates:\n%s", out)
+	// The test binary is a development build, so setup says nothing about updates.
+	if strings.Contains(out, "Updates") {
+		t.Fatalf("setup reported updates for a development build:\n%s", out)
 	}
 	token, err := daemon.Token(testApp.stateDir)
 	if err != nil {
@@ -158,8 +159,8 @@ func TestSetupWarnsWhenTheTeamListsNoRepositories(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	for _, want := range []string{"! Collects      nothing yet: your team lists no repositories", "Next steps:", doctor.NoRepositoriesStep} {
-		if !strings.Contains(out, want) {
+	for _, want := range []string{"! Collects nothing yet: your team lists no repositories", "Next steps:", doctor.NoRepositoriesStep} {
+		if !strings.Contains(flat(out), want) {
 			t.Errorf("setup output lacks %q:\n%s", want, out)
 		}
 	}
@@ -172,6 +173,7 @@ func TestSetupWarnsWhenTheTeamListsNoRepositories(t *testing.T) {
 // policy does not exist yet and who sets it up, not that the team lists no repositories.
 func TestSetupAndDoctorSayWhenTheTeamHasNoPolicy(t *testing.T) {
 	gateway := newFakeAuth(t)
+	gateway.orgs = []organization{orgB()}
 	gateway.policyBody = `{}`
 	authSandbox(t, gateway)
 	sandboxMachine(t)
@@ -182,8 +184,8 @@ func TestSetupAndDoctorSayWhenTheTeamHasNoPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	for _, want := range []string{"! Collects      nothing yet: your team has no collection policy", "Next steps:", doctor.NoPolicyStep} {
-		if !strings.Contains(out, want) {
+	for _, want := range []string{"! Collects nothing yet: your team has no collection policy", "Next steps:", doctor.NoPolicyStep} {
+		if !strings.Contains(flat(out), want) {
 			t.Errorf("setup output lacks %q:\n%s", want, out)
 		}
 	}
@@ -200,16 +202,17 @@ func TestSetupAndDoctorSayWhenTheTeamHasNoPolicy(t *testing.T) {
 	}
 	// Doctor names the team and organization it asked, to hold against the web app's.
 	out, _ = runTerma(t, "doctor")
-	if !regexp.MustCompile(`repository collected +team "Beta Core" \(bbbbbbbb\) in Beta Labs has no collection policy\n`).MatchString(out) || !strings.Contains(out, doctor.NoPolicyStep) {
+	if !regexp.MustCompile(`! team "Beta Core" \(bbbbbbbb\) in Beta Labs has no collection policy\n`).MatchString(out) || !strings.Contains(out, doctor.NoPolicyStep) {
 		t.Errorf("doctor did not say which team has no policy:\n%s", out)
 	}
 }
 
 // A team policy whose list holds a wildcard is stored as 2.x: setup on a fresh machine (the
-// desktop's connect step runs the same setup) reads it, says a wildcard collects every
-// repository under its owner, and keeps it marked so hooks and the relay admit by it.
+// desktop's connect step runs the same setup) reads it and keeps it marked so hooks and the
+// relay admit by it.
 func TestSetupReadsAWildcardPolicy(t *testing.T) {
 	gateway := newFakeAuth(t)
+	gateway.orgs = []organization{orgB()}
 	gateway.policyBody = `{"policy":{"version":"2.0","terma":{"capture":{"exclude_prompts":false,"exclude_tool_content":false},"git_hooks":true,"per_repository":{"repositories":["github.com/Acme/*","github.com/other/api"]}}},"revision":4,"updated_at":"2026-11-19T00:00:00Z"}`
 	authSandbox(t, gateway)
 	sandboxMachine(t)
@@ -219,9 +222,6 @@ func TestSetupReadsAWildcardPolicy(t *testing.T) {
 	out, err := runTerma(t, "setup", "--harness", "codex")
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
-	}
-	if want := "Collects      sessions in the team's repositories (every repository under github.com/Acme, github.com/other/api)"; !strings.Contains(out, want) {
-		t.Errorf("setup output lacks %q:\n%s", want, out)
 	}
 	loaded, err := testApp.loadConfig()
 	if err != nil || !loaded.Policy.Wildcards || loaded.Policy.Revision != 4 {
@@ -237,7 +237,7 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 	for _, name := range testApp.agents.Names() {
 		chosen[name] = true
 	}
-	form := testApp.harnessSelectionForm(context.Background(), chosen)
+	form := testApp.harnessSelectionForm(chosen)
 	wantOrder := []string{"claude", "codex", "copilot", "omp", "antigravity", "grok", "cursor", "opencode", "pi", "hermes", "gemini", "dsh"}
 	if !testApp.agents.IsSupported("antigravity") {
 		// Coming Soon on Windows: last, in registry order.
@@ -270,8 +270,8 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 		item := form.Items[i]
 		available := testApp.agents.IsSupported(name)
 		if available {
-			if item.Disabled || item.Selected != chosen[name] {
-				t.Errorf("%s should be selectable with its saved choice: %+v", name, item)
+			if item.Disabled || !item.Selected || item.Detail != "detected" {
+				t.Errorf("%s should be selectable, ticked and marked detected: %+v", name, item)
 			}
 		} else if !item.Disabled || item.Selected || item.Reason != "Coming Soon" {
 			t.Errorf("%s should be disabled, unselected, and labeled Coming Soon: %+v", name, item)
@@ -285,7 +285,7 @@ func TestHarnessSelectionAntigravityOnWindows(t *testing.T) {
 	app := New(func(dir string) *agents.Registry { return builtin.AgentsOn(dir, "windows") }, "dev")
 	app.binDirs = func() []string { return nil }
 	app.configure(t.TempDir(), t.TempDir())
-	form := app.harnessSelectionForm(context.Background(), map[string]bool{"antigravity": true, "grok": true})
+	form := app.harnessSelectionForm(map[string]bool{"antigravity": true, "grok": true})
 	last := len(form.Items) - 2
 	for i, label := range []string{"Antigravity", "Grok Build"} {
 		item := form.Items[last+i]
@@ -303,9 +303,7 @@ func TestHarnessSelectionAntigravityOnWindows(t *testing.T) {
 func TestHarnessSelectionFlags(t *testing.T) {
 	for _, name := range []string{"cursor", "opencode"} {
 		t.Run(name, func(t *testing.T) {
-			cmd := &cobra.Command{}
-			cfg := &config.Config{}
-			if _, err := testApp.chooseHarnesses(cmd, cfg, setupFlags{harnesses: "claude," + name}); err == nil || !strings.Contains(err.Error(), "Coming Soon") {
+			if _, err := testApp.chooseHarnesses(&cobra.Command{}, setupFlags{harnesses: "claude," + name}); err == nil || !strings.Contains(err.Error(), "Coming Soon") {
 				t.Fatalf("setup error = %v", err)
 			}
 		})
@@ -314,11 +312,11 @@ func TestHarnessSelectionFlags(t *testing.T) {
 	if err != nil || !slices.Equal(got, []string{"claude", "codex"}) {
 		t.Fatalf("available selection = %v, %v", got, err)
 	}
-	if got, err := testApp.chooseHarnesses(&cobra.Command{}, &config.Config{}, setupFlags{harnesses: "omp,claude"}); err != nil || !slices.Equal(got, []string{"claude", "omp"}) {
+	if got, err := testApp.chooseHarnesses(&cobra.Command{}, setupFlags{harnesses: "omp,claude"}); err != nil || !slices.Equal(got, []string{"claude", "omp"}) {
 		t.Fatalf("--harness omp,claude = %v, %v", got, err)
 	}
 	for _, name := range []string{"antigravity", "grok"} {
-		got, err = testApp.chooseHarnesses(&cobra.Command{}, &config.Config{}, setupFlags{harnesses: name + ",claude"})
+		got, err = testApp.chooseHarnesses(&cobra.Command{}, setupFlags{harnesses: name + ",claude"})
 		if !testApp.agents.IsSupported(name) {
 			if err == nil || !strings.Contains(err.Error(), "Coming Soon") {
 				t.Fatalf("%s on Windows: %v, %v", name, got, err)
@@ -329,33 +327,43 @@ func TestHarnessSelectionFlags(t *testing.T) {
 	}
 }
 
-func TestHarnessSelectionFiltersSavedAgents(t *testing.T) {
+// Only the agents detected on this machine are ticked, and marked so; an agent recorded by
+// an earlier setup but not detected now is neither ticked nor recorded by --yes.
+func TestHarnessSelectionTicksOnlyDetectedAgents(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
-	cmd := &cobra.Command{}
-	for _, saved := range [][]string{testApp.agents.Names(), {"cursor", "opencode", "antigravity"}} {
-		cfg := &config.Config{Harnesses: saved}
-		wantInstalled := []string(nil)
-		if slices.Contains(saved, "claude") {
-			wantInstalled = []string{"claude", "codex", "copilot", "omp"}
+	ctx := context.Background()
+	var detected []string
+	for _, n := range testApp.availableAgentNames() {
+		if s, _, _ := testApp.agents.Surface(n); s.Installed(ctx) {
+			detected = append(detected, n)
 		}
-		if len(wantInstalled) == 0 {
-			// With no CLI on PATH, an installed desktop app or editor still counts.
-			for _, n := range []string{"claude", "codex", "copilot", "omp"} {
-				if s, _, _ := testApp.agents.Surface(n); s.Installed(context.Background()) {
-					wantInstalled = append(wantInstalled, n)
-				}
-			}
-		}
-		// Antigravity and grok are not on the emptied PATH, so only a saved choice keeps them.
-		wantSetup := slices.Clone(wantInstalled)
-		for _, name := range []string{"antigravity", "grok"} {
-			if slices.Contains(saved, name) && testApp.agents.IsSupported(name) {
-				wantSetup = append(wantSetup, name)
-			}
-		}
-		got, err := testApp.chooseHarnesses(cmd, cfg, setupFlags{assumeYes: true})
-		if err != nil || !slices.Equal(got, wantSetup) {
-			t.Fatalf("setup selection = %v, %v; want %v", got, err, wantSetup)
+	}
+	// Antigravity and grok are not on the emptied PATH.
+	if slices.Contains(detected, "grok") {
+		t.Fatalf("grok detected with an empty PATH: %v", detected)
+	}
+	got, err := testApp.chooseHarnesses(&cobra.Command{}, setupFlags{assumeYes: true})
+	if err != nil || !slices.Equal(got, detected) {
+		t.Fatalf("--yes selection = %v, %v; want the detected %v", got, err, detected)
+	}
+
+	prevAsk, prevForm := testApp.canAsk, testApp.runForm
+	t.Cleanup(func() { testApp.canAsk, testApp.runForm = prevAsk, prevForm })
+	testApp.canAsk = func() bool { return true }
+	var offered []prompt.Item
+	testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
+		offered = slices.Clone(form.Items)
+		return form.Items, nil
+	}
+	got, err = testApp.chooseHarnesses(&cobra.Command{}, setupFlags{})
+	if err != nil || !slices.Equal(got, detected) {
+		t.Fatalf("picker selection = %v, %v; want the detected %v", got, err, detected)
+	}
+	for i, a := range testApp.harnessSelectionAgents() {
+		item := offered[i]
+		want := slices.Contains(detected, a.Name())
+		if item.Selected != want || (item.Detail == "detected") != want {
+			t.Errorf("%s row = %+v; want ticked and marked detected = %v", a.Name(), item, want)
 		}
 	}
 }

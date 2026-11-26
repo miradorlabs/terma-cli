@@ -56,9 +56,8 @@ func TestRoutedCommonCommandsDoNotCrossIntoPersonal(t *testing.T) {
 	personal.Personal = true
 	personal.Policy.Mode = config.ModeGlobal
 	orgA, orgB := makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true), makeTeam("orgB", "team-b", []string{"github.com/orgB/beta"}, true)
-	binds := map[string]string{"github.com/orgA/alpha": "orgA", "github.com/orgB/beta": "orgB"}
-	withPersonal := routedState(t, stateDir, testAccountA, []routing.Team{orgA, orgB, personal}, binds)
-	orgOnly := routedState(t, t.TempDir(), testAccountA, []routing.Team{orgA, orgB}, binds)
+	withPersonal := routedState(t, stateDir, testAccountA, []routing.Team{orgA, orgB, personal})
+	orgOnly := routedState(t, t.TempDir(), testAccountA, []routing.Team{orgA, orgB})
 
 	ctx, n := context.Background(), 0
 	// kind is the session's claim after one tool call in a new run in repoA reached paths.
@@ -162,8 +161,7 @@ func TestRoutedScratchEditsAreReportedToNoTeam(t *testing.T) {
 	personal := makeTeam("orgPersonal", "team-personal", nil, false)
 	personal.Personal = true
 	personal.Policy.Mode = config.ModeGlobal
-	rt := routedState(t, stateDir, testAccountA, []routing.Team{makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true), personal},
-		map[string]string{"github.com/orgA/alpha": "orgA"})
+	rt := routedState(t, stateDir, testAccountA, []routing.Team{makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true), personal})
 	personalEnrollment := rt.state.Teams[1].EnrollmentID
 	touchesFor := func(sid, path string) (personals int) {
 		t.Helper()

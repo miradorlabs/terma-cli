@@ -183,14 +183,10 @@ func TestCrossRepoRoutingIsolatesTwoTeamsAndSkipsMissingOrDeletedCwd(t *testing.
 				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-b/repo-b"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-b", TeamID: "team-b", AuthURL: "https://auth.example.com", FetchedAt: now},
 			},
 			{
-				// Personal collects everything outside org bindings — deletedDir MUST NOT leak here!
+				// Personal collects everything the org teams do not list — deletedDir MUST NOT leak here!
 				EnrollmentID: "enr-personal", TeamID: "team-personal", OrganizationID: "org-personal", Personal: true, AuthURL: "https://auth.example.com",
 				Policy: config.Policy{Mode: config.ModeGlobal, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-personal", TeamID: "team-personal", AuthURL: "https://auth.example.com", FetchedAt: now},
 			},
-		},
-		Bindings: map[string]routing.Binding{
-			"github.com/org-a/repo-a": {Organization: "org-a"},
-			"github.com/org-b/repo-b": {Organization: "org-b"},
 		},
 	}
 
@@ -364,11 +360,6 @@ func TestHoldingsChunkingMultiOrgSkipAndFailClosed(t *testing.T) {
 				EnrollmentID: "enr-fail", TeamID: "team-fail", OrganizationID: "org-c", AuthURL: "https://auth.example.com",
 				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-c/repo-c"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-c", TeamID: "team-fail", AuthURL: "https://auth.example.com", FetchedAt: now},
 			},
-		},
-		Bindings: map[string]routing.Binding{
-			"github.com/org-a/repo-a": {Organization: "org-a"},
-			"github.com/org-b/repo-b": {Organization: "org-b"},
-			"github.com/org-c/repo-c": {Organization: "org-c"},
 		},
 	}
 
@@ -700,10 +691,6 @@ func TestOriginMismatchFailsClosed(t *testing.T) {
 				EnrollmentID: "enr-b", TeamID: "team-b", OrganizationID: "org-b", AuthURL: "https://auth.example.com",
 				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-b/repo-b"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-b", TeamID: "team-b", AuthURL: "https://auth.example.com", FetchedAt: now},
 			},
-		},
-		Bindings: map[string]routing.Binding{
-			"github.com/org-a/repo-a": {Organization: "org-a"},
-			"github.com/org-b/repo-b": {Organization: "org-b"},
 		},
 	}
 
@@ -1125,10 +1112,6 @@ func TestHistoricalToolReachDropsCrossOrgWithoutRunsLedgerAndIgnoresTmp(t *testi
 				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-b/repo-b"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-b", TeamID: "team-b", AuthURL: "https://auth.example.com", FetchedAt: now},
 			},
 		},
-		Bindings: map[string]routing.Binding{
-			"github.com/org-a/repo-a": {Organization: "org-a"},
-			"github.com/org-b/repo-b": {Organization: "org-b"},
-		},
 	}
 
 	var mu sync.Mutex
@@ -1255,7 +1238,7 @@ func TestPreAttemptStopsOnRebindAndOnPolicyTightenDuring429Retry(t *testing.T) {
 		t.Fatalf("expected policy_changed skip, got %+v", sum)
 	}
 
-	// Now verify ConsentGeneration bump (repo rebind/refusal) aborts before sending!
+	// Now verify a ConsentGeneration bump (a change to the selected teams) aborts before sending!
 	stRebound := stOpen
 	stRebound.ConsentGeneration = 2
 	posts = 0
@@ -1282,7 +1265,7 @@ func TestPreAttemptStopsOnRebindAndOnPolicyTightenDuring429Retry(t *testing.T) {
 		t.Fatal(err)
 	}
 	if posts != 0 || sum2.SkippedSessions[SkipDeselected] != 1 {
-		t.Fatalf("rebind should abort before POST: posts=%d sum=%+v", posts, sum2)
+		t.Fatalf("a team selection change should abort before POST: posts=%d sum=%+v", posts, sum2)
 	}
 }
 
@@ -1413,10 +1396,6 @@ func TestSessionWideReachCutoffOutOfOrderSubagentDeletedPathsAndAgedFailure(t *t
 				EnrollmentID: "enr-b", TeamID: "team-b", OrganizationID: "org-b", AuthURL: "https://auth.example.com",
 				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-b/repo-b"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-b", TeamID: "team-b", AuthURL: "https://auth.example.com", FetchedAt: now},
 			},
-		},
-		Bindings: map[string]routing.Binding{
-			"github.com/org-a/repo-a": {Organization: "org-a"},
-			"github.com/org-b/repo-b": {Organization: "org-b"},
 		},
 	}
 
@@ -1600,7 +1579,9 @@ func TestHeldSubagentUnroutedReachSpawnedChildAndHistoricalBranch(t *testing.T) 
 	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
 	t0 := now.Add(-4 * time.Hour)
 
-	// Org A is active; Org B is blocked (TeamRefused); no Personal team selected.
+	// Org A is active; Org B is blocked but still holds its repository (Suspended: a
+	// Refused team is passed over, so its repository would belong to no organization);
+	// no Personal team selected.
 	st := routing.State{
 		StateID: "st-1", Generation: 1, ConsentGeneration: 1, Account: "acc1",
 		Teams: []routing.Team{
@@ -1610,13 +1591,9 @@ func TestHeldSubagentUnroutedReachSpawnedChildAndHistoricalBranch(t *testing.T) 
 			},
 			{
 				EnrollmentID: "enr-b", TeamID: "team-b", OrganizationID: "org-b", AuthURL: "https://auth.example.com",
-				Refusals: 2, LastError: routing.OrgAccessLost, RefusedAt: now.Add(-time.Hour),
-				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-b/secret"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-b", TeamID: "team-b", AuthURL: "https://auth.example.com", FetchedAt: now},
+				Refusals: 1,
+				Policy:   config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-b/secret"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-b", TeamID: "team-b", AuthURL: "https://auth.example.com", FetchedAt: now},
 			},
-		},
-		Bindings: map[string]routing.Binding{
-			"github.com/org-a/app":    {Organization: "org-a"},
-			"github.com/org-b/secret": {Organization: "org-b"},
 		},
 	}
 
@@ -1728,10 +1705,6 @@ func TestSpawnFamilyChildSiblingOrphanDeletedShellTargetGitDashCAndFetchedAtTick
 				EnrollmentID: "enr-b", TeamID: "team-b", OrganizationID: "org-b", AuthURL: "https://auth.example.com",
 				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-b/secret"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-b", TeamID: "team-b", AuthURL: "https://auth.example.com", FetchedAt: now},
 			},
-		},
-		Bindings: map[string]routing.Binding{
-			"github.com/org-a/app":    {Organization: "org-a"},
-			"github.com/org-b/secret": {Organization: "org-b"},
 		},
 	}
 	// Routine 1-minute TeamRefresher tick: bumps Generation and FetchedAt ONLY (no policy/repo change).
@@ -1880,10 +1853,6 @@ func TestUnroutedMainWithSubagentsResumeAcrossOrgsAndCompanionError(t *testing.T
 				EnrollmentID: "enr-b", TeamID: "team-b", OrganizationID: "org-b", AuthURL: "https://auth.example.com",
 				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-b/other"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-b", TeamID: "team-b", AuthURL: "https://auth.example.com", FetchedAt: now},
 			},
-		},
-		Bindings: map[string]routing.Binding{
-			"github.com/org-a/app":   {Organization: "org-a"},
-			"github.com/org-b/other": {Organization: "org-b"},
 		},
 	}
 

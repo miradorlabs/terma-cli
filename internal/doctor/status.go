@@ -221,28 +221,6 @@ func Local(ctx context.Context, env Env) (LocalReport, error) {
 	return rep, nil
 }
 
-// Context is what `terma doctor` prints above its checks, which do not cover it: what this
-// machine collects, which backend it reports to, how it gets new releases (Env.Updates),
-// and the repository's work in progress.
-func Context(env Env) []Row {
-	if env.Config == nil {
-		return nil
-	}
-	rows := append([]Row{{"Config", output.TildePath(env.ConfigDir)}, {"State", output.TildePath(env.StateDir)}},
-		machineRows(env.Config, env.Routing != nil)...)
-	if env.Routing != nil {
-		rows = append(rows, TeamRows(*env.Routing, time.Now())...)
-	}
-	rows = append(rows, env.Updates...)
-	if env.RepoErr != nil {
-		return rows
-	}
-	if work, err := workRows(env.StateDir, env.Root, env.GitDir); err == nil {
-		rows = append(rows, work...)
-	}
-	return append(rows, repoPolicyRows(env.Agents, env.Root)...)
-}
-
 // captureOff is why nothing is collected once the policy has expired (config.MaxPolicyAge).
 const captureOff = "the collection policy has not been refreshed for over a week"
 
@@ -276,7 +254,7 @@ func workRows(stateDir, root, gitDir string) ([]Row, error) {
 	var rows []Row
 	store := session.Open(storeDir)
 	if active, fresh := store.Active(time.Now(), 4*time.Hour); active != nil && fresh {
-		rows = append(rows, Row{"Session", fmt.Sprintf("%s (%s), active", active.ID, active.ToolLabel())})
+		rows = append(rows, Row{"Session", cmp.Or(active.ToolLabel(), "an agent") + " session active"})
 	}
 	if manifests, _ := store.Manifests(); len(manifests) > 0 {
 		pending, sessions := 0, 0
@@ -287,7 +265,7 @@ func workRows(stateDir, root, gitDir string) ([]Row, error) {
 			}
 		}
 		if pending > 0 {
-			rows = append(rows, Row{"Uncommitted", fmt.Sprintf("%d agent-edited file(s) across %d session(s)", pending, sessions)})
+			rows = append(rows, Row{"Uncommitted", fmt.Sprintf("%d %s edited by agents in %d %s", pending, pick(pending == 1, "file", "files"), sessions, pick(sessions == 1, "session", "sessions"))})
 		}
 	}
 	return rows, nil

@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
@@ -53,7 +52,7 @@ func (p *pass) admit(e spool.Event, pr *profileRoute, lane string, now time.Time
 		return routing.Team{}, spool.Event{}, admitHold
 	}
 	team, ok := pr.state.Team(e.Enrollment)
-	v, d := pr.router.Recheck(routing.Destination{EnrollmentID: e.Enrollment, Location: locationOf(e)}, now)
+	v, _ := pr.router.Recheck(routing.Destination{EnrollmentID: e.Enrollment, Location: locationOf(e)}, now)
 	switch {
 	case v == routing.Discard || !ok:
 		res.Discarded++
@@ -68,7 +67,7 @@ func (p *pass) admit(e spool.Event, pr *profileRoute, lane string, now time.Time
 	case v == routing.Wait:
 		res.Blocked++
 		return routing.Team{}, spool.Event{}, admitHold
-	case v != routing.SendNow || e.HoldKey != "" && !holdBound(pr.state, d, e.HoldKey, team.OrganizationID):
+	case v != routing.SendNow:
 		res.Discarded++
 		return routing.Team{}, spool.Event{}, admitDrop
 	default:
@@ -160,26 +159,6 @@ func locationOf(e spool.Event) routing.Location {
 		return routing.Location{Kind: routing.OutsideGit}
 	}
 	return routing.Location{Kind: routing.Repository, Repository: e.Repository.Origin}
-}
-
-// holdBound reports whether the pending binding that held an event (holdKey) is now bound
-// to organization, and d's current authority is likewise Bound to organization. An owner
-// holdKey (host/owner) requires that owner binding itself; a repository holdKey
-// (host/owner/repo) is satisfied by a binding on that repository, or on its owner when
-// the repository has no conflicting decision of its own.
-func holdBound(st routing.State, d routing.Decision, holdKey, organization string) bool {
-	if d.Authority.Kind != routing.Bound || d.Authority.Organization != organization {
-		return false
-	}
-	key := routing.Normalize(holdKey)
-	if b, ok := st.Bindings[key]; ok {
-		return !b.Refused && b.Organization == organization
-	}
-	if config.IsRepositoryKey(key) {
-		b, ok := st.Bindings[routing.Owner(key)]
-		return ok && !b.Refused && b.Organization == organization
-	}
-	return false
 }
 
 // mixed reports whether e's session's run crossed organizations at or before e's time,
