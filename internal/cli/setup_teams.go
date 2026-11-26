@@ -177,10 +177,10 @@ func (app *App) commitDiscoveredTeams(ctx context.Context, cfg *config.Config, a
 		}
 	}
 
-	if len(disc.teams) == 1 && len(disc.orgs) == 1 {
+	if len(committed.Teams) == 1 && len(disc.orgs) == 1 {
 		ui.policyFetched(primaryDisc.teamName, primary.Policy)
 	} else {
-		ui.teamsConfigured(disc.orgs, disc.teams)
+		ui.teamsConfigured(disc.orgs, committed, disc.names)
 	}
 	for _, w := range disc.warnings {
 		ui.Caution("Teams", w)

@@ -90,23 +90,24 @@ func (u *setupUI) policyFetched(team string, pol config.Policy) {
 	u.policyNextSteps(pol, !pol.AdmitsNone(), doctor.GitHooksOff(pol, time.Now()))
 }
 
-// teamsConfigured summarizes the enrolled organizations and teams.
-func (u *setupUI) teamsConfigured(orgs []organization, teams []discoveredTeam) {
+// teamsConfigured summarizes the enrolled organizations and the teams st ticks, including
+// one whose policy could not be read this run, which keeps its last one.
+func (u *setupUI) teamsConfigured(orgs []organization, st routing.State, names teamNames) {
 	if len(orgs) > 1 {
 		u.Summary("Organizations", strings.Join(orgNamesList(orgs), ", "))
 	}
-	dests := make([]orgTeam, 0, len(teams))
+	dests := make([]orgTeam, 0, len(st.Teams))
 	anyAdmits, gitHooksOff := false, false
 	now := time.Now()
-	for _, dt := range teams {
-		dests = append(dests, orgTeam{dt.orgName, dt.teamName, dt.team.Personal})
-		if pol := dt.team.Policy; !pol.AdmitsNone() {
+	for _, t := range st.Teams {
+		dests = append(dests, orgTeam{cmp.Or(names.Orgs[t.OrganizationID], t.OrganizationID), cmp.Or(names.Teams[t.TeamID], t.TeamID), t.Personal})
+		if pol := t.Policy; !pol.AdmitsNone() {
 			anyAdmits = true
 			gitHooksOff = gitHooksOff || doctor.GitHooksOff(pol, now)
 		}
 	}
 	u.Summary("Sending to", sendingTo(dests))
-	u.policyNextSteps(teams[0].team.Policy, anyAdmits, gitHooksOff)
+	u.policyNextSteps(st.Teams[0].Policy, anyAdmits, gitHooksOff)
 }
 
 // policyNextSteps warns when nothing is collected at all, and otherwise asks for commit

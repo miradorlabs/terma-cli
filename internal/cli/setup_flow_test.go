@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -241,6 +242,32 @@ func TestSetupReportsPolicyConflicts(t *testing.T) {
 	}
 }
 
+// A re-run that cannot read one ticked team's policy keeps that team, and its summary
+// still names it beside the caution.
+func TestSetupRerunSummaryKeepsATeamWhosePolicyFailed(t *testing.T) {
+	gateway := newFakeAuth(t)
+	acmeWeb, betaTeam := projectsIn(orgA().ID)[0].ID, projectsIn(orgB().ID)[0].ID
+	gateway.policyBodies = map[string]string{
+		acmeWeb:  policyAt("2026-11-01T00:00:00Z", "github.com/acme/web"),
+		betaTeam: policyAt("2026-11-10T00:00:00Z", "github.com/beta/core"),
+	}
+	setupMachine(t, gateway)
+	if out, err := runTerma(t, "setup", "--harness", "codex", "--yes"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	gateway.forbiddenTeams = map[string]bool{betaTeam: true}
+	out, err := runTerma(t, "setup", "--harness", "codex", "--yes")
+	if err != nil {
+		t.Fatalf("re-run: %v\n%s", err, out)
+	}
+	if !slices.Contains(enrolledTeams(t), betaTeam) {
+		t.Fatalf("re-run dropped Beta Core: %v", enrolledTeams(t))
+	}
+	if got := flat(out); !strings.Contains(got, "Beta Core: policy could not be read") || !regexp.MustCompile(`Sending to [^!]*Beta Labs › Beta Core`).MatchString(got) {
+		t.Fatalf("re-run summary leaves out Beta Core:\n%s", out)
+	}
+}
+
 // A re-run keeps the developer's choices: --yes enrolls no organization team left unticked,
 // and --team adds the team it names to those ticked.
 func TestSetupRerunKeepsTeamChoices(t *testing.T) {
@@ -339,15 +366,16 @@ func TestSetupPickerOffersPersonalAndKeepsItUnticked(t *testing.T) {
 // Setup's summary names the personal organization's team "Personal", whatever the team is
 // called, and lists no repositories.
 func TestSetupSummaryNamesPersonalAndListsNoRepositories(t *testing.T) {
-	team := func(org, name string, personal bool, pol config.Policy) discoveredTeam {
-		return discoveredTeam{orgName: org, teamName: name, team: routing.Team{OrganizationID: org, Personal: personal, Policy: pol}}
+	team := func(org, id string, personal bool, pol config.Policy) routing.Team {
+		return routing.Team{OrganizationID: org, TeamID: id, Personal: personal, Policy: pol}
 	}
 	repos := config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/web"}, TeamID: "w", FetchedAt: time.Now()}
 	global := config.Policy{Mode: config.ModeGlobal, TeamID: "p", FetchedAt: time.Now()}
 	var b strings.Builder
 	u := newSetupUI(&b, false)
+	names := teamNames{Orgs: map[string]string{"a": "Acme", "p": "Someone's Personal"}, Teams: map[string]string{"w": "Acme Web", "p": "Default"}}
 	u.teamsConfigured([]organization{{ID: "a", Name: "Acme"}, {ID: "p", Name: "Someone's Personal", Type: "personal"}},
-		[]discoveredTeam{team("Acme", "Acme Web", false, repos), team("Someone's Personal", "Default", true, global)})
+		routing.State{Teams: []routing.Team{team("a", "w", false, repos), team("p", "p", true, global)}}, names)
 	u.printLines()
 	out := b.String()
 	if !strings.Contains(flat(out), "Sending to Acme › Acme Web You › Personal") || strings.Contains(out, "Default") || strings.Contains(out, "Collects") || strings.Contains(out, "github.com") {
