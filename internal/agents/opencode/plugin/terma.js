@@ -87,8 +87,11 @@ const EXIT_QUEUE_MS = 8000
 // How long a session waits for its record before it is given up on (fail closed).
 const RECORD_WAIT_MS = 5000
 // What the plugin remembers is bounded, so a long-running server cannot grow it forever;
-// only the ids of tainted sessions are kept for good (see taint).
+// only the ids of sessions that failed closed are kept for good (see taint, darken).
 const MAX_SESSIONS = 512
+// Who opened whom is remembered far longer than a session is kept, so a family holds
+// together on a long-running server (see parents).
+const MAX_PARENTS = 65536
 const MAX_EVENTS = 8192
 const MAX_PER_SESSION = 1024
 const MAX_SMALL = 256
@@ -154,6 +157,9 @@ function newState() {
     // The ids of sessions that went dark, kept for good as taints are: a session that has
     // ended or been forgotten still fails what is below it closed.
     dark: new Set(),
+    // session id -> the id of the session that opened it, for every subagent seen: a family
+    // is walked through this, never through sessions, which are forgotten when idle.
+    parents: new Map(),
     // The time of the last reach check made after its tool ran, by family (familyOf), and
     // the late checks running now, which the family's queued work waits for (lateCheck).
     floors: new Map(),
@@ -682,12 +688,12 @@ async function firstSight(s, lookup) {
   }
   s.latest = null
   s.known = true
-  s.parentID = str(rec.parentID)
+  adopt(s, str(rec.parentID))
   s.directory = str(rec.directory)
   s.askedDirectory = s.directory
   s.version = str(rec.version)
   s.created = num(rec.created) ?? 0
-  s.title = str(rec.title)
+  const titled = (s.title = str(rec.title))
   s.policy = repoPolicy(s.directory)
   s.claimed = await runHook(s, "opencode-session-start", base(s))
   // A timeout or a refusal is not fatal: the relay holds an unclaimed session and the
@@ -696,12 +702,19 @@ async function firstSight(s, lookup) {
     darken(s)
     return
   }
-  // The title as it stands now (a later update may have arrived during the claim); this
-  // is what titles a resumed session.
-  if (!s.parentID && isRealTitle(s.title)) {
-    s.sentTitle = s.title
-    emitTitle(s, s.title)
+  // The title the session came with, which is what titles a resumed session. One that
+  // arrived during the claim is not sent here: it has its own place in the queue, behind
+  // whatever was queued before it, a call still to be checked included.
+  if (!s.parentID && isRealTitle(titled)) {
+    s.sentTitle = titled
+    emitTitle(s, titled)
   }
+}
+
+// adopt notes which session opened s, on the session and in parents.
+function adopt(s, parentID) {
+  s.parentID = parentID
+  if (parentID && parentID !== s.id) remember(state.parents, s.id, parentID, MAX_PARENTS)
 }
 
 function update(s, rec) {
@@ -721,7 +734,7 @@ function update(s, rec) {
       s.movedAt = Date.now() + 1 // strictly after the claim, never the same millisecond
     })
   }
-  if (rec.parentID) s.parentID = rec.parentID
+  if (rec.parentID) adopt(s, rec.parentID)
   if (rec.title && rec.title !== s.title) {
     s.title = rec.title
     const time = Date.now()
@@ -752,7 +765,8 @@ function run(s, fn) {
 // check sends nothing, so it waits neither behind what the session has queued to send nor
 // for a late check elsewhere in the family: the plugin's waits may delay what terma sends,
 // never OpenCode's own work beyond the check that work needs. What the tool itself sends
-// later goes through the queue as ever, and is held there.
+// later goes through the queue as ever, and is held there. A session that failed closed is
+// judged here (blocked), as run judges it for queued work.
 async function beside(s, fn) {
   await s.first
   try {
@@ -781,21 +795,16 @@ function taint(s) {
   let id = s.id
   for (let i = 0; i < 16 && id; i++) {
     state.tainted.add(id)
-    const parent = id === s.id ? s.parentID : state.sessions.get(id)?.parentID
-    if (!parent || parent === id) break
-    id = parent
+    id = state.parents.get(id)
   }
 }
-// familyOf names s's family by the topmost session above it that this process can name,
-// whether or not that session is still kept. A session and its subagents share one run in
-// terma, and so one Mixed cutoff: a reach check made after its tool ran, anywhere in the
-// family, holds the whole family's times (checked, checkFloor).
+// familyOf names s's family by the topmost session above it, whether or not the sessions
+// between are still kept. A session and its subagents share one run in terma, and so one
+// Mixed cutoff: a reach check made after its tool ran, anywhere in the family, holds the
+// whole family's times (checked, checkFloor).
 function familyOf(s) {
   let id = s.id
-  for (let i = 0, parent = s.parentID; i < 16 && parent && parent !== id; i++) {
-    id = parent
-    parent = state.sessions.get(id)?.parentID
-  }
+  for (let i = 0, parent; i < 16 && (parent = state.parents.get(id)); i++) id = parent
   return id
 }
 
@@ -838,9 +847,7 @@ function isTainted(s) {
   let id = s.id
   for (let i = 0; i < 16 && id; i++) {
     if (state.tainted.has(id) || state.dark.has(id)) return true
-    const parent = id === s.id ? s.parentID : state.sessions.get(id)?.parentID
-    if (!parent || parent === id) break
-    id = parent
+    id = state.parents.get(id)
   }
   return false
 }
@@ -1109,6 +1116,18 @@ async function shutdown(owner) {
 }
 
 // --- reach --------------------------------------------------------------------------
+//
+// Where anything leaves, and what it passes. "queued" is a step of the session's queue
+// (run), where a session that failed closed is skipped and a late check in the family is
+// waited for; the floor is checkFloor, applied as the span or record is built.
+//   a model or tool call's span        queued; its end is held to the floor
+//   a prompt or title record           queued; its time is held to the floor
+//   the file-edit, prompt, idle and    queued, from the step that sends what they belong to;
+//   session-end hooks                  they carry no content
+//   the claim (session-start hook)     the queue's first step; nothing precedes it
+//   a reach check, and the request     beside the queue or in it: they are the guard, carry
+//   to mark a run Mixed                no content, and must not wait for what they protect
+//   the end of a session never kept    its own hook queue; an id and a folder only
 //
 // Where a reach is checked:
 //   site                 checks                         when                         waits  sets

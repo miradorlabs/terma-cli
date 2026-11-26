@@ -970,6 +970,30 @@ test("a tool's own check waits neither for a late check elsewhere in its family 
   expect(endOf(call)).toBeGreaterThanOrEqual(began + 400)
 })
 
+test("a title that arrives during the first claim waits its turn behind a call still to be checked", async () => {
+  const { r, hooks } = await start({}, { terma: { delayed: { "opencode-session-start": 0.4, "opencode-tool-reach": 0.3 } } })
+  await hooks.event(sessionCreated("ses_ft"))
+  await hooks.event(toolPart("ses_ft", "msg_1", "c1", "bash", done({ command: "cat /other/x" }, "x")))
+  await hooks.event(ev("session.updated", { info: { id: "ses_ft", directory: "/repo", version: "1.19.6", title: "A real title", time: { created: 1000 } } }))
+  await hooks.dispose()
+  const [title] = named(r.logs(), "opencode.session.title")
+  expect(Number(BigInt(title.timeUnixNano) / 1000000n)).toBeGreaterThan(finishedAt(r.dir, "opencode-tool-reach"))
+})
+
+test("a family holds together when a session in its middle has been forgotten", async () => {
+  const { r, hooks } = await start({}, { terma: { delayed: { "opencode-tool-reach": 0.3 } } })
+  await hooks.event(sessionCreated("ses_r"))
+  await hooks.event(sessionCreated("ses_m", { parentID: "ses_r" }))
+  await hooks.event(sessionCreated("ses_l", { parentID: "ses_m" }))
+  await Promise.all([...globalThis[KEY].sessions.values()].map((s) => s.queue))
+  globalThis[KEY].sessions.delete("ses_m") // as an eviction would
+  await hooks.event(toolPart("ses_l", "msg_k", "k1", "bash", done({ command: "cat /other/x" }, "x")))
+  await hooks.event(assistantDone("ses_r", "msg_1", { time: { created: 2000, completed: Date.now() } }))
+  await hooks.dispose()
+  const [call] = chats(r.spans()).filter((sp) => A(sp)["session.id"] === "ses_r")
+  expect(endOf(call)).toBeGreaterThan(finishedAt(r.dir, "opencode-tool-reach"))
+})
+
 test("a family's floor outlives its root, and a dark session still blocks what is under it once forgotten", async () => {
   const source = SOURCE.replace("const RECORD_WAIT_MS = 5000", "const RECORD_WAIT_MS = 300")
   const { r, hooks } = await start({}, { client: fakeClient(() => null), source, terma: { delayed: { "opencode-tool-reach": 0.2 } } })
