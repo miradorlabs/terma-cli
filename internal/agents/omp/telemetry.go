@@ -30,9 +30,9 @@ func (Agent) CaptureRules() shape.CaptureRules {
 		// Strings and lists only: a number or a flag passes whatever its key (cost, token
 		// counts, latencies). Each is one omp 19.0.1 sends, read from its own export.
 		SafeKeys: []string{
-			// A tool call's outcome (ok, error, skipped, blocked, timeout, aborted), a chat's
-			// stop reason, and the reasoning effort it asked for.
-			"omp.gen_ai.tool.status", "omp.tool.status", "gen_ai.response.finish_reason", "omp.gen_ai.request.reasoning.effort",
+			// A tool call's outcome (ok, error, skipped, blocked, timeout, aborted), type, error class,
+			// a chat's stop reason, and the reasoning effort it asked for.
+			"omp.gen_ai.tool.status", "omp.tool.status", "gen_ai.tool.type", "error.type", "gen_ai.response.finish_reason", "omp.gen_ai.request.reasoning.effort",
 			// What a chat outside the agent loop was for (compaction_summary, handoff,
 			// image_question, …), and why a judgment ran (find, ttsr, judge_batch, …): OMP's own
 			// classifiers, which tell a one-off call from a turn.

@@ -526,3 +526,97 @@ func TestRelayStripsHistoricalSessionMarkerOnLiveExports(t *testing.T) {
 		}
 	}
 }
+
+// ContentFilter.FilterTraces preserves terma.session.historical=true and
+// terma.session.parent.id on both resources and spans under restrictive team policies
+// while stripping prompt, reply, system instructions, and tool content with zero
+// unclassified keys.
+func TestContentFilterTracesPreservesHistoricalAndParentAndRedactsContent(t *testing.T) {
+	t.Parallel()
+	filter := &ContentFilter{rules: testRules}
+	boolTrue := &commonpb.AnyValue{Value: &commonpb.AnyValue_BoolValue{BoolValue: true}}
+	msg := &tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{{
+		Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{
+			kv("service.name", "oh-my-pi"),
+			kv("service.version", "19.0.1"),
+			{Key: semconv.TermaSessionHistoricalKey, Value: proto.CloneOf(boolTrue)},
+			kv(semconv.TermaSessionParentIDKey, "parent-sess-1"),
+			kv("process.command_args", "SECRET-ARGS"),
+			kv("cwd", "/work/SECRET-CWD"),
+		}},
+		ScopeSpans: []*tracepb.ScopeSpans{{
+			Scope: &commonpb.InstrumentationScope{Name: "@oh-my-pi/pi-agent-core"},
+			Spans: []*tracepb.Span{
+				{
+					Name: "chat claude-sonnet-4-6",
+					Attributes: []*commonpb.KeyValue{
+						kv("gen_ai.operation.name", "chat"),
+						kv("gen_ai.conversation.id", "sub-sess-1"),
+						kv("gen_ai.request.model", "claude-sonnet-4-6"),
+						kv("gen_ai.provider.name", "anthropic"),
+						kv("gen_ai.agent.id", "0-explore"),
+						kv("gen_ai.agent.name", "explore"),
+						{Key: semconv.TermaSessionHistoricalKey, Value: proto.CloneOf(boolTrue)},
+						kv("gen_ai.system_instructions", `[{"type":"text","content":"SECRET-SYS"}]`),
+						kv("gen_ai.input.messages", `[{"role":"user","parts":[{"type":"text","content":"SECRET-PROMPT"}]}]`),
+						kv("gen_ai.output.messages", `[{"role":"assistant","parts":[{"type":"text","content":"SECRET-REPLY"}]}]`),
+					},
+				},
+				{
+					Name: "execute_tool read",
+					Attributes: []*commonpb.KeyValue{
+						kv("gen_ai.operation.name", "execute_tool"),
+						kv("gen_ai.conversation.id", "sub-sess-1"),
+						kv("gen_ai.tool.name", "read"),
+						kv("gen_ai.tool.call.id", "call-1"),
+						kv("gen_ai.tool.type", "function"),
+						kv("omp.gen_ai.tool.status", "error"),
+						kv("error.type", "error"),
+						{Key: semconv.TermaSessionHistoricalKey, Value: proto.CloneOf(boolTrue)},
+						kv("gen_ai.tool.call.arguments", `{"path":"SECRET-PATH"}`),
+						kv("gen_ai.tool.call.result", `{"content":[{"type":"text","text":"SECRET-OUTPUT"}]}`),
+					},
+				},
+			},
+		}},
+	}}}
+
+	changed, unclassified := filter.FilterTraces(msg, false, false)
+	if changed == 0 {
+		t.Fatal("expected restrictive policy to withhold trace content")
+	}
+	if len(unclassified) != 0 {
+		t.Fatalf("unexpected unclassified keys: %v", unclassified)
+	}
+	wire, err := proto.Marshal(msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(wire), "SECRET-") {
+		t.Fatalf("withheld trace content survived FilterTraces: %q", string(wire))
+	}
+	rs := msg.ResourceSpans[0]
+	checkBoolTrue := func(where string, attrs []*commonpb.KeyValue) {
+		t.Helper()
+		for _, a := range attrs {
+			if a.GetKey() == semconv.TermaSessionHistoricalKey {
+				b, ok := a.GetValue().GetValue().(*commonpb.AnyValue_BoolValue)
+				if !ok || !b.BoolValue {
+					t.Errorf("%s %s = %v, want bool true", where, semconv.TermaSessionHistoricalKey, a.GetValue())
+				}
+				return
+			}
+		}
+		t.Errorf("%s missing %s", where, semconv.TermaSessionHistoricalKey)
+	}
+	checkBoolTrue("resource", rs.Resource.Attributes)
+	if got := attr(rs.Resource.Attributes, semconv.TermaSessionParentIDKey); got != "parent-sess-1" {
+		t.Errorf("resource %s = %q, want parent-sess-1", semconv.TermaSessionParentIDKey, got)
+	}
+	for i, sp := range rs.ScopeSpans[0].Spans {
+		checkBoolTrue("span", sp.Attributes)
+		if attr(sp.Attributes, "gen_ai.conversation.id") != "sub-sess-1" {
+			t.Errorf("span %d lost gen_ai.conversation.id", i)
+		}
+	}
+}

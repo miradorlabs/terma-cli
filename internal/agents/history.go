@@ -5,6 +5,7 @@ import (
 	"time"
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 // HistoryFile describes one discovered local session transcript on disk.
@@ -24,6 +25,10 @@ type HistoryFile struct {
 	// WatchDirs lists optional companion directories whose regular .jsonl files are checked
 	// when re-verifying that the session has not resumed before upload.
 	WatchDirs []string
+	// SeenWatchFiles lists regular .jsonl files already present inside WatchDirs at discovery
+	// time that were intentionally not included in ExtraPaths (for example, stale copied
+	// subagent transcripts inside a fork's directory), so re-verification only flags new files.
+	SeenWatchFiles []string
 	// ModTime is the latest modification time across Path and ExtraPaths.
 	ModTime time.Time
 	// Active reports whether the transcript was modified within the active-session window
@@ -85,8 +90,13 @@ type HistorySegment struct {
 	// NativeLogs holds the agent's native OTLP log records, filtered by the relay content
 	// filter before upload.
 	NativeLogs *logspb.LogsData
-	// SupplementalLogs holds optional terma-scoped log records (such as replies not present
-	// in the native stream), filtered by the destination team's prompt policy before upload.
+	// NativeTraces holds the agent's native OTLP trace spans (for agents whose platform
+	// adapter maps /v1/traces rather than /v1/logs), filtered by the relay content filter
+	// before upload.
+	NativeTraces *tracepb.TracesData
+	// SupplementalLogs holds optional terma-scoped log records (such as replies, session
+	// titles, subagent parent starts, or file-touch metadata not present in the native
+	// stream), filtered by the destination team's content policy before upload.
 	SupplementalLogs *logspb.LogsData
 	// ToolReaches holds paths reached by tool calls in this segment (with their timestamps)
 	// so historical upload enforces the same cross-organization Mixed cutoff as live hooks.
@@ -95,7 +105,8 @@ type HistorySegment struct {
 	// sharing the parent session's run (so a subagent crossing into another organization
 	// taints the parent session's run at that timestamp).
 	Subagent bool
-	// RecordCount is the total number of log records across NativeLogs and SupplementalLogs.
+	// RecordCount is the total number of log records and spans across NativeLogs,
+	// NativeTraces, and SupplementalLogs.
 	RecordCount int
 }
 

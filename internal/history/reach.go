@@ -316,7 +316,8 @@ func pathUnder(path, root string) bool {
 }
 
 // earliestSegmentTime returns when a segment started: the earliest timestamp among its log
-// records and tool reaches, or zero when any of them is untimed (its start is then unknown).
+// records, trace spans, and tool reaches, or zero when any of them is untimed (its start is
+// then unknown).
 func earliestSegmentTime(seg agents.HistorySegment) time.Time {
 	var best time.Time
 	untimed := false
@@ -338,6 +339,17 @@ func earliestSegmentTime(seg agents.HistorySegment) time.Time {
 	}
 	scan(seg.NativeLogs)
 	scan(seg.SupplementalLogs)
+	for _, rs := range seg.NativeTraces.GetResourceSpans() {
+		for _, ss := range rs.GetScopeSpans() {
+			for _, sp := range ss.GetSpans() {
+				t := spanStartTime(sp)
+				if t.IsZero() {
+					t = spanEndTime(sp)
+				}
+				consider(t)
+			}
+		}
+	}
 	for _, tr := range seg.ToolReaches {
 		consider(tr.At)
 	}
@@ -357,14 +369,30 @@ func prepareSegmentFiltered(
 	reachMixedAt time.Time,
 	hasReachMixed bool,
 	maxRecordTime time.Time,
-) (*logspb.LogsData, int, int) {
+) (PreparedSegment, int, int) {
 	prepared, _ := PrepareSegment(seg, filter, pol, stamp)
-	if prepared == nil {
-		return nil, 0, 0
+	if prepared.Empty() {
+		return PreparedSegment{}, 0, 0
 	}
-	kept, dropped := FilterMixedLogs(prepared, snap, lookup, reachMixedAt, hasReachMixed, maxRecordTime)
+	var kept, dropped int
+	if prepared.Logs != nil {
+		k, d := FilterMixedLogs(prepared.Logs, snap, lookup, reachMixedAt, hasReachMixed, maxRecordTime)
+		kept += k
+		dropped += d
+		if k == 0 {
+			prepared.Logs = nil
+		}
+	}
+	if prepared.Traces != nil {
+		k, d := FilterMixedTraces(prepared.Traces, snap, lookup, reachMixedAt, hasReachMixed, maxRecordTime)
+		kept += k
+		dropped += d
+		if k == 0 {
+			prepared.Traces = nil
+		}
+	}
 	if kept == 0 {
-		return nil, 0, dropped
+		return PreparedSegment{}, 0, dropped
 	}
 	return prepared, kept, dropped
 }
