@@ -267,8 +267,8 @@ terma setup --org acme --team platform --harness claude,codex,copilot,omp --yes
   only available team on a fresh machine). Use `terma teams` to tick or untick teams at
   any time.
 - `--harness <agents>` records those agents (`claude`, `codex`, `copilot`, `omp`, and on macOS and Linux `antigravity` and `grok`); with `--yes` or no
-  terminal and no `--harness`, setup records the agents recorded before and every
-  supported agent installed on this machine.
+  terminal and no `--harness`, setup records the supported agents detected on this
+  machine. The picker ticks the same agents, marked "detected", and nothing else.
 - `--yes` skips interactive prompts, keeping the teams already ticked (all of them on a first
   setup).
   On a fresh machine with several teams, pass `--team` (and `--org` if ambiguous).

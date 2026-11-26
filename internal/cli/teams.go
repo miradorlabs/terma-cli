@@ -138,6 +138,11 @@ func renderTeams(w io.Writer, v teamsView) {
 	}
 	tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
 	for _, o := range v.Organizations {
+		if o.Type == "personal" && len(o.Teams) == 1 && o.Note == "" {
+			t := o.Teams[0]
+			fmt.Fprintf(tw, "\n  %s %s\t%s%s\n", checkbox(t.Selected), personalLabel, t.Collects, teamStateNote(t))
+			continue
+		}
 		fmt.Fprintf(tw, "\n  %s\n", orgTitle(o))
 		if o.Note != "" {
 			fmt.Fprintf(tw, "    %s\n", p.Dim(o.Note))

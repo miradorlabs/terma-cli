@@ -316,3 +316,28 @@ func TestSetupPickerOffersPersonalAndKeepsItUnticked(t *testing.T) {
 		t.Fatalf("re-run enrolled %v, want Acme Web alone", got)
 	}
 }
+
+// Setup lists what the ticked teams collect one repository a line, the first ten, then a count.
+func TestSetupListsCollectedRepositories(t *testing.T) {
+	var repos []string
+	for i := range 12 {
+		repos = append(repos, fmt.Sprintf("github.com/acme/r%02d", i))
+	}
+	team := func(org string, rs ...string) discoveredTeam {
+		return discoveredTeam{orgName: org, teamName: org, team: routing.Team{OrganizationID: org,
+			Policy: config.Policy{Mode: config.ModeRepo, Repositories: rs, TeamID: org, FetchedAt: time.Now()}}}
+	}
+	var b strings.Builder
+	u := newSetupUI(&b, false)
+	u.teamsConfigured([]organization{{ID: "a", Name: "A"}, {ID: "b", Name: "B"}}, []discoveredTeam{team("a", repos[:6]...), team("b", repos[6:]...)})
+	u.printLines()
+	out := b.String()
+	for _, want := range []string{"\n                    github.com/acme/r00\n", "github.com/acme/r09\n", "and 2 more"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "r10") {
+		t.Errorf("listed past ten:\n%s", out)
+	}
+}

@@ -36,7 +36,13 @@ func (app *App) chooseSetupTeams(cmd *cobra.Command, disc *setupDiscovery, assum
 			if dt.team.OrganizationID != prevOrg {
 				heading, prevOrg = dt.orgName, dt.team.OrganizationID
 			}
-			form.Items = append(form.Items, prompt.Item{Label: dt.teamName, Detail: collectsSummary(dt.team.Policy, dt.team.Personal), Kind: prompt.Check, Selected: keep[i], Heading: heading})
+			item := prompt.Item{Label: dt.teamName, Detail: pickerDetail(dt.description, ""), Kind: prompt.Check, Selected: keep[i], Heading: heading}
+			if dt.team.Personal && !slices.ContainsFunc(disc.teams, func(o discoveredTeam) bool {
+				return o.team.OrganizationID == dt.team.OrganizationID && o.team.TeamID != dt.team.TeamID
+			}) {
+				item.Label, item.Heading, item.Gap = personalLabel, "", true
+			}
+			form.Items = append(form.Items, item)
 		}
 		fmt.Fprintln(cmd.OutOrStdout())
 		result, err := app.runForm(form)

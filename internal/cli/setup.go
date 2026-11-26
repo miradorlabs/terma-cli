@@ -81,10 +81,10 @@ rotate it.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return app.runSetup(cmd, f) },
 	}
-	cmd.Flags().StringVar(&f.harnesses, "harness", "", "comma-separated agents to record ("+strings.Join(app.availableAgentNames(), ", ")+"); default: a picker")
+	cmd.Flags().StringVar(&f.harnesses, "harness", "", "comma-separated agents to record ("+strings.Join(app.availableAgentNames(), ", ")+"); default: a picker with the detected agents ticked")
 	cmd.Flags().StringVar(&f.org, "org", "", "limit setup to one organization, by name or id (default: all of your organizations)")
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
-	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip the browser prompt and agent picker; record every available installed agent")
+	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip the browser prompt and agent picker; record the agents detected on this machine")
 	cmd.Flags().StringVar(&f.relayService, "relay-service", "", "run the local relay as a background service: on or off (default: on, or your last choice)")
 	cmd.Flags().StringVar(&f.relayAddr, "relay-addr", "", "move the local relay to this loopback address (default "+claim.DefaultAddr+", or the one recorded)")
 	cmd.Flags().BoolVarP(&f.verbose, "verbose", "v", false, "show each step and what it wrote")
@@ -193,8 +193,8 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			return app.chooseSetupTeams(cmd, disc, f.assumeYes)
 		},
 		// A machine-level preference, not a connection.
-		ChooseAgents: func(_ context.Context, cfg *config.Config) ([]string, error) {
-			return app.chooseHarnesses(cmd, cfg, f)
+		ChooseAgents: func(context.Context, *config.Config) ([]string, error) {
+			return app.chooseHarnesses(cmd, f)
 		},
 		Recorded: func(names []string) {
 			recorded = true

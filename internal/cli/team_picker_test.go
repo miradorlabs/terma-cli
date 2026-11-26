@@ -1,0 +1,92 @@
+package cli
+
+import (
+	"bytes"
+	"strings"
+	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/routing"
+	"github.com/miradorlabs/terma-cli/internal/ui/prompt"
+)
+
+// Setup's team picker shows a team's description, never its policy, and the personal
+// organization as one "Personal" item with no heading.
+func TestSetupTeamPickerDescriptionsAndPersonal(t *testing.T) {
+	gateway := newFakeAuth(t)
+	gateway.orgs = []organization{orgA(), orgPersonal()}
+	gateway.projects = map[string][]project{
+		orgA().ID: {
+			{ID: teamsAcmeWeb, Name: "Acme Web", Description: "The web\n  front end", OrganizationID: orgA().ID},
+			{ID: acmeAPI, Name: "Acme API", OrganizationID: orgA().ID},
+		},
+		teamsPersonalOrg: {{ID: teamsPersonalTeam, Name: "Default", OrganizationID: teamsPersonalOrg}},
+	}
+	gateway.policyBodies = map[string]string{
+		teamsAcmeWeb:      policyBody("github.com/acme/web"),
+		acmeAPI:           policyBody("github.com/acme/api"),
+		teamsPersonalTeam: globalBody,
+	}
+	setupMachine(t, gateway)
+
+	prevAsk, prevForm := testApp.canAsk, testApp.runForm
+	t.Cleanup(func() { testApp.canAsk, testApp.runForm = prevAsk, prevForm })
+	testApp.canAsk = func() bool { return true }
+	var teams []prompt.Item
+	testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
+		if strings.HasPrefix(form.Title, "Send telemetry") {
+			teams = form.Items
+		}
+		return form.Items, nil
+	}
+	if out, err := runTerma(t, "setup"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	want := []prompt.Item{
+		{Label: "Acme Web", Detail: "The web front end", Kind: prompt.Check, Selected: true, Heading: orgA().Name},
+		{Label: "Acme API", Kind: prompt.Check, Selected: true},
+		{Label: "Personal", Kind: prompt.Check, Selected: true, Gap: true},
+	}
+	if len(teams) != len(want) {
+		t.Fatalf("team picker items = %+v, want %+v", teams, want)
+	}
+	for i := range want {
+		if teams[i] != want[i] {
+			t.Errorf("item %d = %+v, want %+v", i, teams[i], want[i])
+		}
+	}
+}
+
+// `terma teams`' picker shows descriptions and state notes, not policies, and the personal
+// organization's one team as "Personal".
+func TestTeamsFormDescriptionsAndPersonal(t *testing.T) {
+	v := teamsView{Organizations: []orgRow{
+		{ID: "o1", Name: "Acme", Teams: []teamRow{
+			{ID: "t1", Name: "Acme Web", Description: "The web front end", Collects: "github.com/acme/web", Selected: true},
+			{ID: "t2", Name: "Acme API", Collects: "github.com/acme/api", Selected: true, State: routing.Suspended},
+			{ID: "t3", Name: "Acme Docs", Collects: "github.com/acme/docs"},
+		}},
+		{ID: "p1", Name: "Someone's Personal", Type: "personal", Teams: []teamRow{{ID: "pt", Name: "Default", Collects: personalCollects, Selected: true}}},
+	}}
+	form, _ := teamsForm(v)
+	if len(form.Items) != 4 {
+		t.Fatalf("items = %+v", form.Items)
+	}
+	if got := form.Items[0]; got.Detail != "The web front end" || got.Heading != "Acme" {
+		t.Errorf("described team = %+v", got)
+	}
+	if got := form.Items[1].Detail; !strings.HasPrefix(got, "— suspended") || strings.Contains(got, "acme/api") {
+		t.Errorf("suspended team detail = %q, want its state note alone", got)
+	}
+	if got := form.Items[2].Detail; got != "" {
+		t.Errorf("undescribed team detail = %q, want none", got)
+	}
+	if got := form.Items[3]; got.Label != "Personal" || got.Heading != "" || !got.Gap || got.Detail != "" {
+		t.Errorf("personal item = %+v", got)
+	}
+
+	var out bytes.Buffer
+	renderTeams(&out, v)
+	if text := out.String(); !strings.Contains(text, "[x] Personal") || strings.Contains(text, "Default") || strings.Contains(text, "Someone's Personal") {
+		t.Errorf("teams text does not show the personal organization as one item:\n%s", text)
+	}
+}

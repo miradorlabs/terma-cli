@@ -92,6 +92,9 @@ func (u *setupUI) policyFetched(team string, pol config.Policy) {
 	}
 }
 
+// maxListedRepos is how many repositories setup lists before it counts the rest.
+const maxListedRepos = 10
+
 // teamsConfigured summarizes multiple enrolled teams/organizations and what their
 // policies actively collect across the machine.
 func (u *setupUI) teamsConfigured(orgs []organization, teams []discoveredTeam) {
@@ -134,28 +137,17 @@ func (u *setupUI) teamsConfigured(orgs []organization, teams []discoveredTeam) {
 		u.Then(doctor.NothingCollectedStep(pol))
 		return
 	}
-	var parts []string
-	if len(repos) > 0 {
-		shown := repos
-		extra := 0
-		if len(shown) > 3 {
-			extra = len(shown) - 3
-			shown = shown[:3]
-		}
-		s := strings.Join(shown, ", ")
-		if extra > 0 {
-			s += fmt.Sprintf(", and %d more", extra)
-		}
-		parts = append(parts, s)
+	lines := repos
+	if len(lines) > maxListedRepos {
+		lines = append(slices.Clone(lines[:maxListedRepos]), fmt.Sprintf("and %d more", len(repos)-maxListedRepos))
 	}
 	if hasPersonal {
-		if len(parts) > 0 {
-			parts = append(parts, "plus Personal (everything else)")
-		} else {
-			parts = append(parts, personalCollects)
-		}
+		lines = append(lines, cmp.Or(map[bool]string{true: "plus Personal: everything else"}[len(repos) > 0], personalCollects))
 	}
-	u.Summary("Collects", strings.Join(parts, "; "))
+	u.Summary("Collects", "")
+	for _, l := range lines {
+		u.keep(" ", "", "  "+l)
+	}
 	if gitHooksOff {
 		u.Then(doctor.GitHooksOffStep)
 	}

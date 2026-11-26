@@ -45,6 +45,7 @@ type orgRow struct {
 type teamRow struct {
 	ID           string             `json:"id"`
 	Name         string             `json:"name,omitempty"`
+	Description  string             `json:"description,omitempty"`
 	Selected     bool               `json:"selected"`
 	EnrollmentID string             `json:"enrollment_id,omitempty"`
 	State        routing.TeamState  `json:"state,omitempty"`
@@ -109,7 +110,7 @@ func (app *App) listTeamsWithClient(ctx context.Context, cfg *config.Config, st 
 			if teamNotFound(p.err) {
 				continue
 			}
-			t := teamRow{ID: p.ID, Name: p.Name}
+			t := teamRow{ID: p.ID, Name: p.Name, Description: p.Description}
 			switch {
 			case orgNotAccessibleErr(p.err):
 				row.Inaccessible, row.Note, t.Unreadable, t.Collects = true, orgInaccessibleNote, orgInaccessibleNote, "its policy could not be read"

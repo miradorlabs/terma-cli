@@ -3,6 +3,7 @@ package cli
 import (
 	"cmp"
 	"errors"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -12,6 +13,16 @@ import (
 )
 
 type checklistSlot struct{ org, team int }
+
+// pickerDetail is a team's line beside its name in a picker: its description on one line,
+// then note. A policy summary is left out, since policies change under the picker.
+func pickerDetail(description, note string) string {
+	return strings.TrimSpace(strings.Join(strings.Fields(description), " ") + note)
+}
+
+// personalLabel names the personal organization's one team in a picker, in place of
+// the organization's heading and the team's own name.
+const personalLabel = "Personal"
 
 func teamsForm(v teamsView) (*prompt.Form, []checklistSlot) {
 	form := &prompt.Form{Title: "Send telemetry from this machine to: (space toggles, enter confirms)"}
@@ -24,7 +35,10 @@ func teamsForm(v teamsView) (*prompt.Form, []checklistSlot) {
 			continue
 		}
 		for j, t := range o.Teams {
-			item := prompt.Item{Label: cmp.Or(t.Name, t.ID), Detail: t.Collects + teamStateNote(t), Kind: prompt.Check, Selected: t.Selected, Heading: heading}
+			item := prompt.Item{Label: cmp.Or(t.Name, t.ID), Detail: pickerDetail(t.Description, teamStateNote(t)), Kind: prompt.Check, Selected: t.Selected, Heading: heading}
+			if o.Type == "personal" && len(o.Teams) == 1 {
+				item.Label, item.Heading, item.Gap = personalLabel, "", true
+			}
 			if (t.Unreadable != "" || o.Inaccessible) && !t.Selected {
 				item.Disabled, item.Reason = true, cmp.Or(t.Unreadable, o.Note)
 			}

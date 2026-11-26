@@ -20,6 +20,8 @@ type discoveredTeam struct {
 	team     routing.Team
 	orgName  string
 	teamName string
+	// description is the team's own, as its admin wrote it.
+	description string
 }
 
 type setupDiscovery struct {
@@ -152,8 +154,9 @@ func (app *App) discoverSetup(ctx context.Context, cmd *cobra.Command, cfg *conf
 					Personal:       personal,
 					Policy:         pol,
 				},
-				orgName:  o.Name,
-				teamName: cmp.Or(p.Name, p.ID),
+				orgName:     o.Name,
+				teamName:    cmp.Or(p.Name, p.ID),
+				description: p.Description,
 			})
 		}
 	}

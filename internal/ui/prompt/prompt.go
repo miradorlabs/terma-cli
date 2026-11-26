@@ -40,6 +40,8 @@ type Item struct {
 	Reason   string
 	// Heading is a section title printed above this item.
 	Heading string
+	// Gap sets this item apart with a blank line above it, as a Heading does, but no title.
+	Gap bool
 }
 
 // Form is the model: a title, its items, and where the cursor is.
@@ -308,8 +310,10 @@ func (f *Form) render(w io.Writer, p style.Palette) int {
 	}
 
 	for i, it := range f.Items {
-		if it.Heading != "" {
+		if it.Heading != "" || it.Gap {
 			line("")
+		}
+		if it.Heading != "" {
 			line("  " + bold(it.Heading))
 		}
 		box := "[ ]"
