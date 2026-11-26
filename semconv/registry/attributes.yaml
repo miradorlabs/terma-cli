@@ -80,6 +80,20 @@ attributes:
     stability: development
     brief: Where the provider says it ran the call, in its own spelling.
     examples: ["global", "us"]
+  - key: terma.serving.backend
+    type:
+      members:
+        - id: private
+          value: private
+          brief: >-
+            An endpoint terma does not recognise: a gateway, a proxy or a local model server.
+          stability: development
+    stability: development
+    brief: Who serves the session's model calls, from the endpoint the agent is configured with.
+    note: >-
+      Absent when the calls go to the model API's own endpoint or a named cloud (Amazon Bedrock,
+      Google Vertex AI, Microsoft Azure), or terma cannot tell. Never the host, URL or provider
+      id itself.
 
   # Operations.
   - key: terma.operation.status

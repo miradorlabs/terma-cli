@@ -277,6 +277,8 @@ const (
 	TermaResponseServiceTierKey = "terma.response.service_tier"
 	// TermaSchemaVersionKey is terma.schema.version: The version of this registry the record follows.
 	TermaSchemaVersionKey = "terma.schema.version"
+	// TermaServingBackendKey is terma.serving.backend: Who serves the session's model calls, from the endpoint the agent is configured with.
+	TermaServingBackendKey = "terma.serving.backend"
 	// TermaSessionHistoricalKey is terma.session.historical: Whether the record was uploaded from a session's history rather than collected live.
 	TermaSessionHistoricalKey = "terma.session.historical"
 	// TermaSessionParentIDKey is terma.session.parent.id: The session that opened this one for a subagent.
@@ -455,6 +457,8 @@ const (
 	TermaRelayLaunchHook = "hook"
 	// TermaRelayLaunchManual is terma.relay.launch manual: A developer started it from the command line.
 	TermaRelayLaunchManual = "manual"
+	// TermaServingBackendPrivate is terma.serving.backend private: An endpoint terma does not recognise: a gateway, a proxy or a local model server.
+	TermaServingBackendPrivate = "private"
 	// TermaUpdateAutoOn is terma.update.auto on: The relay installs each new release by itself.
 	TermaUpdateAutoOn = "on"
 	// TermaUpdateAutoOff is terma.update.auto off: It could, but automatic updates are off (`terma update --auto off`, or CI or TERMA_NO_UPDATE_CHECK=1 in the relay's environment).
