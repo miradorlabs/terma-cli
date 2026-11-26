@@ -391,10 +391,71 @@ func TestWithheldContentKeepsHistoricalSessionMarker(t *testing.T) {
 	}
 }
 
-// End-to-end through the relay (dress, outbox, queued policy re-filter, upstream delivery):
-// under a restrictive policy, withheld prompt, reply, and tool content stay off the wire while
-// terma.session.historical=true survives on both resource and log record attributes.
-func TestRelayPreservesHistoricalSessionMarkerUnderRestrictivePolicy(t *testing.T) {
+// ContentFilter.FilterLogs (used by `terma history upload`, which bypasses the live relay
+// daemon): under a restrictive policy, withheld prompt, reply, and tool content stay off
+// the wire while terma.session.historical=true survives on both resource and log record
+// attributes with zero unclassified keys.
+func TestContentFilterPreservesHistoricalSessionMarkerUnderRestrictivePolicy(t *testing.T) {
+	t.Parallel()
+	filter := NewContentFilter(testCapturers)
+	boolTrue := &commonpb.AnyValue{Value: &commonpb.AnyValue_BoolValue{BoolValue: true}}
+	msg := &logspb.LogsData{ResourceLogs: []*logspb.ResourceLogs{{
+		Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{
+			kv("service.name", "claude-code"),
+			{Key: semconv.TermaSessionHistoricalKey, Value: proto.CloneOf(boolTrue)},
+			kv("process.command_args", "SECRET-ARGS"),
+			kv("cwd", "/work/SECRET-CWD"),
+		}},
+		ScopeLogs: []*logspb.ScopeLogs{{LogRecords: []*logspb.LogRecord{{
+			Body: strValue("SECRET-BODY"),
+			Attributes: []*commonpb.KeyValue{
+				kv("event.name", "user_prompt"),
+				kv("session.id", "A"),
+				{Key: semconv.TermaSessionHistoricalKey, Value: proto.CloneOf(boolTrue)},
+				kv("prompt", "SECRET-PROMPT"),
+				kv("response", "SECRET-REPLY"),
+				kv("gen_ai.tool.call.arguments", "SECRET-TOOL-ARGS"),
+				kv("gen_ai.tool.call.result", "SECRET-TOOL-RESULT"),
+			},
+		}}}},
+	}}}
+	changed, unclassified := filter.FilterLogs(msg, false, false)
+	if changed == 0 {
+		t.Fatal("expected restrictive policy to withhold content")
+	}
+	if len(unclassified) != 0 {
+		t.Fatalf("unexpected unclassified keys: %v", unclassified)
+	}
+	wire, err := proto.Marshal(msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(wire), "SECRET-") {
+		t.Fatalf("withheld content survived filter: %q", string(wire))
+	}
+	rl := msg.ResourceLogs[0]
+	rec := rl.ScopeLogs[0].LogRecords[0]
+	checkBoolTrue := func(where string, attrs []*commonpb.KeyValue) {
+		t.Helper()
+		for _, a := range attrs {
+			if a.GetKey() == semconv.TermaSessionHistoricalKey {
+				b, ok := a.GetValue().GetValue().(*commonpb.AnyValue_BoolValue)
+				if !ok || !b.BoolValue {
+					t.Errorf("%s %s = %v, want bool true", where, semconv.TermaSessionHistoricalKey, a.GetValue())
+				}
+				return
+			}
+		}
+		t.Errorf("%s missing %s", where, semconv.TermaSessionHistoricalKey)
+	}
+	checkBoolTrue("resource", rl.Resource.Attributes)
+	checkBoolTrue("log record", rec.Attributes)
+}
+
+// End-to-end through the live relay daemon: live exports strip any agent-supplied
+// terma.session.historical attribute so a live process cannot spoof historical sessions
+// (history uploads bypass the live relay daemon and use ContentFilter directly).
+func TestRelayStripsHistoricalSessionMarkerOnLiveExports(t *testing.T) {
 	t.Parallel()
 	u := newUpstream(t)
 	f := newFixture()
@@ -445,21 +506,20 @@ func TestRelayPreservesHistoricalSessionMarkerUnderRestrictivePolicy(t *testing.
 	}
 	rl := got.ResourceLogs[0]
 	rec := rl.ScopeLogs[0].LogRecords[0]
-	checkBoolTrue := func(where string, attrs []*commonpb.KeyValue) {
-		t.Helper()
+	hasKey := func(attrs []*commonpb.KeyValue, key string) bool {
 		for _, a := range attrs {
-			if a.GetKey() == semconv.TermaSessionHistoricalKey {
-				b, ok := a.GetValue().GetValue().(*commonpb.AnyValue_BoolValue)
-				if !ok || !b.BoolValue {
-					t.Errorf("%s %s = %v, want bool true", where, semconv.TermaSessionHistoricalKey, a.GetValue())
-				}
-				return
+			if a.GetKey() == key {
+				return true
 			}
 		}
-		t.Errorf("%s missing %s", where, semconv.TermaSessionHistoricalKey)
+		return false
 	}
-	checkBoolTrue("resource", rl.Resource.Attributes)
-	checkBoolTrue("log record", rec.Attributes)
+	if hasKey(rl.Resource.Attributes, semconv.TermaSessionHistoricalKey) {
+		t.Errorf("live relay left %s on resource", semconv.TermaSessionHistoricalKey)
+	}
+	if hasKey(rec.Attributes, semconv.TermaSessionHistoricalKey) {
+		t.Errorf("live relay left %s on log record", semconv.TermaSessionHistoricalKey)
+	}
 	for name := range r.Stats().Snapshot().Counters {
 		if strings.Contains(name, semconv.TermaSessionHistoricalKey) {
 			t.Errorf("historical marker counted in relay stats: %s", name)

@@ -36,6 +36,7 @@ internal/routing/       multi-org routing table (`routing.State` CAS, `routing.R
 internal/runs/          per-session run ledger and cross-org Mixed cutoff
 internal/spool/         the local queue hooks append to
 internal/delivery/      sends the spool to each project, from a detached flush
+internal/history/       `terma history upload`: discovery, routing, holdings skip check, paced upload and resume state
 internal/session/       session manifests and commit attribution
 internal/doctor/        `terma doctor` checks (teams, routing state, Mixed runs, outbox/spool losses)
 internal/setup/         `terma setup`; internal/globalmode/ writes the machine-wide hooks

@@ -58,7 +58,16 @@ func (sc *scan) candidatePath(t string, r role, fallback bool) {
 			} else if (r == creates || slashed && (r == plain || r == folder || r == slashedOnly)) && !res.named {
 				if p, ok := sc.path(t, d); ok {
 					if rPath, parent, _, found := sc.walkPath(p, true); !found && !sc.unknown && parent != "" && (!fallback || filepath.Dir(rPath) == parent && strings.ContainsAny(strings.TrimRight(t, `/\`), `/\`)) {
-						sc.place(parent)
+						// In historical mode, place the missing path itself rather than its
+						// nearest existing ancestor: the ancestor (often "/" or a home folder)
+						// may be nobody's while the path once belonged to an organization.
+						// Missing absolute paths are therefore unknown by design, including
+						// strings that only look like paths (such as an API route).
+						if sc.historical && rPath != "" {
+							sc.place(rPath)
+						} else {
+							sc.place(parent)
+						}
 					}
 				}
 			}
@@ -112,6 +121,11 @@ func (sc *scan) walk(p string, followFinal bool, openMode uint8) (resolved, pare
 		} else if err != nil {
 			dot, missing := slices.Contains(parts, "..") || slices.Contains(parts, "."), filepath.Join(curPath, part)
 			sc.unknown = sc.unknown || dot && sc.created[pick(filepath.Separator == '\\', strings.ToLower(missing), missing)]
+			if sc.historical {
+				// The component may have existed when the command ran: where a ".." after it
+				// led is not knowable (it might have been a symlink), while "." changes nothing.
+				sc.unknown, dot = sc.unknown || slices.Contains(parts, ".."), false
+			}
 			return pick(dot, "", filepath.Join(append([]string{curPath, part}, parts...)...)), pick(dot, "", curPath), nil, nil, false
 		} else if openMode == 3 && !isSysBin(filepath.Join(curPath, part), fi) {
 			return "", "", nil, nil, false
@@ -196,7 +210,7 @@ func (sc *scan) resolveJoined(base, raw string, logical bool) (string, bool) {
 			out = append(out, part)
 		} else if cur := vol + sep + strings.Join(out, sep); part == ".." && cur != "" {
 			if t, _, info, found := sc.walkPath(cur, true); !found || !info.IsDir() {
-				sc.unknown = sc.unknown || sc.created[pick(filepath.Separator == '\\', strings.ToLower(t), t)]
+				sc.unknown = sc.unknown || sc.historical || sc.created[pick(filepath.Separator == '\\', strings.ToLower(t), t)]
 				return "", false
 			} else if _, _, li, ok := sc.walkPath(cur, false); ok && li.Mode()&fs.ModeSymlink != 0 {
 				sc.place(t)
@@ -212,6 +226,13 @@ func (sc *scan) reachRole(w, dir string, r role) (res string, _ os.FileInfo) {
 		return "", nil
 	} else if r0, parent, info, found := sc.walkPath(p, false); !found {
 		sc.unknown = sc.unknown || (r == target || r == physTarget) && sc.created[pick(filepath.Separator == '\\', strings.ToLower(r0), r0)]
+		if sc.historical && (r == target || r == physTarget) {
+			if r0 != "" {
+				sc.place(r0)
+			} else {
+				sc.fail()
+			}
+		}
 		return "", nil
 	} else if res = r0; info.IsDir() {
 		sc.place(res)
@@ -222,7 +243,7 @@ func (sc *scan) reachRole(w, dir string, r role) (res string, _ os.FileInfo) {
 		sc.place(pick(tInfo.IsDir(), dst, tParent))
 		return pick(r == physTarget, dst, pick(r == target, p, res)), tInfo
 	} else if !sc.unknown && tParent != "" {
-		sc.place(tParent)
+		sc.place(pick(sc.historical && dst != "", dst, tParent))
 	}
 	return res, nil
 }

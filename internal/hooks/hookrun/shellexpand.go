@@ -146,7 +146,7 @@ func (sc *scan) mustResolveWord(w *syntax.Word) bool {
 		case *syntax.SglQuoted:
 			found = found || pathLike(n.Value)
 		case *syntax.ParamExp:
-			found = found || n.Param != nil && !sc.loopVars[n.Param.Value] && sc.isUnresolvedVar(n.Param.Value)
+			found = found || n.Param != nil && !sc.loopVars[n.Param.Value] && (sc.isUnresolvedVar(n.Param.Value) || sc.isHistoricalUnknownVar(n.Param.Value))
 		case *syntax.CmdSubst, *syntax.ProcSubst, *syntax.ArithmExp:
 			return false
 		}

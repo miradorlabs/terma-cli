@@ -16,6 +16,15 @@ const plain, program, target, folder, creates, data, part, slashedOnly, globbed,
 
 var maxShellTime, errOpaque, unsetVar = shellTime, errors.New("an expansion ShellPaths cannot resolve"), new(string)
 
+// historicalShellTime bounds the scan of one past command. `terma history upload` is a
+// batch command with no latency budget, and a scan that ran out of a hook's time would
+// cut a session on a slow disk that a fast one keeps; this only stops a scan that hangs.
+const historicalShellTime = 2 * time.Second
+
+func historicalWork() work {
+	return work{deadline: time.Now().Add(historicalShellTime), historical: true}
+}
+
 type role uint8
 
 // scan holds the state of one bounded shell reach scan.
@@ -42,6 +51,7 @@ type work struct {
 	lookups, stats, bytes, words int
 	deadline                     time.Time
 	noRecover                    bool
+	historical                   bool
 }
 type candidate struct {
 	word, dir string
@@ -72,8 +82,24 @@ func pick[T any](c bool, a, b T) T {
 	}
 	return b
 }
+func historicalEnv(name string) (string, bool) {
+	if name == "HOME" || (os.PathSeparator == '\\' && name == "USERPROFILE") {
+		return os.LookupEnv(name)
+	}
+	if name == "PATH" && os.PathSeparator == '/' {
+		return "/usr/bin:/bin", true
+	}
+	return "", false
+}
+func (sc *scan) isHistoricalUnknownVar(name string) bool {
+	if !sc.historical || !isName(name) || name == "_" || name == "PWD" || name == "OLDPWD" || name == "IFS" || name == "HOME" || (os.PathSeparator == '/' && name == "PATH") || (os.PathSeparator == '\\' && name == "USERPROFILE") {
+		return false
+	}
+	v, set := sc.vars[name]
+	return !set || v == nil
+}
 func (sc *scan) Get(name string) expand.Variable {
-	if strings.HasPrefix(name, "HOME ") || sc.isUnresolvedVar(name) || !isName(name) || name == "_" {
+	if strings.HasPrefix(name, "HOME ") || sc.isUnresolvedVar(name) || sc.isHistoricalUnknownVar(name) || !isName(name) || name == "_" {
 		sc.opaque = true
 		return expand.Variable{Set: true, Kind: expand.String}
 	}

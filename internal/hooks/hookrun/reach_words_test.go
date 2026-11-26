@@ -806,6 +806,25 @@ func TestShellPathsEndAtTheirDeadline(t *testing.T) {
 	}
 }
 
+// A past session's command is scanned by a batch command, not a hook, so the scan is not
+// held to a hook's time: on a slow disk that turned ordinary commands into UnknownReach.
+func TestHistoricalScansAreNotHeldToAHooksTime(t *testing.T) {
+	// Not parallel: it changes maxShellTime, which the parallel tests read after this returns.
+	defer func(d time.Duration) { maxShellTime = d }(maxShellTime)
+	maxShellTime = -time.Second
+	dir := t.TempDir()
+	const command = "bash -l -c 'ls sub'"
+	if got := ShellPaths(command, dir); !slices.ContainsFunc(got, isUnknownReach) {
+		t.Fatalf("ShellPaths(%q) out of a hook's time = %q, want UnknownReach", command, got)
+	}
+	if got := ShellPathsHistorical(command, dir); slices.ContainsFunc(got, isUnknownReach) {
+		t.Errorf("ShellPathsHistorical(%q) = %q, want no UnknownReach", command, got)
+	}
+	if got, unknown := ExpandReachHistorical([]string{dir}, dir); unknown {
+		t.Errorf("ExpandReachHistorical(%q) = %q, unknown", dir, got)
+	}
+}
+
 func TestShellPathsWrappersFunctionsUnsetHeredocCdAndWindows(t *testing.T) {
 	t.Parallel()
 	m := newWordsMachine(t)

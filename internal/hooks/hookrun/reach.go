@@ -113,6 +113,32 @@ func nobodys(dir string) bool {
 	return slices.ContainsFunc(machineRoots(), func(root string) bool { return under(dir, root) })
 }
 
+// IsNobodyDir reports whether dir, outside any git checkout, is no one's workspace
+// (root, kernel/device filesystems, OS directories, or shared scratch space outside home).
+func IsNobodyDir(dir string) bool { return nobodys(dir) }
+
+// ExpandReachHistorical expands historical tool-reach paths (including Alone/Search markers
+// and subdirectories) relative to cwd with the static scan live reach hooks run, without
+// consulting the current process's environment (aside from HOME/USERPROFILE). It returns
+// the concrete paths and whether any path or command had statically unknown reach.
+func ExpandReachHistorical(paths []string, cwd string) (expanded []string, unknown bool) {
+	if len(paths) == 0 {
+		return nil, false
+	}
+	scanned := searchedByWork(paths, cwd, historicalEnv, historicalWork())
+	out := make([]string, 0, len(scanned))
+	for _, p := range scanned {
+		if isUnknownReach(p) {
+			unknown = true
+			continue
+		}
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out, unknown
+}
+
 // under reports whether dir is root or a folder below it.
 func under(dir, root string) bool {
 	if root == "" || len(dir) < len(root) || dir[:len(root)] != root && (filepath.Separator != '\\' || !strings.EqualFold(dir[:len(root)], root)) {
@@ -134,6 +160,11 @@ func Alone(paths ...string) []string {
 
 // Search returns dir and the base folder each glob names before its first wildcard.
 func Search(dir string, globs ...string) []string { return searchEnv(dir, os.LookupEnv, globs...) }
+
+// SearchHistorical is Search scoped to historicalEnv (HOME/USERPROFILE only).
+func SearchHistorical(dir string, globs ...string) []string {
+	return searchEnv(dir, historicalEnv, globs...)
+}
 func searchEnv(dir string, env func(string) (string, bool), globs ...string) []string {
 	out := []string{dir}
 	for _, g := range globs {
@@ -206,7 +237,10 @@ func appendUnique(out []string, items ...string) []string {
 	return out
 }
 func searchedBy(paths []string, cwd string, env func(string) (string, bool), deadline time.Time) []string {
-	sc, unknownDir, out := newScan(cwd, env, work{deadline: deadline}), "", make([]string, 0, len(paths))
+	return searchedByWork(paths, cwd, env, work{deadline: deadline})
+}
+func searchedByWork(paths []string, cwd string, env func(string) (string, bool), done work) []string {
+	sc, unknownDir, out := newScan(cwd, env, done), "", make([]string, 0, len(paths))
 	for _, p := range paths {
 		dir, alone := strings.CutPrefix(p, aloneMark)
 		dir = pick(remote(dir, cwd), unknownReach(dir), dir)
