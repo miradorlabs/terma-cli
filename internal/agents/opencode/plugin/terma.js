@@ -587,6 +587,7 @@ function newSession(id, owner) {
     known: false,
     latest: null, // a record that arrived before the first one was applied
     recordArrived: null, // resolves firstSight's wait when a record arrives before the session is known
+    first: null, // the session's first sight (its record and its claim), as a promise
     parentID: "",
     directory: "",
     askedDirectory: "", // the directory most recently moved to, applied or still queued
@@ -629,7 +630,7 @@ function sight(sessionID, { record, fetch, owner } = {}) {
     state.sessions.set(sessionID, s)
     prune()
     if (record) s.latest = record
-    run(s, () => firstSight(s, fetch))
+    s.first = run(s, () => firstSight(s, fetch))
   } else {
     // Kept in order of last use, so prune drops the session idle longest.
     state.sessions.delete(sessionID)
@@ -744,6 +745,21 @@ function run(s, fn) {
     }
   })
   return s.queue
+}
+
+// beside runs a check that OpenCode itself waits for (before a tool runs, or before its
+// result is handed on) once the session's first sight is done, outside its queue. Such a
+// check sends nothing, so it waits neither behind what the session has queued to send nor
+// for a late check elsewhere in the family: the plugin's waits may delay what terma sends,
+// never OpenCode's own work beyond the check that work needs. What the tool itself sends
+// later goes through the queue as ever, and is held there.
+async function beside(s, fn) {
+  await s.first
+  try {
+    if (!blocked(s)) await fn()
+  } catch {
+    // A telemetry failure must never surface in the agent.
+  }
 }
 
 function blocked(s) {
@@ -1599,7 +1615,7 @@ async function server(input) {
       const reach = toolReach(inp.tool, out?.args ?? inp.args)
       if (!reach) return
       remember(s.guarded, inp.callID, { reachKey: JSON.stringify(reach) }, MAX_SMALL)
-      await run(s, () => guardReach(s, reach))
+      await beside(s, () => guardReach(s, reach))
     }),
 
     // The guard for what a call is known to reach only once it ran (a patch's files):
@@ -1612,9 +1628,8 @@ async function server(input) {
       // A call that reaches nothing, or that was checked before it ran, does not wait.
       const before = toolReach(inp.tool, inp.args)
       if (before ? s.guarded.get(callID)?.reachKey === JSON.stringify(before) : !EDIT_TOOLS.has(inp.tool)) return
-      // In the queue: a relative path resolves against the session's directory, known once
-      // its first sight has run.
-      await run(s, async () => {
+      // After its first sight: a relative path resolves against the session's directory.
+      await beside(s, async () => {
         const reach = reachOf1(s, inp.tool, inp.args, out?.metadata)
         if (!reach) return
         const reachKey = JSON.stringify(reach)

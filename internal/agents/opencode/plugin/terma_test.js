@@ -953,6 +953,23 @@ test("while a late reach check runs, what the rest of the family sends waits for
   expect(Number(BigInt(named(r.logs(), "opencode.session.title")[0].timeUnixNano) / 1000000n)).toBeGreaterThan(finished)
 })
 
+test("a tool's own check waits neither for a late check elsewhere in its family nor behind what its session has queued to send", async () => {
+  const { r, hooks } = await start({}, { terma: { delayed: { "opencode-tool-reach": 0.4 } } })
+  await hooks.event(sessionCreated("ses_fg"))
+  await hooks.event(sessionCreated("ses_bg", { parentID: "ses_fg" }))
+  await Promise.all([...globalThis[KEY].sessions.values()].map((s) => s.queue))
+  const began = Date.now()
+  // The child's late check, 400 ms; a reply of the parent's, queued to send and held by it;
+  // then a tool of the parent's, whose own check is another 400 ms.
+  await hooks.event(toolPart("ses_bg", "msg_k", "k1", "bash", done({ command: "cat /other/x" }, "x")))
+  await hooks.event(assistantDone("ses_fg", "msg_1", { time: { created: 2000, completed: began } }))
+  await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_fg", callID: "c1" }, { args: { filePath: "/repo/a" } })
+  expect(Date.now() - began).toBeLessThan(650)
+  await hooks.dispose()
+  const [call] = chats(r.spans()).filter((sp) => A(sp)["session.id"] === "ses_fg")
+  expect(endOf(call)).toBeGreaterThanOrEqual(began + 400)
+})
+
 test("a family's floor outlives its root, and a dark session still blocks what is under it once forgotten", async () => {
   const source = SOURCE.replace("const RECORD_WAIT_MS = 5000", "const RECORD_WAIT_MS = 300")
   const { r, hooks } = await start({}, { client: fakeClient(() => null), source, terma: { delayed: { "opencode-tool-reach": 0.2 } } })
@@ -1476,6 +1493,7 @@ test("a reach check queued behind slow hooks waits for its turn, not from when i
   const hooks = await mod.default.server({ client: fakeClient(null, warnings), directory: "/repo", worktree: "/repo" })
   await hooks.event(sessionCreated("ses_q"))
   for (let i = 0; i < 3; i++) await hooks.event(ev("session.idle", { sessionID: "ses_q" }))
+  await globalThis[KEY].sessions.get("ses_q").queue // the idle hooks are in the hook queue
   const began = Date.now()
   await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_q", callID: "c1" }, { args: { filePath: "/repo/a" } })
   expect(Date.now() - began).toBeGreaterThan(2000 + 250 + 500)
