@@ -123,7 +123,7 @@ func TestSetupOrderSpinnerAndTeamPicker(t *testing.T) {
 		"spinner:start:Fetching organizations…",
 		"spinner:update:Fetching teams…",
 		"spinner:stop",
-		"form:Send telemetry from this machine to: (space toggles, enter confirms)",
+		"form:" + teamPickerTitle,
 		"form:Which coding agents do you use? (space toggles, enter confirms)",
 	}
 	if !slices.Equal(events, want) {
@@ -283,7 +283,7 @@ func TestSetupPickerOffersPersonalAndKeepsItUnticked(t *testing.T) {
 	var offered []prompt.Item
 	testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
 		items := slices.Clone(form.Items)
-		if strings.HasPrefix(form.Title, "Send telemetry") {
+		if form.Title == teamPickerTitle {
 			offered = slices.Clone(form.Items)
 			for i := range items {
 				items[i].Selected = items[i].Label != "Personal"
@@ -301,7 +301,7 @@ func TestSetupPickerOffersPersonalAndKeepsItUnticked(t *testing.T) {
 		t.Fatalf("enrolled %v, want Acme Web alone", got)
 	}
 	testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
-		if strings.HasPrefix(form.Title, "Send telemetry") {
+		if form.Title == teamPickerTitle {
 			offered = slices.Clone(form.Items)
 		}
 		return form.Items, nil

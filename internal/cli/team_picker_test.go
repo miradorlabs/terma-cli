@@ -10,7 +10,7 @@ import (
 )
 
 // Setup's team picker shows a team's description, never its policy, and the personal
-// organization as one "Personal" item with no heading.
+// organization first, as one "Personal" item with no heading.
 func TestSetupTeamPickerDescriptionsAndPersonal(t *testing.T) {
 	gateway := newFakeAuth(t)
 	gateway.orgs = []organization{orgA(), orgPersonal()}
@@ -33,7 +33,7 @@ func TestSetupTeamPickerDescriptionsAndPersonal(t *testing.T) {
 	testApp.canAsk = func() bool { return true }
 	var teams []prompt.Item
 	testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
-		if strings.HasPrefix(form.Title, "Send telemetry") {
+		if form.Title == teamPickerTitle {
 			teams = form.Items
 		}
 		return form.Items, nil
@@ -42,9 +42,9 @@ func TestSetupTeamPickerDescriptionsAndPersonal(t *testing.T) {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
 	want := []prompt.Item{
+		{Label: "Personal", Kind: prompt.Check, Selected: true},
 		{Label: "Acme Web", Detail: "The web front end", Kind: prompt.Check, Selected: true, Heading: orgA().Name},
 		{Label: "Acme API", Kind: prompt.Check, Selected: true},
-		{Label: "Personal", Kind: prompt.Check, Selected: true, Gap: true},
 	}
 	if len(teams) != len(want) {
 		t.Fatalf("team picker items = %+v, want %+v", teams, want)
@@ -57,7 +57,7 @@ func TestSetupTeamPickerDescriptionsAndPersonal(t *testing.T) {
 }
 
 // `terma teams`' picker shows descriptions and state notes, not policies, and the personal
-// organization's one team as "Personal".
+// organization's one team first, as "Personal".
 func TestTeamsFormDescriptionsAndPersonal(t *testing.T) {
 	v := teamsView{Organizations: []orgRow{
 		{ID: "o1", Name: "Acme", Teams: []teamRow{
@@ -67,10 +67,14 @@ func TestTeamsFormDescriptionsAndPersonal(t *testing.T) {
 		}},
 		{ID: "p1", Name: "Someone's Personal", Type: "personal", Teams: []teamRow{{ID: "pt", Name: "Default", Collects: personalCollects, Selected: true}}},
 	}}
-	form, _ := teamsForm(v)
+	form, slots := teamsForm(v)
 	if len(form.Items) != 4 {
 		t.Fatalf("items = %+v", form.Items)
 	}
+	if got := form.Items[0]; got.Label != "Personal" || got.Heading != "" || got.Detail != "" || slots[0] != (checklistSlot{1, 0}) {
+		t.Errorf("personal item = %+v at slot %+v, want it first", got, slots[0])
+	}
+	form.Items, slots = form.Items[1:], slots[1:]
 	if got := form.Items[0]; got.Detail != "The web front end" || got.Heading != "Acme" {
 		t.Errorf("described team = %+v", got)
 	}
@@ -80,8 +84,8 @@ func TestTeamsFormDescriptionsAndPersonal(t *testing.T) {
 	if got := form.Items[2].Detail; got != "" {
 		t.Errorf("undescribed team detail = %q, want none", got)
 	}
-	if got := form.Items[3]; got.Label != "Personal" || got.Heading != "" || !got.Gap || got.Detail != "" {
-		t.Errorf("personal item = %+v", got)
+	if slots[0] != (checklistSlot{0, 0}) {
+		t.Errorf("first organization team at slot %+v", slots[0])
 	}
 
 	var out bytes.Buffer

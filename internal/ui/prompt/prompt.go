@@ -3,12 +3,14 @@
 package prompt
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"regexp"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"golang.org/x/term"
@@ -40,8 +42,6 @@ type Item struct {
 	Reason   string
 	// Heading is a section title printed above this item.
 	Heading string
-	// Gap sets this item apart with a blank line above it, as a Heading does, but no title.
-	Gap bool
 }
 
 // Form is the model: a title, its items, and where the cursor is.
@@ -300,72 +300,115 @@ func (f *Form) render(w io.Writer, p style.Palette) int {
 		} else {
 			line(dim("  ↑/↓ move   space toggle   a all   n none   enter confirm   esc cancel"))
 		}
+		line("")
 	}
 
-	width := 0
+	// Labels pad to the longest one only when some item has text beside it.
+	width, side := 0, false
 	for _, it := range f.Items {
-		if n := len([]rune(it.Label)); n > width {
-			width = n
-		}
+		width = max(width, utf8.RuneCountInString(it.Label))
+		side = side || it.aside() != ""
 	}
+	if !side {
+		width = 0
+	}
+	// What precedes the text beside a label: cursor, box unless a choice, label, gap.
+	lead := 2 + width + len(detailGap)
+	if !f.Choice {
+		lead += 4
+	}
+	room := cmp.Or(f.termWidth, fallbackWidth) - 1 - lead
 
 	for i, it := range f.Items {
-		if it.Heading != "" || it.Gap {
-			line("")
-		}
 		if it.Heading != "" {
-			line("  " + bold(it.Heading))
-		}
-		box := "[ ]"
-		if it.Kind == Radio {
-			box = "( )"
-		}
-		if it.Selected {
-			if it.Kind == Radio {
-				box = brand("(•)")
-			} else {
-				box = brand("[x]")
+			if i > 0 {
+				line("")
 			}
+			line("  " + it.Heading)
 		}
+		here := i == f.cursor && !it.Disabled
 		cursor := "  "
-		if i == f.cursor && !it.Disabled {
+		if here {
 			cursor = brand("❯") + " "
 		}
-		label := it.Label + strings.Repeat(" ", width-len([]rune(it.Label)))
-		if f.Choice {
-			if i == f.cursor && !it.Disabled {
-				label = brand(label)
-			}
-			text := cursor + label
-			switch {
-			case it.Disabled:
-				text = dim(cursor + label + "   " + it.Reason)
-			case it.Detail != "":
-				text += "   " + dim(it.Detail)
-			}
-			line(text)
-			continue
+		label := it.Label
+		aside := truncate(it.aside(), room)
+		if aside != "" {
+			label += strings.Repeat(" ", width-utf8.RuneCountInString(label)) + detailGap
 		}
-		detail := it.Detail
-		if it.Disabled && it.Reason != "" {
-			detail = it.Reason
+		box := ""
+		if !f.Choice {
+			box = checkbox(it, brand) + " "
 		}
-		text := cursor + box + " " + label
-		if detail != "" {
-			text += "   " + detail
-		}
-		if it.Disabled {
-			text = dim(text)
-		} else if detail != "" {
-			text = cursor + box + " " + label + "   " + dim(detail)
+		var text string
+		switch {
+		case it.Disabled:
+			text = dim(cursor + box + label + aside)
+		case f.Choice && here:
+			text = cursor + brand(label) + dim(aside)
+		default:
+			text = cursor + box + label + dim(aside)
 		}
 		line(text)
 	}
 	return lines
 }
 
-// ansiSGR matches the colour escapes the palette emits.
-var ansiSGR = regexp.MustCompile("\x1b\\[[0-9;]*m")
+// detailGap separates the label column from the text beside it.
+const detailGap = "  "
+
+// fallbackWidth is the width text beside a label is cut to when the terminal's is unknown.
+const fallbackWidth = 80
+
+func checkbox(it Item, brand func(string) string) string {
+	switch {
+	case it.Kind == Radio && it.Selected:
+		return brand("(•)")
+	case it.Kind == Radio:
+		return "( )"
+	case it.Selected:
+		return brand("[x]")
+	}
+	return "[ ]"
+}
+
+// aside is the text beside an item's label, as plain text on one line: a disabled item's
+// Reason, else its Detail.
+func (it Item) aside() string {
+	s := it.Detail
+	if it.Disabled && it.Reason != "" {
+		s = it.Reason
+	}
+	return plain(s)
+}
+
+// plain drops escape sequences and control characters, so text from elsewhere, such as a
+// team's description, can neither style the frame nor break a line.
+func plain(s string) string {
+	s = ansiSGR.ReplaceAllString(s, "")
+	s = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, s)
+	return strings.Join(strings.Fields(s), " ")
+}
+
+// truncate cuts s to n columns, ending in "…" when it had to cut; nothing fits below two.
+func truncate(s string, n int) string {
+	if utf8.RuneCountInString(s) <= n {
+		return s
+	}
+	if n < 2 {
+		return ""
+	}
+	r := []rune(s)
+	return strings.TrimRight(string(r[:n-1]), " ") + "…"
+}
+
+// ansiSGR matches a CSI escape: the colours the palette emits, or any other.
+var ansiSGR = regexp.MustCompile("\x1b\\[[0-9;?]*[ -/]*[@-~]")
 
 func visibleWidth(s string) int {
 	return utf8.RuneCountInString(ansiSGR.ReplaceAllString(s, ""))

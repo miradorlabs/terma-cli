@@ -29,18 +29,33 @@ func (app *App) chooseSetupTeams(cmd *cobra.Command, disc *setupDiscovery, assum
 		canAsk = canPrompt
 	}
 	if !assumeYes && canAsk() {
-		form := &prompt.Form{Title: "Send telemetry from this machine to: (space toggles, enter confirms)"}
-		prevOrg := ""
-		for i, dt := range disc.teams {
-			heading := ""
-			if dt.team.OrganizationID != prevOrg {
-				heading, prevOrg = dt.orgName, dt.team.OrganizationID
-			}
-			item := prompt.Item{Label: dt.teamName, Detail: pickerDetail(dt.description, ""), Kind: prompt.Check, Selected: keep[i], Heading: heading}
-			if dt.team.Personal && !slices.ContainsFunc(disc.teams, func(o discoveredTeam) bool {
+		form := &prompt.Form{Title: teamPickerTitle}
+		// Personal heads the list; the organizations follow under their headings.
+		solo := func(dt discoveredTeam) bool {
+			return dt.team.Personal && !slices.ContainsFunc(disc.teams, func(o discoveredTeam) bool {
 				return o.team.OrganizationID == dt.team.OrganizationID && o.team.TeamID != dt.team.TeamID
-			}) {
-				item.Label, item.Heading, item.Gap = personalLabel, "", true
+			})
+		}
+		var order []int
+		for i, dt := range disc.teams {
+			if solo(dt) {
+				order = append(order, i)
+			}
+		}
+		for i, dt := range disc.teams {
+			if !solo(dt) {
+				order = append(order, i)
+			}
+		}
+		prevOrg := ""
+		for _, i := range order {
+			dt := disc.teams[i]
+			item := prompt.Item{Label: dt.teamName, Detail: pickerDetail(dt.description, ""), Kind: prompt.Check, Selected: keep[i]}
+			switch {
+			case solo(dt):
+				item.Label = personalLabel
+			case dt.team.OrganizationID != prevOrg:
+				item.Heading, prevOrg = dt.orgName, dt.team.OrganizationID
 			}
 			form.Items = append(form.Items, item)
 		}
@@ -52,8 +67,8 @@ func (app *App) chooseSetupTeams(cmd *cobra.Command, disc *setupDiscovery, assum
 		if err != nil {
 			return err
 		}
-		for i := range keep {
-			keep[i] = i < len(result) && result[i].Selected
+		for k, i := range order {
+			keep[i] = k < len(result) && result[k].Selected
 		}
 	}
 	disc.untick = map[string]bool{}

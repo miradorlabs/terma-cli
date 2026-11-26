@@ -24,10 +24,27 @@ func pickerDetail(description, note string) string {
 // the organization's heading and the team's own name.
 const personalLabel = "Personal"
 
+// teamPickerTitle asks the question both team pickers put; the keys are on the line below.
+const teamPickerTitle = "Which teams should this machine send to?"
+
 func teamsForm(v teamsView) (*prompt.Form, []checklistSlot) {
-	form := &prompt.Form{Title: "Send telemetry from this machine to: (space toggles, enter confirms)"}
+	form := &prompt.Form{Title: teamPickerTitle}
 	var slots []checklistSlot
+	// Personal heads the list; the organizations follow under their headings.
+	solo := func(o orgRow) bool { return o.Type == "personal" && len(o.Teams) == 1 }
+	order := make([]int, 0, len(v.Organizations))
 	for i, o := range v.Organizations {
+		if solo(o) {
+			order = append(order, i)
+		}
+	}
+	for i, o := range v.Organizations {
+		if !solo(o) {
+			order = append(order, i)
+		}
+	}
+	for _, i := range order {
+		o := v.Organizations[i]
 		heading := orgTitle(o)
 		if len(o.Teams) == 0 && o.Note != "" {
 			form.Items = append(form.Items, prompt.Item{Label: "(no teams listed)", Kind: prompt.Check, Disabled: true, Reason: o.Note, Heading: heading})
@@ -36,8 +53,8 @@ func teamsForm(v teamsView) (*prompt.Form, []checklistSlot) {
 		}
 		for j, t := range o.Teams {
 			item := prompt.Item{Label: cmp.Or(t.Name, t.ID), Detail: pickerDetail(t.Description, teamStateNote(t)), Kind: prompt.Check, Selected: t.Selected, Heading: heading}
-			if o.Type == "personal" && len(o.Teams) == 1 {
-				item.Label, item.Heading, item.Gap = personalLabel, "", true
+			if solo(o) {
+				item.Label, item.Heading = personalLabel, ""
 			}
 			if (t.Unreadable != "" || o.Inaccessible) && !t.Selected {
 				item.Disabled, item.Reason = true, cmp.Or(t.Unreadable, o.Note)

@@ -2,8 +2,10 @@ package prompt
 
 import (
 	"bytes"
+	"slices"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
@@ -157,7 +159,7 @@ func TestRenderCountsEveryLineItWrites(t *testing.T) {
 		"❯ [x] Traces",
 		"  [x] Events",
 		"  (•) Global",
-		"  ( ) Local     Codex has no repository settings",
+		"  ( ) Local    Codex has no repository settings",
 		"  Data", "  Where",
 	} {
 		if !strings.Contains(out, want) {
@@ -280,7 +282,89 @@ func TestChoiceRendersAList(t *testing.T) {
 	if strings.Contains(out, "( )") || strings.Contains(out, "[ ]") || !strings.Contains(out, "enter select") {
 		t.Fatalf("a choice is a list, not a form of boxes:\n%s", out)
 	}
-	if !strings.Contains(out, "❯ Acme API    (current)") {
+	if !strings.Contains(out, "❯ Acme API   (current)") {
 		t.Fatalf("the cursor should rest on the current item:\n%s", out)
+	}
+}
+
+func renderPlain(f *Form) []string {
+	f.init()
+	var buf bytes.Buffer
+	f.render(&buf, style.Plain())
+	return strings.Split(strings.TrimSuffix(strings.ReplaceAll(buf.String(), clearLine, ""), "\r\n"), "\r\n")
+}
+
+func teamPicker(width int) *Form {
+	return &Form{
+		Title:     "Which teams should this machine send to?",
+		termWidth: width,
+		Items: []Item{
+			{Label: "Personal", Selected: true},
+			{Label: "Sim", Heading: "Terma Demo", Detail: "Live synthetic AI-coding telemetry: autonomous agents writing code, tokens and cost, and git commits, PRs and merges from the Terma demo simulator"},
+			{Label: "Platform engineering", Detail: "Core services", Selected: true},
+		},
+	}
+}
+
+// Text beside a label is cut to the terminal's width with an ellipsis, never wrapped.
+func TestRenderTruncatesDetailsToTheTerminalWidth(t *testing.T) {
+	t.Parallel()
+	for _, width := range []int{100, 60} {
+		var sim string
+		for _, l := range renderPlain(teamPicker(width))[2:] { // the items, below title and keys
+			if strings.Contains(l, "Sim") {
+				sim = l
+			}
+			if utf8.RuneCountInString(l) >= width {
+				t.Errorf("width %d: line of %d columns would wrap: %q", width, utf8.RuneCountInString(l), l)
+			}
+		}
+		if !strings.HasSuffix(sim, "…") || !strings.Contains(sim, "Live") {
+			t.Errorf("width %d: long description not cut with an ellipsis: %q", width, sim)
+		}
+	}
+	// An unknown width cuts at 80 columns.
+	for _, l := range renderPlain(teamPicker(0))[2:] {
+		if utf8.RuneCountInString(l) >= fallbackWidth {
+			t.Errorf("unknown width: line of %d columns: %q", utf8.RuneCountInString(l), l)
+		}
+	}
+}
+
+// Details start two columns after the longest label shown.
+func TestRenderAlignsDetailsToTheLongestLabel(t *testing.T) {
+	t.Parallel()
+	lines := renderPlain(teamPicker(200))
+	want := []string{
+		"❯ [x] Personal",
+		"  Terma Demo",
+		"  [ ] Sim                   Live synthetic",
+		"  [x] Platform engineering  Core services",
+	}
+	for _, w := range want {
+		if !slices.ContainsFunc(lines, func(l string) bool { return strings.HasPrefix(l, w) }) {
+			t.Errorf("frame lacks a line starting %q:\n%s", w, strings.Join(lines, "\n"))
+		}
+	}
+	if !slices.Contains(lines, "❯ [x] Personal") {
+		t.Errorf("a label with nothing beside it carries no padding:\n%s", strings.Join(lines, "\n"))
+	}
+}
+
+// With nothing beside any label, no column is reserved for it.
+func TestRenderReservesNoDetailColumnWithoutDetails(t *testing.T) {
+	t.Parallel()
+	lines := renderPlain(&Form{Items: []Item{{Label: "A"}, {Label: "A much longer label"}}})
+	if lines[0] != "❯ [ ] A" || lines[1] != "  [ ] A much longer label" {
+		t.Fatalf("labels padded with no details:\n%s", strings.Join(lines, "\n"))
+	}
+}
+
+// A description is plain text: escapes and control characters in it neither style nor break the frame.
+func TestRenderDrawsDetailsAsPlainText(t *testing.T) {
+	t.Parallel()
+	lines := renderPlain(&Form{Items: []Item{{Label: "Sim", Detail: "Live \x1b[4mautonomous\x1b[24m\nagents\tand `cost`"}}})
+	if len(lines) != 1 || lines[0] != "❯ [ ] Sim  Live autonomous agents and `cost`" {
+		t.Fatalf("detail not drawn as one line of plain text: %q", lines)
 	}
 }
