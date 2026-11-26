@@ -40,17 +40,19 @@ func held(f *os.File, path string) bool {
 	return errA == nil && errB == nil && os.SameFile(a, b)
 }
 
+// lockOnce gives up at once on a ctx already done, and otherwise always tries the lock
+// before it waits: a free lock is taken however long opening its file took, which a loaded
+// machine can make longer than a caller's whole wait.
 func lockOnce(ctx context.Context, path string) (*lockedFile, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, fileMode)
 	if err != nil {
 		return nil, err
 	}
 	wait := pollMin
 	for {
-		if err := ctx.Err(); err != nil {
-			f.Close()
-			return nil, err
-		}
 		// Polled rather than a blocking LOCK_EX, which cannot be cancelled.
 		err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
 		if err == nil {

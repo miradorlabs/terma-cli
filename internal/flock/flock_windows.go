@@ -25,17 +25,19 @@ func unlockFile(f *os.File) {
 	_ = f.Close()
 }
 
+// lock gives up at once on a ctx already done, and otherwise always tries the lock before
+// it waits: a free lock is taken however long opening its file took, which on a loaded
+// Windows machine (a virus scan of the new file) can be longer than a caller's whole wait.
 func lock(ctx context.Context, path string) (func(), error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	f, err := openLockFile(ctx, path)
 	if err != nil {
 		return nil, err
 	}
 	wait := pollMin
 	for {
-		if err := ctx.Err(); err != nil {
-			_ = f.Close()
-			return nil, err
-		}
 		err := lockFile(f)
 		if err == nil {
 			break
