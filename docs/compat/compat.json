@@ -73,7 +73,7 @@
       "label": "The machine's heartbeat reaches the project's ingest"
     }
   ],
-  "generated_at": "2026-11-26T12:01:17Z",
+  "generated_at": "2026-11-26T19:44:38Z",
   "harnesses": [
     {
       "ID": "claude",
@@ -13792,6 +13792,17 @@
       "first_passed": "2026-11-25T13:59:04.042042Z",
       "terma": "terma version dev",
       "test": "TestRelayT3/v0.1.12"
+    },
+    {
+      "harness": "t3",
+      "version": "0.1.13",
+      "platform": "darwin/arm64",
+      "capability": "relay.telemetry",
+      "result": "pass",
+      "last_run": "2026-11-26T19:44:01.713076Z",
+      "first_passed": "2026-11-26T19:44:01.713076Z",
+      "terma": "terma version dev",
+      "test": "TestRelayT3/v0.1.13"
     },
     {
       "harness": "t3",

@@ -11,20 +11,44 @@
       "language": "typescript"
     },
     "changelog": "https://github.com/pingdotgg/t3code/releases",
-    "latest": "0.1.12",
+    "latest": "0.1.13",
     "support": "supported",
-    "versions_tracked": 9,
+    "versions_tracked": 10,
     "first_tracked": "2026-10-02",
     "last_change": {
-      "from": "0.1.11",
-      "to": "0.1.12",
-      "at": "2026-11-25T07:43:08.450450844Z",
-      "released_at": "2026-11-25T07:37:43.095Z",
+      "from": "0.1.12",
+      "to": "0.1.13",
+      "at": "2026-11-26T19:44:39.703894631Z",
+      "released_at": "2026-11-26T19:35:23.927Z",
       "changes": 0,
       "categories": {}
     }
   },
   "versions": [
+    {
+      "version": "0.1.13",
+      "released_at": "2026-11-26T19:35:23.927Z",
+      "captured_at": "2026-11-26T19:44:39.703894631Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.1.12",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-26T19:44:39.703894631Z",
+      "attempts": 1
+    },
     {
       "version": "0.1.12",
       "released_at": "2026-11-25T07:37:43.095Z",

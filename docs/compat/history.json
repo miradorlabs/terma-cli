@@ -13665,6 +13665,17 @@
   },
   {
     "harness": "t3",
+    "version": "0.1.13",
+    "platform": "darwin/arm64",
+    "capability": "relay.telemetry",
+    "result": "pass",
+    "last_run": "2026-11-26T19:44:01.713076Z",
+    "first_passed": "2026-11-26T19:44:01.713076Z",
+    "terma": "terma version dev",
+    "test": "TestRelayT3/v0.1.13"
+  },
+  {
+    "harness": "t3",
     "version": "0.1.1",
     "platform": "darwin/arm64",
     "capability": "relay.telemetry",

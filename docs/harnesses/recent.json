@@ -1,7 +1,33 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-26T12:01:18.28433114Z",
+  "generated_at": "2026-11-26T19:44:39.703894631Z",
   "versions": [
+    {
+      "harness": "t3",
+      "name": "T3 Code",
+      "version": "0.1.13",
+      "released_at": "2026-11-26T19:35:23.927Z",
+      "captured_at": "2026-11-26T19:44:39.703894631Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "0.1.12",
+      "changes": 0,
+      "categories": {},
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 0,
+        "notable": 0
+      },
+      "undocumented": 0,
+      "highlights": [],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-26T19:44:39.703894631Z",
+      "attempts": 1
+    },
     {
       "harness": "copilot",
       "name": "GitHub Copilot CLI",
@@ -6193,30 +6219,6 @@
         "New vendor telemetry event: tengu_turn_end",
         "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added"
       ],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.231",
-      "released_at": "2026-08-13T08:27:21.757Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.229",
-      "changes": 0,
-      "categories": {},
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 0,
-        "notable": 0
-      },
-      "undocumented": 0,
-      "highlights": [],
       "signing": "valid"
     }
   ]
