@@ -15,6 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
+	"golang.org/x/term"
 )
 
 // setupUI reports setup's steps, verdict and next steps; successful steps and details
@@ -57,8 +58,14 @@ func (u *setupUI) Warn(label, what string) {
 // without leaving them a step.
 func (u *setupUI) Caution(label, what string) { u.keep(u.p.Warn("!"), label, what) }
 
+// keep adds a checklist line, wrapping what under itself.
 func (u *setupUI) keep(mark, label, what string) {
-	u.lines = append(u.lines, fmt.Sprintf("  %s %-*s %s", mark, stepLabelWidth, label, u.p.Commands(what)))
+	const indent = 2 + 1 + 1 + stepLabelWidth + 1
+	lines := wrapStep(what, cmp.Or(terminalColumns(u.out), 80)-indent)
+	u.lines = append(u.lines, fmt.Sprintf("  %s %-*s %s", mark, stepLabelWidth, label, u.p.Commands(lines[0])))
+	for _, l := range lines[1:] {
+		u.lines = append(u.lines, strings.Repeat(" ", indent)+u.p.Commands(l))
+	}
 }
 
 // Detail takes the long form, shown under --verbose.
@@ -122,26 +129,17 @@ func (u *setupUI) policyNextSteps(pol config.Policy, admits, gitHooksOff bool) {
 	}
 }
 
-// reportConflicts names every repository two organizations' policies both list, the team
-// that collects it, and the order routing tries the teams in, which policy updates change.
+// reportConflicts names every repository two selected teams' policies both list and the
+// team that collects it.
 func (u *setupUI) reportConflicts(st routing.State, names teamNames) {
 	overlaps := routing.Overlaps(st)
-	if len(overlaps) == 0 {
-		return
-	}
 	for _, o := range overlaps {
-		u.Caution("Conflict", fmt.Sprintf("%s is listed by %s and %s; %s collects it, as its policy is newer",
-			o.Entry, teamLabel(names, o.Winner), teamLabel(names, o.Other), teamLabel(names, o.Winner)))
+		u.Caution("Conflict", fmt.Sprintf("%s: %s collects it, not %s (newer policy)",
+			o.Entry, teamLabel(names, o.Winner), teamLabel(names, o.Other)))
 	}
-	for i, t := range routing.Order(st) {
-		line := fmt.Sprintf("%d. %s — %s", i+1, teamLabel(names, t), doctor.PolicyAge(t))
-		if i == 0 {
-			u.Caution("Routing order", line)
-		} else {
-			u.keep(" ", "", line)
-		}
+	if len(overlaps) > 0 {
+		u.Then("Run `terma doctor` to see which team collects each repository.")
 	}
-	u.Then("Note that " + doctor.OrderChanges + ". Run `terma doctor` to see the current order.")
 }
 
 func orgNamesList(orgs []organization) []string {
@@ -177,13 +175,74 @@ func (u *setupUI) finish() {
 		return
 	}
 	fmt.Fprintf(u.out, "\n%s\n", u.p.Bold("Next steps:"))
+	width := cmp.Or(terminalColumns(u.out), 80) - 4
 	for _, step := range u.next {
-		lines := strings.Split(u.p.Commands(step), "\n")
-		fmt.Fprintf(u.out, "  %s %s\n", u.p.Brand("•"), lines[0])
+		lines := wrapStep(step, width)
+		fmt.Fprintf(u.out, "  %s %s\n", u.p.Brand("•"), u.p.Commands(lines[0]))
 		for _, l := range lines[1:] {
-			fmt.Fprintf(u.out, "    %s\n", l)
+			fmt.Fprintf(u.out, "    %s\n", u.p.Commands(l))
 		}
 	}
+}
+
+// terminalColumns is w's width when it is a terminal, or 0.
+func terminalColumns(w io.Writer) int {
+	f, ok := w.(*os.File)
+	if !ok {
+		return 0
+	}
+	cols, _, err := term.GetSize(int(f.Fd()))
+	if err != nil {
+		return 0
+	}
+	return cols
+}
+
+// wrapStep breaks a next step at spaces into lines of at most width columns, never inside a
+// `quoted command`, keeping the step's own line breaks.
+func wrapStep(step string, width int) []string {
+	var out []string
+	for para := range strings.SplitSeq(step, "\n") {
+		line := ""
+		for _, word := range stepWords(para) {
+			switch {
+			case line == "":
+				line = word
+			case len([]rune(line))+1+len([]rune(word)) <= width:
+				line += " " + word
+			default:
+				out = append(out, line)
+				line = word
+			}
+		}
+		out = append(out, line)
+	}
+	return out
+}
+
+// stepWords splits s at spaces outside backquotes.
+func stepWords(s string) []string {
+	var words []string
+	var b strings.Builder
+	inQuote := false
+	for _, r := range s {
+		switch {
+		case r == '`':
+			inQuote = !inQuote
+			b.WriteRune(r)
+		case r == ' ' && !inQuote:
+			if b.Len() > 0 {
+				words = append(words, b.String())
+				b.Reset()
+			}
+		default:
+			b.WriteRune(r)
+		}
+	}
+	if b.Len() > 0 {
+		words = append(words, b.String())
+	}
+	return words
 }
 
 // setupHeaderInfo is the column beside the logo; it reads only local state, so it is safe

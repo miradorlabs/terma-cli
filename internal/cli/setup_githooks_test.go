@@ -25,10 +25,10 @@ func TestSetupRecommendsCommitHooksWhenThePolicyHasThemOff(t *testing.T) {
 			if err != nil {
 				t.Fatalf("setup: %v\n%s", err, out)
 			}
-			if got := strings.Contains(out, doctor.GitHooksOffStep); got != tc.want {
+			if got := strings.Contains(flat(out), doctor.GitHooksOffStep); got != tc.want {
 				t.Errorf("recommendation shown = %v, want %v:\n%s", got, tc.want, out)
 			}
-			if i := strings.Index(out, doctor.GitHooksOffStep); i >= 0 && !strings.Contains(out[:i], "Next steps:") {
+			if i := strings.Index(flat(out), doctor.GitHooksOffStep); i >= 0 && !strings.Contains(flat(out)[:i], "Next steps:") {
 				t.Errorf("the recommendation is not a next step:\n%s", out)
 			}
 			if strings.Contains(out, "! Commits") {

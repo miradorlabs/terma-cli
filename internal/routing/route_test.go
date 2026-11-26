@@ -259,7 +259,8 @@ func TestOrganizationOf(t *testing.T) {
 	}
 }
 
-// Overlaps names every entry two organizations both cover, and the team Route gives it.
+// Overlaps names every entry two teams both cover, in one organization or two, and the
+// team Route gives it.
 func TestOverlaps(t *testing.T) {
 	t.Parallel()
 	older, newer := now.Add(-48*time.Hour), now.Add(-time.Hour)
@@ -269,10 +270,14 @@ func TestOverlaps(t *testing.T) {
 		updated(team("clientco", "clientco-contractors", "github.com/shared/api", "github.com/clientco/*"), newer),
 		personal("github.com/shared/*"))
 	got := Overlaps(*s)
-	if len(got) != 1 || got[0].Entry != "github.com/shared/api" || got[0].Winner.TeamID != "clientco-contractors" || got[0].Other.TeamID != "acme-platform" {
+	if len(got) != 2 ||
+		got[0].Entry != "github.com/acme/api" || got[0].Winner.TeamID != "acme-platform" || got[0].Other.TeamID != "acme-mobile" ||
+		got[1].Entry != "github.com/shared/api" || got[1].Winner.TeamID != "clientco-contractors" || got[1].Other.TeamID != "acme-platform" {
 		t.Fatalf("Overlaps = %+v", got)
 	}
-	expect(t, s, repo(got[0].Entry), Send, got[0].Winner.TeamID)
+	for _, o := range got {
+		expect(t, s, repo(o.Entry), Send, o.Winner.TeamID)
+	}
 }
 
 // With three organizations on one repository, only the newest policy's wins are reported.

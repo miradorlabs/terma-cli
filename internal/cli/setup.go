@@ -17,6 +17,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/setup"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
@@ -310,7 +311,11 @@ func (app *App) reportUpdates(ui *setupUI) {
 	if err != nil {
 		return
 	}
-	ui.Summary("Updates", updatesSummary(selfupdate.InstallOf(exe, app.version), p.Auto))
+	install := selfupdate.InstallOf(exe, app.version)
+	if install.Method == semconv.TermaInstallMethodSource {
+		return // a development build: nothing to tell a developer trying it
+	}
+	ui.Summary("Updates", updatesSummary(install, p.Auto))
 }
 
 // stopFirst stops a spinner before anything is written to its stream, so the two never

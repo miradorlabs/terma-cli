@@ -130,9 +130,9 @@ func TestSetupFetchesThePolicyAndPointsAgentsAtTheRelay(t *testing.T) {
 	if strings.Contains(out, "Collects") {
 		t.Fatalf("setup listed what the team collects:\n%s", out)
 	}
-	// The test binary is no release, so it is never updated; setup says so.
-	if !strings.Contains(out, "Updates       never for a development build") {
-		t.Fatalf("setup did not say how terma updates:\n%s", out)
+	// The test binary is a development build, so setup says nothing about updates.
+	if strings.Contains(out, "Updates") {
+		t.Fatalf("setup reported updates for a development build:\n%s", out)
 	}
 	token, err := daemon.Token(testApp.stateDir)
 	if err != nil {
@@ -159,8 +159,8 @@ func TestSetupWarnsWhenTheTeamListsNoRepositories(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	for _, want := range []string{"! Collects      nothing yet: your team lists no repositories", "Next steps:", doctor.NoRepositoriesStep} {
-		if !strings.Contains(out, want) {
+	for _, want := range []string{"! Collects nothing yet: your team lists no repositories", "Next steps:", doctor.NoRepositoriesStep} {
+		if !strings.Contains(flat(out), want) {
 			t.Errorf("setup output lacks %q:\n%s", want, out)
 		}
 	}
@@ -184,8 +184,8 @@ func TestSetupAndDoctorSayWhenTheTeamHasNoPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	for _, want := range []string{"! Collects      nothing yet: your team has no collection policy", "Next steps:", doctor.NoPolicyStep} {
-		if !strings.Contains(out, want) {
+	for _, want := range []string{"! Collects nothing yet: your team has no collection policy", "Next steps:", doctor.NoPolicyStep} {
+		if !strings.Contains(flat(out), want) {
 			t.Errorf("setup output lacks %q:\n%s", want, out)
 		}
 	}

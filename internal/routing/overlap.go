@@ -2,7 +2,7 @@ package routing
 
 import "slices"
 
-// Overlap is an entry two selected organizations' policies both cover: Route sends what it
+// Overlap is an entry two selected teams' policies both cover: Route sends what it
 // matches to Winner, whose policy was updated more recently, and never to Other.
 type Overlap struct {
 	// Entry is the narrower of the two entries, which is what both cover.
@@ -35,15 +35,15 @@ func Order(s State) []Team {
 	return out
 }
 
-// Overlaps lists every pair of entries in which two organizations' selected teams claim
-// the same repositories, with the team Route gives them to. A refused team claims nothing,
+// Overlaps lists every pair of entries in which two selected teams, in one organization or
+// two, claim the same repositories, with the team Route gives them to. A refused team claims nothing,
 // and a pair whose winner itself loses the entry to a newer third team is left out.
 func Overlaps(s State) []Overlap {
 	var out []Overlap
 	for i, a := range s.Teams {
 		for j := i + 1; j < len(s.Teams); j++ {
 			b := s.Teams[j]
-			if a.Personal || b.Personal || a.refused() || b.refused() || a.OrganizationID == b.OrganizationID {
+			if a.Personal || b.Personal || a.refused() || b.refused() {
 				continue
 			}
 			winner, other := a, b

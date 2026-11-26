@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"io"
-	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -86,7 +85,7 @@ func TestSetupOrderSpinnerAndTeamPicker(t *testing.T) {
 	acmeWeb, acmeAPI, betaTeam := projectsIn(orgA().ID)[0].ID, projectsIn(orgA().ID)[1].ID, projectsIn(orgB().ID)[0].ID
 	gateway.policyBodies = map[string]string{
 		acmeWeb:  policyAt("2026-11-01T00:00:00Z", "github.com/acme/web"),
-		acmeAPI:  policyAt("2026-11-01T00:00:00Z", "github.com/acme/api"),
+		acmeAPI:  policyAt("2026-10-01T00:00:00Z", "github.com/shared/web"),
 		betaTeam: policyAt("2026-11-01T00:00:00Z", "github.com/beta/core"),
 	}
 	setupMachine(t, gateway)
@@ -201,13 +200,14 @@ func TestSetupCancelAtTeamPickerCommitsNothing(t *testing.T) {
 	}
 }
 
-// Overlapping policies are reported, never asked about: the newer policy collects.
+// Overlapping policies, in one organization or two, are reported, never asked about: the
+// newer policy collects.
 func TestSetupReportsPolicyConflicts(t *testing.T) {
 	gateway := newFakeAuth(t)
 	acmeWeb, acmeAPI, betaTeam := projectsIn(orgA().ID)[0].ID, projectsIn(orgA().ID)[1].ID, projectsIn(orgB().ID)[0].ID
 	gateway.policyBodies = map[string]string{
 		acmeWeb:  policyAt("2026-11-01T00:00:00Z", "github.com/shared/*"),
-		acmeAPI:  policyAt("2026-11-01T00:00:00Z", "github.com/acme/api"),
+		acmeAPI:  policyAt("2026-10-01T00:00:00Z", "github.com/shared/web"),
 		betaTeam: policyAt("2026-11-10T00:00:00Z", "github.com/shared/api", "github.com/beta/core"),
 	}
 	setupMachine(t, gateway)
@@ -216,12 +216,17 @@ func TestSetupReportsPolicyConflicts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "github.com/shared/api is listed by") || !strings.Contains(out, "Beta Core collects it, as its policy is newer") {
-		t.Fatalf("conflict not reported:\n%s", out)
+	for _, want := range []string{
+		"Conflict github.com/shared/api: Beta Labs Beta Core collects it, not Acme Web (newer policy)",
+		"Conflict github.com/shared/web: Acme Web collects it, not Acme API (newer policy)",
+		"Run `terma doctor` to see which team collects each repository.",
+	} {
+		if !strings.Contains(flat(out), want) {
+			t.Errorf("setup output lacks %q:\n%s", want, out)
+		}
 	}
-	order := regexp.MustCompile(`Routing order\s+1\. [^\n]*Beta Core — policy updated [^\n]*\n\s+2\. [^\n]*Acme Web — policy updated [^\n]*\n\s+3\. [^\n]*Acme API — policy updated `)
-	if !order.MatchString(out) || !strings.Contains(out, "policies can change at any time") {
-		t.Fatalf("routing order or its note missing:\n%s", out)
+	if strings.Contains(out, "Routing order") {
+		t.Errorf("setup printed the routing order:\n%s", out)
 	}
 	st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
 	if err != nil {
