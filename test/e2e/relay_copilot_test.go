@@ -27,9 +27,11 @@ func TestRelayCopilot(t *testing.T) {
 			t.Run(relayMode(content), func(t *testing.T) {
 				Proves(t, b.Harness, b.Version, map[bool]string{true: "relay.content_allowed", false: "relay.content_withheld"}[content])
 				track(t)
-				sb := copilotSandbox(t, b)
-				sb.UseRelay(RelayOptions{Start: true, Content: content})
-				sid, out := sb.CopilotRun(sb.Repo, "Create a file named hello.txt containing exactly TERMA_COPILOT_FILE, then reply with exactly: done. TERMA_COPILOT_PROMPT")
+				sb, sid, out := CopilotRunTool(t, func() (*Sandbox, string) {
+					sb := copilotSandbox(t, b)
+					sb.UseRelay(RelayOptions{Start: true, Content: content})
+					return sb, "Create a file named hello.txt containing exactly TERMA_COPILOT_FILE, then reply with exactly: done. TERMA_COPILOT_PROMPT"
+				}, fileIn("hello.txt"))
 				if sid == "" {
 					t.Fatalf("Copilot reported no session:\n%s", tail(out, 2000))
 				}
@@ -153,13 +155,15 @@ func TestRelayCopilotToolsGetNoExporter(t *testing.T) {
 		track(t)
 		out := filepath.Join(os.TempDir(), "terma-copilot-env-"+time.Now().Format("150405.000000"))
 		t.Cleanup(func() { _ = os.Remove(out) })
-		sb := copilotSandbox(t, b)
-		sb.UseRelay(RelayOptions{Start: true})
-		sb.CopilotRun(sb.Repo, "Run exactly this one shell command, then reply with exactly: done.\nenv | cut -d= -f1 | grep -E '^(OTEL_|COPILOT_OTEL)' > "+out+"; env | grep -c "+sb.relayAddr+" >> "+out+"; printf ran >> "+out)
+		sb, _, _ := CopilotRunTool(t, func() (*Sandbox, string) {
+			sb := copilotSandbox(t, b)
+			sb.UseRelay(RelayOptions{Start: true})
+			return sb, "Run exactly this one shell command, then reply with exactly: done.\nenv | cut -d= -f1 | grep -E '^(OTEL_|COPILOT_OTEL)' > " + out + "; env | grep -c " + sb.relayAddr + " >> " + out + "; printf ran >> " + out
+		}, func(*Sandbox) bool {
+			data, _ := os.ReadFile(out)
+			return strings.Contains(string(data), "ran")
+		})
 		data, _ := os.ReadFile(out)
-		if !strings.Contains(string(data), "ran") {
-			t.Fatalf("Copilot's shell tool never ran: %q", data)
-		}
 		// The exporter variables' names, then how many variables name the relay's address.
 		if seen := strings.Fields(strings.ReplaceAll(string(data), "ran", "")); len(seen) != 1 || seen[0] != "0" {
 			t.Errorf("Copilot's tools inherited exporter settings: %q", data)
@@ -175,8 +179,9 @@ func TestRelayCopilotToolsGetNoExporter(t *testing.T) {
 func TestCopilotAttribution(t *testing.T) {
 	forEachCopilot(t, func(t *testing.T, b Binary) {
 		track(t)
-		sb := copilotSandbox(t, b)
-		sid, out := sb.CopilotRun(sb.Repo, "Using your file editing tool, not a shell command, create a file named hello.txt containing exactly hello, then reply with exactly: done.")
+		sb, sid, out := CopilotRunTool(t, func() (*Sandbox, string) {
+			return copilotSandbox(t, b), "Using your file editing tool, not a shell command, create a file named hello.txt containing exactly hello, then reply with exactly: done."
+		}, fileIn("hello.txt"))
 		if sid == "" {
 			t.Fatalf("Copilot reported no session:\n%s", tail(out, 2000))
 		}
