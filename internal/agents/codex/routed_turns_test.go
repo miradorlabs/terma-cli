@@ -58,9 +58,6 @@ func makeRoutedCodexEnv(t *testing.T, stateDir, configDir, cwd string) (hookrun.
 				return err
 			}
 			enrollments[spec.org] = enr
-			if err := s.Bind(spec.repo, spec.org, false); err != nil {
-				return err
-			}
 		}
 		return nil
 	})

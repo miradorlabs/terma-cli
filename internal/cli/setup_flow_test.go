@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -42,20 +43,19 @@ func (s *recordingSpinner) Stop() {
 	*s.events = append(*s.events, "spinner:stop")
 }
 
-// Verifies the streamlined setup order:
-// 1. Auth -> 2. Fetch orgs (spinner on) -> 3. Fetch teams (same spinner continues) ->
-// 4. Stop spinner -> 5. Harness picker -> 6. Automatically enroll all teams & bind repos
-// without any org, team, or repository confirmation prompts.
-func TestSetupStreamlinedOrderAndSpinner(t *testing.T) {
-	gateway := newFakeAuth(t)
-	acmeWeb := projectsIn(orgA().ID)[0].ID
-	acmeAPI := projectsIn(orgA().ID)[1].ID
-	betaTeam := projectsIn(orgB().ID)[0].ID
-	gateway.policyBodies = map[string]string{
-		acmeWeb:  `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/acme/web"]},"git_hooks":true,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
-		acmeAPI:  `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/acme/api"]},"git_hooks":true,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
-		betaTeam: `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/beta/core"]},"git_hooks":true,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
+// policyAt is a per-repository policy body for repos, last updated at updated.
+func policyAt(updated string, repos ...string) string {
+	quoted := make([]string, len(repos))
+	for i, r := range repos {
+		quoted[i] = fmt.Sprintf("%q", r)
 	}
+	return fmt.Sprintf(`{"policy":{"version":"2.0","terma":{"per_repository":{"repositories":[%s]},"git_hooks":true,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":%q}`,
+		strings.Join(quoted, ","), updated)
+}
+
+// setupMachine signs a fresh machine in to gateway, ready for `terma setup`.
+func setupMachine(t *testing.T, gateway *fakeAuth) {
+	t.Helper()
 	authSandbox(t, gateway)
 	sandboxMachine(t)
 	t.Setenv("CODEX_HOME", t.TempDir())
@@ -63,34 +63,53 @@ func TestSetupStreamlinedOrderAndSpinner(t *testing.T) {
 	if err := saveSignIn(testApp.dir, storedSession(gateway)); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func enrolledTeams(t *testing.T) []string {
+	t.Helper()
+	st, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+	if err != nil || !found {
+		t.Fatalf("routing.Load = %v, found=%v", err, found)
+	}
+	var ids []string
+	for _, tm := range st.Teams {
+		ids = append(ids, tm.TeamID)
+	}
+	return ids
+}
+
+// Setup signs in, fetches organizations and teams under one spinner, asks which teams to
+// send to, then which agents, and enrolls only the teams left ticked.
+func TestSetupOrderSpinnerAndTeamPicker(t *testing.T) {
+	gateway := newFakeAuth(t)
+	acmeWeb, acmeAPI, betaTeam := projectsIn(orgA().ID)[0].ID, projectsIn(orgA().ID)[1].ID, projectsIn(orgB().ID)[0].ID
+	gateway.policyBodies = map[string]string{
+		acmeWeb:  policyAt("2026-11-01T00:00:00Z", "github.com/acme/web"),
+		acmeAPI:  policyAt("2026-11-01T00:00:00Z", "github.com/acme/api"),
+		betaTeam: policyAt("2026-11-01T00:00:00Z", "github.com/beta/core"),
+	}
+	setupMachine(t, gateway)
 
 	var mu sync.Mutex
 	var events []string
-	record := func(e string) {
-		mu.Lock()
-		events = append(events, e)
-		mu.Unlock()
-	}
-
 	prevSpin, prevAsk, prevForm, prevPick := testApp.newSpinner, testApp.canAsk, testApp.runForm, testApp.pickOne
 	t.Cleanup(func() {
 		testApp.newSpinner, testApp.canAsk, testApp.runForm, testApp.pickOne = prevSpin, prevAsk, prevForm, prevPick
 	})
-	testApp.newSpinner = func(io.Writer) progressSpinner {
-		return &recordingSpinner{events: &events}
-	}
+	testApp.newSpinner = func(io.Writer) progressSpinner { return &recordingSpinner{events: &events} }
 	testApp.canAsk = func() bool { return true }
 	testApp.pickOne = func(*cobra.Command, string, []pickRow, func(string) (int, error)) (int, error) {
-		t.Fatal("setup must not invoke any org, team, or repository picker")
+		t.Fatal("setup must not open a one-of picker")
 		return 0, nil
 	}
-	formsOpened := 0
 	testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
-		formsOpened++
-		record("form:" + form.Title)
+		mu.Lock()
+		events = append(events, "form:"+form.Title)
+		mu.Unlock()
 		items := slices.Clone(form.Items)
 		for i := range items {
-			items[i].Selected = strings.Contains(items[i].Label, "Codex")
+			// Untick Acme API in the team picker; choose Codex in the agent picker.
+			items[i].Selected = items[i].Label == "Acme Web" || items[i].Label == "Beta Core" || strings.Contains(items[i].Label, "Codex")
 		}
 		return items, nil
 	}
@@ -99,62 +118,56 @@ func TestSetupStreamlinedOrderAndSpinner(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	if formsOpened != 1 {
-		t.Fatalf("formsOpened = %d, want 1 (only harness picker)", formsOpened)
-	}
-	wantEvents := []string{
+	want := []string{
 		"spinner:start:Fetching organizations…",
 		"spinner:update:Fetching teams…",
 		"spinner:stop",
+		"form:Send telemetry from this machine to: (space toggles, enter confirms)",
 		"form:Which coding agents do you use? (space toggles, enter confirms)",
 	}
-	if !slices.Equal(events, wantEvents) {
-		t.Fatalf("events = %v\nwant   = %v", events, wantEvents)
+	if !slices.Equal(events, want) {
+		t.Fatalf("events = %v\nwant   = %v", events, want)
 	}
-	// Org list fetched once and policies fetched once per team (no redundant fetches during SetupTeams).
-	if n := gateway.orgLists.Load(); n != 1 {
-		t.Fatalf("orgLists = %d, want 1", n)
-	}
-	if n := gateway.policies.Load(); n != 3 {
-		t.Fatalf("policy fetches = %d, want 3 (one per team)", n)
-	}
-
-	st, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
-	if err != nil || !found {
-		t.Fatalf("routing.Load = %v, found=%v", err, found)
-	}
-	if len(st.Teams) != 3 {
-		t.Fatalf("enrolled %d teams, want 3: %+v", len(st.Teams), st.Teams)
-	}
-	wantBindings := map[string]string{
-		"github.com/acme/web":  orgA().ID,
-		"github.com/acme/api":  orgA().ID,
-		"github.com/beta/core": orgB().ID,
-	}
-	for repo, wantOrg := range wantBindings {
-		if got := st.Bindings[repo]; got.Organization != wantOrg || got.Refused {
-			t.Errorf("binding[%s] = %+v, want org %s", repo, got, wantOrg)
-		}
+	if got := enrolledTeams(t); !slices.Equal(got, []string{acmeWeb, betaTeam}) {
+		t.Fatalf("enrolled %v, want Acme Web and Beta Core", got)
 	}
 	if strings.Contains(out, "Conflict") {
-		t.Errorf("unexpected conflict output for disjoint repos:\n%s", out)
+		t.Errorf("unexpected conflict for disjoint policies:\n%s", out)
 	}
 }
 
-func TestSetupCancelAtHarnessPickerCommitsNothing(t *testing.T) {
+// A developer whose only organization is personal is asked nothing about teams.
+func TestSetupPersonalOnlyAsksNoTeams(t *testing.T) {
 	gateway := newFakeAuth(t)
-	gateway.policyBodies = map[string]string{
-		projectsIn(orgA().ID)[0].ID: `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/acme/web"]},"git_hooks":true,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
-		projectsIn(orgA().ID)[1].ID: `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/acme/api"]},"git_hooks":true,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
-		projectsIn(orgB().ID)[0].ID: `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":["github.com/beta/core"]},"git_hooks":true,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
-	}
-	authSandbox(t, gateway)
-	sandboxMachine(t)
-	t.Setenv("TERMA_POLICY_STUB", "")
-	if err := saveSignIn(testApp.dir, storedSession(gateway)); err != nil {
-		t.Fatal(err)
-	}
+	gateway.orgs = []organization{orgPersonal()}
+	gateway.projects = map[string][]project{teamsPersonalOrg: {{ID: teamsPersonalTeam, Name: "Personal", OrganizationID: teamsPersonalOrg}}}
+	gateway.policyBodies = map[string]string{teamsPersonalTeam: globalBody}
+	setupMachine(t, gateway)
 
+	prevAsk, prevForm := testApp.canAsk, testApp.runForm
+	t.Cleanup(func() { testApp.canAsk, testApp.runForm = prevAsk, prevForm })
+	testApp.canAsk = func() bool { return true }
+	var titles []string
+	testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
+		titles = append(titles, form.Title)
+		return form.Items, nil
+	}
+	out, err := runTerma(t, "setup")
+	if err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if len(titles) != 1 || !strings.HasPrefix(titles[0], "Which coding agents") {
+		t.Fatalf("forms = %v, want only the agent picker", titles)
+	}
+	if got := enrolledTeams(t); !slices.Equal(got, []string{teamsPersonalTeam}) {
+		t.Fatalf("enrolled %v, want personal alone", got)
+	}
+}
+
+// Cancelling the team picker records nothing.
+func TestSetupCancelAtTeamPickerCommitsNothing(t *testing.T) {
+	gateway := newFakeAuth(t)
+	setupMachine(t, gateway)
 	prevAsk, prevForm := testApp.canAsk, testApp.runForm
 	t.Cleanup(func() { testApp.canAsk, testApp.runForm = prevAsk, prevForm })
 	testApp.canAsk = func() bool { return true }
@@ -168,407 +181,133 @@ func TestSetupCancelAtHarnessPickerCommitsNothing(t *testing.T) {
 		t.Fatalf("unexpected cancellation output:\n%s", out)
 	}
 	if _, found, err := routing.Load(testApp.stateDir, config.DefaultProfile); err != nil || found {
-		t.Fatalf("routing state should not be written when harness picker is cancelled (found=%v, err=%v)", found, err)
-	}
-	if cfg, err := testApp.loadConfig(); err != nil || len(cfg.Harnesses) != 0 {
-		t.Fatalf("harnesses should remain empty on cancellation: %+v, %v", cfg.Harnesses, err)
+		t.Fatalf("routing state written after cancelling (found=%v, err=%v)", found, err)
 	}
 }
 
-func TestSetupPolicyConflictsNotified(t *testing.T) {
-	policyJSON := func(version string, repos ...string) string {
-		quoted := make([]string, len(repos))
-		for i, r := range repos {
-			quoted[i] = fmt.Sprintf("%q", r)
-		}
-		return fmt.Sprintf(`{"policy":{"version":%q,"terma":{"per_repository":{"repositories":[%s]},"git_hooks":true,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
-			version, strings.Join(quoted, ","))
+// Overlapping policies are reported, never asked about: the newer policy collects.
+func TestSetupReportsPolicyConflicts(t *testing.T) {
+	gateway := newFakeAuth(t)
+	acmeWeb, acmeAPI, betaTeam := projectsIn(orgA().ID)[0].ID, projectsIn(orgA().ID)[1].ID, projectsIn(orgB().ID)[0].ID
+	gateway.policyBodies = map[string]string{
+		acmeWeb:  policyAt("2026-11-01T00:00:00Z", "github.com/shared/*"),
+		acmeAPI:  policyAt("2026-11-01T00:00:00Z", "github.com/acme/api"),
+		betaTeam: policyAt("2026-11-10T00:00:00Z", "github.com/shared/api", "github.com/beta/core"),
 	}
+	setupMachine(t, gateway)
 
-	acmeWeb := projectsIn(orgA().ID)[0].ID
-	acmeAPI := projectsIn(orgA().ID)[1].ID
-	betaCoreID := projectsIn(orgB().ID)[0].ID
-
-	t.Run("cross-org exact repo overlap left pending and notified while disjoint repos auto-bind", func(t *testing.T) {
-		gateway := newFakeAuth(t)
-		gateway.policyBodies = map[string]string{
-			acmeWeb:    policyJSON("1.1", "github.com/acme/web", "github.com/shared/app"),
-			acmeAPI:    policyJSON("1.1", "github.com/acme/api"),
-			betaCoreID: policyJSON("1.1", "github.com/beta/core", "github.com/shared/app"),
-		}
-		authSandbox(t, gateway)
-		sandboxMachine(t)
-		t.Setenv("CODEX_HOME", t.TempDir())
-		t.Setenv("TERMA_POLICY_STUB", "")
-		if err := saveSignIn(testApp.dir, storedSession(gateway)); err != nil {
-			t.Fatal(err)
-		}
-
-		out, err := runTerma(t, "setup", "--harness", "codex")
-		if err != nil {
-			t.Fatalf("setup: %v\n%s", err, out)
-		}
-		for _, want := range []string{
-			"! Conflict",
-			"github.com/shared/app is claimed by multiple organizations (Acme, Beta Labs); left pending",
-			"terma teams --bind github.com/shared/app=<org>",
-		} {
-			if !strings.Contains(out, want) {
-				t.Errorf("output missing %q:\n%s", want, out)
-			}
-		}
-		for _, line := range strings.Split(out, "\n") {
-			if strings.Contains(line, "Collects") && strings.Contains(line, "github.com/shared/app") {
-				t.Errorf("Collects line must not report pending conflicting repo:\n%s", line)
-			}
-		}
-		st, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
-		if err != nil || !found {
-			t.Fatalf("routing.Load = %v, found=%v", err, found)
-		}
-		if _, bound := st.Bindings["github.com/shared/app"]; bound {
-			t.Fatalf("conflicting repo must remain pending, got %+v", st.Bindings["github.com/shared/app"])
-		}
-		if st.Bindings["github.com/acme/web"].Organization != orgA().ID || st.Bindings["github.com/beta/core"].Organization != orgB().ID {
-			t.Fatalf("non-conflicting repos should still auto-bind: %+v", st.Bindings)
-		}
-	})
-
-	t.Run("cross-org wildcard vs exact repo left pending and notified", func(t *testing.T) {
-		gateway := newFakeAuth(t)
-		gateway.policyBodies = map[string]string{
-			acmeWeb:    policyJSON("2.0", "github.com/shared/*"),
-			acmeAPI:    policyJSON("1.1", "github.com/acme/api"),
-			betaCoreID: policyJSON("1.1", "github.com/shared/web"),
-		}
-		authSandbox(t, gateway)
-		sandboxMachine(t)
-		t.Setenv("CODEX_HOME", t.TempDir())
-		t.Setenv("TERMA_POLICY_STUB", "")
-		if err := saveSignIn(testApp.dir, storedSession(gateway)); err != nil {
-			t.Fatal(err)
-		}
-
-		out, err := runTerma(t, "setup", "--harness", "codex")
-		if err != nil {
-			t.Fatalf("setup: %v\n%s", err, out)
-		}
-		if !strings.Contains(out, "! Conflict") || !strings.Contains(out, "github.com/shared/* (Acme) conflicts with github.com/shared/web (Beta Labs); left pending") {
-			t.Fatalf("expected wildcard conflict notification:\n%s", out)
-		}
-		st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, ok := st.Bindings["github.com/shared"]; ok {
-			t.Fatalf("conflicting owner wildcard must stay pending: %+v", st.Bindings)
-		}
-		if _, ok := st.Bindings["github.com/shared/web"]; ok {
-			t.Fatalf("conflicting exact repo under wildcard must stay pending: %+v", st.Bindings)
-		}
-		if st.Bindings["github.com/acme/api"].Organization != orgA().ID {
-			t.Fatalf("unrelated repo should auto-bind: %+v", st.Bindings)
-		}
-	})
-
-	t.Run("disjoint exact repos under same owner across different orgs auto-bind with no conflict", func(t *testing.T) {
-		gateway := newFakeAuth(t)
-		gateway.policyBodies = map[string]string{
-			acmeWeb:    policyJSON("1.1", "github.com/shared/a"),
-			acmeAPI:    policyJSON("1.1", "github.com/acme/api"),
-			betaCoreID: policyJSON("1.1", "github.com/shared/b"),
-		}
-		authSandbox(t, gateway)
-		sandboxMachine(t)
-		t.Setenv("CODEX_HOME", t.TempDir())
-		t.Setenv("TERMA_POLICY_STUB", "")
-		if err := saveSignIn(testApp.dir, storedSession(gateway)); err != nil {
-			t.Fatal(err)
-		}
-
-		out, err := runTerma(t, "setup", "--harness", "codex")
-		if err != nil {
-			t.Fatalf("setup: %v\n%s", err, out)
-		}
-		if strings.Contains(out, "Conflict") {
-			t.Fatalf("unexpected conflict for disjoint repos under same owner:\n%s", out)
-		}
-		st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if st.Bindings["github.com/shared/a"].Organization != orgA().ID || st.Bindings["github.com/shared/b"].Organization != orgB().ID {
-			t.Fatalf("bindings = %+v, want both disjoint repos bound", st.Bindings)
-		}
-	})
-
-	t.Run("same-org duplicate policy overlap binds to org and notifies routing precedence", func(t *testing.T) {
-		gateway := newFakeAuth(t)
-		gateway.orgs = []organization{orgA()}
-		gateway.policyBodies = map[string]string{
-			acmeWeb: policyJSON("1.1", "github.com/acme/shared"),
-			acmeAPI: policyJSON("1.1", "github.com/acme/shared"),
-		}
-		authSandbox(t, gateway)
-		sandboxMachine(t)
-		t.Setenv("CODEX_HOME", t.TempDir())
-		t.Setenv("TERMA_POLICY_STUB", "")
-		if err := saveSignIn(testApp.dir, storedSession(gateway)); err != nil {
-			t.Fatal(err)
-		}
-
-		out, err := runTerma(t, "setup", "--harness", "codex")
-		if err != nil {
-			t.Fatalf("setup: %v\n%s", err, out)
-		}
-		want := "github.com/acme/shared is listed by multiple teams in Acme (Acme Web, Acme API); sessions will route to Acme Web"
-		if !strings.Contains(out, want) {
-			t.Fatalf("missing same-org overlap notification %q:\n%s", want, out)
-		}
-		st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if st.Bindings["github.com/acme/shared"].Organization != orgA().ID {
-			t.Fatalf("same-org repo should still bind to Acme: %+v", st.Bindings)
-		}
-	})
-
-	t.Run("existing refusal and org binding preserved and reported on re-run", func(t *testing.T) {
-		gateway := newFakeAuth(t)
-		gateway.policyBodies = map[string]string{
-			acmeWeb:    policyJSON("1.1", "github.com/acme/web"),
-			acmeAPI:    policyJSON("1.1", "github.com/acme/api"),
-			betaCoreID: policyJSON("1.1", "github.com/beta/core"),
-		}
-		authSandbox(t, gateway)
-		sandboxMachine(t)
-		t.Setenv("CODEX_HOME", t.TempDir())
-		t.Setenv("TERMA_POLICY_STUB", "")
-		cred := storedSession(gateway)
-		if err := saveSignIn(testApp.dir, cred); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := routing.Create(testApp.stateDir, config.DefaultProfile, cred.Account(), func(s *routing.State) error {
-			if err := s.Refuse("github.com/acme/web"); err != nil {
-				return err
-			}
-			return s.Bind("github.com/beta/core", orgA().ID, false)
-		}); err != nil {
-			t.Fatal(err)
-		}
-
-		out, err := runTerma(t, "setup", "--harness", "codex")
-		if err != nil {
-			t.Fatalf("setup: %v\n%s", err, out)
-		}
-		for _, want := range []string{
-			"github.com/acme/web is refused on this machine",
-			"github.com/beta/core is already bound to Acme",
-		} {
-			if !strings.Contains(out, want) {
-				t.Errorf("output missing existing-decision conflict %q:\n%s", want, out)
-			}
-		}
-		st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !st.Bindings["github.com/acme/web"].Refused {
-			t.Fatalf("existing refusal was overwritten: %+v", st.Bindings["github.com/acme/web"])
-		}
-		if st.Bindings["github.com/beta/core"].Organization != orgA().ID {
-			t.Fatalf("existing org binding was overwritten: %+v", st.Bindings["github.com/beta/core"])
-		}
-		if st.Bindings["github.com/acme/api"].Organization != orgA().ID {
-			t.Fatalf("new repo should still auto-bind: %+v", st.Bindings["github.com/acme/api"])
-		}
-	})
-
-	t.Run("inaccessible org reports warning without blocking other orgs", func(t *testing.T) {
-		gateway := newFakeAuth(t)
-		gateway.policyBodies = map[string]string{
-			acmeWeb: policyJSON("1.1", "github.com/acme/web"),
-			acmeAPI: policyJSON("1.1", "github.com/acme/api"),
-		}
-		gateway.orgGone = orgB().ID
-		authSandbox(t, gateway)
-		sandboxMachine(t)
-		t.Setenv("CODEX_HOME", t.TempDir())
-		t.Setenv("TERMA_POLICY_STUB", "")
-		if err := saveSignIn(testApp.dir, storedSession(gateway)); err != nil {
-			t.Fatal(err)
-		}
-
-		out, err := runTerma(t, "setup", "--harness", "codex")
-		if err != nil {
-			t.Fatalf("setup: %v\n%s", err, out)
-		}
-		if !strings.Contains(out, "Beta Labs: "+orgInaccessibleNote) {
-			t.Errorf("output missing inaccessible org notice:\n%s", out)
-		}
-		st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(st.Teams) != 2 || st.Bindings["github.com/acme/web"].Organization != orgA().ID {
-			t.Fatalf("expected Acme teams enrolled despite inaccessible Beta Labs: teams=%+v bindings=%+v", st.Teams, st.Bindings)
-		}
-	})
+	out, err := runTerma(t, "setup", "--harness", "codex", "--yes")
+	if err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "github.com/shared/api is listed by") || !strings.Contains(out, "Beta Core collects it, as its policy is newer") {
+		t.Fatalf("conflict not reported:\n%s", out)
+	}
+	st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := routing.NewRouter(st).Route(routing.Location{Kind: routing.Repository, Repository: "github.com/shared/api"}, time.Now())
+	if tm, _ := st.Team(d.EnrollmentID); d.Outcome != routing.Send || tm.TeamID != betaTeam {
+		t.Fatalf("shared/api routed to %+v, want Beta Core", d)
+	}
+	d = routing.NewRouter(st).Route(routing.Location{Kind: routing.Repository, Repository: "github.com/shared/web"}, time.Now())
+	if tm, _ := st.Team(d.EnrollmentID); d.Outcome != routing.Send || tm.TeamID != acmeWeb {
+		t.Fatalf("shared/web routed to %+v, want Acme Web", d)
+	}
 }
 
-func TestSetupInteractiveConflictResolution(t *testing.T) {
-	policyJSON := func(version string, repos ...string) string {
-		quoted := make([]string, len(repos))
-		for i, r := range repos {
-			quoted[i] = fmt.Sprintf("%q", r)
+// A re-run keeps the developer's choices: --yes enrolls no organization team left unticked,
+// and --team adds the team it names to those ticked.
+func TestSetupRerunKeepsTeamChoices(t *testing.T) {
+	gateway := newFakeAuth(t)
+	gateway.orgs = []organization{orgA(), orgB(), orgPersonal()}
+	gateway.projects = map[string][]project{
+		orgA().ID:        projectsIn(orgA().ID),
+		orgB().ID:        projectsIn(orgB().ID),
+		teamsPersonalOrg: {{ID: teamsPersonalTeam, Name: "Personal", OrganizationID: teamsPersonalOrg}},
+	}
+	acmeWeb, betaTeam := projectsIn(orgA().ID)[0].ID, projectsIn(orgB().ID)[0].ID
+	gateway.policyBodies = map[string]string{teamsPersonalTeam: globalBody}
+	setupMachine(t, gateway)
+	prevAsk, prevForm := testApp.canAsk, testApp.runForm
+	t.Cleanup(func() { testApp.canAsk, testApp.runForm = prevAsk, prevForm })
+	testApp.canAsk = func() bool { return true }
+	testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
+		items := slices.Clone(form.Items)
+		for i := range items {
+			items[i].Selected = items[i].Label == "Personal"
 		}
-		return fmt.Sprintf(`{"policy":{"version":%q,"terma":{"per_repository":{"repositories":[%s]},"git_hooks":true,"capture":{"exclude_prompts":false,"exclude_tool_content":false}}},"revision":1,"updated_at":"2026-11-01T00:00:00Z"}`,
-			version, strings.Join(quoted, ","))
+		return items, nil
 	}
-	stubPrompts := func(t *testing.T, fn func(*prompt.Form) ([]prompt.Item, error)) {
-		t.Helper()
-		origAsk, origForm := testApp.canAsk, testApp.runForm
-		t.Cleanup(func() {
-			testApp.canAsk, testApp.runForm = origAsk, origForm
-		})
-		testApp.canAsk = func() bool { return true }
-		testApp.runForm = fn
+	if out, err := runTerma(t, "setup", "--harness", "codex"); err != nil {
+		t.Fatalf("setup unticking every organization team: %v\n%s", err, out)
 	}
+	if got := enrolledTeams(t); !slices.Equal(got, []string{teamsPersonalTeam}) {
+		t.Fatalf("enrolled %v, want personal alone", got)
+	}
+	if out, err := runTerma(t, "setup", "--harness", "codex", "--yes"); err != nil {
+		t.Fatalf("setup --yes: %v\n%s", err, out)
+	}
+	if got := enrolledTeams(t); !slices.Equal(got, []string{teamsPersonalTeam}) {
+		t.Fatalf("--yes enrolled %v, want personal alone still", got)
+	}
+	if out, err := runTerma(t, "setup", "--harness", "codex", "--yes", "--team", betaTeam); err != nil {
+		t.Fatalf("setup --team: %v\n%s", err, out)
+	}
+	if got := enrolledTeams(t); !slices.Contains(got, betaTeam) || slices.Contains(got, acmeWeb) {
+		t.Fatalf("--team enrolled %v, want Beta Core added and Acme Web still unticked", got)
+	}
+}
 
+// With organization teams, the picker offers Personal too, and a re-run keeps it unticked
+// once the developer unticked it.
+func TestSetupPickerOffersPersonalAndKeepsItUnticked(t *testing.T) {
+	gateway := newFakeAuth(t)
+	gateway.orgs = []organization{orgA(), orgPersonal()}
+	gateway.projects = map[string][]project{
+		orgA().ID:        projectsIn(orgA().ID)[:1],
+		teamsPersonalOrg: {{ID: teamsPersonalTeam, Name: "Personal", OrganizationID: teamsPersonalOrg}},
+	}
 	acmeWeb := projectsIn(orgA().ID)[0].ID
-	acmeAPI := projectsIn(orgA().ID)[1].ID
-	betaCoreID := projectsIn(orgB().ID)[0].ID
-
-	t.Run("resolves exact and wildcard-vs-exact conflicts interactively inside setup", func(t *testing.T) {
-		gateway := newFakeAuth(t)
-		gateway.policyBodies = map[string]string{
-			acmeWeb:    policyJSON("1.1", "github.com/acme/web", "github.com/shared/app"),
-			acmeAPI:    policyJSON("1.1", "github.com/shared-org/api"),
-			betaCoreID: policyJSON("2.0", "github.com/beta/core", "github.com/shared/app", "github.com/shared-org/*"),
-		}
-		authSandbox(t, gateway)
-		sandboxMachine(t)
-		t.Setenv("CODEX_HOME", t.TempDir())
-		t.Setenv("TERMA_POLICY_STUB", "")
-		if err := saveSignIn(testApp.dir, storedSession(gateway)); err != nil {
-			t.Fatal(err)
-		}
-
-		var titles []string
-		stubPrompts(t, func(f *prompt.Form) ([]prompt.Item, error) {
-			titles = append(titles, f.Title)
-			if strings.Contains(f.Title, "coding agents") {
-				for i := range f.Items {
-					f.Items[i].Selected = strings.Contains(f.Items[i].Label, "Codex")
-				}
-				return f.Items, nil
-			}
-			// Keep default selection (split exception for wildcard-vs-exact, Acme for exact repo).
-			return f.Items, nil
-		})
-
-		out, err := runTerma(t, "setup")
-		if err != nil {
-			t.Fatalf("setup: %v\n%s", err, out)
-		}
-		if len(titles) != 3 {
-			t.Fatalf("expected harness form + 2 conflict resolution prompts, got %v", titles)
-		}
-		if !strings.Contains(titles[1], "github.com/shared-org/*") || !strings.Contains(titles[2], "github.com/shared/app") {
-			t.Fatalf("unexpected conflict prompt titles: %v", titles)
-		}
-		for _, want := range []string{
-			"✓ Resolved",
-			"github.com/shared-org/* → Beta Labs (except github.com/shared-org/api → Acme)",
-			"github.com/shared/app → Acme",
-		} {
-			if !strings.Contains(out, want) {
-				t.Errorf("output missing %q:\n%s", want, out)
+	gateway.policyBodies = map[string]string{teamsPersonalTeam: globalBody}
+	setupMachine(t, gateway)
+	prevAsk, prevForm := testApp.canAsk, testApp.runForm
+	t.Cleanup(func() { testApp.canAsk, testApp.runForm = prevAsk, prevForm })
+	testApp.canAsk = func() bool { return true }
+	var offered []prompt.Item
+	testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
+		items := slices.Clone(form.Items)
+		if strings.HasPrefix(form.Title, "Send telemetry") {
+			offered = slices.Clone(form.Items)
+			for i := range items {
+				items[i].Selected = items[i].Label != "Personal"
 			}
 		}
-		if strings.Contains(out, "! Conflict") || strings.Contains(out, "terma teams --bind") {
-			t.Errorf("resolved conflicts should not leave pending warnings or extra bind commands:\n%s", out)
+		return items, nil
+	}
+	if out, err := runTerma(t, "setup", "--harness", "codex"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if !slices.ContainsFunc(offered, func(it prompt.Item) bool { return it.Label == "Personal" && it.Selected }) {
+		t.Fatalf("first setup offered %+v, want Personal ticked among the teams", offered)
+	}
+	if got := enrolledTeams(t); !slices.Equal(got, []string{acmeWeb}) {
+		t.Fatalf("enrolled %v, want Acme Web alone", got)
+	}
+	testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
+		if strings.HasPrefix(form.Title, "Send telemetry") {
+			offered = slices.Clone(form.Items)
 		}
-
-		st, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
-		if err != nil || !found {
-			t.Fatalf("routing.Load = %v, found=%v", err, found)
-		}
-		if st.Bindings["github.com/shared-org"].Organization != orgB().ID {
-			t.Fatalf("expected github.com/shared-org bound to Beta Labs, got %+v", st.Bindings["github.com/shared-org"])
-		}
-		if st.Bindings["github.com/shared-org/api"].Organization != orgA().ID {
-			t.Fatalf("expected github.com/shared-org/api overridden to Acme, got %+v", st.Bindings["github.com/shared-org/api"])
-		}
-		if st.Bindings["github.com/shared/app"].Organization != orgA().ID {
-			t.Fatalf("expected github.com/shared/app bound to Acme, got %+v", st.Bindings["github.com/shared/app"])
-		}
-	})
-
-	t.Run("choosing Decide later leaves conflict pending with terma teams guidance", func(t *testing.T) {
-		gateway := newFakeAuth(t)
-		gateway.policyBodies = map[string]string{
-			acmeWeb:    policyJSON("1.1", "github.com/acme/web", "github.com/shared/app"),
-			acmeAPI:    policyJSON("1.1", "github.com/acme/api"),
-			betaCoreID: policyJSON("1.1", "github.com/beta/core", "github.com/shared/app"),
-		}
-		authSandbox(t, gateway)
-		sandboxMachine(t)
-		t.Setenv("CODEX_HOME", t.TempDir())
-		t.Setenv("TERMA_POLICY_STUB", "")
-		if err := saveSignIn(testApp.dir, storedSession(gateway)); err != nil {
-			t.Fatal(err)
-		}
-
-		stubPrompts(t, func(f *prompt.Form) ([]prompt.Item, error) {
-			for i := range f.Items {
-				f.Items[i].Selected = strings.Contains(f.Items[i].Label, "Decide later")
-			}
-			return f.Items, nil
-		})
-
-		out, err := runTerma(t, "setup", "--harness", "codex")
-		if err != nil {
-			t.Fatalf("setup: %v\n%s", err, out)
-		}
-		if !strings.Contains(out, "! Conflict") || !strings.Contains(out, "terma teams --bind github.com/shared/app=<org>") {
-			t.Errorf("expected deferred conflict warning + terma teams next step:\n%s", out)
-		}
-		st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, bound := st.Bindings["github.com/shared/app"]; bound {
-			t.Fatalf("deferred repo must remain pending, got %+v", st.Bindings["github.com/shared/app"])
-		}
-	})
-
-	t.Run("cancelling conflict resolution commits nothing", func(t *testing.T) {
-		gateway := newFakeAuth(t)
-		gateway.policyBodies = map[string]string{
-			acmeWeb:    policyJSON("1.1", "github.com/shared/app"),
-			acmeAPI:    policyJSON("1.1", "github.com/acme/api"),
-			betaCoreID: policyJSON("1.1", "github.com/shared/app"),
-		}
-		authSandbox(t, gateway)
-		sandboxMachine(t)
-		t.Setenv("CODEX_HOME", t.TempDir())
-		t.Setenv("TERMA_POLICY_STUB", "")
-		if err := saveSignIn(testApp.dir, storedSession(gateway)); err != nil {
-			t.Fatal(err)
-		}
-
-		stubPrompts(t, func(f *prompt.Form) ([]prompt.Item, error) {
-			return nil, prompt.ErrCancelled
-		})
-
-		_, err := runTerma(t, "setup", "--harness", "codex")
-		if err == nil {
-			t.Fatal("expected cancellation error")
-		}
-		if _, found, err := routing.Load(testApp.stateDir, config.DefaultProfile); err != nil || found {
-			t.Fatalf("routing state must not be committed on conflict cancellation (found=%v, err=%v)", found, err)
-		}
-	})
+		return form.Items, nil
+	}
+	if out, err := runTerma(t, "setup", "--harness", "codex"); err != nil {
+		t.Fatalf("re-run: %v\n%s", err, out)
+	}
+	if !slices.ContainsFunc(offered, func(it prompt.Item) bool { return it.Label == "Personal" && !it.Selected }) {
+		t.Fatalf("re-run offered %+v, want Personal unticked", offered)
+	}
+	if got := enrolledTeams(t); !slices.Equal(got, []string{acmeWeb}) {
+		t.Fatalf("re-run enrolled %v, want Acme Web alone", got)
+	}
 }

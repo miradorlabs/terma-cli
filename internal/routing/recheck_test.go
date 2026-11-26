@@ -8,9 +8,9 @@ import (
 )
 
 // Recheck sends a queued or held record only to its pinned enrollment while that team is
-// Active and still covers the location; waits while the team may recover or binding is
-// pending; and discards (never re-routing to Personal or another team) on refusal,
-// deselection, rebinding, policy narrowing, or Mixed.
+// Active and still covers the location; waits while the team may recover; and discards
+// (never re-routing to Personal or another team) on refusal, deselection, a newer policy
+// claiming the location, policy narrowing, or Mixed.
 func TestRecheckNeverReroutes(t *testing.T) {
 	t.Parallel()
 	verdict := func(s *State, d Destination) Verdict {
@@ -32,9 +32,6 @@ func TestRecheckNeverReroutes(t *testing.T) {
 		"expired":        func(st *State) { st.Teams[0].Policy.FetchedAt = now.Add(-config.MaxPolicyAge - time.Hour) },
 		"sign_in_needed": func(st *State) { st.Teams[0].SignInNeeded = true },
 		"suspended":      func(st *State) { st.Teams[0].Refusals = 1 },
-		"pending": func(st *State) {
-			must(t, st.Unbind("github.com/acme"))
-		},
 	} {
 		st := fixture(t)
 		block(st)
@@ -49,16 +46,13 @@ func TestRecheckNeverReroutes(t *testing.T) {
 		"refused": func(st *State) {
 			st.Teams[0].Refusals = 2
 		},
-		"refused_with_pending_binding": func(st *State) {
-			st.Teams[0].Refusals = 2
-			must(t, st.Unbind("github.com/acme"))
-		},
-		"deselected_and_unbound": func(st *State) {
+		"deselected_and_personal_collects": func(st *State) {
 			st.Deselect(enrollment(t, st, "acme-platform"))
-			must(t, st.Unbind("github.com/acme"))
 		},
-		"rebound_to_refused_and_personal_collects": func(st *State) {
-			must(t, st.Refuse("github.com/acme"))
+		"a_newer_policy_claims_it": func(st *State) {
+			st.Teams[1].Policy.Repositories = []string{"github.com/acme/*"}
+			st.Teams[1].Policy.UpdatedAt = now.Add(-time.Hour)
+			st.Teams[0].Policy.UpdatedAt = now.Add(-48 * time.Hour)
 		},
 		"policy_dropped_repo": func(st *State) {
 			st.Teams[0].Policy.Repositories = []string{"github.com/acme/other"}

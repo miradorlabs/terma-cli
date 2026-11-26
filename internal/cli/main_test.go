@@ -115,19 +115,8 @@ func selectPolicy(t *testing.T, pol config.Policy) {
 		Policy:         pol,
 	}
 	if _, err := routing.Replace(testApp.stateDir, cfg.ProfileName, nil, lane, func(s *routing.State) error {
-		if _, err := s.Select(tm); err != nil {
-			return err
-		}
-		if !tm.Personal {
-			for _, raw := range pol.Repositories {
-				if e, ok := routing.ParseEntry(raw, pol.Wildcards); ok {
-					if err := s.Bind(e.Key(), orgID, false); err != nil {
-						return err
-					}
-				}
-			}
-		}
-		return nil
+		_, err := s.Select(tm)
+		return err
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -159,15 +148,6 @@ func signInHereAs(t *testing.T, user string) string {
 		_, err := routing.Replace(testApp.stateDir, config.DefaultProfile, nil, acct, func(s *routing.State) error {
 			for _, tm := range st.Teams {
 				if _, err := s.Select(tm); err != nil {
-					return err
-				}
-			}
-			for k, b := range st.Bindings {
-				if b.Refused {
-					if err := s.Refuse(k); err != nil {
-						return err
-					}
-				} else if err := s.Bind(k, b.Organization, false); err != nil {
 					return err
 				}
 			}

@@ -8,55 +8,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
-type bindingChoice struct {
-	key      string
-	org      string
-	refuse   bool
-	override bool
-}
-
-// autoSetupBindings computes non-prompting bindings for a single team (used by server-key
-// setup and server-key routing migration).
-func autoSetupBindings(target routing.Team, existing map[string]routing.Binding) []bindingChoice {
-	choices, _ := planSetupBindings([]discoveredTeam{{team: target}}, nil, existing, teamNames{})
-	return choices
-}
-
-func applySetupBindingsAll(s *routing.State, choices []bindingChoice) error {
-	for _, c := range choices {
-		if _, decided := s.Bindings[c.key]; decided && !c.override {
-			continue
-		}
-		if config.IsRepositoryKey(c.key) && !c.override {
-			if _, ownerDecided := s.Bindings[routing.Owner(c.key)]; ownerDecided {
-				continue
-			}
-		}
-		if c.refuse {
-			if err := s.Refuse(c.key); err != nil {
-				return err
-			}
-		} else if err := s.Bind(c.key, c.org, c.override); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func alreadyDecided(bindings map[string]routing.Binding, e routing.Entry) bool {
-	if len(bindings) == 0 {
-		return false
-	}
-	if _, ok := bindings[e.Key()]; ok {
-		return true
-	}
-	if !e.Wildcard() {
-		_, ok := bindings[routing.Owner(e.Key())]
-		return ok
-	}
-	return false
-}
-
 func committedPrimary(st routing.State, fallback routing.Team) routing.Team {
 	for _, t := range st.Teams {
 		if t.TeamID == fallback.TeamID {

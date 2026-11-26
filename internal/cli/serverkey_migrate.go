@@ -115,9 +115,8 @@ func (app *App) serverKeyTeam(name string) (routing.Team, bool) {
 }
 
 // migrateServerKeyProfile writes the one-team, no-person routing state of the server-key
-// profile name when it has none, binding the repositories its policy lists to the team's
-// organization as `TERMA_API_KEY=… terma setup` does unasked, and reports the file it
-// wrote. A profile that is not such a profile, or already has a routing state, is left as
+// profile name when it has none, as `TERMA_API_KEY=… terma setup` does, and reports the
+// file it wrote. A profile that is not such a profile, or already has a routing state, is left as
 // it is: so is one whose state cannot be read, which stays failing closed until setup
 // replaces it. The state is created under its lock only if there is still none
 // (routing.Create), and only while the profile still names the same server-key team.
@@ -129,15 +128,12 @@ func (app *App) migrateServerKeyProfile(name string) (string, bool, error) {
 	if _, found, err := routing.Load(app.stateDir, name); found || err != nil {
 		return "", false, nil
 	}
-	bindings := autoSetupBindings(target, nil)
 	st, err := routing.Create(app.stateDir, name, sendas.NoPersonLane, func(s *routing.State) error {
 		if now, ok := app.serverKeyTeam(name); !ok || now.TeamID != target.TeamID || now.OrganizationID != target.OrganizationID || now.AuthURL != target.AuthURL {
 			return errServerKeyProfileMoved
 		}
-		if _, err := s.Select(target); err != nil {
-			return err
-		}
-		return applySetupBindingsAll(s, bindings)
+		_, err := s.Select(target)
+		return err
 	})
 	switch {
 	case errors.Is(err, routing.ErrStateExists), errors.Is(err, errServerKeyProfileMoved):

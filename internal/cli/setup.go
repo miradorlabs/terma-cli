@@ -53,11 +53,13 @@ func (app *App) newSetupCommand() *cobra.Command {
 		Long: `Gets this machine ready to use terma, once per developer:
 
   1. Signs you in (a browser handoff; --no-browser prints the URL instead).
-  2. Fetches your organizations, teams, and collection policies (--org or --team
-     narrows setup to a specific organization or team).
+  2. Fetches your organizations, teams, and collection policies, and asks which of
+     your organizations' teams to send to (--org or --team narrows setup to one).
+     With only a personal organization, there is nothing to ask.
   3. Records which coding agents you work with.
-  4. Activates your teams and binds their repositories automatically, notifying you
-     of any policy conflicts to resolve with ` + "`terma teams`" + `.
+  4. Activates your teams, and tells you of any policy conflict: where two
+     organizations' policies list the same repository, the most recently updated
+     policy collects it.
   5. Points those agents' telemetry at terma's local relay, and runs the relay in
      the background (--relay-service off: started on demand instead).
   6. Writes the agents' machine-wide hooks, so a session in a repository a policy
@@ -68,7 +70,7 @@ func (app *App) newSetupCommand() *cobra.Command {
      repository's working tree or committed files.
 
 Run it again any time: it reuses a working sign-in, refreshes your organizations and
-teams, preserves existing repository binding choices, and --relay-addr moves the relay
+teams, offers the teams ticked before, and --relay-addr moves the relay
 off a port another program holds.
 
 With TERMA_API_KEY set to a team server key (Ingest permission), setup signs in with
@@ -183,6 +185,12 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 				_ = auth.Relocate(app.dir)
 			}
 			return cfg, err
+		},
+		ChooseTeams: func(context.Context) error {
+			if disc == nil || disc.stub {
+				return nil
+			}
+			return app.chooseSetupTeams(cmd, disc, f.assumeYes)
 		},
 		// A machine-level preference, not a connection.
 		ChooseAgents: func(_ context.Context, cfg *config.Config) ([]string, error) {

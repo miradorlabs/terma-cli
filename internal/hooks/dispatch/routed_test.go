@@ -117,9 +117,6 @@ func TestDispatchToolReachFailsClosedOnWriteError(t *testing.T) {
 				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{spec[2]}, Revision: 1, FetchedAt: now, TeamID: spec[1], OrganizationID: spec[0], AuthURL: "https://api.example.com"}}); err != nil {
 				return err
 			}
-			if err := s.Bind(spec[2], spec[0], false); err != nil {
-				return err
-			}
 		}
 		return nil
 	})

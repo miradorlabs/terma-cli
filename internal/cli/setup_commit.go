@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/routing"
@@ -48,8 +49,8 @@ func (app *App) checkSetupBaseline(profile, account string, b setupBaseline, sin
 }
 
 // commitRoutingStateLocked writes targets into routing/<profile>.json via CAS while the
-// caller exclusively holds the relay lock.
-func (app *App) commitRoutingStateLocked(profile, account string, b setupBaseline, targets []routing.Team, refreshes []setupRefresh, bindings []bindingChoice, singleTeamOnly bool) (routing.State, bool, error) {
+// caller exclusively holds the relay lock, and unticks the teams named in untick.
+func (app *App) commitRoutingStateLocked(profile, account string, b setupBaseline, targets []routing.Team, untick map[string]bool, refreshes []setupRefresh, singleTeamOnly bool) (routing.State, bool, error) {
 	now := time.Now().UTC()
 	pre := make([]preFetchEntry, len(targets))
 	for i, target := range targets {
@@ -65,7 +66,7 @@ func (app *App) commitRoutingStateLocked(profile, account string, b setupBaselin
 				return err
 			}
 		}
-		return applySetupBindingsAll(s, bindings)
+		return nil
 	}
 	for range 3 {
 		if err := app.verifyActiveLane(account); err != nil {
@@ -120,10 +121,12 @@ func (app *App) commitRoutingStateLocked(profile, account string, b setupBaselin
 						return err
 					}
 				}
-				if err := applySetupRefreshes(s, refreshes); err != nil {
-					return err
+				for _, t := range slices.Clone(s.Teams) {
+					if untick[t.TeamID] {
+						s.Deselect(t.EnrollmentID)
+					}
 				}
-				return applySetupBindingsAll(s, bindings)
+				return applySetupRefreshes(s, refreshes)
 			})
 			if errors.Is(err, routing.ErrStaleGeneration) {
 				continue

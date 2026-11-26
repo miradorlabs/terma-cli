@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -45,9 +46,6 @@ func routedFixture(t *testing.T) Routing {
 		if _, err := st.Select(tm); err != nil {
 			t.Fatal(err)
 		}
-	}
-	if err := st.Bind("github.com/acme", testOrgAcme, false); err != nil {
-		t.Fatal(err)
 	}
 	return Routing{
 		State:         st,
@@ -160,17 +158,6 @@ func TestTeamsCheckEnrollmentHealthAndSingleSignInRemediation(t *testing.T) {
 		t.Fatalf("Expired check = %+v", c)
 	}
 
-	// Pending binding fails with `terma teams --bind` fix.
-	r = routedFixture(t)
-	if err := r.State.Unbind("github.com/acme"); err != nil {
-		t.Fatal(err)
-	}
-	c = TeamsCheck(r, now)
-	if c.Status != Fail || !strings.Contains(c.Detail, "github.com/acme is undecided") ||
-		!strings.Contains(c.Fix, "terma teams --bind github.com/acme=Acme") {
-		t.Fatalf("Pending check = %+v", c)
-	}
-
 	// SignInNeeded always wins the recommended fix regardless of enrollment order
 	// (even when an earlier enrollment is Expired or Refused).
 	for _, tc := range []struct {
@@ -228,17 +215,6 @@ func TestTeamsCheckEnrollmentHealthAndSingleSignInRemediation(t *testing.T) {
 			status: Fail,
 			fix:    "terma teams --release 'R&D' (or wait for its policy to come back)",
 		},
-		{
-			name: "shell_metachars_bind",
-			mutate: func(r *Routing) {
-				r.Orgs[r.State.Teams[0].OrganizationID] = "A's $Org"
-				if err := r.State.Unbind("github.com/acme"); err != nil {
-					t.Fatal(err)
-				}
-			},
-			status: Fail,
-			fix:    `terma teams --bind github.com/acme='A'\''s $Org' (or --refuse github.com/acme)`,
-		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := routedFixture(t)
@@ -264,7 +240,6 @@ func TestTeamsCheckAndRowsShowMixedRunsAndBlockedCounts(t *testing.T) {
 	}
 	r.MixedDropped = 7
 	r.Blocked = map[string]int{
-		"pending:github.com/torvalds/linux":     3,
 		"team:" + r.State.Teams[0].EnrollmentID: 2,
 		"team:ended":                            1,
 	}
@@ -283,14 +258,12 @@ func TestTeamsCheckAndRowsShowMixedRunsAndBlockedCounts(t *testing.T) {
 	joined := strings.Join(lines, "\n")
 	for _, want := range []string{
 		"Teams|Acme Platform — active: github.com/acme/*",
-		"Bindings|github.com/acme → Acme",
 		"Mixed|5 session run(s) Mixed",
 		"|session s-1 crossed organizations, into github.com/acme/api",
 		`|session s-2 ran a shell command whose reach is not known: cd "$(cat p)" && cat …`,
 		"|session s-3 touched more places than the run ledger keeps",
 		"|session s-5 with a run ledger that cannot be read",
-		"Relay held|3 record(s) for github.com/torvalds/linux, undecided",
-		"|2 record(s) for Acme Platform, which could not send",
+		"Relay held|2 record(s) for Acme Platform, which could not send",
 		"|1 record(s) for ended, no longer ticked",
 	} {
 		if !strings.Contains(joined, want) {
@@ -304,6 +277,28 @@ func TestTeamsCheckAndRowsShowMixedRunsAndBlockedCounts(t *testing.T) {
 	// Older idle session s-4 is counted, not named individually.
 	if strings.Contains(joined, "session s-4") {
 		t.Errorf("TeamRows named an older idle Mixed session:\n%s", joined)
+	}
+}
+
+// Two organizations listing the same repository show as an overlap, won by the newer policy.
+func TestTeamRowsShowOverlapsWonByTheNewerPolicy(t *testing.T) {
+	t.Parallel()
+	now := time.Now().UTC()
+	r := routedFixture(t)
+	r.State.Teams[0].Policy.UpdatedAt = now
+	beta := routing.Team{OrganizationID: testOrgBeta, AuthURL: testAuthURL, TeamID: testTeamCore, Policy: config.Policy{
+		Mode: config.ModeRepo, Repositories: []string{"github.com/acme/one"}, Revision: 1, FetchedAt: now, UpdatedAt: now.Add(-time.Hour),
+		OrganizationID: testOrgBeta, AuthURL: testAuthURL, TeamID: testTeamCore,
+	}}
+	if _, err := r.State.Select(beta); err != nil {
+		t.Fatal(err)
+	}
+	var lines []string
+	for _, row := range TeamRows(r, now) {
+		lines = append(lines, row.Label+"|"+row.Value)
+	}
+	if want := "Overlaps|github.com/acme/one → Acme Platform, whose policy is newer than Beta Labs Core's"; !slices.Contains(lines, want) {
+		t.Errorf("TeamRows lacks %q:\n%s", want, strings.Join(lines, "\n"))
 	}
 }
 

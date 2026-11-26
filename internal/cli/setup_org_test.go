@@ -44,9 +44,6 @@ func TestSetupAutomaticallyEnrollsAllOrganizations(t *testing.T) {
 	if !slices.Contains(ids, projectsIn(orgA().ID)[0].ID) || !slices.Contains(ids, projectsIn(orgB().ID)[0].ID) {
 		t.Fatalf("enrolled teams = %v, want both orgs' teams", ids)
 	}
-	if st.Bindings["github.com/acme/web"].Organization != orgA().ID || st.Bindings["github.com/beta/core"].Organization != orgB().ID {
-		t.Fatalf("bindings = %+v, want both repos auto-bound to their orgs", st.Bindings)
-	}
 }
 
 // --org narrows setup to the named organization without prompting.

@@ -145,7 +145,6 @@ func replay(t *testing.T, fixture string, o replayOpts) *replayRun {
 		}
 		stores = append(stores, session.Open(dir))
 	}
-	origin := "github.com/acme/" + filepath.Base(root)
 	deps := dispatch.Deps{
 		ConfigDir: t.TempDir(),
 		StateDir:  stateDir,
@@ -163,7 +162,6 @@ func replay(t *testing.T, fixture string, o replayOpts) *replayRun {
 					EnrollmentID: "enr-1", OrganizationID: "org-a", AuthURL: "https://auth.example", TeamID: hookruntest.Team, Epoch: 1,
 					Policy: p,
 				}},
-				Bindings: map[string]routing.Binding{origin: {Organization: "org-a"}},
 			}
 			return dispatch.Profile{Agents: o.agents, Account: hookruntest.Account, Routing: hookrun.NewRouting("default", &st)}
 		},

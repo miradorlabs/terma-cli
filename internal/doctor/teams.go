@@ -40,8 +40,8 @@ type Routing struct {
 	// records the relay dropped from Mixed runs.
 	Mixed        []runs.MixedRun
 	MixedDropped int
-	// Blocked counts records the relay held and dropped by blocker ("pending:<key>",
-	// "team:<enrollment>", "overflow").
+	// Blocked counts records the relay held and dropped by blocker ("team:<enrollment>",
+	// "overflow").
 	Blocked map[string]int
 }
 
@@ -53,8 +53,6 @@ func (r Routing) label(t routing.Team) string {
 	}
 	return name
 }
-
-func (r Routing) org(id string) string { return cmp.Or(r.Orgs[id], id) }
 
 func (r Routing) setupFix() string {
 	if r.ServerKey {
@@ -76,8 +74,8 @@ func (r Routing) unusable() bool {
 }
 
 // TeamsCheck judges the profile's routing state and ticked enrollments. Missing, unreadable,
-// or wrong-account routing state fails closed. Suspended/refused enrollments and undecided
-// bindings fail; expired policies and SignInNeeded warn (remediated with a single `terma setup`).
+// or wrong-account routing state fails closed. Suspended/refused enrollments fail;
+// expired policies and SignInNeeded warn (remediated with a single `terma setup`).
 func TeamsCheck(r Routing, now time.Time) Check {
 	switch {
 	case r.Err != nil:
@@ -112,14 +110,6 @@ func TeamsCheck(r Routing, now time.Time) Check {
 		case routing.Expired:
 			warning = append(warning, r.label(t)+"'s policy has not been refreshed for over a week, so it blocks what it lists")
 			warnFix = cmp.Or(warnFix, "check the network; the relay refreshes it every minute")
-		}
-	}
-	for _, p := range Pending(r.State) {
-		failing = append(failing, p.Key+" is undecided, so what "+p.Entry+" matches is held")
-		if r.ServerKey {
-			failFix = cmp.Or(failFix, r.setupFix())
-		} else {
-			failFix = cmp.Or(failFix, "terma teams --bind "+p.Key+"="+quoteWord(r.org(p.Organization))+" (or --refuse "+p.Key+")")
 		}
 	}
 	fix := cmp.Or(signInFix, failFix, warnFix)
@@ -223,38 +213,6 @@ func refusalWords(c routing.ErrorClass) string {
 	return "its refreshes were refused"
 }
 
-// PendingBinding is a binding a ticked organization's entry needs that no one has decided.
-type PendingBinding struct {
-	Key, Organization, TeamID, Entry string
-}
-
-// Pending lists the bindings st's ticked organizations' entries need with no decision
-// covering them, each once.
-func Pending(st routing.State) []PendingBinding {
-	var out []PendingBinding
-	for _, t := range st.Teams {
-		if t.Personal || t.Policy.Global() || t.Policy.Unset {
-			continue
-		}
-		for _, raw := range t.Policy.Repositories {
-			e, ok := routing.ParseEntry(raw, t.Policy.Wildcards)
-			if !ok || slices.ContainsFunc(out, func(p PendingBinding) bool { return p.Key == e.Key() }) || decided(st, e) {
-				continue
-			}
-			out = append(out, PendingBinding{Key: e.Key(), Organization: t.OrganizationID, TeamID: t.TeamID, Entry: raw})
-		}
-	}
-	return out
-}
-
-func decided(st routing.State, e routing.Entry) bool {
-	if _, ok := st.Bindings[e.Key()]; ok {
-		return true
-	}
-	_, ok := st.Bindings[routing.Owner(e.Key())]
-	return !e.Wildcard() && ok
-}
-
 // RoutedRepository is where Router.Route sends a session started in gitDir ("" outside
 // git), and the team it goes to when sent.
 func RoutedRepository(r Routing, gitDir string, repoErr error, now time.Time) (Check, *routing.Team) {
@@ -277,20 +235,12 @@ func RoutedRepository(r Routing, gitDir string, repoErr error, now time.Time) (C
 			detail += " (" + d.Entry + ")"
 		}
 		return Check{Status: Pass, Detail: detail}, &team
-	case d.Reason == routing.ReasonPending:
-		fix := "terma teams --bind " + d.Authority.Key + "=<organization> (or --refuse " + d.Authority.Key + ")"
-		if r.ServerKey {
-			fix = r.setupFix()
-		}
-		return Check{Status: Warn, Detail: where + " is held: " + d.Authority.Key + " is undecided", Fix: fix}, nil
 	case hasTeam && d.Blocked == routing.SignInNeeded:
 		return Check{Status: Warn, Detail: where + " is held: " + r.label(team) + " would collect it, but needs you to sign in again", Fix: r.setupFix()}, nil
 	case hasTeam && (d.Blocked == routing.Suspended || d.Blocked == routing.Refused):
 		return Check{Status: Warn, Detail: where + " is held: " + r.label(team) + " would collect it, but is " + words(string(d.Blocked)) + " (" + refusalWords(team.LastError) + ")", Fix: r.teamsFix()}, nil
 	case hasTeam:
 		return Check{Status: Warn, Detail: where + " is held: " + r.label(team) + " would collect it, but is " + words(string(d.Blocked)), Fix: r.teamsFix()}, nil
-	case d.Reason == routing.ReasonBoundNotCollected:
-		return Check{Status: Warn, Detail: where + " is bound to " + r.org(d.Authority.Organization) + ", and no ticked team of it collects it, so nothing here is collected"}, nil
 	case len(r.State.Teams) == 1 && r.State.Teams[0].Policy.Unset:
 		return Check{Status: Warn, Detail: cmp.Or(r.SingleTeamLabel, r.label(r.State.Teams[0])) + " has no collection policy", Fix: NoPolicyStep}, nil
 	}
@@ -298,7 +248,7 @@ func RoutedRepository(r Routing, gitDir string, repoErr error, now time.Time) (C
 }
 
 // TeamRows are doctor's context rows for a routed profile: each ticked team and its health,
-// bindings, undecided bindings, Mixed runs, and what the relay held.
+// overlapping policies, Mixed runs, and what the relay held.
 func TeamRows(r Routing, now time.Time) []Row {
 	if r.unusable() {
 		return []Row{{"Teams", "none: no usable routing state, so nothing is sent"}}
@@ -309,7 +259,7 @@ func TeamRows(r Routing, now time.Time) []Row {
 		lists := strings.Join(t.Policy.Repositories, ", ")
 		switch {
 		case t.Personal && t.Policy.Global():
-			lists = "everything not bound to an organization"
+			lists = "everything no organization collects"
 		case lists == "":
 			lists = "nothing until an admin chooses repositories"
 		}
@@ -325,18 +275,10 @@ func TeamRows(r Routing, now time.Time) []Row {
 	if len(rows) == 0 {
 		rows = append(rows, Row{"Teams", "none ticked — run `" + r.teamsFix() + "`"})
 	}
-	label = "Bindings"
-	for _, k := range slices.Sorted(maps.Keys(r.State.Bindings)) {
-		b := r.State.Bindings[k]
-		who := r.org(b.Organization)
-		if b.Refused {
-			who = "refused to every organization"
-		}
-		rows = append(rows, Row{label, k + " → " + who})
+	label = "Overlaps"
+	for _, o := range routing.Overlaps(r.State) {
+		rows = append(rows, Row{label, o.Entry + " → " + r.label(o.Winner) + ", whose policy is newer than " + r.label(o.Other) + "'s"})
 		label = ""
-	}
-	for _, p := range Pending(r.State) {
-		rows = append(rows, Row{"Undecided", p.Key + ", needed by " + p.Entry})
 	}
 	if len(r.Mixed) > 0 || r.MixedDropped > 0 {
 		rows = append(rows, Row{"Mixed", MixedSummary(r)})
@@ -355,8 +297,6 @@ func (r Routing) blockedRows() []Row {
 	for _, k := range slices.Sorted(maps.Keys(r.Blocked)) {
 		what := k
 		switch kind, name, _ := strings.Cut(k, ":"); kind {
-		case "pending":
-			what = name + ", undecided"
 		case "team":
 			what = name + ", no longer ticked"
 			if t, ok := r.State.Team(name); ok {

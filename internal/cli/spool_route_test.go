@@ -128,10 +128,8 @@ func routeProject(t *testing.T, projectID, key, endpoint string) {
 				break
 			}
 		}
-		if _, err := s.Select(tm); err != nil {
-			return err
-		}
-		return s.Bind(repo, orgID, false)
+		_, err := s.Select(tm)
+		return err
 	}
 	st, found, err := routing.Load(testApp.stateDir, profile)
 	switch {

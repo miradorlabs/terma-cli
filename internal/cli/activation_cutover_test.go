@@ -66,10 +66,8 @@ func TestRoutingStateFailClosedAcrossHooksRelayAndDelivery(t *testing.T) {
 				pol := config.Policy{Mode: config.ModeRepo, Repositories: []string{appRepo.Origin},
 					TeamID: acmeWeb, OrganizationID: orgA().ID, AuthURL: authURL, Revision: 1, FetchedAt: time.Now()}
 				if _, err := routing.Replace(stateDir, config.DefaultProfile, nil, otherAcct, func(s *routing.State) error {
-					if _, err := s.Select(routing.Team{OrganizationID: orgA().ID, AuthURL: authURL, TeamID: acmeWeb, Policy: pol}); err != nil {
-						return err
-					}
-					return s.Bind(appRepo.Origin, orgA().ID, false)
+					_, err := s.Select(routing.Team{OrganizationID: orgA().ID, AuthURL: authURL, TeamID: acmeWeb, Policy: pol})
+					return err
 				}); err != nil {
 					t.Fatal(err)
 				}
@@ -182,9 +180,6 @@ func TestDesktopGrantTicksOnlyRequestedTeamPreservesExistingAndNeverEnablesPerso
 	if len(st.Teams) != 1 || st.Teams[0].TeamID != teamA || st.Teams[0].Personal {
 		t.Fatalf("Teams after grant 1 = %+v, want only [%s] (non-personal)", st.Teams, teamA)
 	}
-	if b, ok := st.Bindings["github.com/acme/app"]; !ok || b.Organization != orgA().ID || b.Refused {
-		t.Fatalf("Bindings after grant 1 = %+v, want github.com/acme/app -> %s", st.Bindings, orgA().ID)
-	}
 
 	// Second grant (same user, different org/team): preserves teamA, adds ONLY teamB, never enables Personal.
 	stdin2 := identityLine(deskUser, orgB().ID)
@@ -204,9 +199,6 @@ func TestDesktopGrantTicksOnlyRequestedTeamPreservesExistingAndNeverEnablesPerso
 	}
 	if !slices.Equal(ids, []string{teamA, teamB}) {
 		t.Fatalf("Teams after grant 2 = %v, want [%s %s]", ids, teamA, teamB)
-	}
-	if st2.Bindings["github.com/acme/app"].Organization != orgA().ID || st2.Bindings["github.com/beta/web"].Organization != orgB().ID {
-		t.Fatalf("Bindings after grant 2 = %+v", st2.Bindings)
 	}
 }
 
@@ -376,7 +368,7 @@ func TestAccountSwitchCASReplaceRejectsStaleAliceWriter(t *testing.T) {
 
 	// Stale Alice writers (Update on ExpectConsent, Update on Expect, Delete on Expect) are all rejected.
 	if _, err := routing.Update(testApp.stateDir, config.DefaultProfile, aliceSnap.ExpectConsent(), func(s *routing.State) error {
-		return s.Bind("github.com/acme/stale", orgA().ID, false)
+		return nil
 	}); !errors.Is(err, routing.ErrAccountMismatch) {
 		t.Fatalf("stale Alice Update(ExpectConsent) = %v, want ErrAccountMismatch", err)
 	}
@@ -819,7 +811,7 @@ func TestActivationGateBlocksPreRoutingRelayStartedInFlight(t *testing.T) {
 
 // Switching a server-key profile from team1 (orgA) to team2 (orgB) that lists the same
 // repository computes fresh bindings for team2 rather than leaving the repo Pending.
-func TestServerKeyTeamSwitchComputesFreshBindingsForSharedRepo(t *testing.T) {
+func TestServerKeyTeamSwitchReplacesTheTeam(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
 	sandboxMachine(t)
@@ -836,7 +828,7 @@ func TestServerKeyTeamSwitchComputesFreshBindingsForSharedRepo(t *testing.T) {
 		t.Fatalf("server-key setup A: %v\n%s", err, out)
 	}
 	stA, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
-	if err != nil || !found || stA.Bindings["github.com/acme/app"].Organization != orgA().ID {
+	if err != nil || !found || len(stA.Teams) != 1 || stA.Teams[0].TeamID != teamA {
 		t.Fatalf("state after keyA = %+v found=%v err=%v", stA, found, err)
 	}
 
@@ -851,10 +843,6 @@ func TestServerKeyTeamSwitchComputesFreshBindingsForSharedRepo(t *testing.T) {
 	}
 	if stB.Account != sendas.NoPersonLane || len(stB.Teams) != 1 || stB.Teams[0].TeamID != teamB {
 		t.Fatalf("teams after keyB = %+v, want only %s", stB.Teams, teamB)
-	}
-	b, ok := stB.Bindings["github.com/acme/app"]
-	if !ok || b.Organization != orgB().ID || b.Refused {
-		t.Fatalf("Bindings after server-key team switch = %+v, want github.com/acme/app -> %s (not Pending)", stB.Bindings, orgB().ID)
 	}
 }
 
@@ -989,10 +977,8 @@ func TestConcurrentServerKeySetupRejectsStaleReplacement(t *testing.T) {
 		TeamID: teamB, OrganizationID: orgB().ID, AuthURL: f.srv.URL, Revision: 1, FetchedAt: time.Now()}
 	expA := stA.Expect()
 	stB, err := routing.Replace(testApp.stateDir, config.DefaultProfile, &expA, sendas.NoPersonLane, func(s *routing.State) error {
-		if _, err := s.Select(routing.Team{OrganizationID: orgB().ID, AuthURL: f.srv.URL, TeamID: teamB, Policy: polB}); err != nil {
-			return err
-		}
-		return s.Bind("github.com/acme/app", orgB().ID, false)
+		_, err := s.Select(routing.Team{OrganizationID: orgB().ID, AuthURL: f.srv.URL, TeamID: teamB, Policy: polB})
+		return err
 	})
 	if err != nil {
 		close(release)
@@ -1005,7 +991,7 @@ func TestConcurrentServerKeySetupRejectsStaleReplacement(t *testing.T) {
 	}
 
 	after, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
-	if err != nil || !found || after.StateID != stB.StateID || len(after.Teams) != 1 || after.Teams[0].TeamID != teamB || after.Bindings["github.com/acme/app"].Organization != orgB().ID {
+	if err != nil || !found || after.StateID != stB.StateID || len(after.Teams) != 1 || after.Teams[0].TeamID != teamB {
 		t.Fatalf("concurrent teamB state altered by stale setup A: %+v", after)
 	}
 }
@@ -1083,38 +1069,6 @@ func TestLiveAccountCheckUnderRoutingLockPreventsStaleReplace(t *testing.T) {
 	if err != nil || !found || after.Account != bobAcct || after.StateID != bobState.StateID {
 		t.Fatalf("Bob's routing.State was overwritten while Bob was active: %+v", after)
 	}
-}
-
-func TestAutoSetupBindingsWildcardScope(t *testing.T) {
-	t.Run("pure wildcard binds owner key directly without prompting", func(t *testing.T) {
-		target := routing.Team{
-			OrganizationID: "org_acme",
-			Policy: config.Policy{
-				Mode:         config.ModeRepo,
-				Wildcards:    true,
-				Repositories: []string{"github.com/acme/*"},
-			},
-		}
-		choices := autoSetupBindings(target, nil)
-		if len(choices) != 1 || choices[0].key != "github.com/acme" || choices[0].org != "org_acme" {
-			t.Fatalf("choices = %+v, want [{key:github.com/acme org:org_acme}]", choices)
-		}
-	})
-
-	t.Run("mixed wildcard and exact binds owner and non-covered repo without prompting", func(t *testing.T) {
-		target := routing.Team{
-			OrganizationID: "org_acme",
-			Policy: config.Policy{
-				Mode:         config.ModeRepo,
-				Wildcards:    true,
-				Repositories: []string{"github.com/acme/*", "github.com/acme/web", "github.com/other/repo"},
-			},
-		}
-		choices := autoSetupBindings(target, nil)
-		if len(choices) != 2 || choices[0].key != "github.com/acme" || choices[1].key != "github.com/other/repo" {
-			t.Fatalf("choices = %+v, want [github.com/acme github.com/other/repo]", choices)
-		}
-	})
 }
 
 func TestTeardownRemovesRoutingStateForAllProfiles(t *testing.T) {

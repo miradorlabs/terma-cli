@@ -45,10 +45,8 @@ func main() {
 		pol := cfg.Policy
 		pol.OrganizationID, pol.AuthURL = "org_bench", cfg.AuthURL
 		_, err = routing.Create(stateDir, cfg.ProfileName, sendas.NoPersonLane, func(s *routing.State) error {
-			if _, err := s.Select(routing.Team{OrganizationID: "org_bench", AuthURL: cfg.AuthURL, TeamID: "proj_bench", Policy: pol}); err != nil {
-				return err
-			}
-			return s.Bind("github.com/acme/repo", "org_bench", false)
+			_, err := s.Select(routing.Team{OrganizationID: "org_bench", AuthURL: cfg.AuthURL, TeamID: "proj_bench", Policy: pol})
+			return err
 		})
 		if err == nil {
 			rt := hookrun.LoadRouting(stateDir, cfg.ProfileName)

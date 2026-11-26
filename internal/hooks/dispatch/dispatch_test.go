@@ -176,7 +176,6 @@ func TestRunMarksWithoutClaiming(t *testing.T) {
 			EnrollmentID: "enr-1", OrganizationID: "org-a", AuthURL: "https://auth.example", TeamID: "t1", Epoch: 1,
 			Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/work"}, TeamID: "t1", FetchedAt: time.Now()},
 		}},
-		Bindings: map[string]routing.Binding{"github.com/acme/work": {Organization: "org-a"}},
 	}
 	h.deps.Profile = func() Profile {
 		return Profile{Account: hookruntest.Account, Routing: hookrun.NewRouting("default", &st)}
@@ -244,7 +243,6 @@ func TestRunHandsOnTheClaimedCheckout(t *testing.T) {
 			EnrollmentID: "enr-1", OrganizationID: "org-a", AuthURL: "https://auth.example", TeamID: hookruntest.Team, Epoch: 1,
 			Policy: p,
 		}},
-		Bindings: map[string]routing.Binding{p.Repositories[0]: {Organization: "org-a"}},
 	}
 	rt := hookrun.NewRouting("default", &st)
 	h.deps.Profile = func() Profile {
@@ -352,7 +350,6 @@ func routedProfileFor(root string) Profile {
 			EnrollmentID: "enr-1", OrganizationID: "org-a", AuthURL: "https://auth.example", TeamID: hookruntest.Team, Epoch: 1,
 			Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{origin}, TeamID: hookruntest.Team, FetchedAt: time.Now()},
 		}},
-		Bindings: map[string]routing.Binding{origin: {Organization: "org-a"}},
 	}
 	return Profile{Account: hookruntest.Account, Routing: hookrun.NewRouting("default", &st)}
 }

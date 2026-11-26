@@ -94,7 +94,7 @@ func (u *setupUI) policyFetched(team string, pol config.Policy) {
 
 // teamsConfigured summarizes multiple enrolled teams/organizations and what their
 // policies actively collect across the machine.
-func (u *setupUI) teamsConfigured(orgs []organization, teams []discoveredTeam, state routing.State) {
+func (u *setupUI) teamsConfigured(orgs []organization, teams []discoveredTeam) {
 	if len(orgs) > 1 {
 		u.Summary("Organizations", strings.Join(orgNamesList(orgs), ", "))
 	}
@@ -118,8 +118,8 @@ func (u *setupUI) teamsConfigured(orgs []organization, teams []discoveredTeam, s
 		} else if !pol.AdmitsNone() {
 			anyAdmits = true
 			for _, r := range pol.Repositories {
-				if entryBoundToOrg(state, r, pol.Wildcards, dt.team.OrganizationID) {
-					repos = appendUnique(repos, r)
+				if !slices.Contains(repos, r) {
+					repos = append(repos, r)
 				}
 			}
 		}
@@ -155,55 +155,18 @@ func (u *setupUI) teamsConfigured(orgs []organization, teams []discoveredTeam, s
 			parts = append(parts, personalCollects)
 		}
 	}
-	if len(parts) == 0 {
-		u.Warn("Collects", "nothing yet — resolve pending bindings with `terma teams`")
-		return
-	}
 	u.Summary("Collects", strings.Join(parts, "; "))
 	if gitHooksOff {
 		u.Then(doctor.GitHooksOffStep)
 	}
 }
 
-// entryBoundToOrg reports whether policy entry raw is actively bound to org in state
-// (not pending and not refused).
-func entryBoundToOrg(state routing.State, raw string, wildcards bool, orgID string) bool {
-	if orgID == "" {
-		return true
-	}
-	e, ok := routing.ParseEntry(raw, wildcards)
-	if !ok {
-		return false
-	}
-	if b, ok := state.Bindings[e.Key()]; ok {
-		return !b.Refused && b.Organization == orgID
-	}
-	if !e.Wildcard() {
-		if ob, ok := state.Bindings[routing.Owner(e.Key())]; ok {
-			return !ob.Refused && ob.Organization == orgID
-		}
-	}
-	return false
-}
-
-// reportResolvedConflicts confirms each conflict the developer resolved interactively during setup.
-func (u *setupUI) reportResolvedConflicts(resolved []string) {
-	for _, r := range resolved {
-		u.Summary("Resolved", r)
-	}
-}
-
-// reportConflicts notifies the developer of every policy conflict found during setup.
-func (u *setupUI) reportConflicts(conflicts []policyConflict) {
-	for _, c := range conflicts {
-		if c.severity == conflictPending {
-			u.Warn("Conflict", c.summary)
-		} else {
-			u.Caution("Conflict", c.summary)
-		}
-		if c.nextStep != "" {
-			u.Then(c.nextStep)
-		}
+// reportConflicts names every repository two organizations' policies both list, and the
+// team that collects it: the one whose policy was updated most recently.
+func (u *setupUI) reportConflicts(st routing.State, names teamNames) {
+	for _, o := range routing.Overlaps(st) {
+		u.Caution("Conflict", fmt.Sprintf("%s is listed by %s and %s; %s collects it, as its policy is newer",
+			o.Entry, teamLabel(names, o.Winner), teamLabel(names, o.Other), teamLabel(names, o.Winner)))
 	}
 }
 

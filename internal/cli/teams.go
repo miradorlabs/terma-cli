@@ -20,12 +20,11 @@ import (
 
 type teamsFlags struct {
 	selects, deselects, releases []string
-	binds, refuses, unbinds      []string
-	json, assumeYes              bool
+	json                         bool
 }
 
 func (f teamsFlags) changes() bool {
-	return len(f.selects)+len(f.deselects)+len(f.releases)+len(f.binds)+len(f.refuses)+len(f.unbinds) > 0
+	return len(f.selects)+len(f.deselects)+len(f.releases) > 0
 }
 
 var errServerKeyTeams = errors.New("this machine signs in with a team server key (TERMA_API_KEY), which stays on its one team: sign in as yourself with `terma setup` to choose teams")
@@ -36,22 +35,17 @@ func (app *App) newTeamsCommand() *cobra.Command {
 		Use:   "teams",
 		Short: "Choose which teams this machine sends telemetry to",
 		Long: `List every organization and team your sign-in belongs to and choose which ones
-this machine sends telemetry to. Ticking a team fetches its policy and asks you
-to decide each binding it needs. Bindings say which organization owns an owner or
-repository on this machine and outlive unticking (personal never collects bound
-repositories). Records route to the most specific ticked team, with personal last.`,
+this machine sends telemetry to. Each team's policy decides which repositories it
+collects. Where two organizations' policies list the same repository, the most
+recently updated policy collects it; personal collects what no ticked organization does.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return app.runTeams(cmd, f) },
 	}
 	fl := cmd.Flags()
 	fl.StringArrayVar(&f.selects, "select", nil, "tick a team, by name or id")
-	fl.StringArrayVar(&f.deselects, "deselect", nil, "untick it; bindings stay")
+	fl.StringArrayVar(&f.deselects, "deselect", nil, "untick a team, by name or id")
 	fl.StringArrayVar(&f.releases, "release", nil, "remove a suspended or refused team, by name or id")
-	fl.StringArrayVar(&f.binds, "bind", nil, "bind an owner or repository to an organization: <owner-or-repository>=<organization>")
-	fl.StringArrayVar(&f.refuses, "refuse", nil, "refuse an owner or repository to every organization")
-	fl.StringArrayVar(&f.unbinds, "unbind", nil, "remove the decision on an owner or repository")
 	fl.BoolVar(&f.json, "json", false, "print the list, and what changed, as JSON")
-	fl.BoolVarP(&f.assumeYes, "yes", "y", false, "take each question's default: bind what a ticked team needs to its organization")
 	return cmd
 }
 
@@ -152,19 +146,10 @@ func renderTeams(w io.Writer, v teamsView) {
 		}
 	}
 	_ = tw.Flush()
-	if len(v.Bindings) > 0 {
-		fmt.Fprintf(out, "\n%s\n", p.Bold("Bindings:"))
-		tw = tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
-		for _, b := range v.Bindings {
-			fmt.Fprintf(tw, "  %s\t%s\n", b.Key, bindingTarget(b))
-		}
-		_ = tw.Flush()
-	}
-	if len(v.Pending) > 0 {
-		fmt.Fprintf(out, "\n%s\n", p.Bold("To decide (what these match is held until you do):"))
-		for _, pr := range v.Pending {
-			fmt.Fprintf(out, "  %s %s  needed by %s: `terma teams --bind %s` or `terma teams --refuse %s`\n",
-				p.Warn("!"), pr.Key, pr.Entry, quoteArg(pr.Key+"="+cmp.Or(v.orgName(pr.Organization), pr.Organization)), quoteArg(pr.Key))
+	if len(v.Overlaps) > 0 {
+		fmt.Fprintf(out, "\n%s\n", p.Bold("Policy conflicts (the most recently updated policy collects):"))
+		for _, o := range v.Overlaps {
+			fmt.Fprintf(out, "  %s %s → %s, not %s\n", p.Warn("!"), o.Entry, o.Team, o.Other)
 		}
 	}
 }
@@ -174,13 +159,6 @@ func checkbox(selected bool) string {
 		return "[x]"
 	}
 	return "[ ]"
-}
-
-func bindingTarget(b bindingRow) string {
-	if b.Refused {
-		return "refused to every organization"
-	}
-	return cmp.Or(b.Name, b.Organization)
 }
 
 func orgTitle(o orgRow) string { return cmp.Or(o.Name, o.ID) }

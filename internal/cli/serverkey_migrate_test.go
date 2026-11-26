@@ -74,9 +74,6 @@ func TestRefreshMigratesAnUpgradedServerKeyProfileToRoutingState(t *testing.T) {
 		tm.Policy.TeamID != team || len(tm.Policy.Repositories) != 1 || tm.StateAt(time.Now()) != routing.Active {
 		t.Fatalf("migrated team = %+v, want the profile's team with its stored policy, active", tm)
 	}
-	if b, ok := st.Bindings["github.com/acme/app"]; !ok || b.Refused || b.Organization != orgA().ID {
-		t.Fatalf("bindings = %+v, want the policy's repository bound to %s as setup -y binds it", st.Bindings, orgA().ID)
-	}
 
 	// Hooks get the no-person lane, and the spool delivers with the stored key alone.
 	if hp := testApp.hookProfile(); !hp.Routing.Usable() || !hp.ServerKey || hp.Account != "" {
@@ -307,7 +304,7 @@ func TestServerKeyMigrationHoldsAGlobalPolicyToItsRepositories(t *testing.T) {
 		t.Fatalf("migration wrote %v (%v), want the routing state", wrote, err)
 	}
 	st, found, err := routing.Load(testApp.stateDir, config.DefaultProfile)
-	if err != nil || !found || len(st.Teams) != 1 || st.Teams[0].Policy.Global() || len(st.Teams[0].Policy.Repositories) != 0 || len(st.Bindings) != 0 {
+	if err != nil || !found || len(st.Teams) != 1 || st.Teams[0].Policy.Global() || len(st.Teams[0].Policy.Repositories) != 0 {
 		t.Fatalf("migrated state: found=%v err=%v state=%+v; want one team that lists nothing", found, err, st)
 	}
 }

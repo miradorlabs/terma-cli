@@ -1,0 +1,72 @@
+package routing
+
+// Overlap is an entry two selected organizations' policies both cover: Route sends what it
+// matches to Winner, whose policy was updated more recently, and never to Other.
+type Overlap struct {
+	// Entry is the narrower of the two entries, which is what both cover.
+	Entry         string
+	Winner, Other Team
+}
+
+// Overlaps lists every pair of entries in which two organizations' selected teams claim
+// the same repositories, with the team Route gives them to. A refused team claims nothing,
+// and a pair whose winner itself loses the entry to a newer third team is left out.
+func Overlaps(s State) []Overlap {
+	var out []Overlap
+	for i, a := range s.Teams {
+		for j := i + 1; j < len(s.Teams); j++ {
+			b := s.Teams[j]
+			if a.Personal || b.Personal || a.refused() || b.refused() || a.OrganizationID == b.OrganizationID {
+				continue
+			}
+			winner, other := a, b
+			if newer(b.Policy, a.Policy) {
+				winner, other = b, a
+			}
+			for _, ea := range entries(a) {
+				for _, eb := range entries(b) {
+					if !ea.Overlaps(eb) {
+						continue
+					}
+					narrow := ea
+					if eb.Wildcard() == ea.Wildcard() && eb.Fixed() > ea.Fixed() || ea.Wildcard() && !eb.Wildcard() {
+						narrow = eb
+					}
+					if !outranked(s, narrow, winner) {
+						out = append(out, Overlap{Entry: narrow.Raw, Winner: winner, Other: other})
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
+// outranked reports whether another organization team with a newer policy also covers e.
+func outranked(s State, e Entry, winner Team) bool {
+	for _, t := range s.Teams {
+		if t.Personal || t.refused() || t.EnrollmentID == winner.EnrollmentID || !newer(t.Policy, winner.Policy) {
+			continue
+		}
+		for _, te := range entries(t) {
+			if te.Overlaps(e) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// entries are t's parsed repository entries; none for a policy that lists none.
+func entries(t Team) []Entry {
+	if t.Policy.Global() || t.Policy.Unset {
+		return nil
+	}
+	var out []Entry
+	for _, raw := range t.Policy.Repositories {
+		if e, ok := ParseEntry(raw, t.Policy.Wildcards); ok {
+			out = append(out, e)
+		}
+	}
+	return out
+}

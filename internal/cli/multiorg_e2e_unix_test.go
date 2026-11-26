@@ -337,7 +337,7 @@ func TestMultiOrgSingleTokenEndToEnd(t *testing.T) {
 		"--org", orgA().ID, "--team", acmeAPI, "--harness", "claude"); err != nil {
 		t.Fatalf("alice setup: %v\nstdout:\n%s\nstderr:\n%s", err, stdout, stderr)
 	}
-	if out, err := runTerma(t, "teams", "--select", "Acme Web", "--select", "Beta Core", "--select", "Personal", "--yes"); err != nil {
+	if out, err := runTerma(t, "teams", "--select", "Acme Web", "--select", "Beta Core", "--select", "Personal"); err != nil {
 		t.Fatalf("teams --select: %v\n%s", err, out)
 	}
 	if f.exchanges.Load() != 1 {

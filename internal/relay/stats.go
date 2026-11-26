@@ -96,7 +96,7 @@ type Snapshot struct {
 	Since    time.Time      `json:"since"`
 	Counters map[string]int `json:"counters"`
 	// Blocked is, on a routed machine, the records each blocker kept from leaving, by
-	// "pending:<binding>", "team:<enrollment>" and "mixed:<session>": local only, never sent.
+	// "team:<enrollment>" and "mixed:<session>": local only, never sent.
 	Blocked map[string]int `json:"blocked,omitempty"`
 }
 

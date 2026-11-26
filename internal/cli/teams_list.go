@@ -24,8 +24,7 @@ import (
 type teamsView struct {
 	Organizations []orgRow     `json:"organizations"`
 	Unlisted      string       `json:"unlisted,omitempty"`
-	Bindings      []bindingRow `json:"bindings"`
-	Pending       []pendingRow `json:"pending"`
+	Overlaps      []overlapRow `json:"overlaps"`
 	Changes       []string     `json:"changes,omitempty"`
 	Warnings      []string     `json:"warnings,omitempty"`
 	state         routing.State
@@ -53,23 +52,17 @@ type teamRow struct {
 	Unreadable   string             `json:"unreadable,omitempty"`
 }
 
-type bindingRow struct {
-	Key          string `json:"key"`
-	Organization string `json:"organization,omitempty"`
-	Name         string `json:"organization_name,omitempty"`
-	Refused      bool   `json:"refused,omitempty"`
-}
-
-type pendingRow struct {
-	Key          string `json:"key"`
-	Organization string `json:"organization"`
-	TeamID       string `json:"team_id"`
-	Entry        string `json:"entry"`
+// overlapRow is an entry two organizations' ticked teams both cover: Team collects it,
+// since its policy was updated more recently, and Other does not.
+type overlapRow struct {
+	Entry string `json:"entry"`
+	Team  string `json:"team"`
+	Other string `json:"other"`
 }
 
 const (
 	listLimit           = 4
-	personalCollects    = "everything not bound to an organization"
+	personalCollects    = "everything no ticked organization collects"
 	orgInaccessibleNote = "you no longer have access to this organization"
 )
 
@@ -210,7 +203,6 @@ func (v *teamsView) mergeState(st routing.State, names teamNames, now time.Time)
 			t.Selected, t.EnrollmentID, t.State, t.LastError = false, "", "", ""
 		}
 	}
-	v.Bindings = nil
 	for _, t := range st.Teams {
 		org := v.org(t.OrganizationID, names)
 		i := slices.IndexFunc(org.Teams, func(r teamRow) bool { return r.ID == t.TeamID })
@@ -224,12 +216,7 @@ func (v *teamsView) mergeState(st routing.State, names teamNames, now time.Time)
 			org.Type = "personal"
 		}
 	}
-	for _, k := range slices.Sorted(maps.Keys(st.Bindings)) {
-		b := st.Bindings[k]
-		v.Bindings = append(v.Bindings, bindingRow{Key: k, Organization: b.Organization, Refused: b.Refused,
-			Name: cmp.Or(names.Orgs[b.Organization], v.orgName(b.Organization))})
-	}
-	v.Pending = pendingBindings(st)
+	v.Overlaps = overlapRows(st, names)
 	orgRank := func(o orgRow) int {
 		if o.Type == "personal" {
 			return 1
@@ -247,26 +234,11 @@ func (v *teamsView) org(id string, names teamNames) *orgRow {
 	return &v.Organizations[len(v.Organizations)-1]
 }
 
-func (v *teamsView) orgName(id string) string {
-	if i := slices.IndexFunc(v.Organizations, func(o orgRow) bool { return o.ID == id }); i >= 0 {
-		return v.Organizations[i].Name
-	}
-	return ""
-}
-
-func pendingBindings(st routing.State) []pendingRow {
-	var out []pendingRow
-	for _, t := range st.Teams {
-		if t.Personal || t.Policy.Global() || t.Policy.Unset {
-			continue
-		}
-		for _, raw := range t.Policy.Repositories {
-			e, ok := routing.ParseEntry(raw, t.Policy.Wildcards)
-			if !ok || alreadyDecided(st.Bindings, e) || slices.ContainsFunc(out, func(p pendingRow) bool { return p.Key == e.Key() }) {
-				continue
-			}
-			out = append(out, pendingRow{Key: e.Key(), Organization: t.OrganizationID, TeamID: t.TeamID, Entry: raw})
-		}
+// overlapRows are st's policy conflicts, each team named as doctor and setup name it.
+func overlapRows(st routing.State, names teamNames) []overlapRow {
+	var out []overlapRow
+	for _, o := range routing.Overlaps(st) {
+		out = append(out, overlapRow{Entry: o.Entry, Team: teamLabel(names, o.Winner), Other: teamLabel(names, o.Other)})
 	}
 	return out
 }

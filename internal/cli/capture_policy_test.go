@@ -75,10 +75,8 @@ func TestPolicyRefreshFiltersAlreadyQueuedReplies(t *testing.T) {
 	}
 	target.Policy = pol1
 	st, err := routing.Create(testApp.stateDir, cfg.ProfileName, account, func(s *routing.State) error {
-		if _, err := s.Select(target); err != nil {
-			return err
-		}
-		return s.Bind(appRepo.Origin, cfg.OrganizationID, false)
+		_, err := s.Select(target)
+		return err
 	})
 	if err != nil {
 		t.Fatal(err)

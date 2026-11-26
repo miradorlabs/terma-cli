@@ -71,7 +71,6 @@ func writeRoutingState(t *testing.T, stateDir string, st routing.State) routing.
 	t.Helper()
 	saved, err := routing.Replace(stateDir, st.Profile, nil, st.Account, func(s *routing.State) error {
 		s.Teams = st.Teams
-		s.Bindings = st.Bindings
 		return nil
 	})
 	if err != nil {
@@ -500,7 +499,7 @@ func TestTeamsActiveMixedAndResolve(t *testing.T) {
 
 	// Valid user-token routing state + interval Mixed check.
 	tm := activeTeam("e1", "team-1", testOrgA, false, now, "github.com/a/r1")
-	writeRoutingState(t, stateDir, routing.State{Profile: "default", Account: alice, Teams: []routing.Team{tm}})
+	saved := writeRoutingState(t, stateDir, routing.State{Profile: "default", Account: alice, Teams: []routing.Team{tm}})
 	teams.Invalidate()
 
 	if _, err := runs.Start(stateDir, "sess-mixed", now.Add(-10*time.Minute)); err != nil {
@@ -519,21 +518,9 @@ func TestTeamsActiveMixedAndResolve(t *testing.T) {
 	if got := teams.Route(straddle); got.Outcome != relay.Drop || got.Why != relay.WhyMixed || !got.MixedAt.Equal(mixedAt) {
 		t.Fatalf("straddling interval Route = %+v, want Drop(WhyMixed, %v)", got, mixedAt)
 	}
-	// Before binding: pre-mixed record holds with destination pinned to e1.
+	// A pre-mixed record routes to Send.
 	before := straddle
 	before.At, before.EndAt = mixedAt.Add(-3*time.Minute), mixedAt.Add(-time.Minute)
-	pinned := teams.Route(before)
-	if pinned.Outcome != relay.Hold || pinned.Why != relay.WhyPending || pinned.Queued.Enrollment != "e1" {
-		t.Fatalf("unbound pre-mixed Route = %+v, want Hold(WhyPending) pinned to e1", pinned)
-	}
-	// After binding repo to org-a: pre-mixed record routes to Send!
-	saved := writeRoutingState(t, stateDir, routing.State{
-		Profile:  "default",
-		Account:  alice,
-		Teams:    []routing.Team{tm},
-		Bindings: map[string]routing.Binding{"github.com/a/r1": {Organization: testOrgA}},
-	})
-	teams.Invalidate()
 	routed := teams.Route(before)
 	if routed.Outcome != relay.Send || routed.Queued.Enrollment != "e1" || routed.Queued.Account != alice {
 		t.Fatalf("pre-mixed Route = %+v, want Send(e1, alice)", routed)
@@ -656,10 +643,9 @@ func TestTeamsRouteRejectsForeignPlacementAccount(t *testing.T) {
 
 	tm := activeTeam("e-bob", "team-bob", testOrgA, false, now, "github.com/a/r1")
 	writeRoutingState(t, stateDir, routing.State{
-		Profile:  "default",
-		Account:  bob,
-		Teams:    []routing.Team{tm},
-		Bindings: map[string]routing.Binding{"github.com/a/r1": {Organization: testOrgA}},
+		Profile: "default",
+		Account: bob,
+		Teams:   []routing.Team{tm},
 	})
 	cfg := &config.Config{Dir: cfgDir, StateDir: stateDir, ProfileName: "default", AuthURL: testAuthURL, OTLPURL: testOTLPURL, Account: bob}
 	teams := NewTeams(cfg, TeamsDeps{Now: func() time.Time { return now }})
@@ -694,10 +680,9 @@ func TestTeamsMixedIntervalSpanningCleanResume(t *testing.T) {
 
 	tm := activeTeam("e1", "team-1", testOrgA, false, now, "github.com/a/r1")
 	writeRoutingState(t, stateDir, routing.State{
-		Profile:  "default",
-		Account:  alice,
-		Teams:    []routing.Team{tm},
-		Bindings: map[string]routing.Binding{"github.com/a/r1": {Organization: testOrgA}},
+		Profile: "default",
+		Account: alice,
+		Teams:   []routing.Team{tm},
 	})
 	// Run 1 starts at t0, turns Mixed at t0+10s; Run 2 resumes cleanly at t0+20s.
 	if _, err := runs.Start(stateDir, "sess-resume", t0); err != nil {
@@ -765,10 +750,9 @@ func TestTeamsSendFenceReadsFreshStateWithoutInvalidate(t *testing.T) {
 
 	tm := activeTeam("e1", "team-1", testOrgA, false, now, "github.com/a/r1")
 	writeRoutingState(t, stateDir, routing.State{
-		Profile:  "default",
-		Account:  alice,
-		Teams:    []routing.Team{tm},
-		Bindings: map[string]routing.Binding{"github.com/a/r1": {Organization: testOrgA}},
+		Profile: "default",
+		Account: alice,
+		Teams:   []routing.Team{tm},
 	})
 	cfg := &config.Config{Dir: cfgDir, StateDir: stateDir, ProfileName: "default", AuthURL: testAuthURL, OTLPURL: up.URL, Account: alice}
 	// Fixed clock keeps Route's 1s cache perpetually fresh if Recheck doesn't bypass it.
@@ -980,10 +964,9 @@ func TestBindTeams403RefreshesCommitsRefusedAndPurgesQueue(t *testing.T) {
 
 	tm := activeTeam("e-403", "team-403", testOrgA, false, now, "github.com/a/r1")
 	writeRoutingState(t, stateDir, routing.State{
-		Profile:  "default",
-		Account:  alice,
-		Teams:    []routing.Team{tm},
-		Bindings: map[string]routing.Binding{"github.com/a/r1": {Organization: testOrgA}},
+		Profile: "default",
+		Account: alice,
+		Teams:   []routing.Team{tm},
 	})
 	cfg := &config.Config{Dir: cfgDir, StateDir: stateDir, ProfileName: "default", AuthURL: testAuthURL, OTLPURL: up.URL, Account: alice}
 

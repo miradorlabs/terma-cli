@@ -110,7 +110,6 @@ func runGrokHooks(t *testing.T, grok bool, owners ...string) *grokRun {
 	root, stateDir, sp := hookruntest.Project(t)
 	hookruntest.RelayOn(t, stateDir)
 	run := &grokRun{root: root, stateDir: stateDir, sp: sp}
-	origin := "github.com/acme/" + filepath.Base(root)
 	p := hookruntest.Admitting(root)
 	p.TeamID, p.FetchedAt = hookruntest.Team, time.Now()
 	st := routing.State{
@@ -120,7 +119,6 @@ func runGrokHooks(t *testing.T, grok bool, owners ...string) *grokRun {
 			EnrollmentID: "enr-1", OrganizationID: "org-a", AuthURL: "https://auth.example", TeamID: hookruntest.Team, Epoch: 1,
 			Policy: p,
 		}},
-		Bindings: map[string]routing.Binding{origin: {Organization: "org-a"}},
 	}
 	deps := dispatch.Deps{
 		ConfigDir: t.TempDir(),

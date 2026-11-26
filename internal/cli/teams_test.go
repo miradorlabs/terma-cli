@@ -338,12 +338,9 @@ func TestTeamsAnnotatesOrgNotAccessibleWithoutFailingOthers(t *testing.T) {
 			if !strings.Contains(text, orgInaccessibleNote) || !strings.Contains(text, "Acme API") || !strings.Contains(text, "Personal") {
 				t.Errorf("unexpected text output:\n%s", text)
 			}
-			// Attempting to tick a team or bind to the inaccessible org (by name or UUID) fails cleanly.
+			// Attempting to tick a team in the inaccessible org fails cleanly.
 			if _, _, err := teamsJSON(t, "--select", betaCore); err == nil {
 				t.Error("selecting a team in an ORG_NOT_ACCESSIBLE org should fail")
-			}
-			if _, _, err := teamsJSON(t, "--bind", "github.com/beta/core="+orgB().ID); err == nil || !strings.Contains(err.Error(), "no longer have access") {
-				t.Errorf("binding to ORG_NOT_ACCESSIBLE org by UUID err = %v, want inaccessible rejection", err)
 			}
 		})
 	}
@@ -387,7 +384,7 @@ func TestTeamsSelectRefreshesViewWhenPolicyChangesBetweenListAndTick(t *testing.
 		return items, nil
 	}
 
-	stdout, stderr, err := termaRun{}.exec(t, "teams", "--yes")
+	stdout, stderr, err := termaRun{}.exec(t, "teams")
 	if err != nil {
 		t.Fatalf("teams --yes: %v\n%s\n%s", err, stdout, stderr)
 	}
@@ -403,18 +400,19 @@ func TestTeamsSelectRefreshesViewWhenPolicyChangesBetweenListAndTick(t *testing.
 // spurious conflict.
 func TestTeamsCASRejectsStaleConsentAndAccountSwitch(t *testing.T) {
 	t.Run("stale consent generation rejects Alice's open session", func(t *testing.T) {
-		_, aliceAccount := routedMachine(t, "alice", nil)
+		f, aliceAccount := routedMachine(t, "alice", nil)
 		prevAsk, prevForm := testApp.canAsk, testApp.runForm
 		t.Cleanup(func() { testApp.canAsk, testApp.runForm = prevAsk, prevForm })
 		testApp.canAsk = func() bool { return true }
 		testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
-			// While Alice's checklist is open, another `terma teams` command binds a repo
+			// While Alice's checklist is open, another `terma teams` command ticks a team
 			// (advancing ConsentGeneration).
 			cur := loadState(t)
 			if _, err := routing.Update(testApp.stateDir, config.DefaultProfile, cur.ExpectConsent(), func(s *routing.State) error {
-				return s.Bind("github.com/beta/core", orgB().ID, false)
+				_, err := s.Select(stateTeam(f, orgB().ID, betaCore, false, "github.com/beta/core"))
+				return err
 			}); err != nil {
-				t.Fatalf("concurrent bind: %v", err)
+				t.Fatalf("concurrent tick: %v", err)
 			}
 			items := slices.Clone(form.Items)
 			for i := range items {
@@ -425,16 +423,13 @@ func TestTeamsCASRejectsStaleConsentAndAccountSwitch(t *testing.T) {
 			return items, nil
 		}
 
-		_, _, err := termaRun{}.exec(t, "teams", "--yes")
+		_, _, err := termaRun{}.exec(t, "teams")
 		if !errors.Is(err, routing.ErrStaleGeneration) {
 			t.Fatalf("got err = %v, want routing.ErrStaleGeneration", err)
 		}
 		st := loadState(t)
-		if st.Account != aliceAccount || len(st.Teams) != 0 {
+		if st.Account != aliceAccount || len(st.Teams) != 1 || st.Teams[0].TeamID != betaCore {
 			t.Fatalf("stale consent was replayed into state: %+v", st)
-		}
-		if st.Bindings["github.com/beta/core"].Organization != orgB().ID || st.Bindings["github.com/acme/api"].Organization != "" {
-			t.Fatalf("bindings corrupted on CAS conflict: %+v", st.Bindings)
 		}
 	})
 
@@ -468,7 +463,7 @@ func TestTeamsCASRejectsStaleConsentAndAccountSwitch(t *testing.T) {
 			return items, nil
 		}
 
-		_, _, err := termaRun{}.exec(t, "teams", "--yes")
+		_, _, err := termaRun{}.exec(t, "teams")
 		if !errors.Is(err, routing.ErrAccountMismatch) {
 			t.Fatalf("got err = %v, want routing.ErrAccountMismatch", err)
 		}
@@ -510,7 +505,7 @@ func TestTeamsCASRejectsStaleConsentAndAccountSwitch(t *testing.T) {
 			return items, nil
 		}
 
-		stdout, stderr, err := termaRun{}.exec(t, "teams", "--yes")
+		stdout, stderr, err := termaRun{}.exec(t, "teams")
 		if err != nil {
 			t.Fatalf("teams across background refresh failed: %v\n%s\n%s", err, stdout, stderr)
 		}
@@ -531,11 +526,11 @@ func TestTeamsCASRejectsStaleConsentAndAccountSwitch(t *testing.T) {
 		if err := saveSignIn(testApp.dir, storedSessionOf(f, "bob")); err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err := teamsJSON(t, "--bind", "github.com/acme/api="+orgA().ID); !errors.Is(err, routing.ErrAccountMismatch) {
+		if _, _, err := teamsJSON(t, "--select", acmeAPI); !errors.Is(err, routing.ErrAccountMismatch) {
 			t.Fatalf("got err = %v, want routing.ErrAccountMismatch", err)
 		}
-		if st := loadState(t); len(st.Bindings) != 0 {
-			t.Fatalf("binding written despite account mismatch: %+v", st.Bindings)
+		if st := loadState(t); len(st.Teams) != 0 {
+			t.Fatalf("team ticked despite account mismatch: %+v", st.Teams)
 		}
 	})
 }
@@ -581,13 +576,13 @@ func TestTeamsRefusesServerKeyProfiles(t *testing.T) {
 }
 
 // Invariant 4 & 5: ticking a team on one user token mints no server keys, stores its
-// policy file, handles 2.x wildcard policies and pending bindings, downgrades a shared
-// org's global policy, and rejects a team deleted (403 PROJECT_NOT_FOUND) before commit.
-func TestTeamsSelectWildcardPendingGlobalAndNoKeyMinting(t *testing.T) {
-	t.Run("select wildcard with --yes binds owner and mints no key", func(t *testing.T) {
+// policy file, handles 2.x wildcard policies, reports overlapping policies, and downgrades
+// a shared org's global policy.
+func TestTeamsSelectWildcardOverlapGlobalAndNoKeyMinting(t *testing.T) {
+	t.Run("select wildcard mints no key", func(t *testing.T) {
 		f, _ := routedMachine(t, "alice", nil)
 		f.policyBodies[acmeAPI] = wildcardPolicyBody("github.com/acme/*")
-		v, out, err := teamsJSON(t, "--select", "Acme API", "--yes")
+		_, out, err := teamsJSON(t, "--select", "Acme API")
 		if err != nil {
 			t.Fatalf("teams --select: %v\n%s", err, out)
 		}
@@ -595,52 +590,28 @@ func TestTeamsSelectWildcardPendingGlobalAndNoKeyMinting(t *testing.T) {
 		if len(st.Teams) != 1 || !st.Teams[0].Policy.Wildcards || !slices.Equal(st.Teams[0].Policy.Repositories, []string{"github.com/acme/*"}) {
 			t.Fatalf("ticked wildcard team = %+v", st.Teams)
 		}
-		if b := st.Bindings["github.com/acme"]; b.Organization != orgA().ID {
-			t.Errorf("owner not bound to Acme: %+v", st.Bindings)
-		}
 		if key, err := keystore.Get(testApp.dir, acmeAPI); err != nil || key != "" {
 			t.Errorf("keystore has minted key %q (err=%v), want none", key, err)
 		}
 		if pol, ok, err := config.ReadPolicy(testApp.stateDir, acmeAPI); err != nil || !ok || !pol.Wildcards {
 			t.Errorf("stored policy file = (%+v, %v, %v)", pol, ok, err)
 		}
-		if len(v.Pending) != 0 {
-			t.Errorf("unexpected pending bindings: %+v", v.Pending)
-		}
 	})
 
-	t.Run("select without --yes leaves bindings pending", func(t *testing.T) {
-		routedMachine(t, "alice", nil)
-		v, out, err := teamsJSON(t, "--select", acmeAPI)
-		if err != nil {
-			t.Fatalf("teams --select: %v\n%s", err, out)
-		}
-		if st := loadState(t); len(st.Bindings) != 0 || len(st.Teams) != 1 {
-			t.Fatalf("state = %+v", st)
-		}
-		if len(v.Pending) != 1 || v.Pending[0].Key != "github.com/acme/api" || v.Pending[0].Organization != orgA().ID {
-			t.Fatalf("pending = %+v", v.Pending)
-		}
-		text, err := runTerma(t, "teams")
-		if err != nil || !strings.Contains(text, "`terma teams --bind github.com/acme/api=Acme`") {
-			t.Errorf("text output missing bind instruction (%v):\n%s", err, text)
-		}
-	})
-
-	t.Run("select skips entry under owner bound elsewhere", func(t *testing.T) {
-		routedMachine(t, "alice", func(_ *fakeAuth, s *routing.State) error {
-			return s.Bind("github.com/acme", orgB().ID, false)
+	t.Run("an overlap with a newer policy is reported", func(t *testing.T) {
+		f, _ := routedMachine(t, "alice", func(f *fakeAuth, s *routing.State) error {
+			tm := stateTeam(f, orgB().ID, betaCore, false, "github.com/acme/api")
+			tm.Policy.UpdatedAt = time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
+			_, err := s.Select(tm)
+			return err
 		})
-		v, out, err := teamsJSON(t, "--select", "Acme API", "--yes")
+		f.policyBodies[acmeAPI] = wildcardPolicyBody("github.com/acme/*")
+		v, out, err := teamsJSON(t, "--select", "Acme API")
 		if err != nil {
 			t.Fatalf("teams --select: %v\n%s", err, out)
 		}
-		st := loadState(t)
-		if _, ok := st.Bindings["github.com/acme/api"]; ok || st.Bindings["github.com/acme"].Organization != orgB().ID {
-			t.Errorf("bindings = %+v", st.Bindings)
-		}
-		if !slices.ContainsFunc(v.Warnings, func(w string) bool { return strings.Contains(w, "github.com/acme/api is skipped") }) {
-			t.Errorf("warnings = %v", v.Warnings)
+		if len(v.Overlaps) != 1 || v.Overlaps[0].Entry != "github.com/acme/api" || !strings.Contains(v.Overlaps[0].Team, "Beta") {
+			t.Fatalf("overlaps = %+v, want github.com/acme/api to Beta Core", v.Overlaps)
 		}
 	})
 
@@ -660,18 +631,15 @@ func TestTeamsSelectWildcardPendingGlobalAndNoKeyMinting(t *testing.T) {
 	})
 }
 
-// Invariant 7: deselect keeps bindings so bound repos never spill into Personal, and warns
-// clearly. --release removes only Suspended or Refused teams.
-func TestTeamsDeselectKeepsBindingsAndReleaseRequiresBlockedState(t *testing.T) {
-	t.Run("deselect keeps bindings and warns", func(t *testing.T) {
+// Deselect unticks a team, and --release removes only Suspended or Refused teams.
+func TestTeamsDeselectAndReleaseRequiresBlockedState(t *testing.T) {
+	t.Run("deselect leaves personal", func(t *testing.T) {
 		f, _ := routedMachine(t, "alice", func(f *fakeAuth, s *routing.State) error {
 			if _, err := s.Select(stateTeam(f, orgA().ID, acmeAPI, false, "github.com/acme/*")); err != nil {
 				return err
 			}
-			if _, err := s.Select(stateTeam(f, teamsPersonalOrg, teamsPersonalTeam, true)); err != nil {
-				return err
-			}
-			return s.Bind("github.com/acme", orgA().ID, false)
+			_, err := s.Select(stateTeam(f, teamsPersonalOrg, teamsPersonalTeam, true))
+			return err
 		})
 		f.orgs = []organization{orgA(), orgPersonal()}
 		f.projects = map[string][]project{
@@ -679,23 +647,12 @@ func TestTeamsDeselectKeepsBindingsAndReleaseRequiresBlockedState(t *testing.T) 
 			teamsPersonalOrg: {{ID: teamsPersonalTeam, Name: "Personal", OrganizationID: teamsPersonalOrg}},
 		}
 
-		v, out, err := teamsJSON(t, "--deselect", acmeAPI)
+		_, out, err := teamsJSON(t, "--deselect", acmeAPI)
 		if err != nil {
 			t.Fatalf("teams --deselect: %v\n%s", err, out)
 		}
-		st := loadState(t)
-		if len(st.Teams) != 1 || !st.Teams[0].Personal || st.Bindings["github.com/acme"].Organization != orgA().ID {
+		if st := loadState(t); len(st.Teams) != 1 || !st.Teams[0].Personal {
 			t.Fatalf("state after deselect = %+v", st)
-		}
-		if !slices.ContainsFunc(v.Warnings, func(w string) bool {
-			return strings.Contains(w, "github.com/acme stays bound to Acme, so it collects nowhere") && strings.Contains(w, "--unbind github.com/acme")
-		}) {
-			t.Errorf("missing orphaned binding warning: %v", v.Warnings)
-		}
-		if !slices.ContainsFunc(v.Warnings, func(w string) bool {
-			return strings.Contains(w, "unknown never goes to personal")
-		}) {
-			t.Errorf("missing personal unknown-location warning: %v", v.Warnings)
 		}
 	})
 
@@ -726,49 +683,6 @@ func TestTeamsDeselectKeepsBindingsAndReleaseRequiresBlockedState(t *testing.T) 
 			t.Fatalf("teams after release = %+v", st.Teams)
 		}
 	})
-}
-
-// Bindings: conflict against owner requires --yes without terminal; --refuse and --unbind
-// work; wildcards and personal org bindings are refused.
-func TestTeamsBindRefuseAndUnbind(t *testing.T) {
-	routedMachine(t, "alice", func(f *fakeAuth, s *routing.State) error {
-		if _, err := s.Select(stateTeam(f, orgA().ID, acmeAPI, false, "github.com/acme/api")); err != nil {
-			return err
-		}
-		return s.Bind("github.com/acme", orgA().ID, false)
-	})
-	_, _, err := teamsJSON(t, "--bind", "github.com/acme/api="+orgB().ID)
-	if err == nil || !strings.Contains(err.Error(), "github.com/acme is bound to") || !strings.Contains(err.Error(), "--yes") {
-		t.Fatalf("conflict without --yes = %v", err)
-	}
-	if _, ok := loadState(t).Bindings["github.com/acme/api"]; ok {
-		t.Fatal("conflicting binding written without confirmation")
-	}
-	if _, out, err := teamsJSON(t, "--bind", "https://GitHub.com/Acme/API.git="+orgB().ID, "--yes"); err != nil {
-		t.Fatalf("teams --bind --yes: %v\n%s", err, out)
-	}
-	if b := loadState(t).Bindings["github.com/acme/api"]; b.Organization != orgB().ID {
-		t.Fatalf("bindings = %+v", loadState(t).Bindings)
-	}
-	if _, out, err := teamsJSON(t, "--refuse", "github.com/acme/api"); err != nil {
-		t.Fatalf("teams --refuse: %v\n%s", err, out)
-	}
-	if !loadState(t).Bindings["github.com/acme/api"].Refused {
-		t.Fatalf("bindings after refuse = %+v", loadState(t).Bindings)
-	}
-	if _, out, err := teamsJSON(t, "--unbind", "github.com/acme"); err != nil {
-		t.Fatalf("teams --unbind owner: %v\n%s", err, out)
-	}
-	v, out, err := teamsJSON(t, "--unbind", "github.com/acme/api")
-	if err != nil {
-		t.Fatalf("teams --unbind repo: %v\n%s", err, out)
-	}
-	if len(loadState(t).Bindings) != 0 || !slices.ContainsFunc(v.Changes, func(c string) bool { return strings.Contains(c, "it is now pending") }) {
-		t.Fatalf("changes = %v, bindings = %+v", v.Changes, loadState(t).Bindings)
-	}
-	if _, _, err := teamsJSON(t, "--bind", "github.com/acme/*=Acme"); err == nil {
-		t.Fatal("wildcard was accepted as a binding key")
-	}
 }
 
 // SignInNeeded points to `terma setup` (not removed --org), and missing or unreadable
@@ -830,24 +744,6 @@ func TestTeamsSignInNeededMessageAndInvalidStateFailure(t *testing.T) {
 		}
 	})
 
-	t.Run("stale cached org name resolves against live organizations", func(t *testing.T) {
-		routedMachine(t, "alice", nil)
-		// Seed a stale cache claiming orgB is named "Acme" while live API says orgA is "Acme".
-		stale := teamNames{Orgs: map[string]string{}, Teams: map[string]string{}}
-		stale.org(orgB().ID, "Acme")
-		stale.save(testApp.stateDir, config.DefaultProfile)
-		if _, out, err := teamsJSON(t, "--bind", "github.com/acme/api=Acme"); err != nil {
-			t.Fatalf("teams --bind: %v\n%s", err, out)
-		}
-		st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if b := st.Bindings["github.com/acme/api"]; b.Organization != orgA().ID {
-			t.Fatalf("bound org = %q, want live %q (not stale cached %q)", b.Organization, orgA().ID, orgB().ID)
-		}
-	})
-
 	t.Run("duplicate team names across organizations require an id", func(t *testing.T) {
 		f, _ := routedMachine(t, "alice", nil)
 		dupA := project{ID: "dddddddd-0000-4000-8000-000000000001", Name: "Platform"}
@@ -859,10 +755,10 @@ func TestTeamsSignInNeededMessageAndInvalidStateFailure(t *testing.T) {
 		f.policyBodies[dupA.ID] = policyBody("github.com/acme/api")
 		f.policyBodies[dupB.ID] = policyBody("github.com/beta/core")
 
-		if _, _, err := teamsJSON(t, "--select", "Platform", "--yes"); err == nil || !strings.Contains(err.Error(), "matches several") {
+		if _, _, err := teamsJSON(t, "--select", "Platform"); err == nil || !strings.Contains(err.Error(), "matches several") {
 			t.Fatalf("duplicate --select err = %v, want ambiguity error", err)
 		}
-		if _, out, err := teamsJSON(t, "--select", dupB.ID, "--yes"); err != nil {
+		if _, out, err := teamsJSON(t, "--select", dupB.ID); err != nil {
 			t.Fatalf("--select by id: %v\n%s", err, out)
 		}
 		st, _, _ := routing.Load(testApp.stateDir, config.DefaultProfile)
@@ -873,7 +769,7 @@ func TestTeamsSignInNeededMessageAndInvalidStateFailure(t *testing.T) {
 
 	t.Run("deselect preserves shared team policy file", func(t *testing.T) {
 		routedMachine(t, "alice", nil)
-		if _, out, err := teamsJSON(t, "--select", "Acme API", "--yes"); err != nil {
+		if _, out, err := teamsJSON(t, "--select", "Acme API"); err != nil {
 			t.Fatalf("select: %v\n%s", err, out)
 		}
 		path, err := config.PolicyPath(testApp.stateDir, acmeAPI)
@@ -909,120 +805,10 @@ func TestTeamsSignInNeededMessageAndInvalidStateFailure(t *testing.T) {
 		}
 	})
 
-	t.Run("refusing an owner warns about existing child repository exceptions", func(t *testing.T) {
-		routedMachine(t, "alice", func(_ *fakeAuth, s *routing.State) error {
-			return s.Bind("github.com/acme/api", orgA().ID, false)
-		})
-		v, out, err := teamsJSON(t, "--refuse", "github.com/acme")
-		if err != nil {
-			t.Fatalf("--refuse owner: %v\n%s", err, out)
-		}
-		if !slices.ContainsFunc(v.Warnings, func(w string) bool {
-			return strings.Contains(w, "kept github.com/acme/api") && strings.Contains(w, "under github.com/acme")
-		}) {
-			t.Fatalf("warnings = %v, want warning about kept child exception", v.Warnings)
-		}
-	})
-
-	t.Run("binding to personal organization is rejected by name and id even when unselected", func(t *testing.T) {
-		f, _ := routedMachine(t, "alice", nil)
-		hexPersonal := "99999999-aaaa-4999-8999-999999999999"
-		f.orgs = []organization{orgA(), orgB(), {ID: hexPersonal, Name: "Personal", Type: "personal"}}
-		if _, _, err := teamsJSON(t, "--bind", "github.com/acme/api=Personal"); err == nil || !strings.Contains(err.Error(), "personal") {
-			t.Fatalf("bind Personal by name err = %v, want personal rejection", err)
-		}
-		if _, _, err := teamsJSON(t, "--bind", "github.com/acme/api="+hexPersonal); err == nil || !strings.Contains(err.Error(), "personal") {
-			t.Fatalf("bind Personal by id err = %v, want personal rejection", err)
-		}
-		if _, _, err := teamsJSON(t, "--bind", "github.com/acme/api="+strings.ToUpper(hexPersonal)); err == nil || !strings.Contains(err.Error(), "personal") {
-			t.Fatalf("bind Personal by uppercase id err = %v, want personal rejection", err)
-		}
-		if _, _, err := teamsJSON(t, "--bind", "github.com/acme/api=00000000-0000-4000-8000-000000000099"); err == nil || !strings.Contains(err.Error(), "not one of your organizations") {
-			t.Fatalf("bind unknown UUID err = %v, want unknown-org rejection", err)
-		}
-	})
-
-	t.Run("unbinding a repository reports inherited owner decision", func(t *testing.T) {
-		routedMachine(t, "alice", func(_ *fakeAuth, s *routing.State) error {
-			if err := s.Bind("github.com/acme", orgA().ID, false); err != nil {
-				return err
-			}
-			return s.Bind("github.com/acme/api", orgB().ID, true)
-		})
-		v, out, err := teamsJSON(t, "--unbind", "github.com/acme/api")
-		if err != nil {
-			t.Fatalf("--unbind repo: %v\n%s", err, out)
-		}
-		joined := strings.Join(v.Changes, "\n")
-		if !strings.Contains(joined, "under github.com/acme") || strings.Contains(joined, "free: personal may collect it") {
-			t.Fatalf("changes = %v, want inherited owner status", v.Changes)
-		}
-	})
-
-	t.Run("combined bind flags validate against evolving planned bindings", func(t *testing.T) {
-		routedMachine(t, "alice", nil)
-		if _, _, err := teamsJSON(t, "--bind", "github.com/acme=Acme", "--bind", "github.com/acme/api=Beta"); err == nil {
-			t.Fatal("expected conflict error without --yes on combined owner+repo binds")
-		}
-		if _, out, err := teamsJSON(t, "--bind", "github.com/acme=Acme", "--bind", "github.com/acme/api=Beta", "--yes"); err != nil {
-			t.Fatalf("combined --bind --yes: %v\n%s", err, out)
-		}
-		st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if st.Bindings["github.com/acme"].Organization != orgA().ID || st.Bindings["github.com/acme/api"].Organization != orgB().ID {
-			t.Fatalf("bindings = %+v", st.Bindings)
-		}
-	})
-
-	t.Run("interactive whole-owner selection reconciles existing child repository bindings", func(t *testing.T) {
-		for _, keepChild := range []bool{true, false} {
-			name, answer := "unbind", "n\n"
-			if keepChild {
-				name, answer = "keep", "y\n"
-			}
-			t.Run(name, func(t *testing.T) {
-				routedMachine(t, "alice", func(_ *fakeAuth, s *routing.State) error {
-					return s.Bind("github.com/acme/other", orgB().ID, false)
-				})
-				prevAsk, prevPick := testApp.canAsk, testApp.pickOne
-				t.Cleanup(func() { testApp.canAsk, testApp.pickOne = prevAsk, prevPick })
-				testApp.canAsk = func() bool { return true }
-				testApp.pickOne = func(*cobra.Command, string, []pickRow, func(string) (int, error)) (int, error) { return 1, nil }
-				cmd := testApp.NewRootCommand()
-				var out strings.Builder
-				cmd.SetIn(strings.NewReader(answer))
-				cmd.SetOut(&out)
-				cmd.SetErr(&out)
-				cmd.SetArgs([]string{"teams", "--select", "Acme API"})
-				if err := cmd.Execute(); err != nil {
-					t.Fatalf("teams --select: %v\n%s", err, out.String())
-				}
-				st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if st.Bindings["github.com/acme"].Organization != orgA().ID {
-					t.Fatalf("owner binding = %+v, want %s", st.Bindings["github.com/acme"], orgA().ID)
-				}
-				child, hasChild := st.Bindings["github.com/acme/other"]
-				if keepChild {
-					if !hasChild || child.Organization != orgB().ID {
-						t.Fatalf("kept child = (%+v, %v), want %s", child, hasChild, orgB().ID)
-					}
-					if !strings.Contains(out.String(), "kept github.com/acme/other") {
-						t.Fatalf("output missing kept warning:\n%s", out.String())
-					}
-				} else if hasChild {
-					t.Fatalf("child binding = %+v, want unbound under whole owner", child)
-				}
-			})
-		}
-	})
 }
 
-func TestSetupAutomaticMultiOrgEnrollsWithoutChecklist(t *testing.T) {
+// With --yes, setup ticks every team without asking.
+func TestSetupYesEnrollsEveryTeamWithoutAsking(t *testing.T) {
 	f, account := routedMachine(t, "alice", nil)
 	f.orgs = []organization{orgPersonal(), orgA(), orgB()}
 	f.projects = map[string][]project{
@@ -1034,7 +820,7 @@ func TestSetupAutomaticMultiOrgEnrollsWithoutChecklist(t *testing.T) {
 	t.Cleanup(func() { testApp.canAsk, testApp.runForm, testApp.pickOne = prevAsk, prevForm, prevPick })
 	testApp.canAsk = func() bool { return true }
 	testApp.runForm = func(*prompt.Form) ([]prompt.Item, error) {
-		t.Fatal("setup must not open a team checklist prompt")
+		t.Fatal("setup --yes must not open a picker")
 		return nil, nil
 	}
 	testApp.pickOne = func(*cobra.Command, string, []pickRow, func(string) (int, error)) (int, error) {
@@ -1042,7 +828,7 @@ func TestSetupAutomaticMultiOrgEnrollsWithoutChecklist(t *testing.T) {
 		return 0, nil
 	}
 
-	out, err := runTerma(t, "setup", "--harness", "codex")
+	out, err := runTerma(t, "setup", "--harness", "codex", "--yes")
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
@@ -1062,12 +848,8 @@ func TestSetupAutomaticMultiOrgEnrollsWithoutChecklist(t *testing.T) {
 			t.Fatalf("teams = %v, missing %s", ids, want)
 		}
 	}
-	// Personal team must always be last, and shared org repos must be auto-bound.
 	if !st.Teams[len(st.Teams)-1].Personal {
 		t.Fatalf("last team = %+v, want Personal last", st.Teams[len(st.Teams)-1])
-	}
-	if st.Bindings["github.com/acme/web"].Organization != orgA().ID || st.Bindings["github.com/beta/core"].Organization != orgB().ID {
-		t.Fatalf("bindings = %+v, want both shared org repos auto-bound", st.Bindings)
 	}
 }
 
@@ -1081,7 +863,7 @@ func TestTeamsSelectFailsWhenPolicyCannotBePersisted(t *testing.T) {
 	if err := os.WriteFile(polDir, []byte("not-a-dir"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	out, err := runTerma(t, "teams", "--select", betaCore, "--yes")
+	out, err := runTerma(t, "teams", "--select", betaCore)
 	if err == nil {
 		t.Fatalf("expected error when policy persistence fails, got output:\n%s", out)
 	}

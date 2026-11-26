@@ -31,6 +31,8 @@ type setupDiscovery struct {
 	scoped           bool
 	stub             bool
 	baseline         setupBaseline
+	// untick are the teams the developer left unticked, which setup unticks if ticked.
+	untick map[string]bool
 }
 
 // discoverSetup fetches the signed-in developer's organizations and associated teams (and

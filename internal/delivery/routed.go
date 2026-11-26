@@ -33,7 +33,7 @@ const maxParcelConcurrency = 4
 //   - enrollment ended, Refused, or no longer covers the location: dropped (Discarded);
 //   - session run became Mixed at or before the event's time: dropped (Mixed), unless it
 //     carries no content and routes by its own checkout location (OwnLocation && runs.Locational);
-//   - team expired, signing in, suspended, or binding still pending: held (Blocked);
+//   - team expired, signing in, or suspended: held (Blocked);
 //   - team Active and still covering it: sent per enrollment with SignIn.Token +
 //     X-Mirador-Project (user token) or keys.json with no X-Mirador-Project (server key),
 //     filtered by the team's content policy now, and revalidated (state generation and
@@ -65,7 +65,7 @@ func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event,
 			continue
 		}
 		// 3. Load routing.State, verify State.Account == lane, recheck pinned enrollment
-		// + HoldKey + run-ledger Mixed state, and filter through current policy.
+		// + run-ledger Mixed state, and filter through current policy.
 		pr := b.profile(e.Profile)
 		team, out, action := p.admit(e, pr, lane, now)
 		switch action {

@@ -97,7 +97,7 @@ func (e Env) unpark(r *Repo) {
 			if json.Unmarshal(line, &ev) != nil {
 				continue
 			}
-			if e.Routing != nil && ev.Enrollment == "" && ev.HoldKey == "" {
+			if e.Routing != nil && ev.Enrollment == "" {
 				noDest++
 			} else {
 				events = append(events, ev)

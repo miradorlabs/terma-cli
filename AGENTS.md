@@ -32,7 +32,7 @@ internal/cli/           the command line; `terma --help` lists only the primary 
 internal/agents/        one package per coding agent; builtin/ is the only list of them
 internal/hooks/         `terma hook <event>`: dispatch, runtime (hookrun), hook-file writers (hookmgr)
 internal/relay/         the local relay daemon
-internal/routing/       multi-org routing table (`routing.State` CAS, bindings, `routing.Router`)
+internal/routing/       multi-org routing table (`routing.State` CAS, `routing.Router`)
 internal/runs/          per-session run ledger and cross-org Mixed cutoff
 internal/spool/         the local queue hooks append to
 internal/delivery/      sends the spool to each project, from a detached flush
@@ -64,7 +64,9 @@ keeping its veto; a repository that sets its own `core.hooksPath` is skipped, an
 doctor` says so. Nothing is written into a repository's working tree or committed files:
 `.git/hooks` is neither, and git never tracks it. Every hook runs `terma hook <event>`, which resolves
 the working copy's `origin` as `host/path` (`gitx.RepositoryFS`) and routes against the
-profile's account-stamped `routing.State` (`routing.Router.Route`). Missing, unreadable, or
+profile's account-stamped `routing.State` (`routing.Router.Route`): the selected
+organization teams' policies are tried newest first (`Policy.UpdatedAt`), a Refused team is
+passed over, the first that lists the repository collects it, and personal comes last. Missing, unreadable, or
 wrong-account routing state fails closed (zero fallback to `Profile.Team`). Unmatched
 locations write no manifest, spool line, trailer, or team claim — only a not-collected
 placement (`claim.Mark`). Read/shell reach hooks (and Extension agents' `<prefix>-tool-reach`)
@@ -107,7 +109,7 @@ next sign-in, and the team keys it minted are deleted from this machine (a user 
 cannot revoke them; an admin can, in the web app).
 The state directory (`config.StateDir`) holds what terma writes as it runs: `routing/`
 (per-profile `routing/<profile>.json` storing account-stamped team enrollments, cached
-policies, and owner/repo bindings updated via account- and generation-checked CAS
+policies, updated via account- and generation-checked CAS
 `routing.Update`/`routing.Replace`; only `terma setup` writes a profile's first one, but
 for a server-key profile an earlier terma set up, whose stored team, key and policy the
 refresh after an update, or a relay of this build as it starts, turns into its one-team
@@ -156,9 +158,9 @@ of the team routing sends the hook's checkout to (`hookrun.Env.PolicyFor`) and o
 workspaces routing sends to that same team (`hookrun.Env.RoutesWith`). grok's export often
 loses the prompt, so its prompt hook sends it as `terma.user.message` under the routed
 team's policy (`PolicyFor`) and consent (`Consent`). Use `terma teams` to manage ticked
-teams and bindings, `terma route explain` to trace `routing.Router.Route` for a path, and
+teams, `terma route explain` to trace `routing.Router.Route` for a path, and
 `terma doctor` to inspect routing state, per-enrollment health (including `OrgAccessLost`,
-pending bindings, and single `terma setup` remediation for `SignInNeeded`), Mixed runs, and
+policy conflicts, and single `terma setup` remediation for `SignInNeeded`), Mixed runs, and
 combined outbox/spool losses.
 
 ### Lanes, ownership, and loss accounting
