@@ -45,14 +45,30 @@ type Routing struct {
 	Blocked map[string]int
 }
 
-// label names t by its organization and team name, falling back to IDs.
+// label names t for a reader: Personal, or TeamName of its organization and team.
 func (r Routing) label(t routing.Team) string {
-	name := cmp.Or(r.Teams[t.TeamID], t.TeamID)
-	if org := r.Orgs[t.OrganizationID]; org != "" && org != name && !strings.HasPrefix(name, org) {
-		return org + " " + name
+	if t.Personal {
+		return "Personal"
 	}
-	return name
+	return TeamName(r.Orgs[t.OrganizationID], cmp.Or(r.Teams[t.TeamID], t.TeamID))
 }
+
+// TeamName names an organization's team: the team alone when its name already starts
+// with the organization's first word, the organization alone when the team's name adds
+// nothing to it, else both.
+func TeamName(org, team string) string {
+	first, _, _ := strings.Cut(org, " ")
+	switch {
+	case org == "" || team == org || strings.HasPrefix(team, first+" "):
+		return team
+	case strings.HasSuffix(org, " "+team) || genericTeams[strings.ToLower(team)]:
+		return org
+	}
+	return org + " › " + team
+}
+
+// genericTeams are team names that say nothing their organization's name does not.
+var genericTeams = map[string]bool{"default": true, "general": true, "main": true, "team": true}
 
 func (r Routing) setupFix() string {
 	if r.ServerKey {
@@ -180,18 +196,6 @@ func reasonWords(r runs.Reason) string {
 	return "with a run ledger that cannot be read"
 }
 
-func whyWords(w runs.Why) string {
-	s := reasonWords(w.Reason)
-	switch {
-	case w.Where == "":
-	case w.Reason == runs.Crossed:
-		s += ", into " + w.Where
-	case w.Reason == runs.UnknownReach:
-		s += ": " + w.Where
-	}
-	return s
-}
-
 func words(s string) string { return strings.ReplaceAll(s, "_", " ") }
 
 func quoteWord(s string) string {
@@ -222,7 +226,7 @@ func RoutedRepository(r Routing, gitDir string, repoErr error, now time.Time) (C
 	if r.unusable() {
 		return Check{Status: Fail, Detail: "nothing is sent without a usable routing state", Fix: r.setupFix()}, nil
 	}
-	loc, where := routing.Location{Kind: routing.OutsideGit}, "outside any repository with a hosted origin"
+	loc, where := routing.Location{Kind: routing.OutsideGit}, "this folder"
 	if origin := gitx.RepositoryFS(gitDir); gitDir != "" && routing.Owner(origin) != "" {
 		loc, where = routing.Location{Kind: routing.Repository, Repository: origin}, origin
 	}
@@ -231,7 +235,7 @@ func RoutedRepository(r Routing, gitDir string, repoErr error, now time.Time) (C
 	switch {
 	case d.Outcome == routing.Send && hasTeam:
 		detail := where + " goes to " + r.label(team)
-		if d.Entry != "" {
+		if d.Entry != "" && routing.Normalize(d.Entry) != routing.Normalize(where) {
 			detail += " (" + d.Entry + ")"
 		}
 		return Check{Status: Pass, Detail: detail}, &team

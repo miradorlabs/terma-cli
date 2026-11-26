@@ -118,10 +118,9 @@ func TestDoctorReportsTeamsHealthSignInMixedAndLosses(t *testing.T) {
 		t.Fatalf("expected doctor failure on refused team:\n%s", out)
 	}
 	for _, want := range []string{
-		"you no longer have access to its organization",
-		"1 session run(s) Mixed",
-		"dropped 4 record(s)",
-		"session sess-mixed crossed organizations",
+		"no access to this organization, skipped",
+		"1 session is paused",
+		"4 records from paused sessions dropped",
 		"3 with no routed destination",
 	} {
 		if !strings.Contains(out, want) {
@@ -138,7 +137,7 @@ func TestDoctorReportsTeamsHealthSignInMixedAndLosses(t *testing.T) {
 		t.Fatal(err)
 	}
 	out, _ = runTerma(t, "doctor")
-	if !strings.Contains(out, "needs you to sign in again") || !strings.Contains(out, "→ terma setup") {
+	if !strings.Contains(out, "sign in again to send") || !strings.Contains(out, "\n    terma setup\n") {
 		t.Errorf("SignInNeeded doctor output lacks single terma setup remediation:\n%s", out)
 	}
 	if strings.Contains(out, "terma teams --org") {

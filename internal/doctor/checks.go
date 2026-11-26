@@ -9,7 +9,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
-	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
 // UserHooksCheck reports whether each of the developer's agents (mine; empty means all)
@@ -102,10 +101,10 @@ func StatusLineCheck(v StatusLineVerdict) Check {
 			Detail: "overridden by " + strings.Join(v.Overrides, ", ") + "; plan usage is not captured in this repository",
 			Fix:    "remove statusLine from that file, or accept that this repository does not report plan usage"}
 	case StatusLineBehind:
-		return Check{Status: Pass, Detail: "capturing plan usage; " + output.SanitizeTerminal(v.Renderer) + " runs behind it"}
+		return Check{Status: Pass, Detail: "capturing plan usage, your own line still runs"}
 	case StatusLineDefault:
 		if v.Stacked {
-			return Check{Status: Pass, Detail: "capturing plan usage; the agent's own line is unchanged"}
+			return Check{Status: Pass, Detail: "capturing plan usage, the agent's own line unchanged"}
 		}
 		return Check{Status: Pass, Detail: "capturing plan usage (terma's default line)"}
 	case StatusLineSwitchedOff:
@@ -269,7 +268,7 @@ func RelayCheck(reg *agents.Registry, relay Relay, keys Keys, projectID, env str
 	case !keys.has("", projectID) && !slices.ContainsFunc(reg.With[agents.RelayExporter](), func(e agents.RelayExporter) bool { return keys.has(e.Name(), projectID) }):
 		return Check{Status: Warn, Detail: "local relay on " + addr + " (" + state + "); no sign-in or key for this team on this machine, so its sessions wait", Fix: signInFix}
 	}
-	return Check{Status: Pass, Detail: "through the local relay on " + addr + " (" + state + "); it forwards the sessions your team's policy collects"}
+	return Check{Status: Pass, Detail: "local relay on " + addr + ", " + state}
 }
 
 // NoRepositoriesStep is what a developer whose team lists no repositories is told.

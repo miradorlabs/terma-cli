@@ -22,6 +22,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/relay/service"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -194,7 +195,11 @@ func (app *App) updateRows(exe string) []doctor.Row {
 		return nil
 	}
 	const when = "2006-01-02 15:04"
-	rows := []doctor.Row{{Label: "Updates", Value: updatesSummary(selfupdate.InstallOf(exe, app.version), p.Auto)}}
+	var rows []doctor.Row
+	// A development build never updates; saying so on every run is noise.
+	if install := selfupdate.InstallOf(exe, app.version); install.Method != semconv.TermaInstallMethodSource {
+		rows = append(rows, doctor.Row{Label: "Updates", Value: updatesSummary(install, p.Auto)})
+	}
 	if u, ok := selfupdate.LoadUpdated(app.stateDir); ok {
 		rows = append(rows, doctor.Row{Label: "Last update", Value: fmt.Sprintf("%s → %s automatically (%s), %s", u.From, u.To, u.How(), u.At.Local().Format(when))})
 	}

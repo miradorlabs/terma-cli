@@ -139,14 +139,18 @@ your organizations, see policy conflicts, or release a suspended team.
 Run `terma route explain [path]` (or `--json`) to see which team a directory or repository
 routes to and why using the exact same router hooks and the relay use.
 
-`terma doctor` opens with your selected teams and their state, then what is collected: each
-repository entry with, in brackets, the team that collects it (noting any other team that lists
-it too but loses it, and an entry held while its team cannot send), the routing order, and what
-this repository has in progress (the active session, uncommitted agent edits). It then
-checks every link: sign-in, `routing/<profile>.json` account ownership, per-team policy health (refused/suspended teams, lost organization access,
-expired policies, policy conflicts), Mixed sessions, hooks, agent export, spool/outbox losses,
-and delivery. Every failure names its fix (including a single `terma setup` when your user
-sign-in needs re-authentication).
+`terma doctor` shows its report in sections:
+
+- **This machine**: the environment, terma's folders, and how terma last updated.
+- **Where your data goes**: your teams in the order they are tried, each with its state.
+  Under each team are the repositories it collects. A repository two teams list shows once,
+  under the team whose newer policy wins.
+- **Paused sessions**: sessions that may have touched another organization's work. They
+  send nothing until they resume.
+- **This repository**: which team collects it, and the agent work not yet committed.
+- **Checks**: sign-in, hooks, agent export, the event queue, and delivery.
+
+It ends with what needs you, each with the one command that fixes it.
 
 ### Managing teams and switching accounts
 
