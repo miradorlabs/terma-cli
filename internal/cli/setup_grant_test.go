@@ -189,7 +189,7 @@ func TestDesktopGrantSignsInAndSetsUp(t *testing.T) {
 	if probed, err := testApp.doctorProbes(cfg).Credential(); err != nil || !probed.ViaDesktop {
 		t.Fatalf("doctor's credential = %+v, %v; want it signed in through Terma Desktop", probed, err)
 	}
-	for _, want := range []string{"Signed in     dev@example.com (Beta Labs)", "Agents", "Collects"} {
+	for _, want := range []string{"Signed in     dev@example.com (Beta Labs)", "Agents", "Machine"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("setup's own output does not say %q:\n%s", want, stdout)
 		}

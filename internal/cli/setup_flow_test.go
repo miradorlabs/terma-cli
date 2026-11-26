@@ -124,7 +124,13 @@ func TestSetupOrderSpinnerAndTeamPicker(t *testing.T) {
 		"spinner:update:Fetching teams…",
 		"spinner:stop",
 		"form:" + teamPickerTitle,
-		"form:Which coding agents do you use? (space toggles, enter confirms)",
+		"form:Which coding agents do you use?",
+		// From the agent picker to the summary, one spinner names each step.
+		"spinner:start:Applying team policies…",
+		"spinner:update:Starting the relay…",
+		"spinner:update:Writing agent hooks…",
+		"spinner:update:Checking in…",
+		"spinner:stop",
 	}
 	if !slices.Equal(events, want) {
 		t.Fatalf("events = %v\nwant   = %v", events, want)
@@ -134,6 +140,15 @@ func TestSetupOrderSpinnerAndTeamPicker(t *testing.T) {
 	}
 	if strings.Contains(out, "Conflict") || strings.Contains(out, "Routing order") {
 		t.Errorf("unexpected conflict for disjoint policies:\n%s", out)
+	}
+
+	// --verbose prints each step as it goes, so no spinner runs past the picker.
+	events = nil
+	if out, err := runTerma(t, "setup", "--verbose", "--harness", "codex"); err != nil {
+		t.Fatalf("setup --verbose: %v\n%s", err, out)
+	}
+	if slices.ContainsFunc(events, func(e string) bool { return strings.Contains(e, "Applying team policies") }) {
+		t.Fatalf("--verbose ran the progress spinner: %v", events)
 	}
 }
 
@@ -317,27 +332,21 @@ func TestSetupPickerOffersPersonalAndKeepsItUnticked(t *testing.T) {
 	}
 }
 
-// Setup lists what the ticked teams collect one repository a line, the first ten, then a count.
-func TestSetupListsCollectedRepositories(t *testing.T) {
-	var repos []string
-	for i := range 12 {
-		repos = append(repos, fmt.Sprintf("github.com/acme/r%02d", i))
+// Setup's summary names the personal organization's team "Personal", whatever the team is
+// called, and lists no repositories.
+func TestSetupSummaryNamesPersonalAndListsNoRepositories(t *testing.T) {
+	team := func(org, name string, personal bool, pol config.Policy) discoveredTeam {
+		return discoveredTeam{orgName: org, teamName: name, team: routing.Team{OrganizationID: org, Personal: personal, Policy: pol}}
 	}
-	team := func(org string, rs ...string) discoveredTeam {
-		return discoveredTeam{orgName: org, teamName: org, team: routing.Team{OrganizationID: org,
-			Policy: config.Policy{Mode: config.ModeRepo, Repositories: rs, TeamID: org, FetchedAt: time.Now()}}}
-	}
+	repos := config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/web"}, TeamID: "w", FetchedAt: time.Now()}
+	global := config.Policy{Mode: config.ModeGlobal, TeamID: "p", FetchedAt: time.Now()}
 	var b strings.Builder
 	u := newSetupUI(&b, false)
-	u.teamsConfigured([]organization{{ID: "a", Name: "A"}, {ID: "b", Name: "B"}}, []discoveredTeam{team("a", repos[:6]...), team("b", repos[6:]...)})
+	u.teamsConfigured([]organization{{ID: "a", Name: "Acme"}, {ID: "p", Name: "Someone's Personal", Type: "personal"}},
+		[]discoveredTeam{team("Acme", "Acme Web", false, repos), team("Someone's Personal", "Default", true, global)})
 	u.printLines()
 	out := b.String()
-	for _, want := range []string{"\n                    github.com/acme/r00\n", "github.com/acme/r09\n", "and 2 more"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("output lacks %q:\n%s", want, out)
-		}
-	}
-	if strings.Contains(out, "r10") {
-		t.Errorf("listed past ten:\n%s", out)
+	if !strings.Contains(out, "Teams         Acme Web, Personal\n") || strings.Contains(out, "Default") || strings.Contains(out, "Collects") || strings.Contains(out, "github.com") {
+		t.Fatalf("summary:\n%s", out)
 	}
 }

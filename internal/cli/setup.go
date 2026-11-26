@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -155,6 +156,15 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	team := ""
 	var chosenOrg *organization
 	var disc *setupDiscovery
+	// From the agent picker to the summary, a spinner says which step setup is on; --verbose
+	// prints each step instead, and Terma Desktop drives --desktop-grant.
+	sp := app.startSpinner(cmd.ErrOrStderr())
+	defer sp.Stop()
+	phase := func(text string) {
+		if !f.verbose && !f.desktopGrant {
+			sp.Start(text)
+		}
+	}
 	steps := setup.Steps{
 		SignIn: func(ctx context.Context, cfg *config.Config) (*config.Config, error) {
 			var err error
@@ -194,7 +204,11 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 		},
 		// A machine-level preference, not a connection.
 		ChooseAgents: func(context.Context, *config.Config) ([]string, error) {
-			return app.chooseHarnesses(cmd, f)
+			names, err := app.chooseHarnesses(cmd, f)
+			if err == nil {
+				phase("Applying team policies…")
+			}
+			return names, err
 		},
 		Recorded: func(names []string) {
 			recorded = true
@@ -211,6 +225,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			return pol, err
 		},
 		ConnectRelay: func(ctx context.Context, names []string) error {
+			phase("Starting the relay…")
 			if f.relayAddr != "" {
 				if err := app.moveRelay(f.relayAddr); err != nil {
 					return err
@@ -233,14 +248,16 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			})
 		},
 		MachineHooks: func(_ context.Context, names []string) error {
+			phase("Writing agent hooks…")
 			err := app.globalMode().Apply(names, func(what string) { ui.OK("Machine", what) },
 				func(what string) { ui.Summary("Machine", what) }, ui.Then)
 			if err == nil {
-				app.setupStatusLine(cmd.ErrOrStderr(), ui, names)
+				app.setupStatusLine(stopFirst{sp, cmd.ErrOrStderr()}, ui, names)
 			}
 			return err
 		},
 		CheckIn: func(ctx context.Context) {
+			phase("Checking in…")
 			if ok, what := daemon.CheckIn(ctx, app.stateDir); ok {
 				ui.Summary("Check-in", what)
 			} else {
@@ -253,6 +270,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 		app.useServerKey(&steps, ui, parseOrgRef(f.org), &team, f.insecureStorage)
 	}
 	res, err := setup.Run(cmd.Context(), cfg, steps)
+	sp.Stop()
 	// A team picker left after the agents were recorded is still a cancellation, but not
 	// one that recorded nothing.
 	if errors.Is(err, errCancelled) {
@@ -293,4 +311,16 @@ func (app *App) reportUpdates(ui *setupUI) {
 		return
 	}
 	ui.Summary("Updates", updatesSummary(selfupdate.InstallOf(exe, app.version), p.Auto))
+}
+
+// stopFirst stops a spinner before anything is written to its stream, so the two never
+// share a line; the next step's text starts it again.
+type stopFirst struct {
+	sp progressSpinner
+	w  io.Writer
+}
+
+func (s stopFirst) Write(b []byte) (int, error) {
+	s.sp.Stop()
+	return s.w.Write(b)
 }

@@ -95,7 +95,7 @@ func (app *App) harnessSelectionAgents() []agentChoice {
 
 // harnessSelectionForm ticks and marks "detected" exactly the agents in detected.
 func (app *App) harnessSelectionForm(detected map[string]bool) *prompt.Form {
-	form := &prompt.Form{Title: "Which coding agents do you use? (space toggles, enter confirms)"}
+	form := &prompt.Form{Title: "Which coding agents do you use?"}
 	for _, a := range app.harnessSelectionAgents() {
 		item := prompt.Item{Label: a.DisplayName(), Kind: prompt.Check}
 		if app.agents.IsSupported(a.Name()) {

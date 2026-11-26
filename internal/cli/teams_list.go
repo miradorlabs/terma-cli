@@ -270,6 +270,9 @@ func orgNotAccessibleErr(err error) bool {
 	return ok && e.OrgNotAccessible()
 }
 func teamLabel(names teamNames, t routing.Team) string {
+	if t.Personal {
+		return personalLabel
+	}
 	return orgTeamLabel(names.Orgs[t.OrganizationID], cmp.Or(names.Teams[t.TeamID], t.TeamID))
 }
 func orgTeamLabel(org, team string) string {

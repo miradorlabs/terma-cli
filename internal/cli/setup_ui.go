@@ -75,80 +75,49 @@ func (u *setupUI) Then(step string) {
 	}
 }
 
-// policyFetched says which team and policy are now in force, and what is left to do about
-// them: a policy to set up, a list to fill in, or commit hooks to turn on.
+// policyFetched says which team is now in force, and what is left to do about its policy:
+// a policy to set up, a list to fill in, or commit hooks to turn on.
 func (u *setupUI) policyFetched(team string, pol config.Policy) {
 	if team != "" {
 		u.Summary("Team", team)
 	}
-	if pol.AdmitsNone() {
-		u.Warn("Collects", doctor.PolicySummary(pol))
-		u.Then(doctor.NothingCollectedStep(pol))
-		return
-	}
-	u.Summary("Collects", doctor.PolicySummary(pol))
-	if doctor.GitHooksOff(pol, time.Now()) {
-		u.Then(doctor.GitHooksOffStep)
-	}
+	u.policyNextSteps(pol, !pol.AdmitsNone(), doctor.GitHooksOff(pol, time.Now()))
 }
 
-// maxListedRepos is how many repositories setup lists before it counts the rest.
-const maxListedRepos = 10
-
-// teamsConfigured summarizes multiple enrolled teams/organizations and what their
-// policies actively collect across the machine.
+// teamsConfigured summarizes the enrolled organizations and teams.
 func (u *setupUI) teamsConfigured(orgs []organization, teams []discoveredTeam) {
 	if len(orgs) > 1 {
 		u.Summary("Organizations", strings.Join(orgNamesList(orgs), ", "))
 	}
-	multiOrg := len(orgs) > 1
 	labels := make([]string, 0, len(teams))
-	var repos []string
-	hasPersonal := false
-	anyAdmits := false
-	gitHooksOff := false
+	anyAdmits, gitHooksOff := false, false
 	now := time.Now()
 	for _, dt := range teams {
-		if multiOrg {
+		switch {
+		case dt.team.Personal:
+			labels = append(labels, personalLabel)
+		case len(orgs) > 1:
 			labels = append(labels, orgTeamLabel(dt.orgName, dt.teamName))
-		} else {
+		default:
 			labels = append(labels, dt.teamName)
 		}
-		pol := dt.team.Policy
-		if dt.team.Personal && pol.Global() {
-			hasPersonal = true
+		if pol := dt.team.Policy; !pol.AdmitsNone() {
 			anyAdmits = true
-		} else if !pol.AdmitsNone() {
-			anyAdmits = true
-			for _, r := range pol.Repositories {
-				if !slices.Contains(repos, r) {
-					repos = append(repos, r)
-				}
-			}
-		}
-		if !pol.AdmitsNone() && doctor.GitHooksOff(pol, now) {
-			gitHooksOff = true
+			gitHooksOff = gitHooksOff || doctor.GitHooksOff(pol, now)
 		}
 	}
 	u.Summary("Teams", strings.Join(labels, ", "))
-	if !anyAdmits {
-		pol := teams[0].team.Policy
+	u.policyNextSteps(teams[0].team.Policy, anyAdmits, gitHooksOff)
+}
+
+// policyNextSteps warns when nothing is collected at all, and otherwise asks for commit
+// hooks where a policy has them off.
+func (u *setupUI) policyNextSteps(pol config.Policy, admits, gitHooksOff bool) {
+	switch {
+	case !admits:
 		u.Warn("Collects", doctor.PolicySummary(pol))
 		u.Then(doctor.NothingCollectedStep(pol))
-		return
-	}
-	lines := repos
-	if len(lines) > maxListedRepos {
-		lines = append(slices.Clone(lines[:maxListedRepos]), fmt.Sprintf("and %d more", len(repos)-maxListedRepos))
-	}
-	if hasPersonal {
-		lines = append(lines, cmp.Or(map[bool]string{true: "plus Personal: everything else"}[len(repos) > 0], personalCollects))
-	}
-	u.Summary("Collects", "")
-	for _, l := range lines {
-		u.keep(" ", "", "  "+l)
-	}
-	if gitHooksOff {
+	case gitHooksOff:
 		u.Then(doctor.GitHooksOffStep)
 	}
 }

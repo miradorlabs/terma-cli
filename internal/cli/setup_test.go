@@ -127,8 +127,8 @@ func TestSetupFetchesThePolicyAndPointsAgentsAtTheRelay(t *testing.T) {
 	if p := loaded.Policy; err != nil || !p.Validated() || p.Mode != config.ModeRepo || !p.IncludePrompts || p.FetchedAt.IsZero() {
 		t.Fatalf("policy not recorded: %+v", p)
 	}
-	if !strings.Contains(out, "Collects      sessions in the team's repositories (github.com/acme/app)") {
-		t.Fatalf("setup did not say the policy:\n%s", out)
+	if strings.Contains(out, "Collects") {
+		t.Fatalf("setup listed what the team collects:\n%s", out)
 	}
 	// The test binary is no release, so it is never updated; setup says so.
 	if !strings.Contains(out, "Updates       never for a development build") {
@@ -208,8 +208,8 @@ func TestSetupAndDoctorSayWhenTheTeamHasNoPolicy(t *testing.T) {
 }
 
 // A team policy whose list holds a wildcard is stored as 2.x: setup on a fresh machine (the
-// desktop's connect step runs the same setup) reads it, says a wildcard collects every
-// repository under its owner, and keeps it marked so hooks and the relay admit by it.
+// desktop's connect step runs the same setup) reads it and keeps it marked so hooks and the
+// relay admit by it.
 func TestSetupReadsAWildcardPolicy(t *testing.T) {
 	gateway := newFakeAuth(t)
 	gateway.orgs = []organization{orgB()}
@@ -222,9 +222,6 @@ func TestSetupReadsAWildcardPolicy(t *testing.T) {
 	out, err := runTerma(t, "setup", "--harness", "codex")
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
-	}
-	if want := "Collects      sessions in the team's repositories (every repository under github.com/Acme, github.com/other/api)"; !strings.Contains(out, want) {
-		t.Errorf("setup output lacks %q:\n%s", want, out)
 	}
 	loaded, err := testApp.loadConfig()
 	if err != nil || !loaded.Policy.Wildcards || loaded.Policy.Revision != 4 {

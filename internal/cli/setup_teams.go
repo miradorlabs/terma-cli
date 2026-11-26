@@ -94,6 +94,9 @@ func (app *App) setupTeams(cmd *cobra.Command, cfg *config.Config, org *organiza
 		return config.Policy{}, "", err
 	}
 	primary := committedPrimary(committed, target)
+	if primary.Personal {
+		teamName = personalLabel
+	}
 	if err := app.persistCommittedPolicies(committed); err != nil {
 		return config.Policy{}, "", err
 	}
@@ -162,6 +165,9 @@ func (app *App) commitDiscoveredTeams(ctx context.Context, cfg *config.Config, a
 		}
 	}
 	primary := committedPrimary(committed, primaryDisc.team)
+	if primary.Personal {
+		primaryDisc.teamName = personalLabel
+	}
 	if err := app.recordSetupTeam(cfg, account, primary.OrganizationID, primaryDisc.orgName, primary.TeamID, primaryDisc.teamName); err != nil {
 		return config.Policy{}, "", err
 	}
