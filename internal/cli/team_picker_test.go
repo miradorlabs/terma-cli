@@ -88,9 +88,10 @@ func TestTeamsFormDescriptionsAndPersonal(t *testing.T) {
 		t.Errorf("first organization team at slot %+v", slots[0])
 	}
 
+	v.state = routing.State{Teams: []routing.Team{{TeamID: "t1", OrganizationID: "o1"}, {TeamID: "pt", OrganizationID: "p1", Personal: true}}}
 	var out bytes.Buffer
 	renderTeams(&out, v)
-	if text := out.String(); !strings.Contains(text, "[x] Personal") || strings.Contains(text, "Default") || strings.Contains(text, "Someone's Personal") {
-		t.Errorf("teams text does not show the personal organization as one item:\n%s", text)
+	if text := flat(out.String()); !strings.Contains(text, "✓ Teams Acme Web, Personal") || strings.Contains(text, "Default") || strings.Contains(text, "conflict") {
+		t.Errorf("teams text is not the short summary:\n%s", out.String())
 	}
 }

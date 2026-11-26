@@ -217,8 +217,7 @@ func TestSetupReportsPolicyConflicts(t *testing.T) {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
 	for _, want := range []string{
-		"Conflict github.com/shared/api: Beta Labs Beta Core collects it, not Acme Web (newer policy)",
-		"Conflict github.com/shared/web: Acme Web collects it, not Acme API (newer policy)",
+		"! Policy conflict between Acme Web, Acme API, Beta Labs Beta Core",
 		"Run `terma doctor` to see which team collects each repository.",
 	} {
 		if !strings.Contains(flat(out), want) {

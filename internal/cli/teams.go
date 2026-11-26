@@ -6,17 +6,14 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
-	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
 type teamsFlags struct {
@@ -96,6 +93,9 @@ func (app *App) runTeams(cmd *cobra.Command, f teamsFlags) error {
 	case f.json:
 		return output.Render(cmd.OutOrStdout(), output.FormatJSON, output.Table{}, v)
 	}
+	if v.state.Profile == "" {
+		v.state = st
+	}
 	renderTeams(cmd.OutOrStdout(), v)
 	return nil
 }
@@ -121,55 +121,67 @@ func loadRoutingState(stateDir, profile string) (routing.State, error) {
 	}
 }
 
+// renderTeams prints the selected teams, what changed and any policy conflict, as setup does.
 func renderTeams(w io.Writer, v teamsView) {
-	out, p := style.Highlight(w), style.For(w)
-	for _, c := range v.Changes {
-		fmt.Fprintf(out, "%s %s\n", p.OK("✓"), c)
+	names := teamNames{Teams: map[string]string{}, Orgs: map[string]string{}}
+	for _, o := range v.Organizations {
+		names.Orgs[o.ID] = orgTitle(o)
+		for _, t := range o.Teams {
+			names.Teams[t.ID] = cmp.Or(t.Name, t.ID)
+		}
+	}
+	multi := len(v.Organizations) > 1
+	u := newSetupUI(w, false)
+	var labels []string
+	for _, t := range v.state.Teams {
+		labels = append(labels, summaryLabel(names, multi, t))
+	}
+	if len(labels) == 0 {
+		u.Warn("Teams", "None selected. Nothing is sent.")
+	} else {
+		u.Summary("Teams", strings.Join(labels, ", "))
+	}
+	for _, o := range v.Organizations {
+		for _, t := range o.Teams {
+			if t.Selected {
+				if label, action := teamAttention(t); label != "" {
+					u.Warn(label, summaryLabel(names, multi, routing.Team{TeamID: t.ID, OrganizationID: o.ID, Personal: o.Type == "personal"})+". "+action)
+				}
+			}
+		}
+	}
+	if v.Unlisted != "" {
+		u.Caution("Note", "Your organizations could not be listed.")
+	}
+	if len(v.Changes) > 0 {
+		u.Summary("Changed", "Your team choices are saved.")
 	}
 	for _, warn := range v.Warnings {
-		fmt.Fprintf(out, "%s %s\n", p.Warn("!"), warn)
+		u.Caution("Note", warn)
 	}
-	if len(v.Changes)+len(v.Warnings) > 0 {
-		fmt.Fprintln(out)
+	line := conflictLine(v.state, names, multi)
+	if line != "" {
+		u.Caution("Policy conflict", line)
 	}
-	fmt.Fprintln(out, p.Bold("Send telemetry from this machine to:"))
-	if v.Unlisted != "" {
-		fmt.Fprintf(out, "  %s\n", p.Dim("organizations not listed: "+v.Unlisted))
-	}
-	tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
-	for _, o := range v.Organizations {
-		if o.Type == "personal" && len(o.Teams) == 1 && o.Note == "" {
-			t := o.Teams[0]
-			fmt.Fprintf(tw, "\n  %s %s\t%s%s\n", checkbox(t.Selected), personalLabel, t.Collects, teamStateNote(t))
-			continue
-		}
-		fmt.Fprintf(tw, "\n  %s\n", orgTitle(o))
-		if o.Note != "" {
-			fmt.Fprintf(tw, "    %s\n", p.Dim(o.Note))
-		}
-		for _, t := range o.Teams {
-			fmt.Fprintf(tw, "    %s %s\t%s%s\n", checkbox(t.Selected), cmp.Or(t.Name, t.ID), t.Collects, teamStateNote(t))
-		}
-	}
-	_ = tw.Flush()
-	if len(v.Overlaps) > 0 {
-		fmt.Fprintf(out, "\n%s\n", p.Bold("Policy conflicts (the most recently updated policy collects):"))
-		for _, o := range v.Overlaps {
-			fmt.Fprintf(out, "  %s %s → %s, not %s\n", p.Warn("!"), o.Entry, o.Team, o.Other)
-		}
-		fmt.Fprintf(out, "\n%s\n", p.Bold("Routing order:"))
-		for i, o := range v.Order {
-			fmt.Fprintf(out, "  %d. %s\n", i+1, o)
-		}
-		fmt.Fprintf(out, "  %s\n", p.Dim(doctor.OrderChanges))
+	u.printLines()
+	if line != "" {
+		fmt.Fprintf(w, "\n%s\n", u.p.Commands(conflictStep))
 	}
 }
 
-func checkbox(selected bool) string {
-	if selected {
-		return "[x]"
+// teamAttention names what is wrong with a selected team and what the developer can do.
+func teamAttention(t teamRow) (label, action string) {
+	switch {
+	case t.Unreadable != "":
+		return "Unreadable", "Its policy could not be read."
+	case t.State == routing.SignInNeeded:
+		return "Signed out", "Run `terma setup` to sign in again."
+	case t.State == routing.Suspended, t.State == routing.Refused:
+		return "Blocked", "Run `terma teams --release " + quoteArg(cmp.Or(t.Name, t.ID)) + "` to remove it."
+	case t.State == routing.Expired:
+		return "Out of date", "Its policy could not be refreshed. Check the network."
 	}
-	return "[ ]"
+	return "", ""
 }
 
 func orgTitle(o orgRow) string { return cmp.Or(o.Name, o.ID) }

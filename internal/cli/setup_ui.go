@@ -129,17 +129,43 @@ func (u *setupUI) policyNextSteps(pol config.Policy, admits, gitHooksOff bool) {
 	}
 }
 
-// reportConflicts names every repository two selected teams' policies both list and the
-// team that collects it.
+// reportConflicts names the selected teams whose policies list the same repositories.
 func (u *setupUI) reportConflicts(st routing.State, names teamNames) {
-	overlaps := routing.Overlaps(st)
-	for _, o := range overlaps {
-		u.Caution("Conflict", fmt.Sprintf("%s: %s collects it, not %s (newer policy)",
-			o.Entry, teamLabel(names, o.Winner), teamLabel(names, o.Other)))
+	if line := conflictLine(st, names, len(names.Orgs) > 1); line != "" {
+		u.Caution("Policy conflict", line)
+		u.Then(conflictStep)
 	}
-	if len(overlaps) > 0 {
-		u.Then("Run `terma doctor` to see which team collects each repository.")
+}
+
+// conflictStep points to where each conflict is explained.
+const conflictStep = "Run `terma doctor` to see which team collects each repository."
+
+// conflictLine lists the teams in st whose policies overlap, or "" when none do.
+func conflictLine(st routing.State, names teamNames, multi bool) string {
+	var labels []string
+	for _, o := range routing.Overlaps(st) {
+		for _, t := range []routing.Team{o.Winner, o.Other} {
+			if l := summaryLabel(names, multi, t); !slices.Contains(labels, l) {
+				labels = append(labels, l)
+			}
+		}
 	}
+	if len(labels) == 0 {
+		return ""
+	}
+	return "between " + strings.Join(labels, ", ")
+}
+
+// summaryLabel names t as the Teams line does: with its organization when there are several.
+func summaryLabel(names teamNames, multi bool, t routing.Team) string {
+	if t.Personal {
+		return personalLabel
+	}
+	name := cmp.Or(names.Teams[t.TeamID], t.TeamID)
+	if multi {
+		return orgTeamLabel(names.Orgs[t.OrganizationID], name)
+	}
+	return name
 }
 
 func orgNamesList(orgs []organization) []string {

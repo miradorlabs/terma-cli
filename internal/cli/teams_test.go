@@ -208,14 +208,14 @@ func TestTeamsListsAllOrgsOnSingleUserTokenAndHidesProjectNotFound(t *testing.T)
 		t.Errorf("Personal = %+v (listed=%v)", pers, ok)
 	}
 
-	// Text output lists every org and has no --authorize prompt.
+	// Text output is a short summary, with no --authorize prompt.
 	f.forbiddenTeams = nil
 	text, err := runTerma(t, "teams")
 	if err != nil {
 		t.Fatalf("teams text: %v\n%s", err, text)
 	}
-	if !strings.Contains(text, "[ ] Acme API") || !strings.Contains(text, "[ ] Beta Core") || !strings.Contains(text, personalCollects) {
-		t.Errorf("unexpected text output:\n%s", text)
+	if !strings.Contains(flat(text), "! Teams None selected.") || strings.Contains(text, "[ ]") || strings.Contains(text, personalCollects) {
+		t.Errorf("text output is not the short summary:\n%s", text)
 	}
 	if strings.Contains(text, "--authorize") || strings.Contains(text, "--org") {
 		t.Errorf("text output mentions removed flags:\n%s", text)
@@ -330,12 +330,12 @@ func TestTeamsAnnotatesOrgNotAccessibleWithoutFailingOthers(t *testing.T) {
 			if bi < 0 || !v.Organizations[bi].Inaccessible || !strings.Contains(v.Organizations[bi].Note, "no longer have access") {
 				t.Fatalf("Beta Labs row = %+v, want Inaccessible with clear note", v.Organizations[bi])
 			}
-			// Text rendering prints the annotation while showing Acme and Personal.
+			// Text rendering is the short summary, with no organization listing.
 			text, err := runTerma(t, "teams")
 			if err != nil {
 				t.Fatalf("teams text: %v\n%s", err, text)
 			}
-			if !strings.Contains(text, orgInaccessibleNote) || !strings.Contains(text, "Acme API") || !strings.Contains(text, "Personal") {
+			if !strings.Contains(text, "Teams") || strings.Contains(text, "Beta Labs") {
 				t.Errorf("unexpected text output:\n%s", text)
 			}
 			// Attempting to tick a team in the inaccessible org fails cleanly.
@@ -388,8 +388,9 @@ func TestTeamsSelectRefreshesViewWhenPolicyChangesBetweenListAndTick(t *testing.
 	if err != nil {
 		t.Fatalf("teams --yes: %v\n%s\n%s", err, stdout, stderr)
 	}
-	if !strings.Contains(stdout, "github.com/acme/payments") || strings.Contains(stdout, "github.com/acme/api") {
-		t.Fatalf("returned view still has stale policy:\n%s", stdout)
+	st := loadState(t)
+	if len(st.Teams) != 1 || !slices.Equal(st.Teams[0].Policy.Repositories, []string{"github.com/acme/payments"}) {
+		t.Fatalf("ticked a stale policy: %+v\n%s", st.Teams, stdout)
 	}
 }
 
@@ -617,8 +618,8 @@ func TestTeamsSelectWildcardOverlapGlobalAndNoKeyMinting(t *testing.T) {
 			t.Fatalf("order = %v, want Beta Core then Acme API", v.Order)
 		}
 		text, err := runTerma(t, "teams")
-		if err != nil || !strings.Contains(text, "Routing order:") || !strings.Contains(text, "policies can change at any time") {
-			t.Fatalf("teams text lacks the routing order (%v):\n%s", err, text)
+		if err != nil || !strings.Contains(flat(text), "! Policy conflict between Beta Labs Beta Core, Acme API") || !strings.Contains(text, conflictStep) || strings.Contains(text, "Routing order") {
+			t.Fatalf("teams text lacks the one conflict line (%v):\n%s", err, text)
 		}
 	})
 
@@ -708,7 +709,7 @@ func TestTeamsSignInNeededMessageAndInvalidStateFailure(t *testing.T) {
 		if err != nil {
 			t.Fatalf("teams: %v\n%s", err, text)
 		}
-		if !strings.Contains(text, "run `terma setup` to sign in again") || strings.Contains(text, "--org") {
+		if !strings.Contains(flat(text), "! Signed out Acme API. Run `terma setup` to sign in again.") || strings.Contains(text, "--org") {
 			t.Errorf("unexpected SignInNeeded wording:\n%s", text)
 		}
 	})
