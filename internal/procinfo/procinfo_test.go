@@ -189,10 +189,21 @@ func TestFindSenderNamesTheConnectingProcessNotAChildThatInheritedIt(t *testing.
 	if pid, ok := FindSender(client, server); !ok || pid != sender.Process.Pid {
 		t.Fatalf("FindSender(%v, %v) = %d, %v; want the sender %d, not its child %d", client, server, pid, ok, sender.Process.Pid, child)
 	}
+	// Found first, as macOS finds it, the child still leads to the sender: Linux lists the
+	// sender first, so FindSender alone does not walk.
+	if eldestOwnerForTest != nil {
+		if pid := eldestOwnerForTest(child, conn{client: client, server: server}, os.Getpid()); pid != sender.Process.Pid {
+			t.Fatalf("from the child %d, the eldest owner is %d; want the sender %d", child, pid, sender.Process.Pid)
+		}
+	}
 }
 
-// ownsConnForTest is ownsConn, where the platform asks each process (procinfo_scan_test.go).
-var ownsConnForTest func(pid int, c conn) bool
+// ownsConnForTest and eldestOwnerForTest are ownsConn and eldestOwner, where the platform
+// asks each process (procinfo_scan_test.go).
+var (
+	ownsConnForTest    func(pid int, c conn) bool
+	eldestOwnerForTest func(owner int, c conn, self int) int
+)
 
 // executableEnv makes the test binary print AbsExecutable and exit.
 const executableEnv = "PROCINFO_TEST_EXECUTABLE"
