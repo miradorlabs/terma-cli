@@ -635,12 +635,41 @@ func TestOmpCouncilRegressionCases(t *testing.T) {
 		t.Errorf("span times = [%d, %d], want [%d, %d]", promSpans[0].StartTimeUnixNano, promSpans[0].EndTimeUnixNano, wantStart, wantEnd)
 	}
 
-	// 4. Local file:// decoding and ompParentSessionID filename-first & non-regular-path safety.
+	// 4. Local file:// decoding, OMP path aliases (@, :, quotes, \\?\), remote file:// fail-closed,
+	// deleted whitespace-split selectors, and ompParentSessionID filename-first & non-regular-path safety.
 	if got := nonURLPath("file:///work/org-b/plan%201.md"); got != "/work/org-b/plan 1.md" {
 		t.Errorf("nonURLPath(file://) = %q", got)
 	}
 	if got := nonURLPath("file:///C:/Users/dev/a.go"); got != "C:/Users/dev/a.go" {
 		t.Errorf("nonURLPath(windows file://) = %q", got)
+	}
+	if got, unk := resolveReachPath("@/work/org-b/plan.md"); unk || got != "/work/org-b/plan.md" {
+		t.Errorf("resolveReachPath(@/...) = (%q, %v)", got, unk)
+	}
+	if got, unk := resolveReachPath(":/work/org-b/plan.md"); unk || got != "/work/org-b/plan.md" {
+		t.Errorf("resolveReachPath(:/...) = (%q, %v)", got, unk)
+	}
+	if got, unk := resolveReachPath(`"/work/org-b/plan.md"`); unk || got != "/work/org-b/plan.md" {
+		t.Errorf("resolveReachPath(quoted) = (%q, %v)", got, unk)
+	}
+	if got, unk := resolveReachPath("@my-file.txt"); unk || got != "@my-file.txt" {
+		t.Errorf("resolveReachPath(@my-file.txt) = (%q, %v), want literal preserved", got, unk)
+	}
+	if _, unk := resolveReachPath("file://server/share/secret.txt"); !unk {
+		t.Errorf("resolveReachPath(remote file://) should fail closed with unknown=true")
+	}
+	if got := stripPathSelector("/work/org-b/a.txt:1-2,5-6"); got != "/work/org-b/a.txt" {
+		t.Errorf("stripPathSelector(multi-range) = %q", got)
+	}
+	if got := stripPathSelector("/work/org-b/a.txt:-60"); got != "/work/org-b/a.txt" {
+		t.Errorf("stripPathSelector(tail) = %q", got)
+	}
+	if got := stripPathSelector("/work/org-b/a.txt:raw"); got != "/work/org-b/a.txt" {
+		t.Errorf("stripPathSelector(raw) = %q", got)
+	}
+	wsDeleted := splitOmpDelimitedPaths("missing-a.txt:1-2 /work/org-b/missing-b.txt:1-2", dir)
+	if !slices.Contains(wsDeleted, "/work/org-b/missing-b.txt:1-2") {
+		t.Errorf("splitOmpDelimitedPaths(deleted) = %v, want /work/org-b/missing-b.txt:1-2", wsDeleted)
 	}
 	if got := ompParentSessionID("2026-11-20T10-00-00-000Z_parent1.jsonl"); got != "parent1" {
 		t.Errorf("ompParentSessionID(bare filename) = %q, want parent1", got)

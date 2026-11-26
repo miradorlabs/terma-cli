@@ -1020,6 +1020,33 @@ func TestOmpCouncilR4FileURLSelectorsMissingIntermediateAndPostForkParent(t *tes
 		`{"type":"message","id":"fka1","timestamp":"2026-11-23T07:15:01Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","timestamp":1795418101000,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"CLEAN-FORK-AFTER-PARENT-LATER-CROSS"}]}}`,
 	}, "\n")+"\n")
 
+	// 5. OMP '@' / ':' path aliases (e.g. "@/work/org-b/plan.md") must trigger Mixed cutoff.
+	writeSess("2026-11-23T06-00-00-000Z_s-at-alias.jsonl", strings.Join([]string{
+		`{"type":"session","version":3,"id":"s-at-alias","timestamp":"2026-11-23T06:00:00Z","cwd":` + mustJSONTest(repoA) + `}`,
+		`{"type":"message","id":"au1","timestamp":"2026-11-23T06:00:01Z","message":{"role":"user","content":"grep at alias","timestamp":1795413601000}}`,
+		`{"type":"message","id":"aa1","timestamp":"2026-11-23T06:00:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","duration":100,"timestamp":1795413601900,"usage":{"input":5,"output":5},"content":[{"type":"toolCall","id":"ag1","name":"grep","arguments":{"pattern":"secret","path":` + mustJSONTest("@"+filepath.Join(repoB, "b.txt")) + `}}]}}`,
+		`{"type":"message","id":"atr1","timestamp":"2026-11-23T06:00:03Z","message":{"role":"toolResult","toolCallId":"ag1","toolName":"grep","content":[{"type":"text","text":"LEAKED-AT-ALIAS-MATCH"}],"isError":false,"timestamp":1795413603000}}`,
+		`{"type":"message","id":"aa2","timestamp":"2026-11-23T06:00:04Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","timestamp":1795413604000,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"LEAKED-AT-ALIAS-REPLY"}]}}`,
+	}, "\n")+"\n")
+
+	// 6. Whitespace-separated selector grep targets remain fail-closed even after both files are deleted.
+	deletedWSPath := "deleted-local.txt:1-2 " + filepath.Join(repoB, "deleted-b.txt") + ":1-2"
+	writeSess("2026-11-23T05-00-00-000Z_s-ws-deleted.jsonl", strings.Join([]string{
+		`{"type":"session","version":3,"id":"s-ws-deleted","timestamp":"2026-11-23T05:00:00Z","cwd":` + mustJSONTest(repoA) + `}`,
+		`{"type":"message","id":"du1","timestamp":"2026-11-23T05:00:01Z","message":{"role":"user","content":"grep deleted ws","timestamp":1795410001000}}`,
+		`{"type":"message","id":"da1","timestamp":"2026-11-23T05:00:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","duration":100,"timestamp":1795410001900,"usage":{"input":5,"output":5},"content":[{"type":"toolCall","id":"dg1","name":"grep","arguments":{"pattern":"line","path":` + mustJSONTest(deletedWSPath) + `}}]}}`,
+		`{"type":"message","id":"dtr1","timestamp":"2026-11-23T05:00:03Z","message":{"role":"toolResult","toolCallId":"dg1","toolName":"grep","content":[{"type":"text","text":"LEAKED-DELETED-WS-MATCH"}],"isError":false,"timestamp":1795410003000}}`,
+		`{"type":"message","id":"da2","timestamp":"2026-11-23T05:00:04Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","timestamp":1795410004000,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"LEAKED-DELETED-WS-REPLY"}]}}`,
+	}, "\n")+"\n")
+
+	// 7. A deleted single relative filename with spaces inside repoA still uploads cleanly.
+	writeSess("2026-11-23T04-00-00-000Z_s-clean-spaces.jsonl", strings.Join([]string{
+		`{"type":"session","version":3,"id":"s-clean-spaces","timestamp":"2026-11-23T04:00:00Z","cwd":` + mustJSONTest(repoA) + `}`,
+		`{"type":"message","id":"su1","timestamp":"2026-11-23T04:00:01Z","message":{"role":"user","content":"grep spaces","timestamp":1795406401000}}`,
+		`{"type":"message","id":"sa1","timestamp":"2026-11-23T04:00:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","duration":100,"timestamp":1795406401900,"usage":{"input":5,"output":5},"content":[{"type":"toolCall","id":"sg1","name":"grep","arguments":{"pattern":"note","path":"docs/my design doc.md"}}]}}`,
+		`{"type":"message","id":"sa2","timestamp":"2026-11-23T04:00:04Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","timestamp":1795406404000,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"CLEAN-SPACED-FILE-IN-REPO-A"}]}}`,
+	}, "\n")+"\n")
+
 	stA := singleTeamRoutingState(now, "acc1", "org-a", "team-a", "github.com/org-a/repo-a", true, true)
 	stB := singleTeamRoutingState(now, "acc1", "org-b", "team-b", "github.com/org-b/repo-b", true, true)
 	st := stA
@@ -1058,16 +1085,69 @@ func TestOmpCouncilR4FileURLSelectorsMissingIntermediateAndPostForkParent(t *tes
 		t.Fatal(err)
 	}
 	foundCleanFork := false
+	foundCleanSpaces := false
 	for _, b := range payloads {
 		s := string(b)
 		if strings.Contains(s, "LEAKED-") {
-			t.Fatalf("Round 4 security regression: leaked data in uploaded payload: %q", s)
+			t.Fatalf("Round 4/5 security regression: leaked data in uploaded payload: %q", s)
 		}
 		if strings.Contains(s, "CLEAN-FORK-AFTER-PARENT-LATER-CROSS") {
 			foundCleanFork = true
 		}
+		if strings.Contains(s, "CLEAN-SPACED-FILE-IN-REPO-A") {
+			foundCleanSpaces = true
+		}
 	}
 	if !foundCleanFork {
 		t.Errorf("clean fork split before parent crossed should still upload")
+	}
+	if !foundCleanSpaces {
+		t.Errorf("clean session referencing deleted spaced filename in repoA should still upload")
+	}
+}
+
+type countingHistorySource struct {
+	agents.HistorySource
+	sourceSystem string
+	reads        int
+	cwd          string
+}
+
+func (s *countingHistorySource) SourceSystem() string { return s.sourceSystem }
+func (s *countingHistorySource) ReadHistory(_ context.Context, f agents.HistoryFile, _ agents.HistoryReadOptions, emit func(agents.HistorySegment) error) error {
+	s.reads++
+	return emit(agents.HistorySegment{SessionID: f.SessionID, Cwd: s.cwd})
+}
+
+func TestFamilyCutoffSharesCacheForBidirectionalFamily(t *testing.T) {
+	now := time.Date(2026, 11, 23, 12, 0, 0, 0, time.UTC)
+	repoA := initTestGitRepo(t, "https://github.com/org-a/repo-a.git")
+	st := singleTeamRoutingState(now, "acc1", "org-a", "team-a", "github.com/org-a/repo-a", true, true)
+	resolver := newCwdResolver(st, "https://auth.example.com", false, "", "", now)
+	src := &countingHistorySource{sourceSystem: "codex", cwd: repoA}
+
+	files := []agents.HistoryFile{
+		{SourceSystem: "codex", SessionID: "parent", Path: filepath.Join(repoA, "p.jsonl")},
+		{SourceSystem: "codex", SessionID: "sub-1", ParentSessionID: "parent", Path: filepath.Join(repoA, "s1.jsonl")},
+		{SourceSystem: "codex", SessionID: "sub-2", ParentSessionID: "parent", Path: filepath.Join(repoA, "s2.jsonl")},
+		{SourceSystem: "codex", SessionID: "sub-3", ParentSessionID: "parent", Path: filepath.Join(repoA, "s3.jsonl")},
+	}
+	byID := map[string]agents.HistoryFile{}
+	for _, f := range files {
+		byID[f.SessionID] = f
+	}
+	children := buildChildrenMap(files)
+	cache := map[string]familyVerdict{}
+	snap := fileSnapshot{size: 1}
+	opts := Options{StateDir: t.TempDir()}
+
+	for _, f := range files {
+		comps, missing := collectFamily(f, byID, children)
+		if _, _, err := familyCutoff(context.Background(), opts, src, resolver, f, comps, missing, snap, cache); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if src.reads != len(files) {
+		t.Errorf("ReadHistory calls = %d for %d bidirectional members, want %d (shared cache)", src.reads, len(files), len(files))
 	}
 }

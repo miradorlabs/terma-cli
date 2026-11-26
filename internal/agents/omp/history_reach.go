@@ -31,15 +31,18 @@ type ompToolInput struct {
 }
 
 type ompToolDetails struct {
-	ExitCode           *int64   `json:"exitCode,omitempty"`
-	Cwd                string   `json:"cwd,omitempty"`
-	Path               string   `json:"path,omitempty"`
-	Move               string   `json:"move,omitempty"`
-	SourcePath         string   `json:"sourcePath,omitempty"`
-	ResolvedPath       string   `json:"resolvedPath,omitempty"`
-	DisplayReadTargets []string `json:"displayReadTargets,omitempty"`
-	TouchesNoFiles     bool     `json:"touchesNoFiles,omitempty"`
-	PerFileResults     []struct {
+	ExitCode               *int64    `json:"exitCode,omitempty"`
+	Cwd                    string    `json:"cwd,omitempty"`
+	Path                   string    `json:"path,omitempty"`
+	Move                   string    `json:"move,omitempty"`
+	SourcePath             string    `json:"sourcePath,omitempty"`
+	ResolvedPath           string    `json:"resolvedPath,omitempty"`
+	DisplayTarget          string    `json:"displayTarget,omitempty"`
+	MediaPath              string    `json:"mediaPath,omitempty"`
+	DisplayReadTargets     []string  `json:"displayReadTargets,omitempty"`
+	DisplayReadTargetLinks []*string `json:"displayReadTargetLinks,omitempty"`
+	TouchesNoFiles         bool      `json:"touchesNoFiles,omitempty"`
+	PerFileResults         []struct {
 		Path       string `json:"path,omitempty"`
 		Move       string `json:"move,omitempty"`
 		SourcePath string `json:"sourcePath,omitempty"`
@@ -165,7 +168,7 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 }
 
 // ompToolResultReachPaths extracts any resolved paths disclosed in a tool result's details.
-func ompToolResultReachPaths(toolName string, d *ompToolDetails) []string {
+func ompToolResultReachPaths(toolName string, d *ompToolDetails, cwd string) []string {
 	if d == nil {
 		return nil
 	}
@@ -175,14 +178,21 @@ func ompToolResultReachPaths(toolName string, d *ompToolDetails) []string {
 		if unknown {
 			out = append(out, hookrun.UnknownReach+"\x00"+p)
 		} else if resolved != "" {
-			out = append(out, hookrun.Alone(resolved)...)
+			out = append(out, hookrun.Alone(peelSelectorIfMissing(resolved, cwd))...)
 		}
 	}
 	switch toolName {
 	case "read":
 		add(d.ResolvedPath)
+		add(d.DisplayTarget)
+		add(d.MediaPath)
 		for _, target := range d.DisplayReadTargets {
 			add(target)
+		}
+		for _, link := range d.DisplayReadTargetLinks {
+			if link != nil {
+				add(*link)
+			}
 		}
 		if len(d.Meta) > 0 {
 			var meta struct {

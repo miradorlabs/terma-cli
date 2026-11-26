@@ -298,8 +298,8 @@ func ancestorCutoffs(f agents.HistoryFile, companions []agents.HistoryFile) map[
 				q = q[1:]
 				if prev, exists := cutoffs[id]; !exists || running.Before(prev) {
 					cutoffs[id] = running
+					q = append(q, bidirChildren[id]...)
 				}
-				q = append(q, bidirChildren[id]...)
 			}
 		}
 		cur = parent

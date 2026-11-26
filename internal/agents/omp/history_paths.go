@@ -19,34 +19,90 @@ import (
 
 var (
 	ompInternalURLRe = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*://`)
-	ompLineRangeRe   = regexp.MustCompile(`(?::\d+(?:-\d+)?|#L?\d+(?:-L?\d+)?)$`)
+	ompStrayColonRe  = regexp.MustCompile(`^:(?:[/\\~]|\.\.?[/\\]|[A-Za-z]:)`)
+	ompLineRangeRe   = regexp.MustCompile(`(?i)(?::(?:(?:\d+(?:(?:-|\+)\d+)?|-\d+)(?:,(?:\d+(?:(?:-|\+)\d+)?|-\d+))*|raw|conflicts|img)|#L?\d+(?:-L?\d+)?)$`)
 )
 
-// nonURLPath converts local file:// URLs to filesystem paths and filters out non-filesystem
-// OMP internal URLs (agent://, cfg://, local://, http://, etc.).
-func nonURLPath(p string) string {
-	p = strings.TrimSpace(p)
+func normalizeUnicodeSpaces(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r == '\u00A0' || (r >= '\u2000' && r <= '\u200A') || r == '\u202F' || r == '\u205F' || r == '\u3000' {
+			return ' '
+		}
+		return r
+	}, s)
+}
+
+func stripWindowsExtendedPrefix(p string) string {
+	switch {
+	case len(p) >= 8 && strings.EqualFold(p[:8], `\\?\UNC\`):
+		return `\\` + p[8:]
+	case len(p) >= 8 && strings.EqualFold(p[:8], `//?/UNC/`):
+		return `//` + p[8:]
+	case strings.HasPrefix(p, `\\?\`) || strings.HasPrefix(p, `//?/`):
+		return p[4:]
+	}
+	return p
+}
+
+// normalizeOmpPath mirrors OMP's expandPath / normalizeAtPrefix / stripOuterDoubleQuotes
+// before URL decoding and tilde expansion: Unicode spaces, outer double quotes, stray leading
+// ':' before a path root, leading '@' shorthands (@/..., @~/..., @C:\..., @\\..., @scheme://...),
+// and Windows extended-length prefixes (\\?\).
+func normalizeOmpPath(raw string) string {
+	p := strings.TrimSpace(normalizeUnicodeSpaces(raw))
+	if len(p) >= 2 && p[0] == '"' && p[len(p)-1] == '"' {
+		p = strings.TrimSpace(p[1 : len(p)-1])
+	}
 	if p == "" {
 		return ""
+	}
+	if ompStrayColonRe.MatchString(p) {
+		p = p[1:]
+	}
+	if strings.HasPrefix(p, "@") {
+		rest := p[1:]
+		if strings.HasPrefix(rest, "/") || strings.HasPrefix(rest, `\`) ||
+			rest == "~" || strings.HasPrefix(rest, "~/") || strings.HasPrefix(rest, `~\`) ||
+			isAbsToolPath(rest) || ompInternalURLRe.MatchString(rest) {
+			p = rest
+		}
+	}
+	return stripWindowsExtendedPrefix(p)
+}
+
+func decodeReachPath(raw string) (string, bool) {
+	p := normalizeOmpPath(raw)
+	if p == "" {
+		return "", false
 	}
 	if len(p) >= 7 && strings.EqualFold(p[:7], "file://") {
 		u, err := url.Parse(p)
 		if err != nil || u.Path == "" {
-			return ""
+			return p, true
 		}
 		if u.Host != "" && !strings.EqualFold(u.Host, "localhost") {
-			return ""
+			return p, true
 		}
 		decoded := u.Path
 		if len(decoded) >= 3 && decoded[0] == '/' && isASCIILetter(decoded[1]) && decoded[2] == ':' {
 			decoded = decoded[1:]
 		}
-		return decoded
+		return stripWindowsExtendedPrefix(decoded), false
 	}
 	if ompInternalURLRe.MatchString(p) {
+		return "", false
+	}
+	return p, false
+}
+
+// nonURLPath normalizes OMP path shorthands, converts local file:// URLs to filesystem paths,
+// and filters out non-filesystem OMP internal URLs (agent://, cfg://, local://, http://, etc.).
+func nonURLPath(p string) string {
+	decoded, unknown := decodeReachPath(p)
+	if unknown {
 		return ""
 	}
-	return p
+	return decoded
 }
 
 func isASCIILetter(b byte) bool {
@@ -86,14 +142,14 @@ func isAbsToolPath(p string) bool {
 	return len(p) >= 3 && isASCIILetter(p[0]) && p[1] == ':' && (p[2] == '\\' || p[2] == '/')
 }
 
-// resolveReachPath decodes local file:// URLs, filters internal URLs, and expands a leading
-// ~ / ~/ / ~\ to the user's home directory so reach classification never joins ~/... under
-// the session cwd. An unexpandable ~ path (missing home dir or ~otheruser/...) returns
-// unknown=true to fail closed.
+// resolveReachPath normalizes OMP path shorthands, decodes local file:// URLs, filters
+// internal URLs, and expands a leading ~ / ~/ / ~\ to the user's home directory so reach
+// classification never joins ~/... under the session cwd. An unexpandable ~ path or a
+// remote/malformed file:// URL returns unknown=true to fail closed.
 func resolveReachPath(raw string) (string, bool) {
-	p := nonURLPath(raw)
-	if p == "" {
-		return "", false
+	p, unknown := decodeReachPath(raw)
+	if unknown || p == "" {
+		return p, unknown
 	}
 	if !strings.HasPrefix(p, "~") {
 		return p, false
@@ -111,29 +167,54 @@ func resolveReachPath(raw string) (string, bool) {
 	return filepath.Join(home, p[2:]), false
 }
 
-// splitOmpDelimitedPaths mirrors OMP's splitDelimitedPathEntry: existing literal paths stay
-// intact (so filenames with spaces/commas/semicolons stay whole); otherwise entries split on
-// top-level ';' or ',' outside '{...}' braces, and on top-level whitespace when any part
-// (with or without a line selector) resolves on disk.
+// splitOmpDelimitedPaths mirrors OMP's splitDelimitedPathEntry while remaining fail-closed
+// after referenced files have been deleted: an existing literal path stays intact, otherwise
+// entries split on top-level ';' or ',' outside '{...}' braces. When a segment does not exist
+// on disk and has top-level whitespace, any live whitespace-split part confirms the split;
+// when disk state cannot disambiguate (all targets deleted), both the unsplit segment and its
+// whitespace-split parts are returned so no cross-org target is missed.
 func splitOmpDelimitedPaths(entry, cwd string) []string {
-	entry = strings.TrimSpace(entry)
+	entry = strings.TrimSpace(normalizeUnicodeSpaces(entry))
 	if entry == "" {
 		return nil
 	}
 	if statReachExists(entry, cwd) {
 		return []string{entry}
 	}
-	if parts := splitTopLevel(entry, false); len(parts) >= 2 {
-		return parts
+	primary := splitTopLevel(entry, false)
+	if len(primary) == 0 {
+		return nil
 	}
-	if parts := splitTopLevel(entry, true); len(parts) >= 2 {
-		for _, p := range parts {
-			if statReachExists(p, cwd) {
-				return parts
-			}
+	var out []string
+	add := func(s string) {
+		if s != "" && !slices.Contains(out, s) {
+			out = append(out, s)
 		}
 	}
-	return []string{entry}
+	for _, seg := range primary {
+		if statReachExists(seg, cwd) {
+			add(seg)
+			continue
+		}
+		if ws := splitTopLevel(seg, true); len(ws) >= 2 {
+			anyLive := false
+			for _, w := range ws {
+				if statReachExists(w, cwd) {
+					anyLive = true
+					break
+				}
+			}
+			if !anyLive {
+				add(seg)
+			}
+			for _, w := range ws {
+				add(w)
+			}
+			continue
+		}
+		add(seg)
+	}
+	return out
 }
 
 func splitTopLevel(s string, whitespace bool) []string {

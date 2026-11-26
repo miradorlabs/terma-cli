@@ -334,7 +334,7 @@ func peekOmpSessionHeader(path string) (ompSessionHeader, error) {
 		return ompSessionHeader{}, err
 	}
 	defer func() { _ = f.Close() }()
-	br := bufio.NewReader(f)
+	br := bufio.NewReader(io.LimitReader(f, 1<<20))
 	for range 8 {
 		line, rerr := br.ReadBytes('\n')
 		trimmed := bytes.TrimSpace(line)

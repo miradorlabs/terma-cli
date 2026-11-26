@@ -290,7 +290,7 @@ func (p *ompHistoryParser) handleMessage(rec *ompLine, entryTS time.Time) error 
 			if unknown {
 				paths = append(paths, hookrun.UnknownReach+"\x00"+f.Path)
 			} else if resolved != "" {
-				paths = append(paths, hookrun.Alone(resolved)...)
+				paths = append(paths, hookrun.Alone(peelSelectorIfMissing(resolved, p.cwd))...)
 			}
 		}
 		if len(paths) > 0 {
@@ -379,7 +379,7 @@ func (p *ompHistoryParser) handleToolResult(rec *ompLine, msg *ompMessage, entry
 			details = &d
 		}
 	}
-	if paths := ompToolResultReachPaths(toolName, details); len(paths) > 0 {
+	if paths := ompToolResultReachPaths(toolName, details, p.cwd); len(paths) > 0 {
 		p.segReaches = append(p.segReaches, agents.HistoryToolReach{At: end, Cwd: p.cwd, Paths: paths})
 	}
 	if !seen || tool.Copied || p.isCopiedPrefix(end) {

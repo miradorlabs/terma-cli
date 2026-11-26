@@ -101,7 +101,10 @@ func familyCutoff(
 	}
 	slices.Sort(ids)
 	cutoffs := ancestorCutoffs(f, companions)
-	key := f.SourceSystem + "\x00" + f.SessionID + "\x00" + strings.Join(ids, "\x00")
+	key := f.SourceSystem + "\x00" + strings.Join(ids, "\x00")
+	if len(cutoffs) > 0 {
+		key += "\x00self:" + f.SessionID
+	}
 	state := fmt.Sprintf("%s:%d:%d", resolver.state.StateID, resolver.state.Generation, resolver.state.ConsentGeneration)
 
 	var at time.Time
