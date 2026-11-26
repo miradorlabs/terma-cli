@@ -296,7 +296,7 @@ func renderPlain(f *Form) []string {
 
 func teamPicker(width int) *Form {
 	return &Form{
-		Title:     "Which teams should this machine send to?",
+		Title:     "Where do you want to send your session data?",
 		termWidth: width,
 		Items: []Item{
 			{Label: "Personal", Selected: true},

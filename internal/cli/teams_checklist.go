@@ -32,7 +32,7 @@ const (
 )
 
 // teamPickerTitle asks the question both team pickers put; the keys are on the line below.
-const teamPickerTitle = "Which teams should this machine send to?"
+const teamPickerTitle = "Where do you want to send your session data?"
 
 func teamsForm(v teamsView) (*prompt.Form, []checklistSlot) {
 	form := &prompt.Form{Title: teamPickerTitle}
