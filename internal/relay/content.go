@@ -53,7 +53,7 @@ func (ru *rules) withhold(p *part, prompts, toolContent bool, unclassified map[s
 				// The relay's own stamps (stampCheckout, nameUser), safe on the resource alone: on
 				// a record they would be an agent's, unchecked.
 			case !prompts && contains(ru.promptDropFields, key):
-				// A key that is content of both kinds (Copilot's exception.message) goes with
+				// A key that is content of both kinds (an exception's message) goes with
 				// prompts withheld, whatever tool content does.
 				changed++
 				continue

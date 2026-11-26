@@ -4,7 +4,7 @@ package procinfo
 
 // findSender asks every process whether it owns c's client end: neither platform has a
 // table naming a socket's owner. A process the sender started while the connection was
-// open can hold it too, inherited (OpenCode's `terma hook`, started beside its exporter's
+// open can hold it too, inherited (an agent's `terma hook`, started beside its exporter's
 // connection), and macOS lists the newest process first: the sender is the eldest of the
 // first owner's ancestors that holds it.
 func findSender(c conn, self int) (int, bool) {
