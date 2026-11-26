@@ -280,8 +280,8 @@ func TestTeamsCheckAndRowsShowMixedRunsAndBlockedCounts(t *testing.T) {
 	}
 }
 
-// Two organizations listing the same repository show as an overlap, won by the newer policy.
-func TestTeamRowsShowOverlapsWonByTheNewerPolicy(t *testing.T) {
+// TeamRows names each conflict, then the order routing tries the teams in and why it moves.
+func TestTeamRowsShowConflictsAndRoutingOrder(t *testing.T) {
 	t.Parallel()
 	now := time.Now().UTC()
 	r := routedFixture(t)
@@ -297,8 +297,19 @@ func TestTeamRowsShowOverlapsWonByTheNewerPolicy(t *testing.T) {
 	for _, row := range TeamRows(r, now) {
 		lines = append(lines, row.Label+"|"+row.Value)
 	}
-	if want := "Overlaps|github.com/acme/one → Acme Platform, whose policy is newer than Beta Labs Core's"; !slices.Contains(lines, want) {
-		t.Errorf("TeamRows lacks %q:\n%s", want, strings.Join(lines, "\n"))
+	for _, want := range []string{
+		"Conflicts|github.com/acme/one is listed by Acme Platform and Beta Labs Core: Acme Platform collects it, as its policy is newer",
+		"Routing order|1. Acme Platform — " + PolicyAge(r.State.Teams[0]),
+		"|2. Beta Labs Core — " + PolicyAge(beta),
+		"|3. Personal — last, collects what no organization does",
+		"|" + OrderChanges,
+	} {
+		if !slices.Contains(lines, want) {
+			t.Errorf("TeamRows lacks %q:\n%s", want, strings.Join(lines, "\n"))
+		}
+	}
+	if beta.Policy.UpdatedAt = (time.Time{}); PolicyAge(beta) != "policy update time unknown" {
+		t.Errorf("PolicyAge of an undated policy = %q", PolicyAge(beta))
 	}
 }
 

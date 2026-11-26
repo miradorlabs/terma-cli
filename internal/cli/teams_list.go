@@ -17,6 +17,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/api"
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
@@ -25,9 +26,11 @@ type teamsView struct {
 	Organizations []orgRow     `json:"organizations"`
 	Unlisted      string       `json:"unlisted,omitempty"`
 	Overlaps      []overlapRow `json:"overlaps"`
-	Changes       []string     `json:"changes,omitempty"`
-	Warnings      []string     `json:"warnings,omitempty"`
-	state         routing.State
+	// Order is the order routing tries the ticked teams in, while any policies overlap.
+	Order    []string `json:"order,omitempty"`
+	Changes  []string `json:"changes,omitempty"`
+	Warnings []string `json:"warnings,omitempty"`
+	state    routing.State
 }
 
 type orgRow struct {
@@ -216,7 +219,12 @@ func (v *teamsView) mergeState(st routing.State, names teamNames, now time.Time)
 			org.Type = "personal"
 		}
 	}
-	v.Overlaps = overlapRows(st, names)
+	v.Overlaps, v.Order = overlapRows(st, names), nil
+	if len(v.Overlaps) > 0 {
+		for _, t := range routing.Order(st) {
+			v.Order = append(v.Order, teamLabel(names, t)+" — "+doctor.PolicyAge(t))
+		}
+	}
 	orgRank := func(o orgRow) int {
 		if o.Type == "personal" {
 			return 1

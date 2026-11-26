@@ -12,6 +12,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
@@ -151,6 +152,11 @@ func renderTeams(w io.Writer, v teamsView) {
 		for _, o := range v.Overlaps {
 			fmt.Fprintf(out, "  %s %s → %s, not %s\n", p.Warn("!"), o.Entry, o.Team, o.Other)
 		}
+		fmt.Fprintf(out, "\n%s\n", p.Bold("Routing order:"))
+		for i, o := range v.Order {
+			fmt.Fprintf(out, "  %d. %s\n", i+1, o)
+		}
+		fmt.Fprintf(out, "  %s\n", p.Dim(doctor.OrderChanges))
 	}
 }
 

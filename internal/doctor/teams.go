@@ -247,8 +247,29 @@ func RoutedRepository(r Routing, gitDir string, repoErr error, now time.Time) (C
 	return Check{Status: Warn, Detail: where + ": no ticked team collects it, so nothing here is collected"}, nil
 }
 
+// OrderChanges says why the routing order is not fixed.
+const OrderChanges = "policies can change at any time: the most recently updated policy wins an overlap, so this order changes whenever a team updates its policy"
+
+// PolicyAge says when t's policy was last updated, which places it in the routing order.
+func PolicyAge(t routing.Team) string {
+	switch {
+	case t.Personal:
+		return "last, collects what no organization does"
+	case t.Policy.UpdatedAt.IsZero():
+		return "policy update time unknown"
+	}
+	return "policy updated " + t.Policy.UpdatedAt.Local().Format("2 Jan 2006 15:04")
+}
+
+func pick[T any](cond bool, a, b T) T {
+	if cond {
+		return a
+	}
+	return b
+}
+
 // TeamRows are doctor's context rows for a routed profile: each ticked team and its health,
-// overlapping policies, Mixed runs, and what the relay held.
+// the order routing tries them in and their conflicts, Mixed runs, and what the relay held.
 func TeamRows(r Routing, now time.Time) []Row {
 	if r.unusable() {
 		return []Row{{"Teams", "none: no usable routing state, so nothing is sent"}}
@@ -275,10 +296,16 @@ func TeamRows(r Routing, now time.Time) []Row {
 	if len(rows) == 0 {
 		rows = append(rows, Row{"Teams", "none ticked — run `" + r.teamsFix() + "`"})
 	}
-	label = "Overlaps"
+	label = "Conflicts"
 	for _, o := range routing.Overlaps(r.State) {
-		rows = append(rows, Row{label, o.Entry + " → " + r.label(o.Winner) + ", whose policy is newer than " + r.label(o.Other) + "'s"})
+		rows = append(rows, Row{label, o.Entry + " is listed by " + r.label(o.Winner) + " and " + r.label(o.Other) + ": " + r.label(o.Winner) + " collects it, as its policy is newer"})
 		label = ""
+	}
+	if order := routing.Order(r.State); len(order) > 1 {
+		for i, t := range order {
+			rows = append(rows, Row{pick(i == 0, "Routing order", ""), fmt.Sprintf("%d. %s — %s", i+1, r.label(t), PolicyAge(t))})
+		}
+		rows = append(rows, Row{"", OrderChanges})
 	}
 	if len(r.Mixed) > 0 || r.MixedDropped > 0 {
 		rows = append(rows, Row{"Mixed", MixedSummary(r)})

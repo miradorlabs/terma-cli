@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -131,7 +132,7 @@ func TestSetupOrderSpinnerAndTeamPicker(t *testing.T) {
 	if got := enrolledTeams(t); !slices.Equal(got, []string{acmeWeb, betaTeam}) {
 		t.Fatalf("enrolled %v, want Acme Web and Beta Core", got)
 	}
-	if strings.Contains(out, "Conflict") {
+	if strings.Contains(out, "Conflict") || strings.Contains(out, "Routing order") {
 		t.Errorf("unexpected conflict for disjoint policies:\n%s", out)
 	}
 }
@@ -202,6 +203,10 @@ func TestSetupReportsPolicyConflicts(t *testing.T) {
 	}
 	if !strings.Contains(out, "github.com/shared/api is listed by") || !strings.Contains(out, "Beta Core collects it, as its policy is newer") {
 		t.Fatalf("conflict not reported:\n%s", out)
+	}
+	order := regexp.MustCompile(`Routing order\s+1\. [^\n]*Beta Core — policy updated [^\n]*\n\s+2\. [^\n]*Acme Web — policy updated [^\n]*\n\s+3\. [^\n]*Acme API — policy updated `)
+	if !order.MatchString(out) || !strings.Contains(out, "policies can change at any time") {
+		t.Fatalf("routing order or its note missing:\n%s", out)
 	}
 	st, _, err := routing.Load(testApp.stateDir, config.DefaultProfile)
 	if err != nil {

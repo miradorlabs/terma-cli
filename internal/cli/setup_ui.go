@@ -161,13 +161,26 @@ func (u *setupUI) teamsConfigured(orgs []organization, teams []discoveredTeam) {
 	}
 }
 
-// reportConflicts names every repository two organizations' policies both list, and the
-// team that collects it: the one whose policy was updated most recently.
+// reportConflicts names every repository two organizations' policies both list, the team
+// that collects it, and the order routing tries the teams in, which policy updates change.
 func (u *setupUI) reportConflicts(st routing.State, names teamNames) {
-	for _, o := range routing.Overlaps(st) {
+	overlaps := routing.Overlaps(st)
+	if len(overlaps) == 0 {
+		return
+	}
+	for _, o := range overlaps {
 		u.Caution("Conflict", fmt.Sprintf("%s is listed by %s and %s; %s collects it, as its policy is newer",
 			o.Entry, teamLabel(names, o.Winner), teamLabel(names, o.Other), teamLabel(names, o.Winner)))
 	}
+	for i, t := range routing.Order(st) {
+		line := fmt.Sprintf("%d. %s — %s", i+1, teamLabel(names, t), doctor.PolicyAge(t))
+		if i == 0 {
+			u.Caution("Routing order", line)
+		} else {
+			u.keep(" ", "", line)
+		}
+	}
+	u.Then("Note that " + doctor.OrderChanges + ". Run `terma doctor` to see the current order.")
 }
 
 func orgNamesList(orgs []organization) []string {

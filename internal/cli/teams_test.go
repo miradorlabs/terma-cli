@@ -613,6 +613,13 @@ func TestTeamsSelectWildcardOverlapGlobalAndNoKeyMinting(t *testing.T) {
 		if len(v.Overlaps) != 1 || v.Overlaps[0].Entry != "github.com/acme/api" || !strings.Contains(v.Overlaps[0].Team, "Beta") {
 			t.Fatalf("overlaps = %+v, want github.com/acme/api to Beta Core", v.Overlaps)
 		}
+		if len(v.Order) != 2 || !strings.Contains(v.Order[0], "Beta") || !strings.Contains(v.Order[1], "Acme API") {
+			t.Fatalf("order = %v, want Beta Core then Acme API", v.Order)
+		}
+		text, err := runTerma(t, "teams")
+		if err != nil || !strings.Contains(text, "Routing order:") || !strings.Contains(text, "policies can change at any time") {
+			t.Fatalf("teams text lacks the routing order (%v):\n%s", err, text)
+		}
 	})
 
 	t.Run("shared org global policy is downgraded to empty repo mode", func(t *testing.T) {

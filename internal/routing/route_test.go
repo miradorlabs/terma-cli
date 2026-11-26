@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -288,5 +289,26 @@ func TestOverlapsNameOnlyTheRealWinner(t *testing.T) {
 	}
 	if n := len(Overlaps(*s)); n != 2 {
 		t.Fatalf("Overlaps = %d, want a-team over b-team and over c-team", n)
+	}
+}
+
+// Order is newest policy first, equal or unknown ages in ticked order, refused teams out,
+// and personal last.
+func TestOrder(t *testing.T) {
+	t.Parallel()
+	s := fixture(t,
+		team("a", "undated"),
+		updated(team("b", "old"), now.Add(-48*time.Hour)),
+		updated(team("c", "new"), now.Add(-time.Hour)),
+		updated(team("d", "old-too"), now.Add(-48*time.Hour)),
+		updated(team("e", "refused"), now),
+		personal())
+	s.Teams[4].Refusals = 2
+	var got []string
+	for _, tm := range Order(*s) {
+		got = append(got, tm.TeamID)
+	}
+	if want := []string{"new", "old", "old-too", "undated", "personal"}; !slices.Equal(got, want) {
+		t.Fatalf("Order = %v, want %v", got, want)
 	}
 }
