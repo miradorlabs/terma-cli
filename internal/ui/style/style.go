@@ -15,8 +15,11 @@ import (
 // Palette wraps text in the CLI's colours, or leaves it alone when disabled.
 type Palette struct {
 	enabled bool
-	// brand is terma's purple at the terminal's colour depth.
-	brand string
+	// brand is terma's purple at the terminal's colour depth, with bright and muted
+	// shades for the logo mark and loading spinner.
+	brand       string
+	brandBright string
+	brandMuted  string
 }
 
 // For returns the palette for w: coloured only when w is a terminal a person is reading.
@@ -28,7 +31,8 @@ func For(w io.Writer) Palette {
 	if !ok || !enabled(f) {
 		return Palette{}
 	}
-	return Palette{enabled: true, brand: brandSequence()}
+	b, hi, muted := brandPalette()
+	return Palette{enabled: true, brand: b, brandBright: hi, brandMuted: muted}
 }
 
 // Plain is the palette that colours nothing, for callers that already know.
@@ -81,11 +85,20 @@ func AgentMode() bool {
 	return false
 }
 
-// Light purple, #a78bfa, keeps terminal text readable on dark backgrounds.
+// Light purple, #a78bfa, keeps terminal text readable on dark backgrounds; bright (#c4b5fd)
+// and muted (#58488a) give the Terma mark and spinner crisp depth without relying on ANSI dim.
 const (
-	brandTrueColor = "\x1b[38;2;167;139;250m"
+	brandTrueColor       = "\x1b[38;2;167;139;250m"
+	brandBrightTrueColor = "\x1b[38;2;196;181;253m"
+	brandMutedTrueColor  = "\x1b[38;2;88;72;138m"
+
 	brand256       = "\x1b[38;5;141m"
-	brandBasic     = "\x1b[95m"
+	brandBright256 = "\x1b[38;5;183m"
+	brandMuted256  = "\x1b[38;5;60m"
+
+	brandBasic       = "\x1b[95m"
+	brandBrightBasic = "\x1b[1;95m"
+	brandMutedBasic  = "\x1b[2;35m"
 )
 
 // BrandSequence is the raw brand escape for output another program draws from a pipe,
@@ -102,15 +115,20 @@ const Reset = reset
 
 // brandSequence picks the closest rendering the terminal can show.
 func brandSequence() string {
+	b, _, _ := brandPalette()
+	return b
+}
+
+func brandPalette() (base, bright, muted string) {
 	switch strings.ToLower(os.Getenv("COLORTERM")) {
 	case "truecolor", "24bit":
-		return brandTrueColor
+		return brandTrueColor, brandBrightTrueColor, brandMutedTrueColor
 	}
 	termName := os.Getenv("TERM")
 	if strings.Contains(termName, "256color") || strings.Contains(termName, "direct") || os.Getenv("COLORTERM") != "" {
-		return brand256
+		return brand256, brandBright256, brandMuted256
 	}
-	return brandBasic
+	return brandBasic, brandBrightBasic, brandMutedBasic
 }
 
 const (
@@ -131,6 +149,12 @@ func (p Palette) wrap(seq, s string) string {
 
 // Brand is terma's purple: the mark, a cursor, a highlighted choice.
 func (p Palette) Brand(s string) string { return p.wrap(p.brand, s) }
+
+// BrandBright is the lighter violet highlight used by the animated spinner peak.
+func (p Palette) BrandBright(s string) string { return p.wrap(p.brandBright, s) }
+
+// BrandMuted is the deeper violet tone for the Terma mark's secondary squares.
+func (p Palette) BrandMuted(s string) string { return p.wrap(p.brandMuted, s) }
 
 // Bold is for titles and the one line a reader must not miss.
 func (p Palette) Bold(s string) string { return p.wrap(bold, s) }

@@ -20,7 +20,7 @@ import (
 
 const routedAccount = "1111111111111111"
 
-// routedTeam is a routing state of one organization team that lists and is bound to the
+// routedTeam is a routing state of one organization team that lists the
 // repository InitRepo made at root, with its policy's content switches as given.
 func routedTeam(t *testing.T, root, org, team string, prompts, tools bool) routing.State {
 	t.Helper()
@@ -31,7 +31,7 @@ func routedTeam(t *testing.T, root, org, team string, prompts, tools bool) routi
 			Revision: 1, FetchedAt: time.Now().UTC(), TeamID: team, OrganizationID: org, AuthURL: "https://api.example.com"}}); err != nil {
 			return err
 		}
-		return s.Bind(repo, org, false)
+		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -118,19 +118,20 @@ func TestAntigravityContentFollowsTheRoutedTeamsPolicyThroughDispatch(t *testing
 }
 
 // A workspace is collected with the hook's checkout only where routing sends both to the
-// same team: another team's repository, or one the developer bound elsewhere, shares none of
+// same team: another team's repository, or one a newer policy claims elsewhere, shares none of
 // the conversation's content, whatever the hook's own team lists.
 func TestAntigravityRoutedWorkspacesShareOnlyTheSameTeam(t *testing.T) {
 	g := newTranscriptRig(t, turnsConversation, "transcript_turns.jsonl")
 	other := hookruntest.InitRepo(t)
 	now := time.Now().UTC()
+	updated := map[string]time.Time{"team-a": now.Add(-time.Hour), "team-b": now}
 	pol := func(org, team string, repos ...string) config.Policy {
 		return config.Policy{Mode: config.ModeRepo, Repositories: repos, IncludePrompts: true, IncludeToolContent: true,
-			Revision: 1, FetchedAt: now, TeamID: team, OrganizationID: org, AuthURL: "https://api.example.com"}
+			Revision: 1, FetchedAt: now, UpdatedAt: updated[team], TeamID: team, OrganizationID: org, AuthURL: "https://api.example.com"}
 	}
 	mine, theirs := "github.com/acme/"+filepath.Base(g.root), "github.com/acme/"+filepath.Base(other)
 	st, err := routing.Create(t.TempDir(), "default", routedAccount, func(s *routing.State) error {
-		// Team A lists both repositories; the developer bound the other one to organization B.
+		// Team A lists both repositories; team B lists the other one under the newer policy, so it wins it.
 		for _, team := range []routing.Team{
 			{OrganizationID: "orgA", AuthURL: "https://api.example.com", TeamID: "team-a", Policy: pol("orgA", "team-a", mine, theirs)},
 			{OrganizationID: "orgB", AuthURL: "https://api.example.com", TeamID: "team-b", Policy: pol("orgB", "team-b", theirs)},
@@ -139,10 +140,7 @@ func TestAntigravityRoutedWorkspacesShareOnlyTheSameTeam(t *testing.T) {
 				return err
 			}
 		}
-		if err := s.Bind(mine, "orgA", false); err != nil {
-			return err
-		}
-		return s.Bind(theirs, "orgB", false)
+		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -160,7 +158,7 @@ func TestAntigravityRoutedWorkspacesShareOnlyTheSameTeam(t *testing.T) {
 		t.Error("the hook's own checkout is not collected")
 	}
 	if paths.workspacesCollected(g.root, &antigravityHookInput{WorkspacePaths: []string{g.root, other}}) {
-		t.Error("a workspace bound to another organization shares the conversation's content")
+		t.Error("a workspace routed to another organization shares the conversation's content")
 	}
 	if paths.workspacesCollected(g.root, &antigravityHookInput{WorkspacePaths: []string{g.root, t.TempDir()}}) {
 		t.Error("a workspace outside git, which no selected team collects, shares the conversation's content")

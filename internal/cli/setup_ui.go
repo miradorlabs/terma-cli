@@ -12,6 +12,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
+	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
@@ -56,8 +57,14 @@ func (u *setupUI) Warn(label, what string) {
 // without leaving them a step.
 func (u *setupUI) Caution(label, what string) { u.keep(u.p.Warn("!"), label, what) }
 
+// keep adds a checklist line, wrapping what under itself.
 func (u *setupUI) keep(mark, label, what string) {
-	u.lines = append(u.lines, fmt.Sprintf("  %s %-*s %s", mark, stepLabelWidth, label, u.p.Commands(what)))
+	const indent = 2 + 1 + 1 + stepLabelWidth + 1
+	lines := wrapStep(what, style.Columns(u.out)-indent)
+	u.lines = append(u.lines, fmt.Sprintf("  %s %-*s %s", mark, stepLabelWidth, label, u.p.Commands(lines[0])))
+	for _, l := range lines[1:] {
+		u.lines = append(u.lines, strings.Repeat(" ", indent)+u.p.Commands(l))
+	}
 }
 
 // Detail takes the long form, shown under --verbose.
@@ -74,21 +81,97 @@ func (u *setupUI) Then(step string) {
 	}
 }
 
-// policyFetched says which team and policy are now in force, and what is left to do about
-// them: a policy to set up, a list to fill in, or commit hooks to turn on.
+// policyFetched says which team is now in force, and what is left to do about its policy:
+// a policy to set up, a list to fill in, or commit hooks to turn on.
 func (u *setupUI) policyFetched(team string, pol config.Policy) {
 	if team != "" {
 		u.Summary("Team", team)
 	}
-	if pol.AdmitsNone() {
+	u.policyNextSteps(pol, !pol.AdmitsNone(), doctor.GitHooksOff(pol, time.Now()))
+}
+
+// teamsConfigured summarizes the enrolled organizations and the teams st ticks, including
+// one whose policy could not be read this run, which keeps its last one.
+func (u *setupUI) teamsConfigured(orgs []organization, st routing.State, names teamNames) {
+	if len(orgs) > 1 {
+		u.Summary("Organizations", strings.Join(orgNamesList(orgs), ", "))
+	}
+	dests := make([]orgTeam, 0, len(st.Teams))
+	anyAdmits, gitHooksOff := false, false
+	now := time.Now()
+	for _, t := range st.Teams {
+		dests = append(dests, orgTeam{cmp.Or(names.Orgs[t.OrganizationID], t.OrganizationID), cmp.Or(names.Teams[t.TeamID], t.TeamID), t.Personal})
+		if pol := t.Policy; !pol.AdmitsNone() {
+			anyAdmits = true
+			gitHooksOff = gitHooksOff || doctor.GitHooksOff(pol, now)
+		}
+	}
+	u.Summary("Sending to", sendingTo(dests))
+	u.policyNextSteps(st.Teams[0].Policy, anyAdmits, gitHooksOff)
+}
+
+// policyNextSteps warns when nothing is collected at all, and otherwise asks for commit
+// hooks where a policy has them off.
+func (u *setupUI) policyNextSteps(pol config.Policy, admits, gitHooksOff bool) {
+	switch {
+	case !admits:
 		u.Warn("Collects", doctor.PolicySummary(pol))
 		u.Then(doctor.NothingCollectedStep(pol))
-		return
-	}
-	u.Summary("Collects", doctor.PolicySummary(pol))
-	if doctor.GitHooksOff(pol, time.Now()) {
+	case gitHooksOff:
 		u.Then(doctor.GitHooksOffStep)
 	}
+}
+
+// reportConflicts names the selected teams whose policies list the same repositories.
+func (u *setupUI) reportConflicts(st routing.State, names teamNames) {
+	if line := conflictLine(st, names); line != "" {
+		u.Caution("Conflict", line)
+	}
+}
+
+// doctorStep is setup's one pointer to `terma doctor`, which explains every ! line.
+const doctorStep = "Run `terma doctor` to check everything and see which team collects each repository."
+
+// conflictStep points to where each conflict is explained.
+const conflictStep = "Run `terma doctor` to see which team collects each repository."
+
+// conflictLine names the teams in st whose policies overlap, or is "" when none do.
+func conflictLine(st routing.State, names teamNames) string {
+	var ids, labels []string
+	for _, o := range routing.Overlaps(st) {
+		for _, t := range []routing.Team{o.Winner, o.Other} {
+			if slices.Contains(ids, t.EnrollmentID) {
+				continue
+			}
+			ids = append(ids, t.EnrollmentID)
+			// Each name is quoted, as a team name may hold commas, "and" or "›".
+			if l := "'" + teamLabel(names, t) + "'"; !slices.Contains(labels, l) {
+				labels = append(labels, l)
+			}
+		}
+	}
+	switch {
+	case len(ids) == 0:
+		return ""
+	case len(labels) == 1 && len(ids) == 2:
+		return "Two teams named " + labels[0] + " list the same repository."
+	case len(labels) == 1:
+		return fmt.Sprintf("%d teams named %s list the same repositories.", len(ids), labels[0])
+	case len(labels) == 2:
+		return labels[0] + " and " + labels[1] + " list the same repository."
+	}
+	return strings.Join(labels[:len(labels)-1], ", ") + " and " + labels[len(labels)-1] + " list the same repositories."
+}
+
+func orgNamesList(orgs []organization) []string {
+	out := make([]string, 0, len(orgs))
+	for _, o := range orgs {
+		name := cmp.Or(o.Name, o.ID)
+		if !slices.Contains(out, name) {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 // printLines prints the checklist so far.
@@ -102,24 +185,41 @@ func (u *setupUI) printLines() {
 	u.lines = nil
 }
 
-func (u *setupUI) finish() {
-	u.printLines()
+// headline opens the summary: the title in bold green, or the warn title in bold yellow
+// when a step needs the developer.
+func (u *setupUI) headline() {
 	if u.warned {
-		fmt.Fprintf(u.out, "\n%s %s\n", u.p.Warn("!"), u.p.Bold(cmp.Or(u.warnTitle, u.title+" — the steps marked ! need you")))
+		fmt.Fprintf(u.out, "\n%s\n", u.p.Warn(u.p.Bold("! "+cmp.Or(u.warnTitle, u.title+". Some steps need you."))))
 	} else {
-		fmt.Fprintf(u.out, "\n%s %s\n", u.p.OK("✓"), u.p.Bold(u.title))
+		fmt.Fprintf(u.out, "\n%s\n", u.p.OK(u.p.Bold("✓ "+u.title)))
 	}
+}
+
+func (u *setupUI) finish() {
+	u.headline()
+	u.printLines()
 	if len(u.next) == 0 {
 		return
 	}
 	fmt.Fprintf(u.out, "\n%s\n", u.p.Bold("Next steps:"))
+	width := style.Columns(u.out) - 4
 	for _, step := range u.next {
-		lines := strings.Split(u.p.Commands(step), "\n")
-		fmt.Fprintf(u.out, "  %s %s\n", u.p.Brand("•"), lines[0])
+		lines := wrapStep(step, width)
+		fmt.Fprintf(u.out, "  %s %s\n", u.p.Brand("•"), u.p.Commands(lines[0]))
 		for _, l := range lines[1:] {
-			fmt.Fprintf(u.out, "    %s\n", l)
+			fmt.Fprintf(u.out, "    %s\n", u.p.Commands(l))
 		}
 	}
+}
+
+// wrapStep breaks a next step into lines of at most width columns, never inside a
+// `quoted command`, keeping the step's own line breaks.
+func wrapStep(step string, width int) []string {
+	var out []string
+	for para := range strings.SplitSeq(step, "\n") {
+		out = append(out, style.Wrap(para, width)...)
+	}
+	return out
 }
 
 // setupHeaderInfo is the column beside the logo; it reads only local state, so it is safe

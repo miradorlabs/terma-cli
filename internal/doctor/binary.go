@@ -149,8 +149,8 @@ func BinaryCheck(exe string, binDirs []string) Check {
 	if current, err := fileDigest(exe); err == nil {
 		if installed, err := installedBinaryDigest(path); err == nil && current != installed {
 			return Check{Status: Warn,
-				Detail: path + binaryBuildLabel(path) + "; hooks run a different build from " + exe,
-				Fix:    "run `" + AddToPathCommand(filepath.Dir(exe)) + "` to put " + filepath.Dir(exe) + " first on PATH, or replace " + path + " with this build; then run `terma doctor`"}
+				Detail: "PATH finds another build at " + output.TildePath(path) + binaryBuildLabel(path) + ".",
+				Fix:    "Put this build first on PATH.\n`" + AddToPathCommand(filepath.Dir(exe)) + "`"}
 		}
 	}
 	// An app started from the Dock gets the system PATH, so its hooks may run a second

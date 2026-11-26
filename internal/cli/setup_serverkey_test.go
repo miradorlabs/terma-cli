@@ -253,7 +253,7 @@ func TestSetupWithAReadServerKeyCautions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("setup: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "it can also read the team's data, and anything on this machine can use it: an Ingest-only key is enough") {
+	if !strings.Contains(flat(out), "it can also read the team's data, and anything on this machine can use it: an Ingest-only key is enough") {
 		t.Errorf("setup did not caution about the key:\n%s", out)
 	}
 	if key, err := keystore.Get(testApp.dir, team); err != nil || key != testServerKey {

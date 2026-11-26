@@ -54,7 +54,7 @@ func TestACrossingRecordedAsideReadsMixed(t *testing.T) {
 	if !ok || p.Run != run || !p.MixedAt.Equal(crossed) || !p.Aside || !slices.Equal(p.Aliases, []string{"agent-1"}) {
 		t.Errorf("Locate = %+v, %v", p, ok)
 	}
-	if got := Mixed(dir, crossed.Add(time.Hour), time.Hour*24); !slices.Equal(got, []MixedRun{{Session: "s", Why: Why{Reason: Aside}, Recent: true}}) {
+	if got := Mixed(dir, crossed.Add(time.Hour), time.Hour*24); !slices.Equal(got, []MixedRun{{Session: "s", Why: Why{Reason: Aside}, At: crossed, Recent: true}}) {
 		t.Errorf("doctor lists %+v", got)
 	}
 }

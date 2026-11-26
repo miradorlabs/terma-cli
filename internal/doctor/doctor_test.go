@@ -49,12 +49,20 @@ func TestReadinessDeduplicatesActions(t *testing.T) {
 	}
 }
 
-func TestRenderCheck(t *testing.T) {
+// A check's line holds its name and detail; a failure's fix waits for the summary, which
+// gives a command a line of its own.
+func TestRenderCheckAndSummary(t *testing.T) {
 	t.Parallel()
+	c := Check{Status: Fail, Name: "commit hooks in effect", Detail: "hooks missing", Fix: "terma setup"}
 	var out bytes.Buffer
-	RenderCheck(&out, Check{Status: Fail, Name: "commit hooks in effect", Detail: "hooks missing", Fix: "terma setup"}, NameWidth)
-	if !strings.Contains(out.String(), "FAIL  commit hooks in effect") || !strings.Contains(out.String(), "→ terma setup") {
-		t.Fatal(out.String())
+	RenderCheck(&out, c)
+	if got := out.String(); got != "  ✗ commit hooks in effect    hooks missing\n" {
+		t.Fatalf("check line = %q", got)
+	}
+	out.Reset()
+	RenderSummary(&out, Build([]Check{c}))
+	if got, want := out.String(), "\nSetup needs attention\n  ✗ commit hooks in effect\n    terma setup\n"; got != want {
+		t.Fatalf("summary = %q, want %q", got, want)
 	}
 }
 
@@ -68,17 +76,61 @@ func TestFixTextIsPlainOffATerminal(t *testing.T) {
 	}
 }
 
-// Context is doctor's header: it names a non-production backend, and outside a repository
-// it has no work to report and needs no agents.
+// Context is doctor's header: it names a non-production backend and the directories, and
+// outside a repository says only that.
 func TestContextNamesTheDirectoriesAndTheBackendOutsideARepository(t *testing.T) {
 	t.Parallel()
-	if rows := Context(Env{}); rows != nil {
-		t.Fatalf("no configuration: %v", rows)
+	if s := Context(Env{}); s != nil {
+		t.Fatalf("no configuration: %v", s)
 	}
 	configDir, stateDir := t.TempDir(), t.TempDir()
-	rows := Context(Env{ConfigDir: configDir, StateDir: stateDir, Config: &config.Config{Environment: config.EnvDev, AuthURL: "https://auth.example"}, RepoErr: errors.New("not a repository")})
-	if len(rows) != 3 || rows[0] != (Row{"Config", output.TildePath(configDir)}) || rows[1] != (Row{"State", output.TildePath(stateDir)}) ||
-		rows[2].Label != "Environment" || !strings.Contains(rows[2].Value, "https://auth.example") {
-		t.Fatalf("rows = %v", rows)
+	s := Context(Env{ConfigDir: configDir, StateDir: stateDir, Config: &config.Config{Environment: config.EnvDev, AuthURL: "https://auth.example"}, RepoErr: errors.New("not a repository")})
+	if len(s) != 2 || s[0].Title != "This machine" || len(s[0].Lines) != 3 ||
+		s[0].Lines[0].Key != "environment" || !strings.Contains(s[0].Lines[0].Text, "https://auth.example") ||
+		s[0].Lines[1] != (Line{Key: "config", Text: output.TildePath(configDir)}) || s[0].Lines[2] != (Line{Key: "state", Text: output.TildePath(stateDir)}) {
+		t.Fatalf("machine = %+v", s)
+	}
+	if repo := s[1]; repo.Title != "This repository" || len(repo.Lines) != 1 || repo.Lines[0] != (Line{Mark: MarkFail, Text: "not a repository"}) {
+		t.Fatalf("repository = %+v", repo)
+	}
+}
+
+// At a terminal's width every line wraps under its own column, except a command, which
+// keeps a line of its own, whole, so it copies as it is.
+func TestPrinterWrapsToTheTerminalButNeverACommand(t *testing.T) {
+	t.Parallel()
+	cmd := `echo 'export PATH="$HOME/VSCodeProject/terma-cli-setup-flow/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc`
+	checks := []Check{
+		{Status: Warn, Name: "terma on PATH", Detail: "PATH finds another build at ~/.local/bin/terma (build bea38e0), which is not the one the hooks run on this machine.",
+			Fix: "Put this build first on PATH.\n`" + cmd + "`"},
+		{Status: Skip, Name: "backend receives events", Detail: "nothing was waiting to send, so delivery was not tested"},
+	}
+	var b strings.Builder
+	pr := &Printer{W: &b, P: style.Plain(), Cols: 80}
+	pr.Sections([]Section{{Title: "Teams", Lines: []Line{
+		{Mark: MarkOK, Text: "1. Mirador Dev › Platform", Note: "updated 26 Nov 09:07"},
+		{Depth: 1, Text: "github.com/miradorlabs/mirador-platform"},
+		{Depth: 2, Quiet: true, Text: "Also listed by Engineering. This policy is newer."},
+	}, Footnote: orderNote}})
+	for _, c := range checks {
+		pr.Check(c)
+	}
+	pr.Summary(Build(checks))
+	out := b.String()
+	for l := range strings.SplitSeq(strings.TrimRight(out, "\n"), "\n") {
+		if runes(l) > 80 && strings.TrimSpace(l) != cmd {
+			t.Errorf("line over 80 columns: %q", l)
+		}
+	}
+	for _, want := range []string{
+		"  ! terma on PATH             PATH finds another build at ~/.local/bin/terma\n                              (build bea38e0), which is not the one the hooks\n",
+		"\nSetup needs attention\n  ! terma on PATH\n    Put this build first on PATH.\n    " + cmd + "\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Count(out, "PATH finds another build") != 1 {
+		t.Errorf("the summary repeats the check line:\n%s", out)
 	}
 }

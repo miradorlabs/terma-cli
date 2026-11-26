@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"text/tabwriter"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -15,17 +15,15 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
-	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
 type teamsFlags struct {
 	selects, deselects, releases []string
-	binds, refuses, unbinds      []string
-	json, assumeYes              bool
+	json                         bool
 }
 
 func (f teamsFlags) changes() bool {
-	return len(f.selects)+len(f.deselects)+len(f.releases)+len(f.binds)+len(f.refuses)+len(f.unbinds) > 0
+	return len(f.selects)+len(f.deselects)+len(f.releases) > 0
 }
 
 var errServerKeyTeams = errors.New("this machine signs in with a team server key (TERMA_API_KEY), which stays on its one team: sign in as yourself with `terma setup` to choose teams")
@@ -35,23 +33,19 @@ func (app *App) newTeamsCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "teams",
 		Short: "Choose which teams this machine sends telemetry to",
-		Long: `List every organization and team your sign-in belongs to and choose which ones
-this machine sends telemetry to. Ticking a team fetches its policy and asks you
-to decide each binding it needs. Bindings say which organization owns an owner or
-repository on this machine and outlive unticking (personal never collects bound
-repositories). Records route to the most specific ticked team, with personal last.`,
+		Long: `Summarize the organizations and teams your sign-in belongs to, and choose which
+ones this machine sends telemetry to; --json lists each one by name. Each team's policy
+decides which repositories it collects. Where two teams' policies list the same
+repository, the most recently updated policy collects it; Personal collects what no
+ticked team does.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return app.runTeams(cmd, f) },
 	}
 	fl := cmd.Flags()
 	fl.StringArrayVar(&f.selects, "select", nil, "tick a team, by name or id")
-	fl.StringArrayVar(&f.deselects, "deselect", nil, "untick it; bindings stay")
+	fl.StringArrayVar(&f.deselects, "deselect", nil, "untick a team, by name or id")
 	fl.StringArrayVar(&f.releases, "release", nil, "remove a suspended or refused team, by name or id")
-	fl.StringArrayVar(&f.binds, "bind", nil, "bind an owner or repository to an organization: <owner-or-repository>=<organization>")
-	fl.StringArrayVar(&f.refuses, "refuse", nil, "refuse an owner or repository to every organization")
-	fl.StringArrayVar(&f.unbinds, "unbind", nil, "remove the decision on an owner or repository")
 	fl.BoolVar(&f.json, "json", false, "print the list, and what changed, as JSON")
-	fl.BoolVarP(&f.assumeYes, "yes", "y", false, "take each question's default: bind what a ticked team needs to its organization")
 	return cmd
 }
 
@@ -101,6 +95,9 @@ func (app *App) runTeams(cmd *cobra.Command, f teamsFlags) error {
 	case f.json:
 		return output.Render(cmd.OutOrStdout(), output.FormatJSON, output.Table{}, v)
 	}
+	if v.state.Profile == "" {
+		v.state = st
+	}
 	renderTeams(cmd.OutOrStdout(), v)
 	return nil
 }
@@ -126,61 +123,75 @@ func loadRoutingState(stateDir, profile string) (routing.State, error) {
 	}
 }
 
+// renderTeams prints the selected teams, what changed and any policy conflict, as setup does.
 func renderTeams(w io.Writer, v teamsView) {
-	out, p := style.Highlight(w), style.For(w)
-	for _, c := range v.Changes {
-		fmt.Fprintf(out, "%s %s\n", p.OK("✓"), c)
+	names := teamNames{Teams: map[string]string{}, Orgs: map[string]string{}}
+	for _, o := range v.Organizations {
+		names.Orgs[o.ID] = orgTitle(o)
+		for _, t := range o.Teams {
+			names.Teams[t.ID] = cmp.Or(t.Name, t.ID)
+		}
+	}
+	u := newSetupUI(w, false)
+	var dests []orgTeam
+	now := time.Now()
+	for _, t := range v.state.Teams {
+		if t.StateAt(now) == routing.Refused {
+			continue // nothing goes there; its Blocked row says what to do
+		}
+		dests = append(dests, orgTeam{cmp.Or(names.Orgs[t.OrganizationID], t.OrganizationID), cmp.Or(names.Teams[t.TeamID], t.TeamID), t.Personal})
+	}
+	if len(dests) == 0 {
+		u.Warn("Sending to", "Nowhere. Nothing is sent.")
+	} else {
+		u.Summary("Sending to", sendingTo(dests))
+	}
+	for _, o := range v.Organizations {
+		for _, t := range o.Teams {
+			if t.Selected {
+				if label, action := teamAttention(t); label != "" {
+					u.Warn(label, teamLabel(names, routing.Team{TeamID: t.ID, OrganizationID: o.ID, Personal: o.Type == "personal"})+". "+action)
+				}
+			}
+		}
+	}
+	if v.Unlisted != "" {
+		u.Caution("Note", "Your organizations could not be listed.")
 	}
 	for _, warn := range v.Warnings {
-		fmt.Fprintf(out, "%s %s\n", p.Warn("!"), warn)
+		u.Caution("Note", warn)
 	}
-	if len(v.Changes)+len(v.Warnings) > 0 {
-		fmt.Fprintln(out)
+	line := conflictLine(v.state, names)
+	if line != "" {
+		u.Caution("Conflict", line)
 	}
-	fmt.Fprintln(out, p.Bold("Send telemetry from this machine to:"))
-	if v.Unlisted != "" {
-		fmt.Fprintf(out, "  %s\n", p.Dim("organizations not listed: "+v.Unlisted))
+	u.title, u.warnTitle = "All set. Nothing changed.", "Nothing changed. Some teams need you."
+	if len(v.Changes) > 0 {
+		u.title, u.warnTitle = "Changes applied", "Changes applied. Some teams need you."
 	}
-	tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
-	for _, o := range v.Organizations {
-		fmt.Fprintf(tw, "\n  %s\n", orgTitle(o))
-		if o.Note != "" {
-			fmt.Fprintf(tw, "    %s\n", p.Dim(o.Note))
-		}
-		for _, t := range o.Teams {
-			fmt.Fprintf(tw, "    %s %s\t%s%s\n", checkbox(t.Selected), cmp.Or(t.Name, t.ID), t.Collects, teamStateNote(t))
-		}
+	if len(dests) == 0 {
+		u.warnTitle = "Nothing is sent from this machine."
 	}
-	_ = tw.Flush()
-	if len(v.Bindings) > 0 {
-		fmt.Fprintf(out, "\n%s\n", p.Bold("Bindings:"))
-		tw = tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
-		for _, b := range v.Bindings {
-			fmt.Fprintf(tw, "  %s\t%s\n", b.Key, bindingTarget(b))
-		}
-		_ = tw.Flush()
-	}
-	if len(v.Pending) > 0 {
-		fmt.Fprintf(out, "\n%s\n", p.Bold("To decide (what these match is held until you do):"))
-		for _, pr := range v.Pending {
-			fmt.Fprintf(out, "  %s %s  needed by %s: `terma teams --bind %s` or `terma teams --refuse %s`\n",
-				p.Warn("!"), pr.Key, pr.Entry, quoteArg(pr.Key+"="+cmp.Or(v.orgName(pr.Organization), pr.Organization)), quoteArg(pr.Key))
-		}
+	u.headline()
+	u.printLines()
+	if line != "" {
+		fmt.Fprintf(w, "\n%s\n", u.p.Commands(conflictStep))
 	}
 }
 
-func checkbox(selected bool) string {
-	if selected {
-		return "[x]"
+// teamAttention names what is wrong with a selected team and what the developer can do.
+func teamAttention(t teamRow) (label, action string) {
+	switch {
+	case t.Unreadable != "":
+		return "Unreadable", "Its policy could not be read."
+	case t.State == routing.SignInNeeded:
+		return "Signed out", "Run `terma setup` to sign in again."
+	case t.State == routing.Suspended, t.State == routing.Refused:
+		return "Blocked", "Run `terma teams --release " + quoteArg(cmp.Or(t.Name, t.ID)) + "` to remove it."
+	case t.State == routing.Expired:
+		return "Out of date", "Its policy could not be refreshed. Check the network."
 	}
-	return "[ ]"
-}
-
-func bindingTarget(b bindingRow) string {
-	if b.Refused {
-		return "refused to every organization"
-	}
-	return cmp.Or(b.Name, b.Organization)
+	return "", ""
 }
 
 func orgTitle(o orgRow) string { return cmp.Or(o.Name, o.ID) }
@@ -200,7 +211,11 @@ func teamStateNote(t teamRow) string {
 		if t.LastError == routing.OrgAccessLost {
 			note += " (" + orgInaccessibleNote + ")"
 		}
-		return note + ", blocking what it lists: `terma teams --release " + quoteArg(cmp.Or(t.Name, t.ID)) + "` removes it"
+		what := ", blocking what it lists"
+		if t.State == routing.Refused {
+			what = ", skipped"
+		}
+		return note + what + ": `terma teams --release " + quoteArg(cmp.Or(t.Name, t.ID)) + "` removes it"
 	case routing.Expired:
 		return note + ": not refreshed for a week, blocking what it lists"
 	}

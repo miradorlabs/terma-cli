@@ -40,7 +40,7 @@ func TestStatusLineVerdictInBothCommands(t *testing.T) {
 			name:         "capturing, the developer's renderer behind it",
 			st:           agents.StatusLineState{Installed: true, Renderer: "~/bin/line.sh"},
 			capture:      doctor.StatusLineBehind,
-			doctorStatus: doctor.Pass, doctorDetail: "capturing plan usage; ~/bin/line.sh runs behind it",
+			doctorStatus: doctor.Pass, doctorDetail: "capturing plan usage, your own line still runs",
 			status: "capturing plan usage; your own (~/bin/line.sh) runs behind it",
 		},
 		{

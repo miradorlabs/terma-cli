@@ -3,7 +3,6 @@ package cli
 import (
 	"cmp"
 	"errors"
-	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -15,10 +14,44 @@ import (
 
 type checklistSlot struct{ org, team int }
 
+// pickerDetail is a team's line beside its name in a picker: its description on one line,
+// then note. A policy summary is left out, since policies change under the picker.
+func pickerDetail(description, note string) string {
+	return strings.TrimSpace(strings.Join(strings.Fields(description), " ") + note)
+}
+
+// personalLabel names the personal organization's one team in a picker, in place of
+// the organization's heading and the team's own name.
+const personalLabel = "Personal"
+
+// personalHeading and personalDetail give Personal its own group in a picker, laid out
+// as an organization's; a description from the backend replaces personalDetail.
+const (
+	personalHeading = "You"
+	personalDetail  = "Your own workspace."
+)
+
+// teamPickerTitle asks the question both team pickers put; the keys are on the line below.
+const teamPickerTitle = "Where do you want to send your session data?"
+
 func teamsForm(v teamsView) (*prompt.Form, []checklistSlot) {
-	form := &prompt.Form{Title: "Send telemetry from this machine to: (space toggles, enter confirms)"}
+	form := &prompt.Form{Title: teamPickerTitle}
 	var slots []checklistSlot
+	// Personal heads the list; the organizations follow under their headings.
+	solo := func(o orgRow) bool { return o.Type == "personal" && len(o.Teams) == 1 }
+	order := make([]int, 0, len(v.Organizations))
 	for i, o := range v.Organizations {
+		if solo(o) {
+			order = append(order, i)
+		}
+	}
+	for i, o := range v.Organizations {
+		if !solo(o) {
+			order = append(order, i)
+		}
+	}
+	for _, i := range order {
+		o := v.Organizations[i]
 		heading := orgTitle(o)
 		if len(o.Teams) == 0 && o.Note != "" {
 			form.Items = append(form.Items, prompt.Item{Label: "(no teams listed)", Kind: prompt.Check, Disabled: true, Reason: o.Note, Heading: heading})
@@ -26,7 +59,11 @@ func teamsForm(v teamsView) (*prompt.Form, []checklistSlot) {
 			continue
 		}
 		for j, t := range o.Teams {
-			item := prompt.Item{Label: cmp.Or(t.Name, t.ID), Detail: t.Collects + teamStateNote(t), Kind: prompt.Check, Selected: t.Selected, Heading: heading}
+			item := prompt.Item{Label: cmp.Or(t.Name, t.ID), Detail: pickerDetail(t.Description, teamStateNote(t)), Kind: prompt.Check, Selected: t.Selected, Heading: heading}
+			if solo(o) {
+				item.Label, item.Heading = personalLabel, personalHeading
+				item.Detail = pickerDetail(cmp.Or(t.Description, personalDetail), teamStateNote(t))
+			}
 			if (t.Unreadable != "" || o.Inaccessible) && !t.Selected {
 				item.Disabled, item.Reason = true, cmp.Or(t.Unreadable, o.Note)
 			}
@@ -71,52 +108,4 @@ func (app *App) runTeamsChecklist(cmd *cobra.Command, cfg *config.Config, st rou
 		return app.applyTeamsWithView(cmd, cfg, st, v, true, ff)
 	}
 	return v, nil
-}
-
-func (app *App) setupMultiTeamChecklist(cmd *cobra.Command, cfg *config.Config, st routing.State, primary routing.Team, orgName, primaryName string, ui *setupUI) (routing.Team, string, string, bool, error) {
-	v, count := app.listTeams(cmd.Context(), cfg, st), 0
-	for _, o := range v.Organizations {
-		count += len(o.Teams)
-	}
-	if count <= 1 {
-		return primary, orgName, primaryName, false, nil
-	}
-	v, err := app.runTeamsChecklist(cmd, cfg, st, v, teamsFlags{})
-	if err != nil || len(v.Changes) == 0 {
-		return primary, orgName, primaryName, false, err
-	}
-	var ticked []string
-	for _, o := range v.Organizations {
-		for _, t := range o.Teams {
-			if t.Selected {
-				ticked = append(ticked, orgTeamLabel(o.Name, cmp.Or(t.Name, t.ID)))
-			}
-		}
-	}
-	if len(ticked) == 0 {
-		ui.Warn("Teams", "none ticked, so nothing is collected")
-		ui.Then("Run `terma teams` to choose the teams this machine sends telemetry to.")
-	} else {
-		ui.Summary("Teams", strings.Join(ticked, ", "))
-	}
-	for _, w := range v.Warnings {
-		ui.Caution("Teams", w)
-	}
-	if len(v.Pending) > 0 {
-		ui.Then("Run `terma teams` to decide pending repository bindings.")
-	}
-	if len(v.state.Teams) == 0 {
-		return routing.Team{}, "", "", true, nil
-	}
-	if i := slices.IndexFunc(v.state.Teams, func(tm routing.Team) bool {
-		return tm.TeamID == primary.TeamID && tm.OrganizationID == primary.OrganizationID
-	}); i >= 0 {
-		return v.state.Teams[i], cmp.Or(v.orgName(primary.OrganizationID), orgName), primaryName, true, nil
-	}
-	chosen := v.state.Teams[0]
-	name := chosen.TeamID
-	if r := v.findTeam(chosen.OrganizationID, chosen.TeamID); r != nil {
-		name = cmp.Or(r.Name, name)
-	}
-	return chosen, v.orgName(chosen.OrganizationID), name, true, nil
 }

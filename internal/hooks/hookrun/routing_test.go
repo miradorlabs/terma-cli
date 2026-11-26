@@ -24,16 +24,11 @@ import (
 const testAccountA = "1111111111111111"
 const testAccountB = "2222222222222222"
 
-func routedState(t *testing.T, stateDir, account string, teams []routing.Team, bind map[string]string) *Routing {
+func routedState(t *testing.T, stateDir, account string, teams []routing.Team) *Routing {
 	t.Helper()
 	st, err := routing.Create(stateDir, "default", account, func(s *routing.State) error {
 		for _, tm := range teams {
 			if _, err := s.Select(tm); err != nil {
-				return err
-			}
-		}
-		for k, org := range bind {
-			if err := s.Bind(k, org, false); err != nil {
 				return err
 			}
 		}
@@ -90,7 +85,7 @@ func TestRoutedCrossHookAndCrossToolMixedAndStartRun(t *testing.T) {
 	rt := routedState(t, stateDir, testAccountA, []routing.Team{
 		makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true),
 		makeTeam("orgB", "team-b", []string{"github.com/orgB/beta"}, true),
-	}, map[string]string{"github.com/orgA/alpha": "orgA", "github.com/orgB/beta": "orgB"})
+	})
 	env, _, _ := routedEnv(t, stateDir, repoA, testAccountA, rt)
 	ctx := context.Background()
 
@@ -148,7 +143,7 @@ func TestRoutedUnknownReachAndWithholdPlacementsAndKeepRun(t *testing.T) {
 	repoA := namedRepo(t, "alpha", "git@github.com:orgA/alpha.git")
 	rt := routedState(t, stateDir, testAccountA, []routing.Team{
 		makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true),
-	}, map[string]string{"github.com/orgA/alpha": "orgA"})
+	})
 	rt.WithholdPlacements = true
 	env, _, _ := routedEnv(t, stateDir, repoA, testAccountA, rt)
 	ctx := context.Background()
@@ -190,7 +185,7 @@ func TestRoutedOwnerAccountConflictPreserved(t *testing.T) {
 	}
 	rtA := routedState(t, stateDir, testAccountA, []routing.Team{
 		makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true),
-	}, map[string]string{"github.com/orgA/alpha": "orgA"})
+	})
 	envA, _, spoolDir := routedEnv(t, stateDir, repoA, testAccountA, rtA)
 	ctx := context.Background()
 	sid := "018f3a2c-0003-7000-8000-000000000001"
@@ -207,7 +202,7 @@ func TestRoutedOwnerAccountConflictPreserved(t *testing.T) {
 			tm.EnrollmentID = "enr_b"
 			return tm
 		}(),
-	}, Bindings: map[string]routing.Binding{"github.com/orgA/alpha": {Organization: "orgA"}}}
+	}}
 	envB, _, _ := routedEnv(t, stateDir, repoA, testAccountB, NewRouting("default", &stB))
 	rB, err := envB.Repo(ctx)
 	if err != nil {
@@ -228,7 +223,7 @@ func TestRoutedSandboxedGitHooksAndNoDestinationLosses(t *testing.T) {
 	rt := routedState(t, stateDir, testAccountA, []routing.Team{
 		makeTeam("orgA", "team-a", []string{"github.com/orgA/on"}, true),
 		makeTeam("orgB", "team-b", []string{"github.com/orgB/off"}, false),
-	}, map[string]string{"github.com/orgA/on": "orgA", "github.com/orgB/off": "orgB"})
+	})
 
 	if !rt.GitHooks(filepath.Join(repoOn, ".git"), time.Now()) {
 		t.Fatal("GitHooks(repoOn) = false; want true")
@@ -278,16 +273,7 @@ func TestRoutedSandboxedGitHooksAndNoDestinationLosses(t *testing.T) {
 		t.Fatalf("sandboxed PostCommit: %v", err)
 	}
 
-	// Also park a Hold event (Enrollment == "", HoldKey != "") in the same repo to prove unpark keeps Hold events.
-	heldEv := spool.Event{
-		Time: time.Now().UTC(), Name: semconv.TermaFilesTouchedEvent, SessionID: sid,
-		Account: testAccountA, Profile: "default", HoldKey: "github.com/orgA/on",
-	}
-	if !envOn.park(rOn, parkedEvents, heldEv) {
-		t.Fatal("failed to park held event")
-	}
-
-	// Unsandboxed Repo(ctx) runs unpark: drops destination-less commit (counts no_destination), keeps Hold event.
+	// Unsandboxed Repo(ctx) runs unpark: drops the destination-less commit (counts no_destination).
 	if _, err := envOn.Repo(ctx); err != nil {
 		t.Fatalf("unsandboxed Repo: %v", err)
 	}
@@ -295,20 +281,7 @@ func TestRoutedSandboxedGitHooksAndNoDestinationLosses(t *testing.T) {
 	if l[LostNoDestination] != 1 {
 		t.Fatalf("losses = %v; want %s=1", l, LostNoDestination)
 	}
-	spooled := hookruntest.Spooled(t, envOn.Spool)
-	hasHeld, hasCommit := false, false
-	for _, ev := range spooled {
-		if ev.HoldKey == "github.com/orgA/on" {
-			hasHeld = true
-		}
-		if ev.Name == semconv.TermaCommitEvent {
-			hasCommit = true
-		}
-	}
-	if !hasHeld {
-		t.Fatal("unpark dropped Hold event that had HoldKey set")
-	}
-	if hasCommit {
+	if len(hookruntest.Named(hookruntest.Spooled(t, envOn.Spool), semconv.TermaCommitEvent)) != 0 {
 		t.Fatal("unpark spooled destination-less sandboxed commit instead of dropping it")
 	}
 }
@@ -321,7 +294,7 @@ func TestRoutedTurns(t *testing.T) {
 	rt := routedState(t, stateDir, testAccountA, []routing.Team{
 		makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true),
 		makeTeam("orgB", "team-b", []string{"github.com/orgB/beta"}, true),
-	}, map[string]string{"github.com/orgA/alpha": "orgA", "github.com/orgB/beta": "orgB"})
+	})
 	env, _, _ := routedEnv(t, stateDir, repoA, testAccountA, rt)
 	ctx := context.Background()
 
@@ -349,7 +322,7 @@ func TestRoutedHookLatencyBudget(t *testing.T) {
 	}
 	rt := routedState(t, stateDir, testAccountA, []routing.Team{
 		makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true),
-	}, map[string]string{"github.com/orgA/alpha": "orgA"})
+	})
 	env, _, _ := routedEnv(t, stateDir, repoA, testAccountA, rt)
 	ctx := context.Background()
 	sid := "018f3a2c-0005-7000-8000-000000000001"
@@ -425,7 +398,7 @@ func TestRoutedOutsideGitPersonalAndSymlinkEditMixed(t *testing.T) {
 		makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true),
 		makeTeam("orgB", "team-b", []string{"github.com/orgB/beta"}, true),
 		personal,
-	}, map[string]string{"github.com/orgA/alpha": "orgA", "github.com/orgB/beta": "orgB"})
+	})
 	env, _, _ := routedEnv(t, stateDir, repoA, testAccountA, rt)
 	ctx := context.Background()
 	rA, err := env.Repo(ctx)
@@ -461,7 +434,7 @@ func TestRoutedGitCommitDoesNotTaintActiveRunInOtherOrg(t *testing.T) {
 	rt := routedState(t, stateDir, testAccountA, []routing.Team{
 		makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true),
 		makeTeam("orgB", "team-b", []string{"github.com/orgB/beta"}, true),
-	}, map[string]string{"github.com/orgA/alpha": "orgA", "github.com/orgB/beta": "orgB"})
+	})
 	ctx := context.Background()
 	sid := "018f3a2c-0007-7000-8000-000000000001"
 
@@ -515,10 +488,7 @@ func TestSpoolTitleWithholdsAfterRouteChange(t *testing.T) {
 	repoB := namedRepo(t, "beta", "git@github.com:orgB/beta.git")
 	teamA := makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true)
 	teamB := makeTeam("orgB", "team-b", []string{"github.com/orgB/beta"}, true)
-	rt := routedState(t, stateDir, testAccountA, []routing.Team{teamA, teamB}, map[string]string{
-		"github.com/orgA/alpha": "orgA",
-		"github.com/orgB/beta":  "orgB",
-	})
+	rt := routedState(t, stateDir, testAccountA, []routing.Team{teamA, teamB})
 	ctx := context.Background()
 	sid := "018f3a2c-0009-7000-8000-000000000001"
 	envA, _, _ := routedEnv(t, stateDir, repoA, testAccountA, rt)
@@ -544,7 +514,7 @@ func TestUnparkMixedEventsAndPushesPreserveIdempotency(t *testing.T) {
 	stateDir := t.TempDir()
 	repoA := namedRepo(t, "alpha", "git@github.com:orgA/alpha.git")
 	teamA := makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true)
-	rt := routedState(t, stateDir, testAccountA, []routing.Team{teamA}, map[string]string{"github.com/orgA/alpha": "orgA"})
+	rt := routedState(t, stateDir, testAccountA, []routing.Team{teamA})
 	env, _, _ := routedEnv(t, stateDir, repoA, testAccountA, rt)
 	r, err := env.Repo(context.Background())
 	if err != nil {

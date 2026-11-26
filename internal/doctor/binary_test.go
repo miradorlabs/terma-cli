@@ -34,7 +34,7 @@ func TestDoctorComparesPATHBinaryWithRunningBuild(t *testing.T) {
 	installed := writeTerma(t, t.TempDir(), "old build")
 	t.Setenv("PATH", filepath.Dir(installed))
 	check := BinaryCheck(current, nil)
-	if check.Status != Warn || !strings.Contains(check.Detail, "hooks run a different build") || !strings.Contains(check.Fix, filepath.Dir(current)) {
+	if check.Status != Warn || !strings.Contains(check.Detail, "PATH finds another build") || !strings.Contains(check.Fix, filepath.Dir(current)) {
 		t.Fatalf("stale hook binary must be reported: %+v", check)
 	}
 	if err := os.WriteFile(installed, []byte("new build"), 0755); err != nil {

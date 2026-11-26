@@ -57,7 +57,6 @@ func TestEmitForSessionLeavesTheAgentsClaimAlone(t *testing.T) {
 				EnrollmentID: "enr-1", OrganizationID: "org-a", AuthURL: "https://auth.example", TeamID: hookruntest.Team, Epoch: 1,
 				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{origin}, TeamID: hookruntest.Team, FetchedAt: now},
 			}},
-			Bindings: map[string]routing.Binding{origin: {Organization: "org-a"}},
 		}
 		env := hookrun.Env{StateDir: stateDir, Now: now, Cwd: root, Spool: sp, Account: hookruntest.Account, Routing: hookrun.NewRouting("default", &st)}
 		r, err := env.Repo(context.Background())

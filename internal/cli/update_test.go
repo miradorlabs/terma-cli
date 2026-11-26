@@ -546,6 +546,12 @@ func TestDoctorShowsTheLastAutomaticUpdate(t *testing.T) {
 	if rows := app.updateRows(exe); len(rows) != 1 || rows[0].Label != "Updates" || !strings.Contains(rows[0].Value, "automatically") {
 		t.Fatalf("rows before any update: %+v", rows)
 	}
+	// A development build never updates, so doctor does not say how it would.
+	dev := New(builtin.Agents, "dev")
+	dev.dir, dev.stateDir = app.dir, app.stateDir
+	if rows := dev.updateRows(exe); len(rows) != 0 {
+		t.Fatalf("a development build's rows: %+v", rows)
+	}
 	updated := filepath.Join(app.stateDir, selfupdate.Dir, "updated.json")
 	if err := os.MkdirAll(filepath.Dir(updated), 0o700); err != nil {
 		t.Fatal(err)

@@ -25,9 +25,6 @@ func TestExtensionStartRunAndSubagentStart(t *testing.T) {
 	rt := routedState(t, stateDir, testAccountA, []routing.Team{
 		makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true),
 		makeTeam("orgB", "team-b", []string{"github.com/orgB/beta"}, true),
-	}, map[string]string{
-		"github.com/orgA/alpha": "orgA",
-		"github.com/orgB/beta":  "orgB",
 	})
 	env, _, _ := routedEnv(t, stateDir, repoA, testAccountA, rt)
 	ctx := context.Background()
@@ -100,9 +97,6 @@ func TestExtensionMixedPropagatesParentToChildrenAndSiblings(t *testing.T) {
 	rt := routedState(t, stateDir, testAccountA, []routing.Team{
 		makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true),
 		makeTeam("orgB", "team-b", []string{"github.com/orgB/beta"}, true),
-	}, map[string]string{
-		"github.com/orgA/alpha": "orgA",
-		"github.com/orgB/beta":  "orgB",
 	})
 	ctx := context.Background()
 	events := Extension{Tool: "omp", ClaimParent: true}.Events("omp")
@@ -170,9 +164,6 @@ func TestExtensionToolReachCrossOrgMixed(t *testing.T) {
 	rt := routedState(t, stateDir, testAccountA, []routing.Team{
 		makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true),
 		makeTeam("orgB", "team-b", []string{"github.com/orgB/beta"}, true),
-	}, map[string]string{
-		"github.com/orgA/alpha": "orgA",
-		"github.com/orgB/beta":  "orgB",
 	})
 	env, _, _ := routedEnv(t, stateDir, repoA, testAccountA, rt)
 	ctx := context.Background()

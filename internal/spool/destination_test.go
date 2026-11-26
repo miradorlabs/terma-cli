@@ -11,7 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
-// Routed destination metadata (Profile, Enrollment, HoldKey, Run, OwnLocation) round-trips
+// Routed destination metadata (Profile, Enrollment, Run, OwnLocation) round-trips
 // alongside the #152 lane tags (Account / NoPerson) in events-v2.jsonl, while untagged
 // events still drop and count in spool/losses/ even when destination fields are set.
 func TestDestinationMetadataRoundTripAndLaneAccounting(t *testing.T) {
@@ -52,7 +52,6 @@ func TestDestinationMetadataRoundTripAndLaneAccounting(t *testing.T) {
 		Repository:  config.Repository{Origin: "github.com/acme/api"},
 		Profile:     "work",
 		Enrollment:  "enr-acme",
-		HoldKey:     "github.com/acme",
 		Run:         "run-42",
 		OwnLocation: true,
 	}
@@ -79,7 +78,7 @@ func TestDestinationMetadataRoundTripAndLaneAccounting(t *testing.T) {
 		t.Fatalf("Peek = %d events, err=%v", len(got), err)
 	}
 	if got[0].Account != acct || got[0].NoPerson || got[0].Profile != "work" ||
-		got[0].Enrollment != "enr-acme" || got[0].HoldKey != "github.com/acme" ||
+		got[0].Enrollment != "enr-acme" ||
 		got[0].Run != "run-42" || !got[0].OwnLocation {
 		t.Fatalf("got[0] = %+v", got[0])
 	}

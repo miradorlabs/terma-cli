@@ -337,7 +337,7 @@ func TestMultiOrgSingleTokenEndToEnd(t *testing.T) {
 		"--org", orgA().ID, "--team", acmeAPI, "--harness", "claude"); err != nil {
 		t.Fatalf("alice setup: %v\nstdout:\n%s\nstderr:\n%s", err, stdout, stderr)
 	}
-	if out, err := runTerma(t, "teams", "--select", "Acme Web", "--select", "Beta Core", "--select", "Personal", "--yes"); err != nil {
+	if out, err := runTerma(t, "teams", "--select", "Acme Web", "--select", "Beta Core", "--select", "Personal"); err != nil {
 		t.Fatalf("teams --select: %v\n%s", err, out)
 	}
 	if f.exchanges.Load() != 1 {
@@ -365,7 +365,7 @@ func TestMultiOrgSingleTokenEndToEnd(t *testing.T) {
 	// Route explain matches each destination before sending.
 	for repo, want := range map[string]string{
 		acmeRepo:     "Goes to:   Acme",
-		betaRepo:     "Goes to:   Beta Labs",
+		betaRepo:     "Goes to:   Beta Core",
 		personalRepo: "Goes to:   Personal",
 	} {
 		out, err := runTerma(t, "route", "explain", repo)
@@ -438,8 +438,8 @@ func TestMultiOrgSingleTokenEndToEnd(t *testing.T) {
 	if leaked := ingest.matches(postMarker); len(leaked) != 0 {
 		t.Fatalf("post-crossing records leaked to ingest: %+v", leaked)
 	}
-	if docOut, _ := runTerma(t, "doctor"); !strings.Contains(docOut, "1 session run(s) Mixed") {
-		t.Fatalf("doctor lacks Mixed summary:\n%s", docOut)
+	if docOut, _ := runTerma(t, "doctor"); !strings.Contains(docOut, "1 session is paused") {
+		t.Fatalf("doctor lacks the paused session:\n%s", docOut)
 	}
 
 	// 3. Org-wide 403 ORG_NOT_ACCESSIBLE on Acme: refuse both Acme enrollments via coalesced
@@ -490,7 +490,7 @@ func TestMultiOrgSingleTokenEndToEnd(t *testing.T) {
 	if f.revokes.Load() != 0 {
 		t.Fatalf("org 403 revoked user token (%d revokes)", f.revokes.Load())
 	}
-	if docOut, docErr := runTerma(t, "doctor"); docErr == nil || !strings.Contains(docOut, "you no longer have access to its organization") {
+	if docOut, docErr := runTerma(t, "doctor"); docErr == nil || !strings.Contains(docOut, "no access to this organization, skipped") {
 		t.Fatalf("doctor after org 403 (err=%v):\n%s", docErr, docOut)
 	}
 	if explainOut, err := runTerma(t, "route", "explain", acmeRepo); err != nil || !strings.Contains(explainOut, orgInaccessibleNote) {
@@ -537,7 +537,7 @@ func TestMultiOrgSingleTokenEndToEnd(t *testing.T) {
 		t.Fatalf("stale alice CAS update err = %v, want ErrAccountMismatch", err)
 	}
 	// Under bob, beta/core routes to Beta Core and acme/api is not collected.
-	if out, err := runTerma(t, "route", "explain", betaRepo); err != nil || !strings.Contains(out, "Goes to:   Beta Labs") {
+	if out, err := runTerma(t, "route", "explain", betaRepo); err != nil || !strings.Contains(out, "Goes to:   Beta Core") {
 		t.Fatalf("bob route explain beta (%v):\n%s", err, out)
 	}
 	if out, err := runTerma(t, "route", "explain", acmeRepo); err != nil || !strings.Contains(out, "nothing leaves this machine") {

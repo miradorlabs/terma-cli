@@ -75,10 +75,8 @@ func TestPolicyRefreshFiltersAlreadyQueuedReplies(t *testing.T) {
 	}
 	target.Policy = pol1
 	st, err := routing.Create(testApp.stateDir, cfg.ProfileName, account, func(s *routing.State) error {
-		if _, err := s.Select(target); err != nil {
-			return err
-		}
-		return s.Bind(appRepo.Origin, cfg.OrganizationID, false)
+		_, err := s.Select(target)
+		return err
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -472,7 +470,7 @@ func TestEveryReaderSeesTheStoredPolicy(t *testing.T) {
 	if testApp.delivery().Allowed(stored.Policy, "team", spool.Event{Repository: appRepo, Name: semconv.TermaSessionStartEvent}) {
 		t.Fatal("delivery sent under an expired policy")
 	}
-	if rows := doctor.Context(doctor.Env{Config: stored, RepoErr: errors.New("outside git")}); !slices.ContainsFunc(rows, func(r doctor.Row) bool { return r.Label == "Capture" }) {
-		t.Fatalf("doctor shows capture on: %v", rows)
+	if s := doctor.Context(doctor.Env{Config: stored, RepoErr: errors.New("outside git")}); !slices.ContainsFunc(s[0].Lines, func(l doctor.Line) bool { return l.Key == "capture" }) {
+		t.Fatalf("doctor shows capture on: %+v", s)
 	}
 }

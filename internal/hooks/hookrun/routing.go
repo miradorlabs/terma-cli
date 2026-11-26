@@ -146,7 +146,7 @@ func (r *Repo) Collected() bool {
 // RouteKey identifies r's routing destination for deduplicating repeated evidence snapshots.
 func (r *Repo) RouteKey() string {
 	if r.dest != nil {
-		return r.dest.d.EnrollmentID + "\x00" + holdKey(r.dest.d)
+		return r.dest.d.EnrollmentID
 	}
 	return r.ProjectID
 }
@@ -155,12 +155,6 @@ func (r *Repo) routeSalt() string {
 		return ""
 	}
 	return "\x00" + r.RouteKey()
-}
-func holdKey(d routing.Decision) string {
-	if d.Outcome == routing.Hold && d.Reason == routing.ReasonPending {
-		return d.Authority.Key
-	}
-	return ""
 }
 
 // PolicyFor is the collection policy r's records leave under: Env.Policy before routing,
@@ -181,9 +175,8 @@ func (e Env) PolicyFor(r *Repo) config.Policy {
 // RoutesWith reports whether the records of another place leave with r's: the checkout
 // whose git directory is gitDir, with that origin, or a folder outside git when gitDir is
 // "". Before routing the policy says so (it admits the checkout, or global mode collects
-// outside git); with it, routing sends or holds both for the same team, under the same
-// pending binding if any, so a repository the developer bound elsewhere, refused or left
-// undecided never shares r's content, whatever r's team lists.
+// outside git); with it, routing sends or holds both for the same team, so a repository
+// routed to another team never shares r's content, whatever r's team lists.
 func (e Env) RoutesWith(r *Repo, gitDir, origin string) bool {
 	if e.Routing == nil {
 		if gitDir == "" {
@@ -195,7 +188,7 @@ func (e Env) RoutesWith(r *Repo, gitDir, origin string) bool {
 		return false
 	}
 	d := e.Routing.route(locationOf(gitDir, origin), e.Time())
-	return d.collected() && d.d.EnrollmentID == r.dest.d.EnrollmentID && holdKey(d.d) == holdKey(r.dest.d)
+	return d.collected() && d.d.EnrollmentID == r.dest.d.EnrollmentID
 }
 
 // Routed stamps ev with r's routed destination and the session's current run when routed.
@@ -210,7 +203,7 @@ func (e Env) destine(ev spool.Event, d *dest, own bool, run string) spool.Event 
 		l := e.lane()
 		ev.Account, ev.NoPerson = l.Account, l.NoPerson
 	}
-	ev.Profile, ev.Enrollment, ev.HoldKey, ev.Repository = e.Routing.Profile, d.d.EnrollmentID, holdKey(d.d), config.Repository{}
+	ev.Profile, ev.Enrollment, ev.Repository = e.Routing.Profile, d.d.EnrollmentID, config.Repository{}
 	if d.loc.Kind == routing.Repository {
 		ev.Repository.Origin = d.loc.Repository
 	}
@@ -293,7 +286,7 @@ func (t *Turns) Admits(cwd string) bool {
 // RouteKey returns cwd's routed destination key (matching Repo.RouteKey), or "" if unrouted/uncollected.
 func (t *Turns) RouteKey(cwd string) string {
 	if d := t.dest(cwd); t.env.Routing != nil && cwd != "" && d.collected() {
-		return d.d.EnrollmentID + "\x00" + holdKey(d.d)
+		return d.d.EnrollmentID
 	}
 	return ""
 }

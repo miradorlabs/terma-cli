@@ -130,12 +130,7 @@ func TestAProjectWithoutAPolicyOrAKeyKeepsItsEvents(t *testing.T) {
 	expired := orgTeam("org-a", "expired", listed...)
 	expired.Policy.FetchedAt = time.Now().Add(-config.MaxPolicyAge - time.Minute)
 	keyless := orgTeam("org-b", "keyless", "github.com/acme/other")
-	enr := m.createState(config.DefaultProfile, sendas.NoPersonLane, []routing.Team{expired, keyless}, func(s *routing.State, _ map[string]string) error {
-		if err := s.Bind(app.Origin, "org-a", false); err != nil {
-			return err
-		}
-		return s.Bind("github.com/acme/other", "org-b", false)
-	})
+	enr := m.createState(config.DefaultProfile, sendas.NoPersonLane, []routing.Team{expired, keyless}, nil)
 	m.spool.BindNoPerson()
 	for _, ev := range []spool.Event{
 		{Repository: app, Name: semconv.TermaSessionStartEvent, Profile: config.DefaultProfile, Enrollment: enr["expired"]},
@@ -169,9 +164,7 @@ func TestContentSpooledUnderAnOlderPolicyLeavesWithoutIt(t *testing.T) {
 	}
 	tm := orgTeam("org-a", "p1", listed...)
 	tm.Policy.IncludePrompts, tm.Policy.IncludeToolContent = false, false
-	enr := m.createState(config.DefaultProfile, sendas.NoPersonLane, []routing.Team{tm}, func(s *routing.State, _ map[string]string) error {
-		return s.Bind(app.Origin, "org-a", false)
-	})
+	enr := m.createState(config.DefaultProfile, sendas.NoPersonLane, []routing.Team{tm}, nil)
 	m.spool.BindNoPerson()
 	for _, e := range []spool.Event{
 		{Repository: app, Name: semconv.TermaSessionQuotaEvent, SessionID: "s1", Profile: config.DefaultProfile, Enrollment: enr["p1"], Attrs: map[string]any{hookrun.AttrProjectID: "p1", semconv.TermaTurnIDKey: "turn-1", semconv.UserEmailKey: "private@example.com"}},
@@ -364,9 +357,7 @@ func TestALockedKeychainKeepsEventsQueued(t *testing.T) {
 	if err := keystore.Set(m.config, "p1", testKey, keystore.Hosts{}); err != nil {
 		t.Fatal(err)
 	}
-	enr := m.createState(config.DefaultProfile, sendas.NoPersonLane, []routing.Team{orgTeam("org-a", "p1", listed...)}, func(s *routing.State, _ map[string]string) error {
-		return s.Bind(app.Origin, "org-a", false)
-	})
+	enr := m.createState(config.DefaultProfile, sendas.NoPersonLane, []routing.Team{orgTeam("org-a", "p1", listed...)}, nil)
 	secret.FailForTest(t, m.config)
 	m.spool.BindNoPerson()
 	if err := m.spool.Append(spool.Event{Repository: app, Name: semconv.TermaToolCallEvent, SessionID: "s1", Profile: config.DefaultProfile, Enrollment: enr["p1"]}); err != nil {
@@ -435,12 +426,7 @@ func TestHookEventsNameTheUser(t *testing.T) {
 	t1, t2 := orgTeam("org-a", "p1", listed...), orgTeam("org-b", "p2", other.Origin)
 	t1.Policy.IncludePrompts, t1.Policy.IncludeToolContent = false, false
 	t2.Policy.IncludePrompts, t2.Policy.IncludeToolContent = false, false
-	enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{t1, t2}, func(s *routing.State, _ map[string]string) error {
-		if err := s.Bind(app.Origin, "org-a", false); err != nil {
-			return err
-		}
-		return s.Bind(other.Origin, "org-b", false)
-	})
+	enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{t1, t2}, nil)
 	m.spool.Bind(aliceLane)
 	for _, ev := range []spool.Event{
 		{Repository: app, Name: semconv.TermaSessionQuotaEvent, SessionID: "s-p1", Profile: config.DefaultProfile, Enrollment: enr["p1"]},

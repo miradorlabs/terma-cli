@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -91,8 +92,8 @@ func signInHere(t *testing.T, opts signInOptions, wait time.Duration) (*auth.Cre
 	return cred, out.String(), err
 }
 
-// chooseHere runs setup's organization choice for the stored sign-in, asking with ask.
-func chooseHere(t *testing.T, want orgRef, ask orgAsker) (int, error) {
+// discoverHere runs setup's organization/team discovery for the stored sign-in.
+func discoverHere(t *testing.T, want orgRef) (*setupDiscovery, error) {
 	t.Helper()
 	cfg, err := testApp.loadConfig()
 	if err != nil {
@@ -102,8 +103,11 @@ func chooseHere(t *testing.T, want orgRef, ask orgAsker) (int, error) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, n, err := testApp.chooseOrganization(context.Background(), cfg, cred, want, ask)
-	return n, err
+	cmd := &cobra.Command{}
+	cmd.SetContext(context.Background())
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	return testApp.discoverSetup(context.Background(), cmd, cfg, cred, want, "")
 }
 
 // A working stored session is verified and reused; no browser opens.
@@ -126,57 +130,42 @@ func TestSignInReusesAWorkingSession(t *testing.T) {
 	}
 }
 
-// The one sign-in reads every organization: --org picks one by name or id, with no browser
-// and no second sign-in, and selects no team.
-func TestChooseOrganizationWithOneSignIn(t *testing.T) {
+// The one sign-in reads every organization: with no --org it discovers all organizations
+// and teams automatically; --org narrows discovery by name or id with no second sign-in.
+func TestDiscoverOrganizationsWithOneSignIn(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
+	t.Setenv("TERMA_POLICY_STUB", "")
 	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
 		t.Fatal(err)
+	}
+	disc, err := discoverHere(t, orgRef{})
+	if err != nil {
+		t.Fatalf("discover all: %v", err)
+	}
+	if len(disc.orgs) != 2 || len(disc.teams) != 3 {
+		t.Fatalf("discovered %d orgs and %d teams, want 2 orgs and 3 teams", len(disc.orgs), len(disc.teams))
 	}
 	for _, step := range []struct {
 		ref  string
 		want organization
 	}{{"beta labs", orgB()}, {"beta", orgB()}, {orgA().ID, orgA()}} {
-		if _, err := chooseHere(t, parseOrgRef(step.ref), nil); err != nil {
+		scoped, err := discoverHere(t, parseOrgRef(step.ref))
+		if err != nil {
 			t.Fatalf("--org %s: %v", step.ref, err)
 		}
-		file, _ := config.LoadFile(testApp.dir)
-		if p := file.Profiles[config.DefaultProfile]; p.OrganizationID != step.want.ID || p.Team != "" {
-			t.Fatalf("--org %s: profile %+v", step.ref, p)
+		if len(scoped.orgs) != 1 || scoped.orgs[0].ID != step.want.ID {
+			t.Fatalf("--org %s: orgs = %+v, want %s", step.ref, scoped.orgs, step.want.ID)
 		}
 	}
 	if f.exchanges.Load() != 0 || f.revokes.Load() != 0 {
-		t.Fatalf("choosing an organization signed in again: %d exchanges, %d revokes", f.exchanges.Load(), f.revokes.Load())
-	}
-
-	// With no --org and no question to ask, the one chosen before is kept among the person's.
-	kept, err := chooseHere(t, orgRef{}, nil)
-	if err != nil || kept != 2 {
-		t.Fatalf("kept = %d, %v; want the current one kept among 2", kept, err)
-	}
-	// With none chosen, several organizations need --org or a question.
-	if err := config.UpdateProfile(testApp.dir, config.DefaultProfile, func(p *config.Profile) { p.SelectOrganization("", "") }); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := chooseHere(t, orgRef{}, nil); err == nil || !strings.Contains(err.Error(), "pass --org") {
-		t.Fatalf("no organization chosen among two: %v", err)
-	}
-	asked := false
-	if _, err := chooseHere(t, orgRef{}, func(orgs []organization, _ string) (*organization, error) {
-		asked = true
-		return &orgs[1], nil
-	}); err != nil || !asked {
-		t.Fatalf("a terminal is asked: %v, asked %v", err, asked)
-	}
-	if file, _ := config.LoadFile(testApp.dir); file.Profiles[config.DefaultProfile].OrganizationID != orgB().ID {
-		t.Fatal("the organization picked is recorded")
+		t.Fatalf("discovering organizations signed in again: %d exchanges, %d revokes", f.exchanges.Load(), f.revokes.Load())
 	}
 }
 
 // A retryable answer listing the organizations is an error that changes nothing: it never
 // reads as the person having none.
-func TestChooseOrganizationKeepsTheChoiceWhenUnavailable(t *testing.T) {
+func TestDiscoverOrganizationsKeepsTheChoiceWhenUnavailable(t *testing.T) {
 	f := newFakeAuth(t)
 	authSandbox(t, f)
 	if err := saveSignIn(testApp.dir, storedSession(f)); err != nil {
@@ -189,7 +178,7 @@ func TestChooseOrganizationKeepsTheChoiceWhenUnavailable(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.orgsDown = true
-	if _, err := chooseHere(t, orgRef{}, nil); err == nil {
+	if _, err := discoverHere(t, orgRef{}); err == nil {
 		t.Fatal("an unavailable organization list must be an error")
 	}
 	if p := mustProfile(t); p.OrganizationID != orgA().ID || p.Team == "" {

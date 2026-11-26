@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -23,22 +22,21 @@ import (
 )
 
 type routeExplainView struct {
-	Path              string              `json:"path,omitempty"`
-	Location          routeLocationView   `json:"location"`
-	Outcome           routing.Outcome     `json:"outcome"`
-	Reason            string              `json:"reason"`
-	Blocked           routing.TeamState   `json:"blocked,omitempty"`
-	LastError         routing.ErrorClass  `json:"last_error,omitempty"`
-	Entry             string              `json:"entry,omitempty"`
-	Team              *routeTeamView      `json:"team,omitempty"`
-	Authority         *routeAuthorityView `json:"authority,omitempty"`
-	Notes             []string            `json:"notes,omitempty"`
-	Unknown           string              `json:"unknown,omitempty"`
-	UnknownToPersonal bool                `json:"unknown_to_personal,omitempty"`
-	ServerKey         bool                `json:"server_key,omitempty"`
-	StateError        string              `json:"state_error,omitempty"`
-	StateReason       string              `json:"state_reason,omitempty"`
-	Fix               string              `json:"fix,omitempty"`
+	Path              string             `json:"path,omitempty"`
+	Location          routeLocationView  `json:"location"`
+	Outcome           routing.Outcome    `json:"outcome"`
+	Reason            string             `json:"reason"`
+	Blocked           routing.TeamState  `json:"blocked,omitempty"`
+	LastError         routing.ErrorClass `json:"last_error,omitempty"`
+	Entry             string             `json:"entry,omitempty"`
+	Team              *routeTeamView     `json:"team,omitempty"`
+	Notes             []string           `json:"notes,omitempty"`
+	Unknown           string             `json:"unknown,omitempty"`
+	UnknownToPersonal bool               `json:"unknown_to_personal,omitempty"`
+	ServerKey         bool               `json:"server_key,omitempty"`
+	StateError        string             `json:"state_error,omitempty"`
+	StateReason       string             `json:"state_reason,omitempty"`
+	Fix               string             `json:"fix,omitempty"`
 }
 
 type routeLocationView struct {
@@ -56,14 +54,6 @@ type routeTeamView struct {
 	Label            string `json:"label"`
 }
 
-type routeAuthorityView struct {
-	Kind             routing.AuthorityKind `json:"kind"`
-	Key              string                `json:"key,omitempty"`
-	OrganizationID   string                `json:"organization_id,omitempty"`
-	OrganizationName string                `json:"organization_name,omitempty"`
-	Summary          string                `json:"summary,omitempty"`
-}
-
 func (app *App) newRouteCommand() *cobra.Command {
 	route := &cobra.Command{
 		Use:    "route",
@@ -75,8 +65,7 @@ func (app *App) newRouteCommand() *cobra.Command {
 		Use:   "explain [path]",
 		Short: "Explain which team a session started in path would go to",
 		Long: `Says which ticked team a session started in path (default: here) would go to: the
-policy entry that matched, the binding that allowed or blocked it, the teams passed
-over and why, and whether a record whose location is unknown may go to personal.`,
+policy entry that matched, the teams passed over and why, and whether a record whose location is unknown may go to personal.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := "."
@@ -199,7 +188,7 @@ func buildRouteExplain(path string, st routing.State, names teamNames, loc routi
 		Reason:            string(d.Reason),
 		Blocked:           d.Blocked,
 		Entry:             d.Entry,
-		Notes:             routeReasons(st, names, loc, d, serverKey),
+		Notes:             routeReasons(st, names, loc, d, now),
 		Unknown:           unknownRule(st, now),
 		UnknownToPersonal: routing.UnknownToPersonal(st, now),
 		ServerKey:         serverKey,
@@ -219,15 +208,6 @@ func buildRouteExplain(path string, st routing.State, names teamNames, loc routi
 			v.Fix = routeHoldFix(d, t, names, serverKey)
 		}
 	}
-	if line := authorityLine(d.Authority, names, serverKey); line != "" {
-		v.Authority = &routeAuthorityView{
-			Kind:             d.Authority.Kind,
-			Key:              d.Authority.Key,
-			OrganizationID:   d.Authority.Organization,
-			OrganizationName: names.Orgs[d.Authority.Organization],
-			Summary:          line,
-		}
-	}
 	return v
 }
 
@@ -235,14 +215,12 @@ func routeHoldFix(d routing.Decision, t routing.Team, names teamNames, serverKey
 	if serverKey {
 		return routeSetupFix(true)
 	}
-	switch {
-	case d.Reason == routing.ReasonPending:
-		return "terma teams --bind " + d.Authority.Key + "=" + quoteArg(cmp.Or(names.Orgs[t.OrganizationID], t.OrganizationID)) + " (or --refuse " + d.Authority.Key + ")"
-	case d.Blocked == routing.SignInNeeded:
+	switch d.Blocked {
+	case routing.SignInNeeded:
 		return "terma setup"
-	case d.Blocked == routing.Suspended || d.Blocked == routing.Refused:
+	case routing.Suspended, routing.Refused:
 		return "terma teams --release " + quoteArg(cmp.Or(names.Teams[t.TeamID], t.TeamID)) + " (or wait for its policy to come back)"
-	case d.Blocked == routing.Expired:
+	case routing.Expired:
 		return "check the network; the relay refreshes it every minute"
 	}
 	return "terma teams"
@@ -260,8 +238,6 @@ func renderRouteExplain(w io.Writer, v routeExplainView) {
 	switch {
 	case v.Outcome == routing.Send && v.Team != nil:
 		fmt.Fprintf(w, "Goes to:   %s\n", v.Team.Label)
-	case v.Outcome == routing.Hold && v.Team != nil && v.Reason == string(routing.ReasonPending):
-		fmt.Fprintf(w, "Goes to:   held, then dropped: %s's entry needs a binding no one has decided\n", v.Team.Label)
 	case v.Outcome == routing.Hold && v.Team != nil && v.Blocked == routing.SignInNeeded:
 		fmt.Fprintf(w, "Goes to:   held, then dropped: %s would collect it, but needs you to sign in again\n", v.Team.Label)
 	case v.Outcome == routing.Hold && v.Team != nil && (v.Blocked == routing.Suspended || v.Blocked == routing.Refused):
@@ -273,9 +249,6 @@ func renderRouteExplain(w io.Writer, v routeExplainView) {
 	}
 	if v.Entry != "" {
 		fmt.Fprintf(w, "Entry:     %s\n", v.Entry)
-	}
-	if v.Authority != nil && v.Authority.Summary != "" {
-		fmt.Fprintf(w, "Binding:   %s\n", v.Authority.Summary)
 	}
 	if v.ServerKey {
 		fmt.Fprintln(w, "Profile:   server key (one team)")
@@ -299,76 +272,38 @@ func routeRefusalWords(c routing.ErrorClass) string {
 	return "its refreshes were refused"
 }
 
-func authorityLine(a routing.Authority, names teamNames, serverKey bool) string {
-	org := cmp.Or(names.Orgs[a.Organization], a.Organization)
-	switch a.Kind {
-	case routing.Bound:
-		return a.Key + " is bound to " + org + ": only it decides, and personal never collects it"
-	case routing.RefusedAll:
-		return a.Key + " is refused to every organization: personal may collect it"
-	case routing.Pending:
-		if serverKey {
-			return a.Key + " is undecided: run `" + routeSetupFix(true) + "`"
-		}
-		return a.Key + " is undecided: `terma teams --bind " + a.Key + "=<organization>` or `terma teams --refuse " + a.Key + "`"
-	case routing.Free:
-		return "nothing binds it to an organization: personal may collect it"
-	}
-	return ""
-}
-
-func routeReasons(st routing.State, names teamNames, loc routing.Location, d routing.Decision, serverKey bool) []string {
+// routeReasons names each other ticked team whose policy lists the location, and why
+// the team Route chose collects it instead: that team is refused, or its policy is older.
+func routeReasons(st routing.State, names teamNames, loc routing.Location, d routing.Decision, now time.Time) []string {
 	repo := routing.Normalize(loc.Repository)
 	if loc.Kind != routing.Repository || routing.Owner(repo) == "" {
 		return nil
 	}
-	owner := routing.Owner(repo)
+	var winner routing.Team
+	if i := slices.IndexFunc(st.Teams, func(t routing.Team) bool { return t.EnrollmentID == d.EnrollmentID }); i >= 0 {
+		winner = st.Teams[i]
+	}
 	var out []string
 	for _, t := range st.Teams {
 		if t.Personal || t.EnrollmentID == d.EnrollmentID || t.Policy.Global() {
 			continue
 		}
 		for _, raw := range t.Policy.Repositories {
-			e, ok := routing.ParseEntry(raw, t.Policy.Wildcards)
-			if !ok || !e.Matches(repo) {
-				continue
+			if e, ok := routing.ParseEntry(raw, t.Policy.Wildcards); ok && e.Matches(repo) {
+				why := ", but a more recently updated policy collects it"
+				if !winner.Policy.UpdatedAt.After(t.Policy.UpdatedAt) {
+					// Neither is newer: the team ticked first keeps it.
+					why = ", but its policy is no newer, so the team ticked first collects it"
+				}
+				if t.StateAt(now) == routing.Refused {
+					why = ", but it is refused (" + routeRefusalWords(t.LastError) + "), so it is passed over"
+				}
+				out = append(out, teamLabel(names, t)+" lists "+raw+why)
+				break
 			}
-			org := cmp.Or(names.Orgs[t.OrganizationID], t.OrganizationID)
-			label := teamLabel(names, t) + " lists " + raw
-			switch {
-			case d.Authority.Kind == routing.Bound && d.Authority.Organization != t.OrganizationID:
-				out = append(out, label+", but "+d.Authority.Key+" is bound to "+cmp.Or(names.Orgs[d.Authority.Organization], d.Authority.Organization))
-			case d.Authority.Kind == routing.RefusedAll:
-				out = append(out, label+", but "+d.Authority.Key+" is refused to every organization")
-			case e.Wildcard() && d.Authority.Kind == routing.Bound && hasBinding(st, owner):
-				out = append(out, label+": a wildcard collects only once its owner "+owner+" is bound to "+org+", and "+
-					owner+" is "+bindingWords(st.Bindings[owner], names)+", so binding "+repo+" alone to "+org+" collects nothing here")
-			case e.Wildcard() && serverKey:
-				out = append(out, label+": a wildcard collects only once its owner "+owner+" is bound to "+org)
-			case e.Wildcard():
-				out = append(out, label+": a wildcard collects only once its owner "+owner+" is bound to "+org+": `terma teams --bind "+owner+"="+quoteArg(org)+"`")
-			default:
-				out = append(out, label+", but a more specific entry or an earlier team decided")
-			}
-		}
-	}
-	if d.Reason == routing.ReasonPersonal {
-		var bound []string
-		for _, k := range slices.Sorted(maps.Keys(st.Bindings)) {
-			if b := st.Bindings[k]; !b.Refused && k != owner && routing.Owner(k) == owner {
-				bound = append(bound, k+" ("+cmp.Or(names.Orgs[b.Organization], b.Organization)+")")
-			}
-		}
-		if len(bound) > 0 {
-			out = append(out, "personal collects this, though other repositories under "+owner+" are bound to an organization: "+strings.Join(bound, ", "))
 		}
 	}
 	return out
-}
-
-func hasBinding(st routing.State, key string) bool {
-	_, ok := st.Bindings[key]
-	return ok
 }
 
 func unknownRule(st routing.State, now time.Time) string {
@@ -387,5 +322,5 @@ func unknownRule(st routing.State, now time.Time) string {
 	case st.Teams[0].StateAt(now) != routing.Active:
 		return held + "personal cannot send now"
 	}
-	return held + "something is bound to an organization, and the record could be that organization's: unbinding it lets personal take them"
+	return held + "personal cannot take it"
 }

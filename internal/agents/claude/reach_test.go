@@ -56,9 +56,6 @@ func makeRoutedClaudeEnv(t *testing.T, stateDir, cwd string) (hookrun.Env, *hook
 			}); err != nil {
 				return err
 			}
-			if err := s.Bind(spec.repo, spec.org, false); err != nil {
-				return err
-			}
 		}
 		return nil
 	})

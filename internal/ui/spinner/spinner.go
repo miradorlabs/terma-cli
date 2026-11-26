@@ -11,10 +11,34 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
 
-// frames is the web app's loading mark on one cell: quadrants lit two at a time, clockwise.
-var frames = []string{"▘", "▀", "▝", "▐", "▗", "▄", "▖", "▌"}
+type shade int
 
-const interval = 150 * time.Millisecond
+const (
+	shadeBright shade = iota
+	shadeBrand
+	shadeMuted
+)
+
+type frame struct {
+	left, right           string
+	leftShade, rightShade shade
+}
+
+// frames animates Terma's 2x2 mark across two half-block cells (~1:1 square footprint),
+// starting on the signature diagonal (▀▄) and sweeping clockwise through bright, brand,
+// and muted violet tones so the mark stays crisp on both dark and light terminals.
+var frames = []frame{
+	{"▀", "▄", shadeBright, shadeBrand},
+	{"▀", "▀", shadeBrand, shadeBright},
+	{"▀", "▀", shadeMuted, shadeBrand},
+	{"▄", "▀", shadeMuted, shadeBright},
+	{"▄", "▀", shadeBright, shadeBrand},
+	{"▄", "▄", shadeBrand, shadeBright},
+	{"▄", "▄", shadeMuted, shadeBrand},
+	{"▀", "▄", shadeMuted, shadeBright},
+}
+
+const interval = 100 * time.Millisecond
 
 // Spinner animates one line of text in place. Zero value is inert; use New.
 type Spinner struct {
@@ -25,6 +49,7 @@ type Spinner struct {
 	text   string
 	stop   chan struct{}
 	done   chan struct{}
+	redraw chan struct{}
 	active bool
 }
 
@@ -45,12 +70,17 @@ func (s *Spinner) Start(text string) {
 	defer s.mu.Unlock()
 	s.text = text
 	if s.active {
+		select {
+		case s.redraw <- struct{}{}:
+		default:
+		}
 		return
 	}
 	s.active = true
 	s.stop = make(chan struct{})
 	s.done = make(chan struct{})
-	go s.run(s.stop, s.done)
+	s.redraw = make(chan struct{}, 1)
+	go s.run(s.stop, s.done, s.redraw)
 }
 
 // Stop ends the animation and clears its line, returning once the last frame is gone.
@@ -71,7 +101,7 @@ func (s *Spinner) Stop() {
 	fmt.Fprint(s.w, "\r\x1b[2K")
 }
 
-func (s *Spinner) run(stop, done chan struct{}) {
+func (s *Spinner) run(stop, done, redraw chan struct{}) {
 	defer close(done)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -81,6 +111,8 @@ func (s *Spinner) run(stop, done chan struct{}) {
 		select {
 		case <-stop:
 			return
+		case <-redraw:
+			s.draw(i)
 		case <-ticker.C:
 			i++
 			s.draw(i)
@@ -92,5 +124,18 @@ func (s *Spinner) draw(i int) {
 	s.mu.Lock()
 	text := s.text
 	s.mu.Unlock()
-	fmt.Fprintf(s.w, "\r\x1b[2K%s %s", s.p.Brand(frames[i%len(frames)]), s.p.Dim(text))
+	f := frames[i%len(frames)]
+	mark := s.paint(f.left, f.leftShade) + s.paint(f.right, f.rightShade)
+	fmt.Fprintf(s.w, "\r\x1b[2K  %s  %s", mark, s.p.Dim(text))
+}
+
+func (s *Spinner) paint(glyph string, sh shade) string {
+	switch sh {
+	case shadeBright:
+		return s.p.BrandBright(glyph)
+	case shadeMuted:
+		return s.p.BrandMuted(glyph)
+	default:
+		return s.p.Brand(glyph)
+	}
 }

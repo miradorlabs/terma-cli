@@ -66,8 +66,8 @@ type Result struct {
 	Sent, Held, Failed, Expired, Pruned, Dropped, Unroutable, Withheld int
 	// Routed is true for every delivery pass after cutover.
 	Routed bool
-	// Blocked are held until their team can send again (expired, signing in, suspended, or
-	// a pending binding); Unrouted are held because their profile's routing state is
+	// Blocked are held until their team can send again (expired, signing in or
+	// suspended); Unrouted are held because their profile's routing state is
 	// missing, unreadable, or belongs to another account.
 	Blocked, Unrouted int
 	// Discarded were dropped by Recheck (enrollment ended, Refused, or no longer covers the

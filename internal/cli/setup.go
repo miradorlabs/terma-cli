@@ -1,10 +1,10 @@
 package cli
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -16,6 +16,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/selfupdate"
+	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/setup"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
@@ -49,27 +50,29 @@ func (app *App) newSetupCommand() *cobra.Command {
 		Use: "setup",
 		// login was its own command; onboarding emails already sent say `terma login`.
 		Aliases: []string{"login"},
-		Short:   "Sign in, choose your team and coding agents, and write machine-wide hooks",
+		Short:   "Sign in, load your organizations and teams, choose coding agents, and write hooks",
 		Long: `Gets this machine ready to use terma, once per developer:
 
-  1. Signs you in (a browser handoff; --no-browser prints the URL instead) and, when
-     you belong to several organizations, asks which one (--org names it).
-  2. Records which coding agents you work with.
-  3. Chooses your team (--team names it), activates its routing state, and fetches
-     its collection policy, which lists the repositories it collects.
-  4. Points those agents' telemetry at terma's local relay, and runs the relay in
+  1. Signs you in (a browser handoff; --no-browser prints the URL instead).
+  2. Fetches your organizations, teams, and collection policies, and asks which of
+     your organizations' teams to send to (--org or --team narrows setup to one).
+     With only a personal organization, there is nothing to ask.
+  3. Records which coding agents you work with.
+  4. Activates your teams, and tells you of any policy conflict: where two
+     organizations' policies list the same repository, the most recently updated
+     policy collects it.
+  5. Points those agents' telemetry at terma's local relay, and runs the relay in
      the background (--relay-service off: started on demand instead).
-  5. Writes the agents' machine-wide hooks, so a session in a repository the
-     policy lists is collected for your team, and nothing anywhere else. git's
-     configuration is not touched: where the policy asks for commit stamping, the
+  6. Writes the agents' machine-wide hooks, so a session in a repository a policy
+     lists is collected for its team, and nothing anywhere else. git's
+     configuration is not touched: where a policy asks for commit stamping, the
      first agent session in such a repository installs three hooks in its own
      .git/hooks, chaining to any hook already there. Nothing is written into a
      repository's working tree or committed files.
 
-Run it again any time: it reuses a working sign-in, refreshes enrolled teams, offers
-the team chosen before as the default when the organization has several, --team
-selects a team, --org selects an organization, and --relay-addr moves the relay off a
-port another program holds.
+Run it again any time: it reuses a working sign-in, refreshes your organizations and
+teams, offers the teams ticked before, and --relay-addr moves the relay
+off a port another program holds.
 
 With TERMA_API_KEY set to a team server key (Ingest permission), setup signs in with
 the key instead, with no browser: it sets up the key's own team, so --org and --team
@@ -79,10 +82,10 @@ rotate it.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error { return app.runSetup(cmd, f) },
 	}
-	cmd.Flags().StringVar(&f.harnesses, "harness", "", "comma-separated agents to record ("+strings.Join(app.availableAgentNames(), ", ")+"); default: a picker")
-	cmd.Flags().StringVar(&f.org, "org", "", "organization to sign into, by name or id (default: asks when you belong to several)")
+	cmd.Flags().StringVar(&f.harnesses, "harness", "", "comma-separated agents to record ("+strings.Join(app.availableAgentNames(), ", ")+"); default: a picker with the detected agents ticked")
+	cmd.Flags().StringVar(&f.org, "org", "", "limit setup to one organization, by name or id (default: all of your organizations)")
 	cmd.Flags().BoolVar(&f.noBrowser, "no-browser", false, "print the sign-in URL instead of opening a browser")
-	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip the browser prompt and picker; record every available installed agent")
+	cmd.Flags().BoolVarP(&f.assumeYes, "yes", "y", false, "skip the browser prompt and agent picker; record the agents detected on this machine")
 	cmd.Flags().StringVar(&f.relayService, "relay-service", "", "run the local relay as a background service: on or off (default: on, or your last choice)")
 	cmd.Flags().StringVar(&f.relayAddr, "relay-addr", "", "move the local relay to this loopback address (default "+claim.DefaultAddr+", or the one recorded)")
 	cmd.Flags().BoolVarP(&f.verbose, "verbose", "v", false, "show each step and what it wrote")
@@ -148,27 +151,42 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 	}
 
 	ui := newSetupUI(out, f.verbose)
-	ui.title, ui.warnTitle = "Setup complete", "Almost done — finish the steps marked ! below"
+	ui.title, ui.warnTitle = "Setup complete", "Almost done. Finish the steps marked !"
 	recorded := false
 	team := ""
 	var chosenOrg *organization
+	var disc *setupDiscovery
+	// From the agent picker to the summary, a spinner says which step setup is on; --verbose
+	// prints each step instead, and Terma Desktop drives --desktop-grant.
+	sp := app.startSpinner(cmd.ErrOrStderr())
+	defer sp.Stop()
+	phase := func(text string) {
+		if !f.verbose && !f.desktopGrant {
+			sp.Start(text)
+		}
+	}
 	steps := setup.Steps{
-		SignIn: func(_ context.Context, cfg *config.Config) (*config.Config, error) {
-			var kept int
+		SignIn: func(ctx context.Context, cfg *config.Config) (*config.Config, error) {
 			var err error
 			if f.desktopGrant {
 				cfg, chosenOrg, err = app.signInWithGrant(cmd, cfg, parseOrgRef(f.org).ID)
 			} else {
 				opts := signInOptions{org: parseOrgRef(f.org), noBrowser: f.noBrowser, pauseBeforeBrowser: !f.assumeYes}
-				cfg, chosenOrg, kept, err = app.setupSignIn(cmd, cfg, opts, askOrganization(cmd, f.assumeYes))
+				var cred *auth.Credential
+				cred, err = app.signIn(cmd, cfg, opts)
+				if err == nil {
+					cfg, err = app.loadConfig()
+				}
+				if err == nil {
+					disc, err = app.discoverSetup(ctx, cmd, cfg, cred, opts.org, cfg.ProjectID)
+				}
+				if err == nil {
+					cfg, err = app.loadConfig()
+				}
 			}
 			if err == nil {
 				fmt.Fprintln(out)
-				ui.Summary("Signed in", signedInAs(cfg))
-				if kept > 1 {
-					ui.Caution("Organization", fmt.Sprintf("kept %s, one of your %d: `terma setup --org <name>` sets up another",
-						cmp.Or(cfg.OrganizationName, cfg.OrganizationID), kept))
-				}
+				ui.Summary("Signed in", signedInSummary(cfg, disc))
 				reportCredentialStore(ui, cfg, f.insecureStorage)
 				app.settleSecrets(ui, cfg, f.insecureStorage)
 			} else {
@@ -178,9 +196,19 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			}
 			return cfg, err
 		},
+		ChooseTeams: func(context.Context) error {
+			if disc == nil || disc.stub {
+				return nil
+			}
+			return app.chooseSetupTeams(cmd, disc, f.assumeYes)
+		},
 		// A machine-level preference, not a connection.
-		ChooseAgents: func(_ context.Context, cfg *config.Config) ([]string, error) {
-			return app.chooseHarnesses(cmd, cfg, f)
+		ChooseAgents: func(context.Context, *config.Config) ([]string, error) {
+			names, err := app.chooseHarnesses(cmd, f)
+			if err == nil {
+				phase("Applying team policies…")
+			}
+			return names, err
 		},
 		Recorded: func(names []string) {
 			recorded = true
@@ -192,11 +220,12 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 			}
 		},
 		SetupTeams: func(_ context.Context, cfg *config.Config) (config.Policy, error) {
-			pol, name, err := app.setupTeams(cmd, cfg, chosenOrg, f, ui)
+			pol, name, err := app.setupTeams(cmd, cfg, chosenOrg, disc, f, ui)
 			team = name
 			return pol, err
 		},
 		ConnectRelay: func(ctx context.Context, names []string) error {
+			phase("Starting the relay…")
 			if f.relayAddr != "" {
 				if err := app.moveRelay(f.relayAddr); err != nil {
 					return err
@@ -212,26 +241,26 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 				},
 				warn: func(label, what string) {
 					ui.Warn(label, what)
-					ui.Then("Run `terma doctor` to see what is wrong and how to fix it.")
 				},
 				then:   ui.Then,
 				detail: ui.Detail(),
 			})
 		},
 		MachineHooks: func(_ context.Context, names []string) error {
+			phase("Writing agent hooks…")
 			err := app.globalMode().Apply(names, func(what string) { ui.OK("Machine", what) },
 				func(what string) { ui.Summary("Machine", what) }, ui.Then)
 			if err == nil {
-				app.setupStatusLine(cmd.ErrOrStderr(), ui, names)
+				app.setupStatusLine(stopFirst{sp, cmd.ErrOrStderr()}, ui, names)
 			}
 			return err
 		},
 		CheckIn: func(ctx context.Context) {
+			phase("Checking in…")
 			if ok, what := daemon.CheckIn(ctx, app.stateDir); ok {
 				ui.Summary("Check-in", what)
 			} else {
 				ui.Warn("Check-in", what)
-				ui.Then("Run `terma doctor` to see why this machine could not report to your organization.")
 			}
 		},
 	}
@@ -239,6 +268,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 		app.useServerKey(&steps, ui, parseOrgRef(f.org), &team, f.insecureStorage)
 	}
 	res, err := setup.Run(cmd.Context(), cfg, steps)
+	sp.Stop()
 	// A team picker left after the agents were recorded is still a cancellation, but not
 	// one that recorded nothing.
 	if errors.Is(err, errCancelled) {
@@ -260,10 +290,10 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 		return err
 	}
 	if res.Policy.Global() {
-		ui.title = "Setup complete — every session and commit on this machine reports to " + cmp.Or(team, "your organization")
+		ui.Summary("Collects", "Every session and commit on this machine.")
 	}
 	app.reportUpdates(ui)
-	ui.Then("Run `terma doctor` any time to see what terma is collecting and check it end to end.")
+	ui.Then(doctorStep)
 	ui.finish()
 	return nil
 }
@@ -278,5 +308,21 @@ func (app *App) reportUpdates(ui *setupUI) {
 	if err != nil {
 		return
 	}
-	ui.Summary("Updates", updatesSummary(selfupdate.InstallOf(exe, app.version), p.Auto))
+	install := selfupdate.InstallOf(exe, app.version)
+	if install.Method == semconv.TermaInstallMethodSource {
+		return // a development build: nothing to tell a developer trying it
+	}
+	ui.Summary("Updates", updatesSummary(install, p.Auto))
+}
+
+// stopFirst stops a spinner before anything is written to its stream, so the two never
+// share a line; the next step's text starts it again.
+type stopFirst struct {
+	sp progressSpinner
+	w  io.Writer
+}
+
+func (s stopFirst) Write(b []byte) (int, error) {
+	s.sp.Stop()
+	return s.w.Write(b)
 }

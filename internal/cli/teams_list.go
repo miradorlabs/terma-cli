@@ -17,6 +17,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/api"
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/doctor"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
@@ -24,11 +25,12 @@ import (
 type teamsView struct {
 	Organizations []orgRow     `json:"organizations"`
 	Unlisted      string       `json:"unlisted,omitempty"`
-	Bindings      []bindingRow `json:"bindings"`
-	Pending       []pendingRow `json:"pending"`
-	Changes       []string     `json:"changes,omitempty"`
-	Warnings      []string     `json:"warnings,omitempty"`
-	state         routing.State
+	Overlaps      []overlapRow `json:"overlaps"`
+	// Order is the order routing tries the ticked teams in, while any policies overlap.
+	Order    []string `json:"order,omitempty"`
+	Changes  []string `json:"changes,omitempty"`
+	Warnings []string `json:"warnings,omitempty"`
+	state    routing.State
 }
 
 type orgRow struct {
@@ -43,6 +45,7 @@ type orgRow struct {
 type teamRow struct {
 	ID           string             `json:"id"`
 	Name         string             `json:"name,omitempty"`
+	Description  string             `json:"description,omitempty"`
 	Selected     bool               `json:"selected"`
 	EnrollmentID string             `json:"enrollment_id,omitempty"`
 	State        routing.TeamState  `json:"state,omitempty"`
@@ -53,23 +56,17 @@ type teamRow struct {
 	Unreadable   string             `json:"unreadable,omitempty"`
 }
 
-type bindingRow struct {
-	Key          string `json:"key"`
-	Organization string `json:"organization,omitempty"`
-	Name         string `json:"organization_name,omitempty"`
-	Refused      bool   `json:"refused,omitempty"`
-}
-
-type pendingRow struct {
-	Key          string `json:"key"`
-	Organization string `json:"organization"`
-	TeamID       string `json:"team_id"`
-	Entry        string `json:"entry"`
+// overlapRow is an entry two organizations' ticked teams both cover: Team collects it,
+// since its policy was updated more recently, and Other does not.
+type overlapRow struct {
+	Entry string `json:"entry"`
+	Team  string `json:"team"`
+	Other string `json:"other"`
 }
 
 const (
 	listLimit           = 4
-	personalCollects    = "everything not bound to an organization"
+	personalCollects    = "everything no ticked organization collects"
 	orgInaccessibleNote = "you no longer have access to this organization"
 )
 
@@ -113,7 +110,7 @@ func (app *App) listTeamsWithClient(ctx context.Context, cfg *config.Config, st 
 			if teamNotFound(p.err) {
 				continue
 			}
-			t := teamRow{ID: p.ID, Name: p.Name}
+			t := teamRow{ID: p.ID, Name: p.Name, Description: p.Description}
 			switch {
 			case orgNotAccessibleErr(p.err):
 				row.Inaccessible, row.Note, t.Unreadable, t.Collects = true, orgInaccessibleNote, orgInaccessibleNote, "its policy could not be read"
@@ -210,7 +207,6 @@ func (v *teamsView) mergeState(st routing.State, names teamNames, now time.Time)
 			t.Selected, t.EnrollmentID, t.State, t.LastError = false, "", "", ""
 		}
 	}
-	v.Bindings = nil
 	for _, t := range st.Teams {
 		org := v.org(t.OrganizationID, names)
 		i := slices.IndexFunc(org.Teams, func(r teamRow) bool { return r.ID == t.TeamID })
@@ -224,12 +220,12 @@ func (v *teamsView) mergeState(st routing.State, names teamNames, now time.Time)
 			org.Type = "personal"
 		}
 	}
-	for _, k := range slices.Sorted(maps.Keys(st.Bindings)) {
-		b := st.Bindings[k]
-		v.Bindings = append(v.Bindings, bindingRow{Key: k, Organization: b.Organization, Refused: b.Refused,
-			Name: cmp.Or(names.Orgs[b.Organization], v.orgName(b.Organization))})
+	v.Overlaps, v.Order = overlapRows(st, names), nil
+	if len(v.Overlaps) > 0 {
+		for _, t := range routing.Order(st) {
+			v.Order = append(v.Order, teamLabel(names, t)+" — "+doctor.PolicyAge(t))
+		}
 	}
-	v.Pending = pendingBindings(st)
 	orgRank := func(o orgRow) int {
 		if o.Type == "personal" {
 			return 1
@@ -247,26 +243,11 @@ func (v *teamsView) org(id string, names teamNames) *orgRow {
 	return &v.Organizations[len(v.Organizations)-1]
 }
 
-func (v *teamsView) orgName(id string) string {
-	if i := slices.IndexFunc(v.Organizations, func(o orgRow) bool { return o.ID == id }); i >= 0 {
-		return v.Organizations[i].Name
-	}
-	return ""
-}
-
-func pendingBindings(st routing.State) []pendingRow {
-	var out []pendingRow
-	for _, t := range st.Teams {
-		if t.Personal || t.Policy.Global() || t.Policy.Unset {
-			continue
-		}
-		for _, raw := range t.Policy.Repositories {
-			e, ok := routing.ParseEntry(raw, t.Policy.Wildcards)
-			if !ok || alreadyDecided(st.Bindings, e) || slices.ContainsFunc(out, func(p pendingRow) bool { return p.Key == e.Key() }) {
-				continue
-			}
-			out = append(out, pendingRow{Key: e.Key(), Organization: t.OrganizationID, TeamID: t.TeamID, Entry: raw})
-		}
+// overlapRows are st's policy conflicts, each team named as doctor and setup name it.
+func overlapRows(st routing.State, names teamNames) []overlapRow {
+	var out []overlapRow
+	for _, o := range routing.Overlaps(st) {
+		out = append(out, overlapRow{Entry: o.Entry, Team: teamLabel(names, o.Winner), Other: teamLabel(names, o.Other)})
 	}
 	return out
 }
@@ -288,15 +269,49 @@ func orgNotAccessibleErr(err error) bool {
 	e, ok := errors.AsType[*api.Error](err)
 	return ok && e.OrgNotAccessible()
 }
+
+// teamLabel names t as doctor does: Personal, or its organization and team.
 func teamLabel(names teamNames, t routing.Team) string {
+	if t.Personal {
+		return personalLabel
+	}
 	return orgTeamLabel(names.Orgs[t.OrganizationID], cmp.Or(names.Teams[t.TeamID], t.TeamID))
 }
-func orgTeamLabel(org, team string) string {
-	if org == "" || strings.HasPrefix(team, org) {
-		return team
+
+// sendingTo lists where a machine sends, one organization per line: "Org › TeamA, TeamB",
+// in the order first seen, with Personal last as "You › Personal".
+func sendingTo(teams []orgTeam) string {
+	var orgs []string
+	byOrg := map[string][]string{}
+	personal := false
+	for _, t := range teams {
+		if t.personal {
+			personal = true
+			continue
+		}
+		if _, ok := byOrg[t.org]; !ok {
+			orgs = append(orgs, t.org)
+		}
+		byOrg[t.org] = append(byOrg[t.org], t.team)
 	}
-	return org + " " + team
+	lines := make([]string, 0, len(orgs)+1)
+	for _, o := range orgs {
+		lines = append(lines, o+" › "+strings.Join(byOrg[o], ", "))
+	}
+	if personal {
+		lines = append(lines, "You › "+personalLabel)
+	}
+	return strings.Join(lines, "\n")
 }
+
+// orgTeam is one ticked team, named for sendingTo.
+type orgTeam struct {
+	org, team string
+	personal  bool
+}
+
+// orgTeamLabel names an organization's team as doctor does.
+func orgTeamLabel(org, team string) string { return doctor.TeamName(org, team) }
 
 type teamNames struct {
 	Teams   map[string]string `json:"teams"`

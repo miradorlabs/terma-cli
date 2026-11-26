@@ -41,12 +41,6 @@ func routePlanState(t *testing.T) (routing.State, teamNames) {
 			t.Fatal(err)
 		}
 	}
-	if err := st.Bind("github.com/acme", orgA().ID, false); err != nil {
-		t.Fatal(err)
-	}
-	if err := st.Bind("github.com/clientco/app", orgB().ID, false); err != nil {
-		t.Fatal(err)
-	}
 	names := teamNames{
 		Teams: map[string]string{teamsAcmeWeb: "Platform", betaCore: "Contractors", teamsPersonalTeam: "Personal"},
 		Orgs:  map[string]string{orgA().ID: "Acme", orgB().ID: "Beta Labs", routeOwnOrg: "Personal"},
@@ -74,65 +68,41 @@ func wantRouteLines(t *testing.T, out string, want ...string) {
 	}
 }
 
-// route explain matches Router.Route across exact, wildcard, personal, refused, pending,
-// and blocked team states (suspended, refused/OrgAccessLost, expired, sign_in_needed).
+// route explain matches Router.Route across exact, wildcard, personal, an overlap the
+// newer policy wins, blocked team states (suspended, expired, sign_in_needed), and a refused
+// team passed over.
 func TestRouteExplainMatchesRouterAcrossAllCases(t *testing.T) {
 	st, names := routePlanState(t)
 
 	// Wildcard, exact, personal, outside git.
 	out, v := explainText(st, names, "git@github.com:Acme/api.git")
-	wantRouteLines(t, out, "Goes to:   Acme Platform", "Entry:     github.com/acme/*", "Binding:   github.com/acme is bound to Acme: only it decides")
+	wantRouteLines(t, out, "Goes to:   Acme › Platform", "Entry:     github.com/acme/*")
 	if v.Outcome != routing.Send || v.Team == nil || v.Team.TeamID != teamsAcmeWeb {
 		t.Fatalf("wildcard view = %+v", v)
 	}
 	out, _ = explainText(st, names, "https://github.com/clientco/app")
-	wantRouteLines(t, out, "Goes to:   Beta Labs Contractors", "Entry:     github.com/clientco/app")
+	wantRouteLines(t, out, "Goes to:   Beta Labs › Contractors", "Entry:     github.com/clientco/app")
 	out, _ = explainText(st, names, "github.com/dawson/side")
-	wantRouteLines(t, out, "Goes to:   Personal\n", "nothing binds it to an organization")
+	wantRouteLines(t, out, "Goes to:   Personal\n")
 	out, _ = explainText(st, names, "")
 	wantRouteLines(t, out, "Location:  outside any repository", "Goes to:   Personal\n")
 
-	// Personal under a partly bound owner.
-	out, _ = explainText(st, names, "github.com/clientco/other")
-	wantRouteLines(t, out, "Goes to:   Personal", "other repositories under github.com/clientco are bound to an organization: github.com/clientco/app (Beta Labs)")
+	// Two organizations list it: the newer policy collects, and the other is named.
+	overlapSt, _ := routePlanState(t)
+	overlapSt.Teams[1].Policy.Repositories = []string{"github.com/acme/api"}
+	overlapSt.Teams[0].Policy.UpdatedAt = time.Now().Add(-48 * time.Hour)
+	overlapSt.Teams[1].Policy.UpdatedAt = time.Now().Add(-time.Hour)
+	out, v = explainText(overlapSt, names, "github.com/acme/api")
+	wantRouteLines(t, out, "Goes to:   Beta Labs › Contractors", "Acme › Platform lists github.com/acme/*, but a more recently updated policy collects it")
+	if v.Outcome != routing.Send || v.Team == nil || v.Team.TeamID != betaCore {
+		t.Fatalf("overlap view = %+v", v)
+	}
+	// Neither policy is newer: the team ticked first collects, and the reason says so.
+	overlapSt.Teams[0].Policy.UpdatedAt, overlapSt.Teams[1].Policy.UpdatedAt = time.Time{}, time.Time{}
+	out, _ = explainText(overlapSt, names, "github.com/acme/api")
+	wantRouteLines(t, out, "Goes to:   Acme › Platform", "Beta Labs › Contractors lists github.com/acme/api, but its policy is no newer, so the team ticked first collects it")
 
-	// Refused binding falls through to personal.
-	refusedSt, _ := routePlanState(t)
-	if err := refusedSt.Refuse("github.com/acme"); err != nil {
-		t.Fatal(err)
-	}
-	out, v = explainText(refusedSt, names, "github.com/acme/api")
-	wantRouteLines(t, out, "Goes to:   Personal", "github.com/acme is refused to every organization")
-	if v.Outcome != routing.Send || v.Authority == nil || v.Authority.Kind != routing.RefusedAll {
-		t.Fatalf("refused view = %+v", v)
-	}
-
-	// Pending wildcard binding holds and names fix.
-	pendingSt, _ := routePlanState(t)
-	if err := pendingSt.Unbind("github.com/acme"); err != nil {
-		t.Fatal(err)
-	}
-	out, v = explainText(pendingSt, names, "github.com/acme/api")
-	wantRouteLines(t, out, "held, then dropped: Acme Platform's entry needs a binding", "github.com/acme is undecided: `terma teams --bind github.com/acme=<organization>`")
-	if v.Outcome != routing.Hold || v.Reason != string(routing.ReasonPending) {
-		t.Fatalf("pending view = %+v", v)
-	}
-
-	// Wildcard whose owner is bound elsewhere: repo binding alone collects nothing.
-	wildSt, _ := routePlanState(t)
-	wildSt.Teams[1].Policy.Repositories = []string{"github.com/acme/*"}
-	if err := wildSt.Bind("github.com/acme/api", orgB().ID, true); err != nil {
-		t.Fatal(err)
-	}
-	out, v = explainText(wildSt, names, "github.com/acme/api")
-	wantRouteLines(t, out, "Goes to:   nothing leaves this machine",
-		"Acme Platform lists github.com/acme/*, but github.com/acme/api is bound to Beta Labs",
-		"so binding github.com/acme/api alone to Beta Labs collects nothing here")
-	if v.Outcome != routing.Drop || v.Reason != string(routing.ReasonBoundNotCollected) {
-		t.Fatalf("bound-not-collected view = %+v", v)
-	}
-
-	// Blocked states: SignInNeeded (single terma setup fix), Refused/OrgAccessLost, Suspended, Expired.
+	// Blocked states: SignInNeeded (single terma setup fix), Suspended, Expired; a refused team is passed over.
 	signInSt, _ := routePlanState(t)
 	signInSt.Teams[0].SignInNeeded = true
 	out, v = explainText(signInSt, names, "github.com/acme/api")
@@ -145,8 +115,8 @@ func TestRouteExplainMatchesRouterAcrossAllCases(t *testing.T) {
 	orgLostSt.Teams[0].Refusals = 2
 	orgLostSt.Teams[0].LastError = routing.OrgAccessLost
 	out, v = explainText(orgLostSt, names, "github.com/acme/api")
-	wantRouteLines(t, out, "is refused ("+orgInaccessibleNote+")", "terma teams --release Platform")
-	if v.Outcome != routing.Hold || v.Blocked != routing.Refused || v.LastError != routing.OrgAccessLost {
+	wantRouteLines(t, out, "Goes to:   Personal", "Acme › Platform lists github.com/acme/*, but it is refused ("+orgInaccessibleNote+"), so it is passed over")
+	if v.Outcome != routing.Send || v.Team == nil || !v.Team.Personal {
 		t.Fatalf("org_access_lost view = %+v", v)
 	}
 
@@ -174,9 +144,6 @@ func TestRouteExplainUnknownRule(t *testing.T) {
 	wantRouteLines(t, out, "Unknown:   a record whose location is unknown is held, then dropped: personal is not the only ticked team")
 	st.Deselect(st.Teams[0].EnrollmentID)
 	st.Deselect(st.Teams[0].EnrollmentID)
-	out, _ = explainText(st, names, "")
-	wantRouteLines(t, out, "something is bound to an organization")
-	st.Bindings = nil
 	out, v := explainText(st, names, "")
 	wantRouteLines(t, out, "Unknown:   a record whose location is unknown goes to personal")
 	if !v.UnknownToPersonal {
@@ -193,10 +160,8 @@ func TestRouteExplainCLIModesAndFailClosedStates(t *testing.T) {
 	}
 
 	f, _ := routedMachine(t, "alice", func(f *fakeAuth, s *routing.State) error {
-		if _, err := s.Select(stateTeam(f, orgA().ID, teamsAcmeWeb, false, "github.com/acme/web")); err != nil {
-			return err
-		}
-		return s.Bind("github.com/acme/web", orgA().ID, false)
+		_, err := s.Select(stateTeam(f, orgA().ID, teamsAcmeWeb, false, "github.com/acme/web"))
+		return err
 	})
 
 	// Explicit path + human output.
@@ -230,10 +195,8 @@ func TestRouteExplainCLIModesAndFailClosedStates(t *testing.T) {
 	// Wrong-account routing.State fails closed.
 	otherAcct := auth.AccountKey(f.srv.URL, "bob")
 	if _, err := routing.Replace(testApp.stateDir, config.DefaultProfile, nil, otherAcct, func(s *routing.State) error {
-		if _, err := s.Select(stateTeam(f, orgA().ID, teamsAcmeWeb, false, "github.com/acme/web")); err != nil {
-			return err
-		}
-		return s.Bind("github.com/acme/web", orgA().ID, false)
+		_, err := s.Select(stateTeam(f, orgA().ID, teamsAcmeWeb, false, "github.com/acme/web"))
+		return err
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -281,10 +244,8 @@ func TestRouteExplainCLIModesAndFailClosedStates(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := routing.Replace(testApp.stateDir, config.DefaultProfile, nil, sendas.NoPersonLane, func(s *routing.State) error {
-		if _, err := s.Select(stateTeam(f, orgA().ID, teamsAcmeWeb, false, "github.com/acme/web")); err != nil {
-			return err
-		}
-		return s.Bind("github.com/acme/web", orgA().ID, false)
+		_, err := s.Select(stateTeam(f, orgA().ID, teamsAcmeWeb, false, "github.com/acme/web"))
+		return err
 	}); err != nil {
 		t.Fatal(err)
 	}

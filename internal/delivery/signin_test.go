@@ -79,9 +79,7 @@ func signInMachine(t *testing.T, account string, signIn *fakeSignIn, teamIDs ...
 		tm.Policy.IncludePrompts, tm.Policy.IncludeToolContent = false, false
 		teams = append(teams, tm)
 	}
-	enr := m.createState(config.DefaultProfile, account, teams, func(s *routing.State, _ map[string]string) error {
-		return s.Bind(app.Origin, "org-a", false)
-	})
+	enr := m.createState(config.DefaultProfile, account, teams, nil)
 	r := m.router(signIn)
 	r.OTLPPinned = true
 	return m, r, enr

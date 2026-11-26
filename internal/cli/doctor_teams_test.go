@@ -21,10 +21,8 @@ import (
 // doctor fails closed on missing, unreadable, and wrong-account routing.State.
 func TestDoctorFailsClosedOnMissingCorruptAndWrongAccountRoutingState(t *testing.T) {
 	f, _ := routedMachine(t, "alice", func(f *fakeAuth, s *routing.State) error {
-		if _, err := s.Select(stateTeam(f, orgA().ID, teamsAcmeWeb, false, "github.com/acme/web")); err != nil {
-			return err
-		}
-		return s.Bind("github.com/acme/web", orgA().ID, false)
+		_, err := s.Select(stateTeam(f, orgA().ID, teamsAcmeWeb, false, "github.com/acme/web"))
+		return err
 	})
 	statePath, err := routing.StatePath(testApp.stateDir, config.DefaultProfile)
 	if err != nil {
@@ -61,20 +59,18 @@ func TestDoctorFailsClosedOnMissingCorruptAndWrongAccountRoutingState(t *testing
 	}
 }
 
-// doctor reports OrgAccessLost refusal, pending binding, SignInNeeded with single
+// doctor reports OrgAccessLost refusal, SignInNeeded with single
 // `terma setup` remediation, Mixed runs, and #152 outbox/spool losses together.
 func TestDoctorReportsTeamsHealthSignInMixedAndLosses(t *testing.T) {
 	f, acct := routedMachine(t, "alice", func(f *fakeAuth, s *routing.State) error {
 		if _, err := s.Select(stateTeam(f, orgA().ID, teamsAcmeWeb, false, "github.com/acme/web")); err != nil {
 			return err
 		}
-		if _, err := s.Select(stateTeam(f, orgB().ID, betaCore, false, "github.com/beta/core")); err != nil {
-			return err
-		}
-		return s.Bind("github.com/acme/web", orgA().ID, false)
+		_, err := s.Select(stateTeam(f, orgB().ID, betaCore, false, "github.com/beta/core"))
+		return err
 	})
 	_ = f
-	// Mark Acme Web Refused with OrgAccessLost; Beta Core stays pending (unbound).
+	// Mark Acme Web Refused with OrgAccessLost.
 	if _, err := routing.Update(testApp.stateDir, config.DefaultProfile, routing.Expect{Account: acct}, func(s *routing.State) error {
 		s.Teams[0].Refusals = 2
 		s.Teams[0].LastError = routing.OrgAccessLost
@@ -105,7 +101,7 @@ func TestDoctorReportsTeamsHealthSignInMixedAndLosses(t *testing.T) {
 	if err := os.MkdirAll(claimDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	snapBytes, _ := json.Marshal(relay.Snapshot{Blocked: map[string]int{"mixed:sess-mixed": 4, "pending:github.com/beta/core": 2}})
+	snapBytes, _ := json.Marshal(relay.Snapshot{Blocked: map[string]int{"mixed:sess-mixed": 4}})
 	if err := os.WriteFile(filepath.Join(claimDir, daemon.StatsFile), snapBytes, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -119,15 +115,12 @@ func TestDoctorReportsTeamsHealthSignInMixedAndLosses(t *testing.T) {
 
 	out, err := runTerma(t, "doctor")
 	if err == nil {
-		t.Fatalf("expected doctor failure on refused team + pending binding:\n%s", out)
+		t.Fatalf("expected doctor failure on refused team:\n%s", out)
 	}
 	for _, want := range []string{
-		"you no longer have access to its organization",
-		"github.com/beta/core is undecided",
-		"1 session run(s) Mixed",
-		"dropped 4 record(s)",
-		"session sess-mixed crossed organizations",
-		"2 record(s) for github.com/beta/core, undecided",
+		"no access to this organization, skipped",
+		"1 session is paused",
+		"4 records from paused sessions dropped",
 		"3 with no routed destination",
 	} {
 		if !strings.Contains(out, want) {
@@ -135,16 +128,16 @@ func TestDoctorReportsTeamsHealthSignInMixedAndLosses(t *testing.T) {
 		}
 	}
 
-	// Switch both teams to SignInNeeded + bound: doctor warns with single `terma setup` fix.
+	// Switch both teams to SignInNeeded: doctor warns with single `terma setup` fix.
 	if _, err := routing.Update(testApp.stateDir, config.DefaultProfile, routing.Expect{Account: acct}, func(s *routing.State) error {
 		s.Teams[0].Refusals, s.Teams[0].LastError, s.Teams[0].SignInNeeded = 0, routing.SignIn, true
 		s.Teams[1].SignInNeeded, s.Teams[1].LastError = true, routing.SignIn
-		return s.Bind("github.com/beta/core", orgB().ID, false)
+		return nil
 	}); err != nil {
 		t.Fatal(err)
 	}
 	out, _ = runTerma(t, "doctor")
-	if !strings.Contains(out, "needs you to sign in again") || !strings.Contains(out, "→ terma setup") {
+	if !strings.Contains(out, "sign in again to send") || !strings.Contains(out, "\n    terma setup\n") {
 		t.Errorf("SignInNeeded doctor output lacks single terma setup remediation:\n%s", out)
 	}
 	if strings.Contains(out, "terma teams --org") {

@@ -1,6 +1,6 @@
-// Package setup is `terma setup`: sign in, record the developer's agents, fetch the
-// selected team's collection policy, point the agents at the relay, and write the
-// machine-wide hooks.
+// Package setup is `terma setup`: sign in, choose teams, record the developer's agents,
+// activate the chosen teams, point the agents at the relay, and write the machine-wide
+// hooks.
 package setup
 
 import (
@@ -14,7 +14,9 @@ import (
 // and the relay. SignIn, ChooseAgents and SetupTeams are required; the rest do nothing
 // when nil.
 type Steps struct {
-	SignIn       func(ctx context.Context, cfg *config.Config) (*config.Config, error)
+	SignIn func(ctx context.Context, cfg *config.Config) (*config.Config, error)
+	// ChooseTeams asks which teams to send to, before the agents are chosen.
+	ChooseTeams  func(ctx context.Context) error
 	ChooseAgents func(ctx context.Context, cfg *config.Config) ([]string, error)
 	// Recorded says which agents were recorded, before teams are activated.
 	Recorded func(names []string)
@@ -46,6 +48,11 @@ func Run(ctx context.Context, cfg *config.Config, s Steps) (Result, error) {
 	cfg, err := s.SignIn(ctx, cfg)
 	if err != nil {
 		return Result{}, err
+	}
+	if s.ChooseTeams != nil {
+		if err := s.ChooseTeams(ctx); err != nil {
+			return Result{}, err
+		}
 	}
 	names, err := s.ChooseAgents(ctx, cfg)
 	if err != nil {

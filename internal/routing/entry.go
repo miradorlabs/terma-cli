@@ -16,12 +16,3 @@ func Normalize(s string) string { return config.Normalize(s) }
 
 // Owner is a repository's host and first path segment (config.Owner).
 func Owner(repo string) string { return config.Owner(repo) }
-
-// moreSpecific reports whether a is to be tried before b: an exact entry before any
-// wildcard, and between wildcards, the one with more fixed segments.
-func moreSpecific(a, b Entry) bool {
-	if a.Wildcard() != b.Wildcard() {
-		return !a.Wildcard()
-	}
-	return a.Fixed() > b.Fixed()
-}

@@ -26,8 +26,8 @@ func ValidAccount(a string) bool {
 	return len(a) == accountKeyLen && strings.Trim(a, "0123456789abcdef") == ""
 }
 
-// State is one profile's routing state: the teams this machine sends to, in order, and
-// the developer's bindings. It is the only store of either, and Route reads nothing else.
+// State is one profile's routing state: the teams this machine sends to, in order. It is
+// the only store of them, and Route reads nothing else.
 type State struct {
 	// StateID uniquely identifies this state instance; Create and Replace mint a fresh
 	// random ID so a Delete-then-Create or Replace over a corrupt file never ABA-matches
@@ -35,8 +35,8 @@ type State struct {
 	StateID string `json:"state_id,omitempty"`
 	// Generation counts all writes; Update, Create, and Replace advance it.
 	Generation int64 `json:"generation"`
-	// ConsentGeneration counts writes that change Teams membership/order/identity or
-	// Bindings (Select, Deselect, Bind, Unbind, Create, Replace). Background policy
+	// ConsentGeneration counts writes that change Teams membership/order/identity
+	// (Select, Deselect, Create, Replace). Background policy
 	// refreshes advance Generation without advancing ConsentGeneration, so interactive
 	// consent editors (terma teams) can CAS on ExpectConsent() without failing on every
 	// minute's refresh.
@@ -48,8 +48,6 @@ type State struct {
 	Account string `json:"account"`
 	// Teams are the selected teams, organizations first and personal, if selected, last.
 	Teams []Team `json:"teams"`
-	// Bindings are the developer's decisions, by normalised owner or repository.
-	Bindings map[string]Binding `json:"bindings,omitempty"`
 }
 
 // Expect returns the compare-and-set precondition matching this exact state snapshot
@@ -61,7 +59,7 @@ func (s State) Expect() Expect {
 
 // ExpectConsent returns the compare-and-set precondition matching this state's account,
 // state instance ID, and consent generation, allowing concurrent policy refreshes while
-// rejecting concurrent team/binding edits or account switches.
+// rejecting concurrent team edits or account switches.
 func (s State) ExpectConsent() Expect {
 	g := s.ConsentGeneration
 	return Expect{Account: s.Account, StateID: s.StateID, ConsentGeneration: &g}
@@ -106,8 +104,9 @@ type Team struct {
 // TeamState is whether a team can send now, and if not, why it blocks.
 type TeamState string
 
-// Team states. Every state but Active blocks: the records its last list matches are
-// held, then dropped, and never passed to the next team.
+// Team states. Every state but Active blocks. Route passes a Refused team over, so the
+// next team gets what its list matches; under any other state those records are held,
+// then dropped, and never passed on.
 const (
 	Active       TeamState = "active"
 	Expired      TeamState = "expired"
@@ -132,6 +131,10 @@ func (t Team) StateAt(now time.Time) TeamState {
 	}
 	return Active
 }
+
+// refused reports whether t is Refused for good, so Route passes it over; unlike StateAt
+// it needs no clock.
+func (t Team) refused() bool { return t.Refusals >= 2 }
 
 // owns reports whether p was fetched for t: its team, under its organization's login, in
 // its environment. Each must be named, since two blanks establish no scope: every fetch
@@ -318,11 +321,6 @@ func (s *State) Select(t Team) (string, error) {
 			return "", errors.New("only one personal team can be selected")
 		}
 	}
-	for key, b := range s.Bindings {
-		if t.Personal && !b.Refused && b.Organization == t.OrganizationID {
-			return "", fmt.Errorf("%s is bound to the personal organization: unbind it first", key)
-		}
-	}
 	id, err := NewEnrollmentID()
 	if err != nil {
 		return "", err
@@ -336,8 +334,7 @@ func (s *State) Select(t Team) (string, error) {
 	return id, nil
 }
 
-// Deselect ends an enrollment. Bindings stay: what is bound to the team's organization
-// collects nowhere until the developer unbinds it.
+// Deselect ends an enrollment.
 func (s *State) Deselect(enrollmentID string) bool {
 	for i, t := range s.Teams {
 		if t.EnrollmentID == enrollmentID {
@@ -371,17 +368,6 @@ func (s State) check() error {
 			return fmt.Errorf("team %s holds a policy fetched for another team, organization or environment", t.TeamID)
 		}
 		seen[t.EnrollmentID] = true
-	}
-	for key, b := range s.Bindings {
-		if key != Normalize(key) || !config.IsOwnerKey(key) && !config.IsRepositoryKey(key) {
-			return fmt.Errorf("binding %q is not a normalised owner or repository", key)
-		}
-		if b.Refused == (b.Organization != "") {
-			return fmt.Errorf("binding %q must be either refused or bound to one organization", key)
-		}
-		if n := len(s.Teams); n > 0 && s.Teams[n-1].Personal && !b.Refused && b.Organization == s.Teams[n-1].OrganizationID {
-			return fmt.Errorf("binding %q names the personal organization", key)
-		}
 	}
 	return nil
 }

@@ -43,7 +43,7 @@ func TestParseEntry(t *testing.T) {
 			continue
 		}
 		if e.Key() != c.key {
-			t.Errorf("%q needs binding %q, want %q", c.raw, e.Key(), c.key)
+			t.Errorf("%q keys as %q, want %q", c.raw, e.Key(), c.key)
 		}
 		for _, r := range c.matches {
 			if !e.Matches(r) {
@@ -58,11 +58,6 @@ func TestParseEntry(t *testing.T) {
 	}
 	if Owner("gitlab.com/acme/platform/api") != "gitlab.com/acme" || Owner("github.com/acme") != "" {
 		t.Error("an owner is a host and the first path segment, of a repository only")
-	}
-	for _, key := range []string{"github.com", "github.com/*", "github.com/acme/*", "/acme", "github.com//api"} {
-		if _, err := bindingKey(key); err == nil {
-			t.Errorf("%q was accepted as a binding key", key)
-		}
 	}
 }
 
@@ -152,7 +147,7 @@ func TestApplyRefreshKeepsRefusalsInOrder(t *testing.T) {
 
 // Org-wide ORG_NOT_ACCESSIBLE refuses all matching-epoch enrollments in that organization,
 // spares any sibling whose epoch already advanced via a newer success, and leaves other
-// organizations and Personal untouched while keeping bindings intact.
+// organizations and Personal untouched.
 func TestApplyOrgAccessLostRefusesMatchingEpochSiblingsOnly(t *testing.T) {
 	t.Parallel()
 	s := fixture(t,
@@ -218,11 +213,8 @@ func TestApplyOrgAccessLostRefusesMatchingEpochSiblingsOnly(t *testing.T) {
 	if !s.team(ePlat).RefusedAt.Equal(at) {
 		t.Fatal("RefusedAt changed on stale re-apply")
 	}
-	// Bindings remain intact: acme repos hold as Refused, never spilling into Personal.
-	d := NewRouter(*s).Route(repo("github.com/acme/api"), now)
-	if d.Outcome != Hold || d.Blocked != Refused || d.EnrollmentID != ePlat {
-		t.Fatalf("Route after org access lost = %+v, want Hold/Refused on %s", d, ePlat)
-	}
+	// A refused team is passed over: its repositories go down the stack.
+	expect(t, s, repo("github.com/acme/api"), Send, "personal")
 	expect(t, s, repo("github.com/clientco/app"), Send, "clientco-contractors")
 	expect(t, s, repo("github.com/dawson/side"), Send, "personal")
 }
@@ -270,25 +262,22 @@ func TestUpdate(t *testing.T) {
 	}
 	var wg sync.WaitGroup
 	for i := range 20 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, err := Update(dir, "default", exp, func(s *State) error {
-				return s.Bind(fmt.Sprintf("github.com/owner%d", i), "acme", false)
+				return tick(s, "acme", fmt.Sprintf("team%d", i))
 			})
 			if err != nil {
 				t.Error(err)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	s, ok, err := Load(dir, "default")
-	if err != nil || !ok || s.Account != testAccount || len(s.Bindings) != 20 || s.Generation != 21 {
-		t.Fatalf("after 20 concurrent writes: account=%q, %d bindings, generation %d, %v", s.Account, len(s.Bindings), s.Generation, err)
+	if err != nil || !ok || s.Account != testAccount || len(s.Teams) != 20 || s.Generation != 21 {
+		t.Fatalf("after 20 concurrent writes: account=%q, %d teams, generation %d, %v", s.Account, len(s.Teams), s.Generation, err)
 	}
 	for _, noop := range []func(*State) error{
-		func(s *State) error { return s.Bind("github.com/owner0", "acme", false) },
-		func(s *State) error { return s.Unbind("github.com/never-bound") },
+		func(s *State) error { s.Deselect("never-selected"); return nil },
 	} {
 		if again, err := Update(dir, "default", exp, noop); err != nil || again.Generation != s.Generation {
 			t.Fatalf("a change that changed nothing was written: generation %d, %v", again.Generation, err)
@@ -367,7 +356,7 @@ func TestStoreCASRejectsWrongAccountAndStaleGeneration(t *testing.T) {
 
 	// Alice creates her routing state at generation 1.
 	alice1, err := Create(dir, "default", testAccount, func(s *State) error {
-		return s.Bind("github.com/acme", "acme", false)
+		return tick(s, "acme", "acme")
 	})
 	must(t, err)
 	if alice1.Generation != 1 || alice1.Account != testAccount || alice1.StateID == "" {
@@ -376,7 +365,7 @@ func TestStoreCASRejectsWrongAccountAndStaleGeneration(t *testing.T) {
 
 	// Bob cannot update or delete Alice's state.
 	if _, err := Update(dir, "default", Expect{Account: bobAccount}, func(s *State) error {
-		return s.Bind("github.com/bob", "bob", false)
+		return tick(s, "bob", "bob")
 	}); !errors.Is(err, ErrAccountMismatch) {
 		t.Fatalf("Bob Update on Alice state: got %v, want ErrAccountMismatch", err)
 	}
@@ -386,7 +375,7 @@ func TestStoreCASRejectsWrongAccountAndStaleGeneration(t *testing.T) {
 
 	// Concurrent writer advances Alice's state to generation 2 using State.Expect().
 	alice2, err := Update(dir, "default", alice1.Expect(), func(s *State) error {
-		return s.Bind("github.com/clientco", "clientco", false)
+		return tick(s, "clientco", "clientco")
 	})
 	must(t, err)
 	if alice2.Generation != 2 || alice2.StateID != alice1.StateID {
@@ -395,7 +384,7 @@ func TestStoreCASRejectsWrongAccountAndStaleGeneration(t *testing.T) {
 
 	// A stale interactive session holding alice1.Expect() is rejected and writes nothing.
 	if _, err := Update(dir, "default", alice1.Expect(), func(s *State) error {
-		return s.Bind("github.com/stale", "acme", false)
+		return tick(s, "acme", "stale")
 	}); !errors.Is(err, ErrStaleGeneration) {
 		t.Fatalf("stale generation Update: got %v, want ErrStaleGeneration", err)
 	}
@@ -427,13 +416,13 @@ func TestStoreCASRejectsWrongAccountAndStaleGeneration(t *testing.T) {
 	}
 
 	// Bob signs in via setup and atomically replaces Alice's state; generation advances,
-	// a new StateID is minted, and Alice's teams/bindings do not carry over.
+	// a new StateID is minted, and Alice's teams do not carry over.
 	alice2Exp := alice2.Expect()
 	bob1, err := Replace(dir, "default", &alice2Exp, bobAccount, func(s *State) error {
-		return s.Bind("github.com/bobco", "bobco", false)
+		return tick(s, "bobco", "bobco")
 	})
 	must(t, err)
-	if bob1.Account != bobAccount || bob1.Generation != 3 || bob1.StateID == alice2.StateID || len(bob1.Bindings) != 1 || bob1.Bindings["github.com/bobco"].Organization != "bobco" {
+	if bob1.Account != bobAccount || bob1.Generation != 3 || bob1.StateID == alice2.StateID || len(bob1.Teams) != 1 || bob1.Teams[0].OrganizationID != "bobco" {
 		t.Fatalf("bob1 = %+v", bob1)
 	}
 	if SameGeneration(State{StateID: bob1.StateID, Generation: 3, Account: testAccount}, bob1) {
@@ -442,7 +431,7 @@ func TestStoreCASRejectsWrongAccountAndStaleGeneration(t *testing.T) {
 
 	// Alice's in-flight refresher or open `terma teams` session is now rejected.
 	if _, err := Update(dir, "default", Expect{Account: testAccount}, func(s *State) error {
-		return s.Bind("github.com/alice-late", "acme", false)
+		return tick(s, "acme", "alice-late")
 	}); !errors.Is(err, ErrAccountMismatch) {
 		t.Fatalf("Alice late Update after Bob Replace: got %v, want ErrAccountMismatch", err)
 	}
@@ -481,7 +470,7 @@ func TestStoreCASRejectsWrongAccountAndStaleGeneration(t *testing.T) {
 		t.Fatal("SameGeneration matched states across Delete+Create")
 	}
 	if _, err := Update(dir, "default", recovered.Expect(), func(s *State) error {
-		return s.Bind("github.com/aba", "bobco", false)
+		return tick(s, "bobco", "aba")
 	}); !errors.Is(err, ErrStaleGeneration) {
 		t.Fatalf("stale Expect after Delete+Create: got %v, want ErrStaleGeneration", err)
 	}
@@ -613,7 +602,7 @@ func TestRefusedAtPreservedAcrossRefusalReasons(t *testing.T) {
 
 // Background policy refreshes advance Generation without advancing ConsentGeneration, so
 // interactive editors using ExpectConsent() succeed across refreshes while concurrent
-// team/binding edits or account switches are rejected with ErrStaleGeneration /
+// team edits or account switches are rejected with ErrStaleGeneration /
 // ErrAccountMismatch.
 func TestConsentGenerationAndExpectConsent(t *testing.T) {
 	t.Parallel()
@@ -645,23 +634,23 @@ func TestConsentGenerationAndExpectConsent(t *testing.T) {
 
 	// Exact Expect() from st fails, but ExpectConsent() from st succeeds across the refresh!
 	if _, err := Update(dir, "default", st.Expect(), func(s *State) error {
-		return s.Bind("github.com/acme/api", "acme", false)
+		return tick(s, "acme", "acme-api")
 	}); !errors.Is(err, ErrStaleGeneration) {
 		t.Fatalf("stale exact Expect: got %v, want ErrStaleGeneration", err)
 	}
 	bound, err := Update(dir, "default", st.ExpectConsent(), func(s *State) error {
-		return s.Bind("github.com/acme/api", "acme", false)
+		return tick(s, "acme", "acme-api")
 	})
 	must(t, err)
 	if bound.Generation != 3 || bound.ConsentGeneration != 2 {
-		t.Fatalf("after Bind: gen=%d consent=%d, want 3, 2", bound.Generation, bound.ConsentGeneration)
+		t.Fatalf("after Select: gen=%d consent=%d, want 3, 2", bound.Generation, bound.ConsentGeneration)
 	}
 
 	// A second consent writer using st.ExpectConsent() is now rejected with ErrStaleGeneration.
 	if _, err := Update(dir, "default", st.ExpectConsent(), func(s *State) error {
-		return s.Bind("github.com/acme/other", "acme", false)
+		return tick(s, "acme", "acme-other")
 	}); !errors.Is(err, ErrStaleGeneration) {
-		t.Fatalf("stale ExpectConsent after Bind: got %v, want ErrStaleGeneration", err)
+		t.Fatalf("stale ExpectConsent after Select: got %v, want ErrStaleGeneration", err)
 	}
 
 	// ApplyOrgAccessLost advances Generation without advancing ConsentGeneration.
@@ -730,7 +719,7 @@ func TestDeleteCorruptAndReplaceCorruptUnderLock(t *testing.T) {
 	}
 
 	st, err := Create(dir, "default", testAccount, func(s *State) error {
-		return s.Bind("github.com/acme/api", "acme", false)
+		return tick(s, "acme", "acme-api")
 	})
 	must(t, err)
 	if err := DeleteCorrupt(dir, "default"); !errors.Is(err, ErrStaleGeneration) {
@@ -748,10 +737,10 @@ func TestDeleteCorruptAndReplaceCorruptUnderLock(t *testing.T) {
 	must(t, err)
 	must(t, os.WriteFile(path, []byte("{corrupt"), 0o600))
 	repaired, err := ReplaceCorrupt(dir, "default", bobAccount, func(s *State) error {
-		return s.Bind("github.com/bob/app", "bobco", false)
+		return tick(s, "bobco", "bob-app")
 	})
 	must(t, err)
-	if repaired.Account != bobAccount || repaired.Generation != 1 || repaired.Bindings["github.com/bob/app"].Organization != "bobco" {
+	if repaired.Account != bobAccount || repaired.Generation != 1 || len(repaired.Teams) != 1 || repaired.Teams[0].OrganizationID != "bobco" {
 		t.Fatalf("repaired = %+v", repaired)
 	}
 
@@ -760,4 +749,10 @@ func TestDeleteCorruptAndReplaceCorruptUnderLock(t *testing.T) {
 	if _, ok, err := Load(dir, "default"); err != nil || ok {
 		t.Fatalf("corrupt file survived DeleteCorrupt: ok=%v err=%v", ok, err)
 	}
+}
+
+// tick selects a new team id in organization org, for a test that needs some write.
+func tick(s *State, org, id string) error {
+	_, err := s.Select(team(org, id))
+	return err
 }
