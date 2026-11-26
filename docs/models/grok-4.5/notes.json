@@ -11,12 +11,12 @@
     {
       "date": "2026-07",
       "url": "https://docs.x.ai/docs/release-notes",
-      "text": "### Grok 4.5 available in the EU\n\nGrok 4.5 is now available in the API console for EU users. See the [Grok 4.5 overview](/developers/grok-4-5)."
+      "text": "### Grok 4.5 available in the EU\n\nGrok 4.5 is now available in the API console for EU users. See the [Grok 4.5 model page](/developers/models/grok-4.5)."
     },
     {
       "date": "2026-07",
       "url": "https://docs.x.ai/docs/release-notes",
-      "text": "### Grok 4.5\n\nGrok 4.5, SpaceXSI's model for coding, agentic tasks, and knowledge work, is now available on the xAI API. Priced at $2 / 1M input tokens and $6 / 1M output tokens, with configurable reasoning effort (low, medium, or high; default high). See the [Grok 4.5 overview](/developers/grok-4-5) and the [announcement](https://x.ai/news/grok-4-5)."
+      "text": "### Grok 4.5\n\nGrok 4.5, SpaceXSI's model for coding, agentic tasks, and knowledge work, is now available on the xAI API. Priced at $2 / 1M input tokens and $6 / 1M output tokens, with configurable reasoning effort (low, medium, or high; default high). See the [Grok 4.5 model page](/developers/models/grok-4.5) and the [announcement](https://x.ai/news/grok-4-5)."
     }
   ],
   "changes": [
