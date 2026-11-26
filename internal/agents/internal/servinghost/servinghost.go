@@ -5,6 +5,7 @@ package servinghost
 
 import (
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -41,13 +42,25 @@ func recognised(host string) bool {
 	// Vertex AI, Claude on Google Cloud and their Private Service Connect endpoints.
 	case under("googleapis.com"):
 		return true
-	// Foundry's and Azure OpenAI's resources; Azure API Management (azure-api.net) is a gateway.
-	case under("azure.com", "azure.us", "azure.cn"):
+	// Foundry's and Azure OpenAI's resources. A customer's own host on Azure (a VM's
+	// cloudapp.azure.com, API Management's azure-api.net) is a gateway.
+	case under(azureModelDomains...):
 		return true
-	// Bedrock's and Claude Platform on AWS's endpoints; anything else on AWS (a load balancer)
-	// is the customer's own.
-	case under("amazonaws.com", "amazonaws.com.cn", "api.aws") && (strings.Contains(host, "bedrock") || strings.Contains(host, "aws-external-anthropic")):
+	// Bedrock's and Claude Platform on AWS's endpoints, named by their service; anything else on
+	// AWS (a load balancer, API Gateway) is the customer's own.
+	case under("amazonaws.com", "amazonaws.com.cn", "api.aws") && awsModelService.MatchString(host):
 		return true
 	}
 	return false
 }
+
+// azureModelDomains are where Azure serves its model resources.
+var azureModelDomains = []string{
+	"openai.azure.com", "services.ai.azure.com", "cognitiveservices.azure.com", "models.ai.azure.com",
+	"openai.azure.us", "services.ai.azure.us", "cognitiveservices.azure.us",
+	"openai.azure.cn", "services.ai.azure.cn", "cognitiveservices.azure.cn",
+}
+
+// awsModelService is a host whose service label is Bedrock's or Claude Platform on AWS's,
+// behind an optional VPC endpoint id.
+var awsModelService = regexp.MustCompile(`^(?:vpce-[a-z0-9-]+\.)?(?:bedrock(?:-runtime|-mantle|-agent-runtime)?|aws-external-anthropic)(?:-fips)?\.`)
