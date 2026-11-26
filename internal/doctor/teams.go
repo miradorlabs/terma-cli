@@ -114,7 +114,8 @@ func TeamsCheck(r Routing, now time.Time) Check {
 		parts = append(parts, r.label(t)+" ("+words(string(st))+")")
 		switch st {
 		case routing.Suspended, routing.Refused:
-			failing = append(failing, r.label(t)+" is "+words(string(st))+" ("+refusalWords(t.LastError)+"), and blocks what it lists")
+			// Route passes a refused team over; a suspended one still holds what it lists.
+			failing = append(failing, r.label(t)+" is "+words(string(st))+" ("+refusalWords(t.LastError)+"), and "+pick(st == routing.Refused, "is skipped", "blocks what it lists"))
 			if r.ServerKey {
 				failFix = cmp.Or(failFix, r.setupFix())
 			} else {

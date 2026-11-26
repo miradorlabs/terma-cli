@@ -131,7 +131,7 @@ func TestTeamsCheckEnrollmentHealthAndSingleSignInRemediation(t *testing.T) {
 	r.State.Teams[0].Refusals = 2
 	r.State.Teams[0].LastError = routing.OrgAccessLost
 	c := TeamsCheck(r, now)
-	if c.Status != Fail || !strings.Contains(c.Detail, "refused (you no longer have access to its organization)") ||
+	if c.Status != Fail || !strings.Contains(c.Detail, "and is skipped") || strings.Contains(c.Detail, "blocks") || !strings.Contains(c.Detail, "refused (you no longer have access to its organization)") ||
 		!strings.Contains(c.Fix, "terma teams --release Platform") {
 		t.Fatalf("OrgAccessLost check = %+v", c)
 	}
@@ -141,7 +141,7 @@ func TestTeamsCheckEnrollmentHealthAndSingleSignInRemediation(t *testing.T) {
 	r.State.Teams[0].Refusals = 1
 	r.State.Teams[0].LastError = routing.Terminal
 	c = TeamsCheck(r, now)
-	if c.Status != Fail || !strings.Contains(c.Detail, "suspended (its organization says the team is gone)") {
+	if c.Status != Fail || !strings.Contains(c.Detail, "suspended (its organization says the team is gone)") || !strings.Contains(c.Detail, "blocks what it lists") {
 		t.Fatalf("Terminal suspended check = %+v", c)
 	}
 

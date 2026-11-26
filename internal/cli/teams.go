@@ -211,7 +211,11 @@ func teamStateNote(t teamRow) string {
 		if t.LastError == routing.OrgAccessLost {
 			note += " (" + orgInaccessibleNote + ")"
 		}
-		return note + ", blocking what it lists: `terma teams --release " + quoteArg(cmp.Or(t.Name, t.ID)) + "` removes it"
+		what := ", blocking what it lists"
+		if t.State == routing.Refused {
+			what = ", skipped"
+		}
+		return note + what + ": `terma teams --release " + quoteArg(cmp.Or(t.Name, t.ID)) + "` removes it"
 	case routing.Expired:
 		return note + ": not refreshed for a week, blocking what it lists"
 	}

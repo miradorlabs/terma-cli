@@ -882,3 +882,14 @@ func TestTeamsSelectFailsWhenPolicyCannotBePersisted(t *testing.T) {
 		t.Fatalf("must not report successful tick when policy persistence fails:\n%s", out)
 	}
 }
+
+// Route passes a refused team over, so its note says it is skipped; a suspended one blocks.
+func TestTeamStateNoteSaysARefusedTeamIsSkipped(t *testing.T) {
+	refused := teamStateNote(teamRow{Name: "Web", Selected: true, State: routing.Refused})
+	if !strings.Contains(refused, "skipped") || strings.Contains(refused, "blocking") {
+		t.Errorf("refused note = %q", refused)
+	}
+	if got := teamStateNote(teamRow{Name: "Web", Selected: true, State: routing.Suspended}); !strings.Contains(got, "blocking what it lists") {
+		t.Errorf("suspended note = %q", got)
+	}
+}
