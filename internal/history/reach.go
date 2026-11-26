@@ -100,7 +100,8 @@ func familyCutoff(
 		ids = append(ids, c.SessionID)
 	}
 	slices.Sort(ids)
-	key := f.SourceSystem + "\x00" + strings.Join(ids, "\x00")
+	cutoffs := ancestorCutoffs(f, companions)
+	key := f.SourceSystem + "\x00" + f.SessionID + "\x00" + strings.Join(ids, "\x00")
 	state := fmt.Sprintf("%s:%d:%d", resolver.state.StateID, resolver.state.Generation, resolver.state.ConsentGeneration)
 
 	var at time.Time
@@ -110,21 +111,39 @@ func familyCutoff(
 	} else {
 		subagents := len(companions) > 0 || f.ParentSessionID != ""
 		var segs []segReachInfo
-		collect := func(seg agents.HistorySegment) error {
-			if err := ctx.Err(); err != nil {
-				return err
+		collectWithLimit := func(limit time.Time) func(agents.HistorySegment) error {
+			return func(seg agents.HistorySegment) error {
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+				subagents = subagents || seg.Subagent
+				earliest := earliestSegmentTime(seg)
+				reaches := seg.ToolReaches
+				if !limit.IsZero() {
+					if !earliest.IsZero() && !earliest.Before(limit) {
+						return nil
+					}
+					if len(reaches) > 0 {
+						filtered := make([]agents.HistoryToolReach, 0, len(reaches))
+						for _, tr := range reaches {
+							if tr.At.IsZero() || tr.At.Before(limit) {
+								filtered = append(filtered, tr)
+							}
+						}
+						reaches = filtered
+					}
+				}
+				target, _, _ := resolver.resolve(ctx, seg.Cwd, seg.FallbackRepoURL, seg.FallbackBranch)
+				segs = append(segs, segReachInfo{cwd: seg.Cwd, reaches: reaches, earliest: earliest, target: target})
+				return nil
 			}
-			subagents = subagents || seg.Subagent
-			target, _, _ := resolver.resolve(ctx, seg.Cwd, seg.FallbackRepoURL, seg.FallbackBranch)
-			segs = append(segs, segReachInfo{cwd: seg.Cwd, reaches: seg.ToolReaches, earliest: earliestSegmentTime(seg), target: target})
-			return nil
 		}
-		if err := src.ReadHistory(ctx, f, agents.HistoryReadOptions{IncludeSupplemental: false}, collect); err != nil {
+		if err := src.ReadHistory(ctx, f, agents.HistoryReadOptions{IncludeSupplemental: false}, collectWithLimit(time.Time{})); err != nil {
 			return time.Time{}, false, err
 		}
 		readAll := true
 		for _, comp := range companions {
-			if err := src.ReadHistory(ctx, comp, agents.HistoryReadOptions{IncludeSupplemental: false}, collect); err != nil {
+			if err := src.ReadHistory(ctx, comp, agents.HistoryReadOptions{IncludeSupplemental: false}, collectWithLimit(cutoffs[comp.SessionID])); err != nil {
 				if errors.Is(err, context.Canceled) {
 					return time.Time{}, false, err
 				}
@@ -145,7 +164,11 @@ func familyCutoff(
 	farPast := time.Unix(1, 0).UTC()
 	farFuture := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
 	for _, comp := range companions {
-		if mAt, m := runs.Read(opts.StateDir, comp.SessionID).MixedInterval(farPast, farFuture); m {
+		end := farFuture
+		if limit := cutoffs[comp.SessionID]; !limit.IsZero() {
+			end = limit.Add(-time.Nanosecond)
+		}
+		if mAt, m := runs.Read(opts.StateDir, comp.SessionID).MixedInterval(farPast, end); m {
 			at, mixed = mergeMixedCutoff(at, mixed, mAt, true)
 		}
 	}

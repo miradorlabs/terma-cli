@@ -22,6 +22,10 @@ type HistoryFile struct {
 	// as a forked or continued transcript) whose history flowed into this session, rather
 	// than a bidirectional subagent whose activity flows back into the parent.
 	OneWayParent bool
+	// OneWayCutoff optionally bounds inherited ancestor activity to events strictly before
+	// this timestamp (such as a fork's creation time) when OneWayParent is true, so later
+	// unrelated activity on the original parent does not suppress the independent fork.
+	OneWayCutoff time.Time
 	// Path is the main transcript file path on disk.
 	Path string
 	// ExtraPaths lists companion transcript files belonging to the same session, such as

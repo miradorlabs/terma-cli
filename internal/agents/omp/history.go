@@ -122,6 +122,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 				outside := !opts.Since.IsZero() && modTime.Before(opts.Since)
 				sid := ompSessionIDFromFilename(ent.Name())
 				var parentID string
+				var oneWayCutoff time.Time
 				hdr, peekErr := peekOmpSessionHeader(mainPath)
 				if peekErr != nil && !errors.Is(peekErr, fs.ErrNotExist) && subErr == "" {
 					subErr = mainPath
@@ -132,6 +133,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 					}
 					if ref := cmp.Or(strings.TrimSpace(hdr.ParentSession), strings.TrimSpace(hdr.ContinuationOf)); ref != "" {
 						parentID = ompParentSessionID(ref)
+						oneWayCutoff = parseOmpTime(hdr.Timestamp)
 					}
 				}
 				if !session.ValidID(sid) {
@@ -142,6 +144,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 					SessionID:          sid,
 					ParentSessionID:    parentID,
 					OneWayParent:       parentID != "",
+					OneWayCutoff:       oneWayCutoff,
 					Path:               mainPath,
 					ExtraPaths:         extras,
 					WatchDirs:          watchDirs,
@@ -214,6 +217,7 @@ func findOmpSubagents(ctx context.Context, parentPath, stemDir string) (paths, w
 			}
 			return
 		}
+		jsonStems := map[string]bool{}
 		for _, ent := range entries {
 			if ctx.Err() != nil {
 				return
@@ -221,6 +225,7 @@ func findOmpSubagents(ctx context.Context, parentPath, stemDir string) (paths, w
 			if ent.IsDir() || ent.Type()&os.ModeSymlink != 0 || !strings.HasSuffix(ent.Name(), ".jsonl") {
 				continue
 			}
+			jsonStems[strings.TrimSuffix(ent.Name(), ".jsonl")] = true
 			subPath := filepath.Join(curDir, ent.Name())
 			info, err := ent.Info()
 			if err != nil {
@@ -256,6 +261,20 @@ func findOmpSubagents(ctx context.Context, parentPath, stemDir string) (paths, w
 				nestedDir := strings.TrimSuffix(subPath, ".jsonl")
 				watchDirs = append(watchDirs, nestedDir)
 				walk(subPath, nestedDir, depth+1)
+			}
+		}
+		// If an intermediate subagent transcript was deleted while a nested subdirectory
+		// still holds grandchild transcripts (or cannot be read), fail closed on the parent.
+		for _, ent := range entries {
+			if ctx.Err() != nil {
+				return
+			}
+			if !ent.IsDir() || ent.Type()&os.ModeSymlink != 0 || jsonStems[ent.Name()] {
+				continue
+			}
+			orphanSubDir := filepath.Join(curDir, ent.Name())
+			if dirHasJSONLOrErr(ctx, orphanSubDir, depth+1) && readErr == "" {
+				readErr = orphanSubDir
 			}
 		}
 	}
@@ -305,21 +324,6 @@ func findOrphanOmpSubagents(ctx context.Context, expectedParent, dir, missingPar
 		})
 	}
 	return out
-}
-
-func sortPathsParentFirst(paths []string) {
-	depth := func(p string) int { return strings.Count(filepath.ToSlash(filepath.Clean(p)), "/") }
-	slices.SortFunc(paths, func(a, b string) int {
-		return cmp.Or(cmp.Compare(depth(a), depth(b)), strings.Compare(a, b))
-	})
-}
-
-func ompSessionIDFromFilename(base string) string {
-	m := ompFilenameRe.FindStringSubmatch(base)
-	if len(m) == 2 && session.ValidID(m[1]) {
-		return m[1]
-	}
-	return ""
 }
 
 // peekOmpSessionHeader reads the leading lines of an OMP transcript (skipping any optional

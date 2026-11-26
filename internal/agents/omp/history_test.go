@@ -634,6 +634,20 @@ func TestOmpCouncilRegressionCases(t *testing.T) {
 	if promSpans[0].StartTimeUnixNano != wantStart || promSpans[0].EndTimeUnixNano != wantEnd {
 		t.Errorf("span times = [%d, %d], want [%d, %d]", promSpans[0].StartTimeUnixNano, promSpans[0].EndTimeUnixNano, wantStart, wantEnd)
 	}
+
+	// 4. Local file:// decoding and ompParentSessionID filename-first & non-regular-path safety.
+	if got := nonURLPath("file:///work/org-b/plan%201.md"); got != "/work/org-b/plan 1.md" {
+		t.Errorf("nonURLPath(file://) = %q", got)
+	}
+	if got := nonURLPath("file:///C:/Users/dev/a.go"); got != "C:/Users/dev/a.go" {
+		t.Errorf("nonURLPath(windows file://) = %q", got)
+	}
+	if got := ompParentSessionID("2026-11-20T10-00-00-000Z_parent1.jsonl"); got != "parent1" {
+		t.Errorf("ompParentSessionID(bare filename) = %q, want parent1", got)
+	}
+	if got := ompParentSessionID(dir); !strings.HasPrefix(got, "missing-parent-") {
+		t.Errorf("ompParentSessionID(directory) = %q, want missing-parent-*", got)
+	}
 }
 
 func mustJSON(v any) string {

@@ -258,3 +258,51 @@ func familyReadError(f agents.HistoryFile, companions []agents.HistoryFile) stri
 	}
 	return ""
 }
+
+// ancestorCutoffs maps each companion session reached through one or more OneWayParent
+// edges from f to the earliest fork/continuation timestamp along that upward path, so
+// unrelated post-fork activity on an ancestor does not suppress an independent fork.
+func ancestorCutoffs(f agents.HistoryFile, companions []agents.HistoryFile) map[string]time.Time {
+	byID := make(map[string]agents.HistoryFile, len(companions)+1)
+	byID[f.SessionID] = f
+	bidirChildren := map[string][]string{}
+	for _, c := range companions {
+		byID[c.SessionID] = c
+		if c.ParentSessionID != "" && c.ParentSessionID != c.SessionID && !c.OneWayParent {
+			bidirChildren[c.ParentSessionID] = append(bidirChildren[c.ParentSessionID], c.SessionID)
+		}
+	}
+	cutoffs := map[string]time.Time{}
+	var running time.Time
+	seen := map[string]bool{f.SessionID: true}
+	for cur := f; cur.ParentSessionID != ""; {
+		if cur.OneWayParent && !cur.OneWayCutoff.IsZero() {
+			if running.IsZero() || cur.OneWayCutoff.Before(running) {
+				running = cur.OneWayCutoff
+			}
+		}
+		pid := cur.ParentSessionID
+		if seen[pid] {
+			break
+		}
+		seen[pid] = true
+		parent, ok := byID[pid]
+		if !ok {
+			break
+		}
+		if !running.IsZero() {
+			// Propagate the one-way cutoff to this ancestor and its bidirectional subagents.
+			q := []string{pid}
+			for len(q) > 0 {
+				id := q[0]
+				q = q[1:]
+				if prev, exists := cutoffs[id]; !exists || running.Before(prev) {
+					cutoffs[id] = running
+				}
+				q = append(q, bidirChildren[id]...)
+			}
+		}
+		cur = parent
+	}
+	return cutoffs
+}
