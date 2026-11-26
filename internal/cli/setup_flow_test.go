@@ -268,6 +268,43 @@ func TestSetupRerunSummaryKeepsATeamWhosePolicyFailed(t *testing.T) {
 	}
 }
 
+// A personal organization with two teams gets one ticked, as routing takes one personal team.
+func TestSetupTicksOnePersonalTeam(t *testing.T) {
+	gateway := newFakeAuth(t)
+	gateway.orgs = []organization{orgA(), orgPersonal()}
+	gateway.projects = map[string][]project{
+		orgA().ID: projectsIn(orgA().ID),
+		teamsPersonalOrg: {
+			{ID: teamsPersonalTeam, Name: "Personal", OrganizationID: teamsPersonalOrg},
+			{ID: "pppppppp-0000-4000-8000-000000000002", Name: "Side", OrganizationID: teamsPersonalOrg},
+		},
+	}
+	gateway.policyBodies = map[string]string{teamsPersonalTeam: globalBody}
+	setupMachine(t, gateway)
+	if out, err := runTerma(t, "setup", "--harness", "codex", "--yes"); err != nil {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	got := enrolledTeams(t)
+	if !slices.Contains(got, teamsPersonalTeam) || slices.Contains(got, "pppppppp-0000-4000-8000-000000000002") {
+		t.Fatalf("enrolled %v, want the first personal team alone", got)
+	}
+
+	// Ticking both in the picker is refused before anything is committed.
+	prevAsk, prevForm := testApp.canAsk, testApp.runForm
+	t.Cleanup(func() { testApp.canAsk, testApp.runForm = prevAsk, prevForm })
+	testApp.canAsk = func() bool { return true }
+	testApp.runForm = func(form *prompt.Form) ([]prompt.Item, error) {
+		items := slices.Clone(form.Items)
+		for i := range items {
+			items[i].Selected = true
+		}
+		return items, nil
+	}
+	if out, err := runTerma(t, "setup", "--harness", "codex"); err == nil || !strings.Contains(err.Error(), "more than one Personal team") {
+		t.Fatalf("setup ticking two personal teams: %v\n%s", err, out)
+	}
+}
+
 // A re-run keeps the developer's choices: --yes enrolls no organization team left unticked,
 // and --team adds the team it names to those ticked.
 func TestSetupRerunKeepsTeamChoices(t *testing.T) {
