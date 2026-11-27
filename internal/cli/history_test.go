@@ -32,6 +32,10 @@ func TestParseHistorySince(t *testing.T) {
 	if err != nil || !got.Equal(now.Add(-90*24*time.Hour)) {
 		t.Errorf("90d = (%v, %v)", got, err)
 	}
+	got, err = parseHistorySince("40000d", now)
+	if err != nil || !got.Equal(now.Add(-time.Duration(40000)*24*time.Hour)) {
+		t.Errorf("40000d = (%v, %v)", got, err)
+	}
 	got, err = parseHistorySince("48h", now)
 	if err != nil || !got.Equal(now.Add(-48*time.Hour)) {
 		t.Errorf("48h = (%v, %v)", got, err)
@@ -40,9 +44,19 @@ func TestParseHistorySince(t *testing.T) {
 	if err != nil || !got.Equal(time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)) {
 		t.Errorf("2026-08-01 = (%v, %v)", got, err)
 	}
-	for _, bad := range []string{"", "0d", "-5d", "-1h", "nonsense"} {
-		if _, err := parseHistorySince(bad, now); err == nil {
-			t.Errorf("expected error for invalid --since %q", bad)
+	wantErrs := map[string]string{
+		"":         "--since cannot be empty",
+		"0d":       `invalid --since "0d": expected a positive number of days (e.g. 90d)`,
+		"-1d":      `invalid --since "-1d": expected a positive number of days (e.g. 90d)`,
+		"-5d":      `invalid --since "-5d": expected a positive number of days (e.g. 90d)`,
+		"abcd":     `invalid --since "abcd": expected a positive number of days (e.g. 90d)`,
+		"0":        `invalid --since "0": duration must be positive`,
+		"-1h":      `invalid --since "-1h": duration must be positive`,
+		"nonsense": `invalid --since "nonsense": use a duration like 90d or 48h, or a date like 2026-08-01`,
+	}
+	for spec, want := range wantErrs {
+		if _, err := parseHistorySince(spec, now); err == nil || err.Error() != want {
+			t.Errorf("parseHistorySince(%q) err = %v, want %q", spec, err, want)
 		}
 	}
 }

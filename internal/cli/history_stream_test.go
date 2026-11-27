@@ -501,14 +501,29 @@ func TestHistoryUploadActiveWindow(t *testing.T) {
 
 func TestParseHistoryActiveWindow(t *testing.T) {
 	t.Parallel()
-	for spec, want := range map[string]time.Duration{"0": 0, "0d": 0, "1h": time.Hour, " 30m ": 30 * time.Minute, "2d": 48 * time.Hour} {
+	for spec, want := range map[string]time.Duration{
+		"0":      0,
+		"0s":     0,
+		"0d":     0,
+		"30s":    30 * time.Second,
+		"1000ms": time.Second,
+		"1h":     time.Hour,
+		" 30m ":  30 * time.Minute,
+		"2d":     48 * time.Hour,
+	} {
 		if got, err := parseHistoryActiveWindow(spec); err != nil || got != want {
 			t.Errorf("%q = (%v, %v), want %v", spec, got, err, want)
 		}
 	}
-	for _, bad := range []string{"", "-1h", "-1d", "soon", "1x", "999999999d"} {
+	for _, bad := range []string{"", "-1h", "-1d", "-500ms", "soon", "1x", "999999999d"} {
 		if _, err := parseHistoryActiveWindow(bad); err == nil {
 			t.Errorf("%q: no error", bad)
+		}
+	}
+	for _, subSecond := range []string{"500ms", "1500ms", "1.5s", "1ms", "1ns"} {
+		err := func() error { _, e := parseHistoryActiveWindow(subSecond); return e }()
+		if err == nil || !strings.Contains(err.Error(), "whole seconds") {
+			t.Errorf("%q: err = %v, want whole seconds error", subSecond, err)
 		}
 	}
 }
