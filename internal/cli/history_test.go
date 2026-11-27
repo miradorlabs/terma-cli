@@ -65,18 +65,30 @@ func TestParseHistorySince(t *testing.T) {
 // session in team A's repository and a Codex session in team B's, both four hours old, and
 // a fake API that holds nothing and records what it is sent.
 type historyFixture struct {
-	stateDir string
-	srv      *httptest.Server
-	ccPath   string
-	cxPath   string
-	account  string
-	mu       sync.Mutex
-	holdings int
-	received map[string][]*logspb.LogsData
-	// held, holdingsStatus and logsStatus, by team, change what the fake API answers.
+	cfgDir    string
+	stateDir  string
+	claudeDir string
+	codexDir  string
+	repoA     string
+	repoB     string
+	srv       *httptest.Server
+	ccPath    string
+	cxPath    string
+	account   string
+	mu        sync.Mutex
+	holdings  int
+	received  map[string][]*logspb.LogsData
+	// held, holdingsStatus, holdingsBody, logsStatus, logsBody, refreshStatus, refreshBody,
+	// and onHoldings/onLogs change what the fake API answers.
 	held           map[string][]map[string]any
 	holdingsStatus map[string]int
+	holdingsBody   map[string]string
 	logsStatus     map[string]int
+	logsBody       map[string]string
+	refreshStatus  int
+	refreshBody    string
+	onHoldings     func(proj string)
+	onLogs         func(proj string)
 }
 
 // answer sets what the fake API answers from now on.
@@ -126,18 +138,48 @@ func newHistoryFixture(t *testing.T) *historyFixture {
 		}
 	}
 
-	fx := &historyFixture{stateDir: stateDir, received: map[string][]*logspb.LogsData{}}
+	fx := &historyFixture{
+		cfgDir:    cfgDir,
+		stateDir:  stateDir,
+		claudeDir: claudeDir,
+		codexDir:  codexDir,
+		repoA:     repoA,
+		repoB:     repoB,
+		received:  map[string][]*logspb.LogsData{},
+	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case "/v1/auth/user/token":
+			fx.mu.Lock()
+			status, body := fx.refreshStatus, fx.refreshBody
+			fx.mu.Unlock()
+			if status == 0 {
+				http.NotFound(w, r)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(status)
+			if body != "" {
+				_, _ = io.WriteString(w, body)
+			}
 		case "/v1/ai/sessions":
 			proj := r.Header.Get(sendas.ProjectHeader)
 			fx.mu.Lock()
 			fx.holdings++
-			status, held := fx.holdingsStatus[proj], fx.held[proj]
+			status, body, held, hook := fx.holdingsStatus[proj], fx.holdingsBody[proj], fx.held[proj], fx.onHoldings
 			fx.mu.Unlock()
+			if hook != nil {
+				hook(proj)
+			}
 			if status != 0 {
+				if body != "" {
+					w.Header().Set("Content-Type", "application/json")
+				}
 				w.WriteHeader(status)
+				if body != "" {
+					_, _ = io.WriteString(w, body)
+				}
 				return
 			}
 			if held == nil {
@@ -158,12 +200,21 @@ func newHistoryFixture(t *testing.T) *historyFixture {
 			}
 			proj := r.Header.Get(sendas.ProjectHeader)
 			fx.mu.Lock()
-			status := fx.logsStatus[proj]
+			status, respBody, hook := fx.logsStatus[proj], fx.logsBody[proj], fx.onLogs
 			if status == 0 {
 				fx.received[proj] = append(fx.received[proj], &logs)
 			}
 			fx.mu.Unlock()
+			if hook != nil {
+				hook(proj)
+			}
 			if status != 0 {
+				if respBody != "" {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(status)
+					_, _ = io.WriteString(w, respBody)
+					return
+				}
 				http.Error(w, "refused", status)
 				return
 			}

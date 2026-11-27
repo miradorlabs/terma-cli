@@ -75,11 +75,13 @@ func summaryOf(t *testing.T, out string) string {
 	return b.String()
 }
 
-var sizeFields = regexp.MustCompile(`"(estimated_bytes|sent_bytes)": [1-9][0-9]*`)
+var (
+	sizeFields = regexp.MustCompile(`"(estimated_bytes|sent_bytes)": [1-9][0-9]*`)
+	timeFields = regexp.MustCompile(`"failed_at": "[^"]+"`)
+)
 
 // -o json without --json-stream prints what it printed before --json-stream existed. The
-// sizes depend on the fixtures' temporary paths, so a size other than zero is the one
-// thing not compared.
+// sizes and failure timestamps depend on the run, so only those values are normalized.
 func TestHistoryUploadJSONOutputUnchanged(t *testing.T) {
 	newHistoryFixture(t)
 	const wantDry = `{
@@ -148,6 +150,88 @@ func TestHistoryUploadJSONOutputUnchanged(t *testing.T) {
 			t.Errorf("%v printed:\n%s\nwant:\n%s", run.args, got, run.want)
 		}
 	}
+
+	// Failure ordering compatibility: when team A gets a new permanent rejection while team B
+	// already holds a previously failed session, team A's failure precedes team B's in both
+	// -o json and text mode (matching main's route-order execution).
+	t.Run("failure order matches main", func(t *testing.T) {
+		fx := newHistoryFixture(t)
+		// Run 1: team-a holdings temporarily fails so only team-b uploads and permanently fails.
+		fx.answer(func(f *historyFixture) {
+			f.holdingsStatus = map[string]int{"team-a": http.StatusServiceUnavailable}
+			f.logsStatus = map[string]int{"team-b": http.StatusBadRequest}
+		})
+		_, _, err := termaRun{}.exec(t, "history", "upload", "-o", "json")
+		if code, ok := exitCodeOf(err); !ok || code != 1 {
+			t.Fatalf("seed run exit = %v, want 1", err)
+		}
+
+		// Run 2: team-a now reaches upload and permanently fails; team-b is already failed_previously.
+		fx.answer(func(f *historyFixture) {
+			f.holdingsStatus = nil
+			f.logsStatus = map[string]int{"team-a": http.StatusBadRequest}
+		})
+		out, _, err := termaRun{}.exec(t, "history", "upload", "-o", "json")
+		if code, ok := exitCodeOf(err); !ok || code != 1 {
+			t.Fatalf("run 2 exit = %v, want 1\n%s", err, out)
+		}
+		const wantFailed = `{
+  "discovered_files": 2,
+  "sent_sessions": 0,
+  "sent_records": 0,
+  "sent_bytes": 0,
+  "planned": [
+    {
+      "enrollment_id": "enr-a",
+      "team_id": "team-a",
+      "team_label": "team-a",
+      "sessions": 1,
+      "records": 3,
+      "estimated_bytes": 0
+    }
+  ],
+  "skipped_sessions": {
+    "failed_previously": 1
+  },
+  "failed": [
+    {
+      "enrollment_id": "enr-a",
+      "team_id": "team-a",
+      "team_label": "team-a",
+      "source_system": "claude",
+      "session_id": "11111111-1111-1111-1111-111111111111",
+      "reason": "HTTP 400: refused",
+      "failed_at": "T"
+    },
+    {
+      "enrollment_id": "enr-b",
+      "team_id": "team-b",
+      "team_label": "team-b",
+      "source_system": "codex",
+      "session_id": "22222222-2222-2222-2222-222222222222",
+      "reason": "HTTP 400: refused",
+      "previously": true,
+      "failed_at": "T"
+    }
+  ]
+}
+`
+		got := timeFields.ReplaceAllString(sizeFields.ReplaceAllString(out, `"$1": N`), `"failed_at": "T"`)
+		if got != wantFailed {
+			t.Errorf("run 2 -o json:\n%s\nwant:\n%s", got, wantFailed)
+		}
+
+		// Text mode summary also lists team-a's failure before team-b's.
+		textOut, _, err := termaRun{}.exec(t, "history", "upload")
+		if err != nil {
+			t.Fatalf("text summary run: %v\n%s", err, textOut)
+		}
+		idxA := strings.Index(textOut, "claude:11111111-1111-1111-1111-111111111111")
+		idxB := strings.Index(textOut, "codex:22222222-2222-2222-2222-222222222222")
+		if idxA < 0 || idxB < 0 || idxA >= idxB {
+			t.Errorf("text summary failure order wrong (idxA=%d idxB=%d):\n%s", idxA, idxB, textOut)
+		}
+	})
 }
 
 // A dry run streams start, discover, the plan before any server is asked, and the summary
@@ -360,6 +444,10 @@ func TestHistoryUploadJSONStreamErrorCodes(t *testing.T) {
 		if code, ok := exitCodeOf(err); !ok || code != wantExit {
 			t.Fatalf("exit = %v, want %d\n%s", err, wantExit, out)
 		}
+		lines := streamLines(t, out)
+		if got := streamTypes(lines); got != "error" {
+			t.Fatalf("lines = %q, want exact sequence %q (no start or summary before work begins)\n%s", got, "error", out)
+		}
 		code, message := lastError(t, out)
 		if code != wantCode || message != textErr.Error() {
 			t.Errorf("error = %s %q, want %s and text mode's message %q", code, message, wantCode, textErr.Error())
@@ -372,7 +460,7 @@ func TestHistoryUploadJSONStreamErrorCodes(t *testing.T) {
 	t.Run("not set up", func(t *testing.T) {
 		useDirs(t, t.TempDir(), t.TempDir())
 		t.Setenv("TERMA_API_KEY", "")
-		check(t, historyErrNotSetUp, ExitNotSetUp)
+		check(t, "not_set_up", 5)
 	})
 	t.Run("signed out", func(t *testing.T) {
 		stateDir := t.TempDir()
@@ -382,7 +470,7 @@ func TestHistoryUploadJSONStreamErrorCodes(t *testing.T) {
 		if _, err := routing.Replace(stateDir, config.DefaultProfile, nil, account, func(*routing.State) error { return nil }); err != nil {
 			t.Fatal(err)
 		}
-		check(t, historyErrSignedOut, ExitSignedOut)
+		check(t, "signed_out", 6)
 	})
 	t.Run("upload running", func(t *testing.T) {
 		fx := newHistoryFixture(t)
@@ -391,7 +479,7 @@ func TestHistoryUploadJSONStreamErrorCodes(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer unlock()
-		check(t, historyErrUploadRunning, ExitUploadRunning)
+		check(t, "upload_running", 4)
 		if fx.holdingsCalls() != 0 || fx.receivedBy("team-a")+fx.receivedBy("team-b") != 0 {
 			t.Errorf("a run that found another running reached the server")
 		}
@@ -410,8 +498,12 @@ func TestHistoryUploadJSONStreamUsageErrors(t *testing.T) {
 		if code, ok := exitCodeOf(err); !ok || code != 1 {
 			t.Fatalf("%v: exit = %v, want 1\n%s", args, err, out)
 		}
-		if code, _ := lastError(t, out); code != historyErrFailed {
-			t.Errorf("%v: error code %s, want %s", args, code, historyErrFailed)
+		lines := streamLines(t, out)
+		if got := streamTypes(lines); got != "error" {
+			t.Fatalf("%v: lines = %q, want %q\n%s", args, got, "error", out)
+		}
+		if code, _ := lastError(t, out); code != "failed" {
+			t.Errorf("%v: error code %s, want %q", args, code, "failed")
 		}
 	}
 	_, _, err := termaRun{}.exec(t, "history", "upload", "--no-such-flag")
@@ -527,3 +619,218 @@ func TestParseHistoryActiveWindow(t *testing.T) {
 		}
 	}
 }
+
+// Every path where sign-in is lost mid-run ends with summary followed by an error line
+// carrying code "signed_out" and exit code 6, while text mode keeps its non-coded error.
+func TestHistoryUploadJSONStreamSignInLostMidRun(t *testing.T) {
+	t.Run("refresh refused during holdings", func(t *testing.T) {
+		fx := newHistoryFixture(t)
+		cred := storedSession(&fakeAuth{srv: fx.srv})
+		cred.ExpiresAt = time.Now().Add(-time.Hour)
+		if err := saveSignIn(fx.cfgDir, cred); err != nil {
+			t.Fatal(err)
+		}
+		fx.answer(func(f *historyFixture) {
+			f.refreshStatus = http.StatusUnauthorized
+			f.refreshBody = `{"error":"invalid_grant"}`
+		})
+		out, _, err := termaRun{}.exec(t, "history", "upload", "--json-stream")
+		if code, ok := exitCodeOf(err); !ok || code != 6 {
+			t.Fatalf("exit = %v, want 6\n%s", err, out)
+		}
+		lines := streamLines(t, out)
+		if got := streamTypes(lines); got != "start discover holdings summary error" {
+			t.Fatalf("lines = %q, want %q\n%s", got, "start discover holdings summary error", out)
+		}
+		if code, _ := lastError(t, out); code != "signed_out" {
+			t.Errorf("error code = %q, want %q", code, "signed_out")
+		}
+	})
+
+	t.Run("refresh refused in text mode keeps non-coded error", func(t *testing.T) {
+		fx := newHistoryFixture(t)
+		cred := storedSession(&fakeAuth{srv: fx.srv})
+		cred.ExpiresAt = time.Now().Add(-time.Hour)
+		if err := saveSignIn(fx.cfgDir, cred); err != nil {
+			t.Fatal(err)
+		}
+		fx.answer(func(f *historyFixture) {
+			f.refreshStatus = http.StatusUnauthorized
+			f.refreshBody = `{"error":"invalid_grant"}`
+		})
+		_, _, err := termaRun{}.exec(t, "history", "upload")
+		if err == nil {
+			t.Fatal("text mode did not fail")
+		}
+		if _, coded := exitCodeOf(err); coded {
+			t.Errorf("text mode ended with coded exit error: %v", err)
+		}
+	})
+
+	t.Run("signed out between holdings and per-session recheck", func(t *testing.T) {
+		fx := newHistoryFixture(t)
+		fx.answer(func(f *historyFixture) {
+			f.onHoldings = func(proj string) {
+				if proj == "team-b" {
+					_ = auth.DeleteCredential(fx.cfgDir, config.DefaultProfile)
+				}
+			}
+		})
+		out, _, err := termaRun{}.exec(t, "history", "upload", "--json-stream")
+		if code, ok := exitCodeOf(err); !ok || code != 6 {
+			t.Fatalf("exit = %v, want 6\n%s", err, out)
+		}
+		lines := streamLines(t, out)
+		if got := streamTypes(lines); got != "start discover holdings holdings plan summary error" {
+			t.Fatalf("lines = %q, want %q\n%s", got, "start discover holdings holdings plan summary error", out)
+		}
+		if code, _ := lastError(t, out); code != "signed_out" {
+			t.Errorf("error code = %q, want %q", code, "signed_out")
+		}
+	})
+
+	t.Run("sign-in retired on send", func(t *testing.T) {
+		fx := newHistoryFixture(t)
+		fx.answer(func(f *historyFixture) {
+			f.logsStatus = map[string]int{"team-a": http.StatusUnauthorized}
+			f.logsBody = map[string]string{"team-a": `{"reason":"SIGN_IN_RETIRED"}`}
+		})
+		out, _, err := termaRun{}.exec(t, "history", "upload", "--json-stream")
+		if code, ok := exitCodeOf(err); !ok || code != 6 {
+			t.Fatalf("exit = %v, want 6\n%s", err, out)
+		}
+		lines := streamLines(t, out)
+		if got := streamTypes(lines); got != "start discover holdings holdings plan session_start summary error" {
+			t.Fatalf("lines = %q, want %q\n%s", got, "start discover holdings holdings plan session_start summary error", out)
+		}
+		if code, _ := lastError(t, out); code != "signed_out" {
+			t.Errorf("error code = %q, want %q", code, "signed_out")
+		}
+	})
+}
+
+// A team already blocked in routing state at discovery emits team_blocked once before plan
+// even when all sessions belong to it and plan is empty.
+func TestHistoryUploadJSONStreamDiscoveryBlocked(t *testing.T) {
+	fx := newHistoryFixture(t)
+	if _, err := routing.Update(fx.stateDir, config.DefaultProfile, routing.Expect{Account: fx.account}, func(s *routing.State) error {
+		for i := range s.Teams {
+			if s.Teams[i].TeamID == "team-a" {
+				s.Teams[i].Refusals = 1
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// Remove team-b's session so every discovered session belongs to the blocked team.
+	if err := os.Remove(fx.cxPath); err != nil {
+		t.Fatal(err)
+	}
+	out, _, err := termaRun{}.exec(t, "history", "upload", "--json-stream")
+	if err != nil {
+		t.Fatalf("upload: %v\n%s", err, out)
+	}
+	lines := streamLines(t, out)
+	const want = "start discover team_blocked plan summary"
+	if got := streamTypes(lines); got != want {
+		t.Fatalf("lines = %q, want %q\n%s", got, want, out)
+	}
+	b := lines[2]
+	if b["team_id"] != "team-a" || b["enrollment_id"] != "enr-a" ||
+		b["reason_code"] != "team_blocked:suspended" || b["skipped"] != float64(1) {
+		t.Errorf("team_blocked = %v", b)
+	}
+	if p := lines[3]; p["sessions"] != float64(0) || p["source_bytes"] != float64(0) {
+		t.Errorf("plan = %v, want empty plan", p)
+	}
+}
+
+// When team A passes holdings and team B in the same organization gets ORG_NOT_ACCESSIBLE,
+// both teams are blocked before plan is emitted, so plan counts 0 sessions and 0 source bytes.
+func TestHistoryUploadJSONStreamOrgBlockedPlan(t *testing.T) {
+	fx := newHistoryFixture(t)
+	if _, err := routing.Update(fx.stateDir, config.DefaultProfile, routing.Expect{Account: fx.account}, func(s *routing.State) error {
+		for i := range s.Teams {
+			s.Teams[i].OrganizationID = "org-shared"
+			s.Teams[i].Policy.OrganizationID = "org-shared"
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	fx.answer(func(f *historyFixture) {
+		f.holdingsStatus = map[string]int{"team-b": http.StatusForbidden}
+		f.holdingsBody = map[string]string{"team-b": `{"error":"ORG_NOT_ACCESSIBLE","message":"organization is not accessible"}`}
+	})
+	out, _, err := termaRun{}.exec(t, "history", "upload", "--json-stream")
+	if code, ok := exitCodeOf(err); !ok || code != 1 {
+		t.Fatalf("exit = %v, want 1\n%s", err, out)
+	}
+	lines := streamLines(t, out)
+	const want = "start discover holdings holdings team_blocked team_blocked plan summary"
+	if got := streamTypes(lines); got != want {
+		t.Fatalf("lines = %q, want %q\n%s", got, want, out)
+	}
+	plan := lineOf(t, lines, "plan")
+	if plan["sessions"] != float64(0) || plan["source_bytes"] != float64(0) {
+		t.Errorf("plan = %v, want 0 sessions and 0 source_bytes", plan)
+	}
+	if fx.receivedBy("team-a") != 0 || fx.receivedBy("team-b") != 0 {
+		t.Errorf("sent requests for blocked org: team-a=%d team-b=%d", fx.receivedBy("team-a"), fx.receivedBy("team-b"))
+	}
+}
+
+// A transcript split across two teams counts as 2 session-team uploads in plan and events,
+// while plan.source_bytes counts the transcript file once and sent_bytes reconciles with summary.
+func TestHistoryUploadJSONStreamSplitTranscript(t *testing.T) {
+	fx := newHistoryFixture(t)
+	if err := os.Remove(fx.cxPath); err != nil {
+		t.Fatal(err)
+	}
+	oldTime := time.Now().UTC().Add(-4 * time.Hour)
+	splitLines := strings.Join([]string{
+		`{"type":"user","uuid":"u1","promptId":"p1","sessionId":"11111111-1111-1111-1111-111111111111","cwd":` + jsonQuote(fx.repoA) + `,"version":"2.1.301","timestamp":"` + oldTime.Format(time.RFC3339Nano) + `","message":{"role":"user","content":"part in repo a"}}`,
+		`{"type":"assistant","uuid":"a1","sessionId":"11111111-1111-1111-1111-111111111111","cwd":` + jsonQuote(fx.repoA) + `,"version":"2.1.301","timestamp":"` + oldTime.Add(time.Second).Format(time.RFC3339Nano) + `","requestId":"req_1","message":{"id":"msg_1","role":"assistant","model":"claude-opus-5-5","stop_reason":"end_turn","content":[{"type":"text","text":"reply a"}],"usage":{"input_tokens":10,"output_tokens":5}}}`,
+		`{"type":"user","uuid":"u2","promptId":"p2","sessionId":"11111111-1111-1111-1111-111111111111","cwd":` + jsonQuote(fx.repoB) + `,"version":"2.1.301","timestamp":"` + oldTime.Add(2*time.Second).Format(time.RFC3339Nano) + `","message":{"role":"user","content":"part in repo b"}}`,
+		`{"type":"assistant","uuid":"a2","sessionId":"11111111-1111-1111-1111-111111111111","cwd":` + jsonQuote(fx.repoB) + `,"version":"2.1.301","timestamp":"` + oldTime.Add(3*time.Second).Format(time.RFC3339Nano) + `","requestId":"req_2","message":{"id":"msg_2","role":"assistant","model":"claude-opus-5-5","stop_reason":"end_turn","content":[{"type":"text","text":"reply b"}],"usage":{"input_tokens":10,"output_tokens":5}}}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(fx.ccPath, []byte(splitLines), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.Chtimes(fx.ccPath, oldTime, oldTime)
+	info, err := os.Stat(fx.ccPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, _, err := termaRun{}.exec(t, "history", "upload", "--json-stream")
+	if err != nil {
+		t.Fatalf("upload: %v\n%s", err, out)
+	}
+	lines := streamLines(t, out)
+	const want = "start discover holdings holdings plan session_start session_done session_start session_done summary"
+	if got := streamTypes(lines); got != want {
+		t.Fatalf("lines = %q, want %q\n%s", got, want, out)
+	}
+	plan := lineOf(t, lines, "plan")
+	if plan["sessions"] != float64(2) || plan["source_bytes"] != float64(info.Size()) {
+		t.Errorf("plan = %v, want 2 sessions and %d source_bytes (file counted once)", plan, info.Size())
+	}
+	var sentBytes float64
+	for i, idx := range []int{6, 8} {
+		done := lines[idx]
+		if done["index"] != float64(i+1) || done["total"] != float64(2) {
+			t.Errorf("session_done[%d] = %v, want %d of 2", i, done, i+1)
+		}
+		sentBytes += done["sent_bytes"].(float64)
+	}
+	var sum history.Summary
+	if err := json.Unmarshal([]byte(summaryOf(t, out)), &sum); err != nil {
+		t.Fatal(err)
+	}
+	if sum.SentSessions != 2 || float64(sum.SentBytes) != sentBytes {
+		t.Errorf("summary = %+v, want 2 sent_sessions and %v sent_bytes", sum, sentBytes)
+	}
+}
+
