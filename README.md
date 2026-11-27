@@ -652,7 +652,9 @@ sessions that OpenCode process knows: a parent session in another OpenCode proce
 back. On OpenCode 2, every session of the background service runs in one process. Also on
 OpenCode 2, the first model call or tool call of a session can be recorded a few tens of
 milliseconds shorter than it was: OpenCode does not wait for terma's first check of the
-session, and nothing is recorded as starting before the prompt that asked for it.
+session, and nothing is recorded as starting before the prompt that asked for it. On OpenCode
+1, the first prompt an OpenCode process sends in a session waits for terma to claim that
+session: usually a fraction of a second, a few seconds at most.
 
 On OpenCode 2, some attached files stop a session from being recorded. terma checks that a
 file an agent reads belongs to a repository your team collects, and for these OpenCode 2

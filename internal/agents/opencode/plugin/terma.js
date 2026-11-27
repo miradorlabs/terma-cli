@@ -609,6 +609,7 @@ function newSession(id, owner) {
     directory: "",
     askedDirectory: "", // the directory most recently moved to, applied or still queued
     movedAt: 0, // when the last move's claim finished; nothing after it is stamped earlier
+    claimedAt: 0, // when this process's first claim of the session finished, likewise
     version: "",
     created: 0,
     title: "",
@@ -707,6 +708,9 @@ async function firstSight(s, lookup) {
   const titled = (s.title = str(rec.title))
   s.policy = repoPolicy(s.directory)
   s.claimed = await runHook(s, "opencode-session-start", base(s))
+  // The claim starts this process's run of the session: a resumed session's record stamped
+  // before it would fall in the run before, which may be paused (Mixed).
+  s.claimedAt = Date.now()
   // A timeout or a refusal is not fatal: the relay holds an unclaimed session and the
   // next prompt claims it again. A terma that cannot be run is.
   if (!s.claimed && termaMissing()) {
@@ -1044,10 +1048,11 @@ function endAfterCheck(s, end) {
 // prompt text ever goes to a hook.
 function prompt(s, pr) {
   const text = str(pr.text)
-  // No earlier than the session's last move or its last check made after a tool ran: the
-  // relay files a record by its time, under the claim and the Mixed cutoff in force then.
-  const floor = Math.max(s.movedAt, checkFloor(s))
-  const time = floor ? Math.max(num(pr.time) ?? 0, floor) : pr.time
+  // No earlier than the session's claim, its last move or its last check made after a tool
+  // ran: the relay files a record by its time, under the claim and the Mixed cutoff in force then.
+  const floor = Math.max(s.claimedAt ?? 0, s.movedAt, checkFloor(s))
+  // A prompt OpenCode gave no time is stamped now, never back at the floor.
+  const time = floor ? Math.max(num(pr.time) ?? Date.now(), floor) : pr.time
   emitRecord(s, "opencode.user_prompt", policyOf(s).includePrompts ? truncate(text, MAX_TEXT) : "", {
     "opencode.message.id": pr.messageID,
     "opencode.prompt.length": text.length,
@@ -1068,7 +1073,9 @@ function title(s, t) {
 
 // emitTitle stamps the moment the plugin saw the title, made strictly later than the
 // session's previous title, so two titles of a session never share an identity, and no
-// earlier than its last move or its last check made after a tool ran, as a prompt is.
+// earlier than its last move or its last check made after a tool ran, as a prompt is. Not
+// held to the claim: a title seen before it may be one given while the session was paused,
+// and the relay judges it by the time it was seen.
 function emitTitle(s, text, time) {
   const at = Math.max(num(time) ?? Date.now(), s.lastTitleTime + 1, s.movedAt, checkFloor(s))
   s.lastTitleTime = at
@@ -1632,6 +1639,10 @@ async function server(input) {
         provider: msg.model?.providerID ?? inp?.model?.providerID,
         time: num(msg.time?.created),
       }
+      // The prompt is stamped no earlier than the session's claim (prompt), and OpenCode
+      // starts the turn's calls only once this hook returns: while this process's first
+      // claim of the session runs, wait for it, so no call of the turn starts before its prompt.
+      const claiming = !s.claimedAt && !s.dark
       const sent = run(s, async () => {
         for (const reach of reaches) if (!(await guardReach(s, reach))) return
         // A reach that crosses organizations marks the run from the moment its hook did; the
@@ -1645,7 +1656,7 @@ async function server(input) {
         }
         prompt(s, pr)
       })
-      if (reaches.length > 0) await sent
+      if (reaches.length > 0 || claiming) await sent
     }),
 
     // Only to see the title call start. It writes nothing to the request.

@@ -108,11 +108,11 @@ func (t *Teams) Route(rec relay.Record) relay.Routed {
 	if rec.Placed && (rec.Placement.Account == "" || rec.Placement.Account != pr.st.Account) {
 		return relay.Routed{Outcome: relay.Hold, Why: relay.WhyNoState}
 	}
-	if from, mixed := t.mixedInterval(rec.Session, rec.At, rec.EffectiveEnd()); mixed || rec.Placed && rec.Placement.Kind == claim.KindMixed {
+	if run, from, mixed := t.mixedInterval(rec.Session, rec.At, rec.EffectiveEnd()); mixed || rec.Placed && rec.Placement.Kind == claim.KindMixed {
 		if !mixed {
-			from = rec.At
+			run, from = rec.Placement.Run, rec.At
 		}
-		return relay.Routed{Outcome: relay.Drop, Why: relay.WhyMixed, Blocker: mixedBlocker(rec.Session), MixedAt: from}
+		return relay.Routed{Outcome: relay.Drop, Why: relay.WhyMixed, Blocker: mixedBlocker(rec.Session), MixedAt: from, MixedRun: run}
 	}
 	loc := location(rec)
 	d := pr.router.Route(loc, t.deps.Now())

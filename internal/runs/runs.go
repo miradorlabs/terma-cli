@@ -178,11 +178,21 @@ func (s Snapshot) MixedAt(recordTime time.Time) (time.Time, bool) {
 // end, returning the earliest MixedAt across all intersecting Mixed runs. An unreadable
 // ledger fails closed (zero time, true).
 func (s Snapshot) MixedInterval(start, end time.Time) (time.Time, bool) {
+	_, at, mixed := s.MixedRun(start, end)
+	return at, mixed
+}
+
+// MixedRun is MixedInterval that also names the run whose MixedAt it returns: empty when
+// the ledger is unreadable, so a caller scoping by run covers them all.
+func (s Snapshot) MixedRun(start, end time.Time) (string, time.Time, bool) {
 	if s.unreadable || len(s.runs) == 0 {
-		return time.Time{}, s.unreadable
+		return "", time.Time{}, s.unreadable
 	}
 	if start.IsZero() && end.IsZero() {
-		return s.MixedAt(time.Time{})
+		if r := inForce(s.runs, time.Time{}); !r.MixedAt.IsZero() {
+			return r.ID, r.MixedAt, true
+		}
+		return "", time.Time{}, false
 	}
 	if end.IsZero() || (!start.IsZero() && end.Before(start)) {
 		end = start
@@ -193,6 +203,7 @@ func (s Snapshot) MixedInterval(start, end time.Time) (time.Time, bool) {
 	ordered := slices.Clone(s.runs)
 	slices.SortStableFunc(ordered, func(a, b run) int { return a.Started.Compare(b.Started) })
 	var earliest time.Time
+	var id string
 	found := false
 	for i, r := range ordered {
 		if i > 0 && end.Before(r.Started) {
@@ -205,10 +216,10 @@ func (s Snapshot) MixedInterval(start, end time.Time) (time.Time, bool) {
 			continue
 		}
 		if !found || r.MixedAt.Before(earliest) {
-			earliest, found = r.MixedAt, true
+			id, earliest, found = r.ID, r.MixedAt, true
 		}
 	}
-	return earliest, found
+	return id, earliest, found
 }
 
 // Why returns why the run in force at recordTime is Mixed (zero if not or unreadable).
