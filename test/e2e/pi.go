@@ -23,7 +23,7 @@ import (
 // relay (UsePi); a direct run splices the same template pointed at the receiver, so the two
 // differ only in where the extension sends. The builds are the installed one, or
 // TERMA_E2E_PI_VERSIONS's from npm: CI runs the floor (internal/agents/pi/minimum_version.go)
-// and the latest captured.
+// and the latest.
 
 // piPackage is Pi's npm package.
 const piPackage = "@earendil-works/pi-coding-agent"
