@@ -222,6 +222,12 @@ func (s Snapshot) MixedIn(start, end time.Time) (string, time.Time, bool) {
 	return id, earliest, found
 }
 
+// HasRun reports whether this read of the ledger holds run id (false when unreadable): a
+// record placed in a run the read does not hold was claimed after it, so the read is stale.
+func (s Snapshot) HasRun(id string) bool {
+	return !s.unreadable && slices.ContainsFunc(s.runs, func(r run) bool { return r.ID == id })
+}
+
 // Why returns why the run in force at recordTime is Mixed (zero if not or unreadable).
 func (s Snapshot) Why(recordTime time.Time) Why {
 	if !s.unreadable && len(s.runs) > 0 {

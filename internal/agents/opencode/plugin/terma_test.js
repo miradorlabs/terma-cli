@@ -1439,6 +1439,12 @@ test("a resumed session's first prompt is stamped after its claim, and no call o
   const at = ms(p.timeUnixNano)
   expect(at).toBeGreaterThanOrEqual(Math.floor(claimed))
   expect(at).toBeLessThanOrEqual(turn)
+  // The title the session came with is not held to the claim: it may have been given while
+  // the session was paused, and the relay judges it by when it was seen, before the claim.
+  const [titled] = named(r.logs(), "opencode.session.title")
+  expect(titled.body.stringValue).toBe("Resumed title")
+  expect(ms(titled.timeUnixNano)).toBeGreaterThanOrEqual(asked)
+  expect(ms(titled.timeUnixNano)).toBeLessThan(Math.floor(claimed))
   const turnSpans = r.spans().filter((sp) => A(sp)["opencode.parent_message.id"] === "msg_u")
   expect(turnSpans.map((sp) => sp.name).sort()).toEqual(["chat m1", "execute_tool read"])
   for (const sp of turnSpans) expect(ms(sp.startTimeUnixNano)).toBeGreaterThanOrEqual(at)

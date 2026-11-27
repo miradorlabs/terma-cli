@@ -706,6 +706,9 @@ async function firstSight(s, lookup) {
   s.version = str(rec.version)
   s.created = num(rec.created) ?? 0
   const titled = (s.title = str(rec.title))
+  // Seen now, before the claim: a title given while the session was paused is judged in
+  // the paused run, as OpenCode 2's lookup does.
+  const titleSeenAt = Date.now()
   s.policy = repoPolicy(s.directory)
   s.claimed = await runHook(s, "opencode-session-start", base(s))
   // The claim starts this process's run of the session: a resumed session's record stamped
@@ -722,7 +725,7 @@ async function firstSight(s, lookup) {
   // whatever was queued before it, a call still to be checked included.
   if (!s.parentID && isRealTitle(titled)) {
     s.sentTitle = titled
-    emitTitle(s, titled)
+    emitTitle(s, titled, titleSeenAt)
   }
 }
 

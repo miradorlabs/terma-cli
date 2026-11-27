@@ -26,20 +26,24 @@ const ledgerTTL = time.Second
 const maxLedgers = 4096
 
 // mixedInterval reports whether session's run covering [start, end] was Mixed, which run,
-// and from when. An unreadable ledger fails closed (Mixed from Unix(0, 1), no run).
-func (t *Teams) mixedInterval(session string, start, end time.Time) (string, time.Time, bool) {
+// and from when. An unreadable ledger fails closed (Mixed from Unix(0, 1), no run). run is
+// the record's placement's run, if any.
+func (t *Teams) mixedInterval(session, run string, start, end time.Time) (string, time.Time, bool) {
 	if session == "" {
 		return "", time.Time{}, false
 	}
-	return mixedIntervalFrom(t.ledger(session), start, end)
+	return mixedIntervalFrom(t.ledger(session, run), start, end)
 }
 
-func (t *Teams) ledger(session string) runs.Snapshot {
+// ledger is session's run ledger, from a read at most ledgerTTL old that holds run. A read
+// that does not hold it was made before the run began (a resumed process's session-start),
+// and would judge the new run's records by the paused run before it, so it is read again.
+func (t *Teams) ledger(session, run string) runs.Snapshot {
 	now := t.deps.Now()
 	t.ledgerMu.Lock()
 	e, ok := t.ledgers[session]
 	t.ledgerMu.Unlock()
-	if ok && now.Sub(e.read) < t.ledgerTTL {
+	if ok && now.Sub(e.read) < t.ledgerTTL && (run == "" || e.l.HasRun(run)) {
 		return e.l
 	}
 	l := t.readLedger(t.cfg.StateDir, session)

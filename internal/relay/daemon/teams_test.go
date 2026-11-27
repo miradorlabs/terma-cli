@@ -774,6 +774,54 @@ func TestTeamsRouteNamesTheMixedRun(t *testing.T) {
 	}
 }
 
+// A ledger read cached before a resumed process's session-start opened its new run does not
+// judge that run's records: one placed in a run the read does not hold reads the ledger again,
+// so the resumed prompt is sent rather than dropped against the paused run, and the read is
+// cached for the records after it.
+func TestTeamsRouteRereadsALedgerThatPredatesTheRun(t *testing.T) {
+	t.Parallel()
+	stateDir, cfgDir := t.TempDir(), t.TempDir()
+	t0 := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
+	clock := t0.Add(19 * time.Second)
+	alice := testAccount("alice")
+	setupProfileDir(t, cfgDir, "default", []string{"claude"})
+	writeRoutingState(t, stateDir, routing.State{Profile: "default", Account: alice, Teams: []routing.Team{activeTeam("e1", "team-1", testOrgA, false, t0.Add(time.Minute), "github.com/a/r1")}})
+	if _, err := runs.Start(stateDir, "sess-pause", t0); err != nil {
+		t.Fatal(err)
+	}
+	if err := runs.MarkMixed(stateDir, "sess-pause", t0.Add(10*time.Second), runs.Why{Reason: runs.UnknownReach}); err != nil {
+		t.Fatal(err)
+	}
+	cfg := &config.Config{Dir: cfgDir, StateDir: stateDir, ProfileName: "default", AuthURL: testAuthURL, OTLPURL: testOTLPURL, Account: alice}
+	teams := NewTeams(cfg, TeamsDeps{Now: func() time.Time { return clock }})
+	reads := 0
+	teams.readLedger = func(stateDir, id string) runs.Snapshot { reads++; return runs.Read(stateDir, id) }
+
+	// The resumed process's first record arrives before its session-start, unplaced.
+	if got := teams.Route(relay.Record{Session: "sess-pause", Account: alice, At: t0.Add(19 * time.Second)}); got.Outcome != relay.Drop || got.Why != relay.WhyMixed {
+		t.Fatalf("record before the resume Route = %+v, want Drop(WhyMixed)", got)
+	}
+	resumed, err := runs.Start(stateDir, "sess-pause", t0.Add(20*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := relay.Record{
+		Session: "sess-pause", Account: alice, Placed: true, At: t0.Add(20*time.Second + 300*time.Millisecond),
+		Placement: claim.Claim{Profile: "default", Account: alice, Kind: claim.KindRepository, Run: resumed, Repository: config.Repository{Origin: "github.com/a/r1"}},
+	}
+	clock = t0.Add(19*time.Second + 500*time.Millisecond) // within ledgerTTL of the first read
+	if got := teams.Route(rec); got.Outcome != relay.Send || got.Queued.Run != resumed {
+		t.Fatalf("resumed record Route = %+v, want Send under run %s", got, resumed)
+	}
+	clock = clock.Add(100 * time.Millisecond)
+	if got := teams.Route(rec); got.Outcome != relay.Send {
+		t.Fatalf("next resumed record Route = %+v, want Send", got)
+	}
+	if reads != 2 {
+		t.Fatalf("ledger read %d times, want 2: once at first, once more for the run the first read predates", reads)
+	}
+}
+
 // Pre-POST send fence reads fresh routing state even without Invalidate when CAS deselects
 // an enrollment while Token acquisition is blocked (within the 1s route cache TTL).
 func TestTeamsSendFenceReadsFreshStateWithoutInvalidate(t *testing.T) {

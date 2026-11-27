@@ -108,7 +108,11 @@ func (t *Teams) Route(rec relay.Record) relay.Routed {
 	if rec.Placed && (rec.Placement.Account == "" || rec.Placement.Account != pr.st.Account) {
 		return relay.Routed{Outcome: relay.Hold, Why: relay.WhyNoState}
 	}
-	if run, from, mixed := t.mixedInterval(rec.Session, rec.At, rec.EffectiveEnd()); mixed || rec.Placed && rec.Placement.Kind == claim.KindMixed {
+	placedIn := ""
+	if rec.Placed {
+		placedIn = rec.Placement.Run
+	}
+	if run, from, mixed := t.mixedInterval(rec.Session, placedIn, rec.At, rec.EffectiveEnd()); mixed || rec.Placed && rec.Placement.Kind == claim.KindMixed {
 		if !mixed {
 			run, from = rec.Placement.Run, rec.At
 		}
