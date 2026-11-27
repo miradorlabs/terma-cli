@@ -3,6 +3,60 @@
   "harness": "pi",
   "steps": [
     {
+      "version": "1.7.0",
+      "previous": "1.6.1",
+      "changes": [
+        {
+          "id": "cli.commands.pi.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "Description of `pi` changed",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.pi.options.--agent-dir",
+          "category": "cli",
+          "op": "added",
+          "title": "New flag `pi --agent-dir`",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.commands.pi.options.--session-dir.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`pi --session-dir`: description changed",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.--help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `--help` changed (+358 −249 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.enableInstallTelemetry",
+          "category": "config",
+          "op": "removed",
+          "title": "Setting no longer read: enableInstallTelemetry",
+          "impact": "notable",
+          "documented": true
+        },
+        {
+          "id": "config.env_vars.PI_TELEMETRY",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: PI_TELEMETRY",
+          "impact": "informational",
+          "documented": true
+        }
+      ]
+    },
+    {
       "version": "1.6.1",
       "previous": "1.6.0",
       "changes": [

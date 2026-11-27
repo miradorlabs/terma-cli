@@ -1,0 +1,236 @@
+{
+  "schema_version": 1,
+  "harness": "pi",
+  "from": "1.6.1",
+  "to": "1.7.0",
+  "generated_at": "2026-11-27T17:17:43.546096674Z",
+  "source": {
+    "compare": "https://github.com/earendil-works/pi/compare/v1.6.1...v1.7.0"
+  },
+  "changelog": {
+    "url": "https://github.com/earendil-works/pi/releases/tag/v1.7.0",
+    "text": "### New Features\n\n- **[Terminal session resume](https://github.com/earendil-works/pi/blob/v1.7.0/packages/coding-agent/docs/terminal-setup.md#program-resume):** Compatible terminals can reopen the current pi session after a restart with its original profile, tool restrictions, and instructions.\n- **[Image generation in codemode](https://github.com/earendil-works/pi/blob/v1.7.0/packages/coding-agent/docs/codemode.md#generate-images):** Generate images with Radius, or set the aspect ratio and size when using OpenRouter image models.\n- **GitHub Copilot prompt caching:** Changing the thinking level preserves the prompt cache on supported Claude 5.x and GPT-6 models. Supported Claude 5.x models also keep the cache when tools change, and Copilot Claude models support [cache warming](https://github.com/earendil-works/pi/blob/v1.7.0/packages/coding-agent/docs/settings.md#model-and-thinking).\n\n### Breaking Changes\n\n- Removed telemetry reporting from pi for new installs and updates (`/api/report-install`), the `enableInstallTelemetry` setting (`SettingsManager.getEnableInstallTelemetry()` / `setEnableInstallTelemetry()`), and `PI_TELEMETRY`\n\n### Added\n\n- Added program resume through the [Program Resume Protocol (OSC 7577)](https://www.superlogical.com/rex/docs/build/program-resume): in terminals that set `OSC7577_TOKEN`, interactive mode reports `pi --session <id>` for the current session, so the terminal can bring it back after it restarts. Pi removes the token from the environment of every process it starts. See [Terminal setup](https://github.com/earendil-works/pi/blob/v1.7.0/packages/coding-agent/docs/terminal-setup.md#program-resume)\n- Added optional `{ aspectRatio, size }` as the third argument to codemode `models.generateImages()`\n- Added `--agent-dir <dir>`, the command-line form of `PI_CODING_AGENT_DIR`. The resume command pi prints on exit and reports through OSC 7577 now includes it when the config directory is not `~/.pi/agent`. Without it, a session started with `PI_CODING_AGENT_DIR` came back with the default directory's settings and auth: a terminal resumes the command without the environment pi was started in. This is for setups that keep a separate pi profile per project, for example a shell function that sets `PI_CODING_AGENT_DIR` for one directory tree. Terminals that resume programs, such as Rex, need a rule that trusts the longer command; see [Terminal setup](https://github.com/earendil-works/pi/blob/v1.7.0/packages/coding-agent/docs/terminal-setup.md#program-resume)\n- The OSC 7577 resume command now repeats the restriction and resource flags pi was started with (`--tools`, `--no-extensions`, `-e`, `--skill`, `--system-prompt`, and similar), as typed, so a terminal cannot resume a session with other tools or instructions, possibly more access, than it had. The command printed on exit is unchanged. A terminal rule must trust each flag combination; see [Terminal setup](https://github.com/earendil-works/pi/blob/v1.7.0/packages/coding-agent/docs/terminal-setup.md#program-resume)\n- Added Radius image generation to [codemode](https://github.com/earendil-works/pi/blob/v1.7.0/packages/coding-agent/docs/codemode.md#generate-images). Radius image and classifier models are now listed in the built-in catalog as well as through provider discovery\n\n### Changed\n\n- The default model for `cloudflare-workers-ai` and `cloudflare-ai-gateway` is now `@cf/zai-org/glm-5.3`, because Cloudflare deprecated Workers AI Kimi K2.6 and K2.7 Code\n- Changed the `ant-ling` default model from the retired `Ring-2.6-1T` to `Ling-3.1-flash`. Existing `models.json` files can keep `thinkingFormat: \"ant-ling\"` as a deprecated alias for `\"deepseek\"` ([#11800](https://github.com/earendil-works/pi/pull/11800) by [@lvisei](https://github.com/lvisei))\n- Replaced the retired `qwen4-max-preview` with `qwen4-max` on Qwen Token Plan Individual\n- Preserved the GitHub Copilot prompt cache when changing thinking levels on supported Claude 5.x and GPT-6 models or changing tools on supported Claude 5.x models. Copilot Claude models now support cache warming, and GPT-5.3 Codex and MAI-Code receive mid-conversation system messages where they take effect ([#12316](https://github.com/earendil-works/pi/issues/12316))\n\n### Fixed\n\n- Fixed `/llama` \"Download model\" downloading the typed text instead of the highlighted result when the query looked like `owner/repository` and the user had moved the selection with the arrow keys ([#12465](https://github.com/earendil-works/pi/issues/12465))\n- Fixed key hints that named the wrong keybinding or a hardcoded key: the extension editor and session rename now name `tui.input.submit`, `/hotkeys` names `tui.select.cancel` for cancelling autocomplete, and the settings submenu, `/config` selector, session selector and fullscreen copy setting follow remapped keys\n- Fixed a console Ctrl+Break on Windows ending pi without restoring the terminal, which left the shell in the alternate screen with mouse reports typed into the prompt. A child process in the same console can send Ctrl+Break too. pi now shuts down normally on it ([#12133](https://github.com/earendil-works/pi/issues/12133))\n- Fixed print, JSON, and RPC modes not reporting an invalid `models.json`, so a typo such as `\"contextWindow\": \"32000\"` showed up only as `Model \"...\" not found` or `No API key found`. `createAgentSessionServices()` now returns the error as a warning in `diagnostics`, so every mode and SDK runtimes report it; interactive mode shows it as a warning instead of an error, as reported in [#12522](https://github.com/earendil-works/pi/issues/12522) ([#12523](https://github.com/earendil-works/pi/pull/12523) by [@acmerfight](https://github.com/acmerfight))\n- Fixed `app.message.followUp` (Alt+Enter) ignoring an open autocomplete menu and queuing the half-typed text. It now applies the selected suggestion like Enter: a completed command name is queued, and other completions are inserted without queuing\n- Fixed running `!` commands showing the wrong cancel shortcut. The hint now names the configured `app.interrupt` key ([#12518](https://github.com/earendil-works/pi/pull/12518) by [@acmerfight](https://github.com/acmerfight))\n- Fixed `!!` commands counting toward the context estimate even though the model never sees them. Large outputs no longer trigger early compaction or crowd out recent history ([#12513](https://github.com/earendil-works/pi/issues/12513))\n- Fixed Kitty images disappearing in Konsole and regular mode clearing the screen and scrollback when an appended image extended past the bottom of the screen ([#12548](https://github.com/earendil-works/pi/issues/12548))\n- Fixed Amazon Bedrock Kimi K3.1 and GLM 5.3 ignoring the selected thinking level ([#12462](https://github.com/earendil-works/pi/issues/12462)). Kimi K3 and K3.1 also no longer send earlier reasoning back to Bedrock, which could make later turns fail\n- Fixed GitHub Copilot models using `openai-completions` losing their reasoning state between turns ([#12418](https://github.com/earendil-works/pi/issues/12418))\n- Fixed codemode image generation reporting success for failed OpenRouter responses. Image and classifier usage now includes reasoning tokens when reported; image usage distinguishes image output tokens, and OpenRouter costs use the reported total or the model's image output rate when estimating"
+  },
+  "summary": {
+    "changes": 6,
+    "categories": {
+      "cli": 4,
+      "config": 2
+    },
+    "impact": {
+      "breaking": 0,
+      "degrading": 0,
+      "informational": 5,
+      "notable": 1
+    },
+    "undocumented": 1
+  },
+  "changes": [
+    {
+      "id": "cli.commands.pi.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "pi",
+        "description"
+      ],
+      "title": "Description of `pi` changed",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -1,2 +1,2 @@\n pi - AI coding assistant with read, bash, edit, write tools pi [options] [--] [@files...] [messages...] # Print a provider API key for an external client pi auth print-api-key --provider openai # Print an OAuth bearer token for an external client (refreshes if expired) pi auth print-bearer-token --provider openai-codex # Interactive mode pi # Interactive mode with initial prompt pi \"List all .ts files in src/\" # Include files in initial message pi @prompt.md @image.png \"What color is the sky?\" # Non-interactive mode (process and exit) pi -p \"List all .ts files in src/\" # Prompt beginning with a dash pi -p -- \"- Summarize these points\" # Multiple messages (interactive) pi \"Read package.json\" \"What dependencies do we have?\" # Continue previous session pi --continue \"What did we discuss?\" # Start a named session pi --name \"Refactor auth module\" # Use different model pi --provider openai --model gpt-4o-mini \"Help me refactor this code\" # Use model with provider prefix (no --provider needed) pi --model openai/gpt-4o \"Help me refactor this code\" # Use model with thinking level shorthand pi --model sonnet:high \"Solve this complex problem\" # Limit model cycling to specific models pi --models claude-sonnet,claude-haiku,gpt-4o # Limit to a specific provider with glob pattern pi --models \"github-copilot/*\" # Cycle models with fixed thinking levels pi --models sonnet:high,haiku:low # Start with a specific thinking level pi --thinking high \"Solve this complex problem\" # Read-only mode (no file modifications possible) pi --tools read,grep,find,ls -p \"Review the code in src/\" # Add codemode to the default tools pi --tools +codemode # Codemode with only the tools of one MCP server pi --tools read,bash,codemode,'mcp__radius__*' # Disable one tool while keeping the rest available pi --exclude-tools ask_question # Export a session file to HTML pi --export ~/.pi/agent/sessions/--path--/session.jsonl pi --export session.jsonl output.html ANTHROPIC_AUTH_TOKEN             - Anthropic bearer auth token ANTHROPIC_API_KEY                - Anthropic Claude API key ANTHROPIC_OAUTH_TOKEN            - Anthropic OAuth token (alternative to API key) ANT_LING_API_KEY                 - Ant Ling API key OPENAI_API_KEY                   - OpenAI GPT API key AZURE_OPENAI_API_KEY             - Azure OpenAI API key AZURE_OPENAI_BASE_URL            - Azure OpenAI/Cognitive Services base URL (e.g.\n-https://{resource}.openai.azure.com) AZURE_OPENAI_RESOURCE_NAME       - Azure OpenAI resource name (alternative to base URL) AZURE_OPENAI_API_VERSION         - Azure OpenAI API version (default: v1) AZURE_OPENAI_DEPLOYMENT_NAME_MAP - Azure OpenAI model=deployment map (comma-separated) DEEPSEEK_API_KEY                 - DeepSeek API key NVIDIA_API_KEY                   - NVIDIA NIM API key GEMINI_API_KEY                   - Google Gemini API key GROQ_API_KEY                     - Groq API key CEREBRAS_API_KEY                 - Cerebras API key XAI_API_KEY                      - xAI Grok API key FIREWORKS_API_KEY                - Fireworks API key TOGETHER_API_KEY                 - Together AI API key BASETEN_API_KEY                  - Baseten API key OPENROUTER_API_KEY               - OpenRouter API key AI_GATEWAY_API_KEY               - Vercel AI Gateway API key ZAI_API_KEY                      - ZAI Coding Plan API key (Global) ZAI_CODING_CN_API_KEY            - ZAI Coding Plan API key (China) MISTRAL_API_KEY                  - Mistral API key MINIMAX_API_KEY                  - MiniMax API key MOONSHOT_API_KEY                 - Moonshot AI API key OPENCODE_API_KEY                 - OpenCode Zen/OpenCode Go API key KIMI_API_KEY                     - Kimi For Coding API key META_API_KEY                     - Meta Model API key CLOUDFLARE_API_KEY               - Cloudflare API token (Workers AI and AI Gateway) CLOUDFLARE_ACCOUNT_ID            - Cloudflare account id (required for both) CLOUDFLARE_GATEWAY_ID            - Cloudflare AI Gateway slug (required for AI Gateway) QWEN_TOKEN_PLAN_TEAM_API_KEY     - Qwen Token Plan Team API key (international region) QWEN_TOKEN_PLAN_TEAM_CN_API_KEY  - Qwen Token Plan Team API key (China region) QWEN_TOKEN_PLAN_INDIVIDUAL_API_KEY - Qwen Token Plan Individual API key (international region) QWEN_TOKEN_PLAN_INDIVIDUAL_CN_API_KEY - Qwen Token Plan Individual API key (China region) XIAOMI_API_KEY                   - Xiaomi MiMo API key (api.xiaomimimo.com billing) XIAOMI_TOKEN_PLAN_CN_API_KEY     - Xiaomi MiMo Token Plan API key (China region) XIAOMI_TOKEN_PLAN_AMS_API_KEY    - Xiaomi MiMo Token Plan API key (Amsterdam region) XIAOMI_TOKEN_PLAN_SGP_API_KEY    - Xiaomi MiMo Token Plan API key (Singapore region) AWS_PROFILE                      - AWS profile for Amazon Bedrock AWS_ACCESS_KEY_ID                - AWS access key for Amazon Bedrock AWS_SECRET_ACCESS_KEY            - AWS secret key for Amazon Bedrock AWS_BEARER_TOKEN_BEDROCK         - Bedrock API key (bearer token) AWS_REGION                       - AWS region for Amazon Bedrock (e.g., us-east-1) PI_CODING_AGENT_DIR              - Config directory (default: ~/.pi/agent) PI_CODING_AGENT_SESSION_DIR      - Session storage directory (overridden by --session-dir) PI_PACKAGE_DIR                   - Override package directory (for Nix/Guix store paths) PI_OFFLINE                       - Disable startup network operations when set to 1/true/yes PI_SELF_UPDATE_COMMAND           - Command pi update runs to update pi itself ({packageName}, {version}, {installSpec}) PI_TELEMETRY                     - Override install telemetry when set to 1/true/yes or 0/false/no PI_SHARE_VIEWER_URL              - Base URL for /share command (default: https://pi.dev/session/) Built-in Tool Names: read       - Read file contents bash       - Execute bash commands powershell - Execute PowerShell commands on Windows edit       - Edit files with find/replace write      - Write files (creates/overwrites) grep       - Search file contents (read-only, off by default) find       - Find files by glob pattern (read-only, off by default) ls         - List directory contents (read-only, off by default)\n+https://{resource}.openai.azure.com) AZURE_OPENAI_RESOURCE_NAME       - Azure OpenAI resource name (alternative to base URL) AZURE_OPENAI_API_VERSION         - Azure OpenAI API version (default: v1) AZURE_OPENAI_DEPLOYMENT_NAME_MAP - Azure OpenAI model=deployment map (comma-separated) DEEPSEEK_API_KEY                 - DeepSeek API key NVIDIA_API_KEY                   - NVIDIA NIM API key GEMINI_API_KEY                   - Google Gemini API key GROQ_API_KEY                     - Groq API key CEREBRAS_API_KEY                 - Cerebras API key XAI_API_KEY                      - xAI Grok API key FIREWORKS_API_KEY                - Fireworks API key TOGETHER_API_KEY                 - Together AI API key BASETEN_API_KEY                  - Baseten API key OPENROUTER_API_KEY               - OpenRouter API key AI_GATEWAY_API_KEY               - Vercel AI Gateway API key ZAI_API_KEY                      - ZAI Coding Plan API key (Global) ZAI_CODING_CN_API_KEY            - ZAI Coding Plan API key (China) MISTRAL_API_KEY                  - Mistral API key MINIMAX_API_KEY                  - MiniMax API key MOONSHOT_API_KEY                 - Moonshot AI API key OPENCODE_API_KEY                 - OpenCode Zen/OpenCode Go API key KIMI_API_KEY                     - Kimi For Coding API key META_API_KEY                     - Meta Model API key CLOUDFLARE_API_KEY               - Cloudflare API token (Workers AI and AI Gateway) CLOUDFLARE_ACCOUNT_ID            - Cloudflare account id (required for both) CLOUDFLARE_GATEWAY_ID            - Cloudflare AI Gateway slug (required for AI Gateway) QWEN_TOKEN_PLAN_TEAM_API_KEY     - Qwen Token Plan Team API key (international region) QWEN_TOKEN_PLAN_TEAM_CN_API_KEY  - Qwen Token Plan Team API key (China region) QWEN_TOKEN_PLAN_INDIVIDUAL_API_KEY - Qwen Token Plan Individual API key (international region) QWEN_TOKEN_PLAN_INDIVIDUAL_CN_API_KEY - Qwen Token Plan Individual API key (China region) XIAOMI_API_KEY                   - Xiaomi MiMo API key (api.xiaomimimo.com billing) XIAOMI_TOKEN_PLAN_CN_API_KEY     - Xiaomi MiMo Token Plan API key (China region) XIAOMI_TOKEN_PLAN_AMS_API_KEY    - Xiaomi MiMo Token Plan API key (Amsterdam region) XIAOMI_TOKEN_PLAN_SGP_API_KEY    - Xiaomi MiMo Token Plan API key (Singapore region) AWS_PROFILE                      - AWS profile for Amazon Bedrock AWS_ACCESS_KEY_ID                - AWS access key for Amazon Bedrock AWS_SECRET_ACCESS_KEY            - AWS secret key for Amazon Bedrock AWS_BEARER_TOKEN_BEDROCK         - Bedrock API key (bearer token) AWS_REGION                       - AWS region for Amazon Bedrock (e.g., us-east-1) PI_CODING_AGENT_DIR              - Config directory (default: ~/.pi/agent, overridden by --agent-dir) PI_CODING_AGENT_SESSION_DIR      - Session storage directory (overridden by --session-dir) PI_PACKAGE_DIR                   - Override package directory (for Nix/Guix store paths) PI_OFFLINE                       - Disable startup network operations when set to 1/true/yes PI_SELF_UPDATE_COMMAND           - Command pi update runs to update pi itself ({packageName}, {version}, {installSpec}) PI_SHARE_VIEWER_URL              - Base URL for /share command (default: https://pi.dev/session/) Built-in Tool Names: read       - Read file contents bash       - Execute bash commands powershell - Execute PowerShell commands on Windows edit       - Edit files with find/replace write      - Write files (creates/overwrites) grep       - Search file contents (read-only, off by default) find       - Find files by glob pattern (read-only, off by default) ls         - List directory contents (read-only, off by default)\n",
+      "stats": {
+        "added_chars": 3651,
+        "removed_chars": 3723
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/coding-agent/src/cli/args.ts",
+            "line": 477,
+            "url": "https://github.com/earendil-works/pi/blob/v1.7.0/packages/coding-agent/src/cli/args.ts#L477-L530"
+          },
+          {
+            "path": "packages/ai/src/providers/qwen-token-plan-individual.ts",
+            "line": 9,
+            "url": "https://github.com/earendil-works/pi/blob/v1.7.0/packages/ai/src/providers/qwen-token-plan-individual.ts#L9-L12"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.pi.options.--agent-dir",
+      "category": "cli",
+      "op": "added",
+      "path": [
+        "cli",
+        "commands",
+        "pi",
+        "options",
+        "--agent-dir"
+      ],
+      "title": "New flag `pi --agent-dir`",
+      "impact": "informational",
+      "before": null,
+      "after": {
+        "description": "Config directory for settings, auth, and resources (overrides PI_CODING_AGENT_DIR)",
+        "names": [
+          "--agent-dir"
+        ],
+        "value": "<dir>"
+      },
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/ai/src/api/bedrock-converse-stream.ts",
+            "line": 530,
+            "url": "https://github.com/earendil-works/pi/blob/v1.7.0/packages/ai/src/api/bedrock-converse-stream.ts#L530"
+          },
+          {
+            "path": "packages/ai/src/api/openai-codex-responses.ts",
+            "line": 293,
+            "url": "https://github.com/earendil-works/pi/blob/v1.7.0/packages/ai/src/api/openai-codex-responses.ts#L293"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.commands.pi.options.--session-dir.description",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "commands",
+        "pi",
+        "options",
+        "--session-dir",
+        "description"
+      ],
+      "title": "`pi --session-dir`: description changed",
+      "impact": "informational",
+      "before": "Directory for session storage and lookup",
+      "after": "Directory for session storage and lookup (overrides PI_CODING_AGENT_SESSION_DIR and the sessionDir setting)",
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/ai/src/api/bedrock-converse-stream.ts",
+            "line": 530,
+            "url": "https://github.com/earendil-works/pi/blob/v1.7.0/packages/ai/src/api/bedrock-converse-stream.ts#L530"
+          },
+          {
+            "path": "packages/ai/src/api/openai-codex-responses.ts",
+            "line": 293,
+            "url": "https://github.com/earendil-works/pi/blob/v1.7.0/packages/ai/src/api/openai-codex-responses.ts#L293"
+          }
+        ],
+        "gone": false
+      },
+      "documented": true
+    },
+    {
+      "id": "cli.help.--help",
+      "category": "cli",
+      "op": "changed",
+      "path": [
+        "cli",
+        "help",
+        "--help"
+      ],
+      "title": "Full help text of `--help` changed (+358 −249 chars)",
+      "impact": "informational",
+      "before": null,
+      "after": null,
+      "text_diff": "@@ -27,7 +27,8 @@\n   --session <path|id>            Open a session by file path or full/partial ID\n   --session-id <id>              Use the current directory's existing session with the ID, creating it otherwise\n   --fork <path|id>               Fork a session by file path or full/partial ID into the current directory\n-  --session-dir <dir>            Directory for session storage and lookup\n+  --session-dir <dir>            Directory for session storage and lookup (overrides PI_CODING_AGENT_SESSION_DIR and the sessionDir setting)\n+  --agent-dir <dir>              Config directory for settings, auth, and resources (overrides PI_CODING_AGENT_DIR)\n   --no-session                   Don't save session (ephemeral)\n   --name, -n <name>              Set session display name\n   --models <patterns>            Comma-separated model patterns for Ctrl+P cycling\n@@ -178,12 +179,11 @@\n   AWS_SECRET_ACCESS_KEY            - AWS secret key for Amazon Bedrock\n   AWS_BEARER_TOKEN_BEDROCK         - Bedrock API key (bearer token)\n   AWS_REGION                       - AWS region for Amazon Bedrock (e.g., us-east-1)\n-  PI_CODING_AGENT_DIR              - Config directory (default: ~/.pi/agent)\n+  PI_CODING_AGENT_DIR              - Config directory (default: ~/.pi/agent, overridden by --agent-dir)\n   PI_CODING_AGENT_SESSION_DIR      - Session storage directory (overridden by --session-dir)\n   PI_PACKAGE_DIR                   - Override package directory (for Nix/Guix store paths)\n   PI_OFFLINE                       - Disable startup network operations when set to 1/true/yes\n   PI_SELF_UPDATE_COMMAND           - Command pi update runs to update pi itself ({packageName}, {version}, {installSpec})\n-  PI_TELEMETRY                     - Override install telemetry when set to 1/true/yes or 0/false/no\n   PI_SHARE_VIEWER_URL              - Base URL for /share command (default: https://pi.dev/session/)\n \n Built-in Tool Names:\n",
+      "stats": {
+        "added_chars": 358,
+        "removed_chars": 249
+      },
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/coding-agent/src/cli/args.ts",
+            "line": 363,
+            "url": "https://github.com/earendil-works/pi/blob/v1.7.0/packages/coding-agent/src/cli/args.ts#L363-L364"
+          }
+        ],
+        "gone": false
+      },
+      "documented": false
+    },
+    {
+      "id": "config.options.enableInstallTelemetry",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "options",
+        "enableInstallTelemetry"
+      ],
+      "title": "Setting no longer read: enableInstallTelemetry",
+      "impact": "notable",
+      "before": {
+        "default": true,
+        "description": "Send an anonymous version and update ping after changelog-detected updates.",
+        "type": "boolean"
+      },
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/coding-agent/src/core/settings-manager.ts",
+            "line": 1073,
+            "url": "https://github.com/earendil-works/pi/blob/v1.6.1/packages/coding-agent/src/core/settings-manager.ts#L1073"
+          },
+          {
+            "path": "packages/coding-agent/src/core/settings-defaults.ts",
+            "line": 31,
+            "url": "https://github.com/earendil-works/pi/blob/v1.6.1/packages/coding-agent/src/core/settings-defaults.ts#L31"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    },
+    {
+      "id": "config.env_vars.PI_TELEMETRY",
+      "category": "config",
+      "op": "removed",
+      "path": [
+        "config",
+        "env_vars",
+        "PI_TELEMETRY"
+      ],
+      "title": "Environment variable no longer read: PI_TELEMETRY",
+      "impact": "informational",
+      "before": "PI_TELEMETRY",
+      "after": null,
+      "text_diff": null,
+      "terma": null,
+      "source": {
+        "refs": [
+          {
+            "path": "packages/coding-agent/src/core/telemetry.ts",
+            "line": 10,
+            "url": "https://github.com/earendil-works/pi/blob/v1.6.1/packages/coding-agent/src/core/telemetry.ts#L10"
+          }
+        ],
+        "gone": true
+      },
+      "documented": true
+    }
+  ]
+}

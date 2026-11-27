@@ -13664,6 +13664,61 @@
     "test": "TestRelayPi/v1.6.1"
   },
   {
+    "harness": "pi",
+    "version": "1.7.0",
+    "platform": "darwin/arm64",
+    "capability": "relay.content_allowed",
+    "result": "pass",
+    "last_run": "2026-11-27T17:16:49.804037Z",
+    "first_passed": "2026-11-27T17:16:49.804037Z",
+    "terma": "terma version dev",
+    "test": "TestRelayPi/v1.7.0/content"
+  },
+  {
+    "harness": "pi",
+    "version": "1.7.0",
+    "platform": "darwin/arm64",
+    "capability": "relay.content_withheld",
+    "result": "pass",
+    "last_run": "2026-11-27T17:16:57.091834Z",
+    "first_passed": "2026-11-27T17:16:57.091834Z",
+    "terma": "terma version dev",
+    "test": "TestRelayPi/v1.7.0/withheld"
+  },
+  {
+    "harness": "pi",
+    "version": "1.7.0",
+    "platform": "darwin/arm64",
+    "capability": "relay.equivalent",
+    "result": "pass",
+    "last_run": "2026-11-27T17:16:34.356912Z",
+    "first_passed": "2026-11-27T17:16:34.356912Z",
+    "terma": "terma version dev",
+    "test": "TestRelayWorkloadsPi/v1.7.0"
+  },
+  {
+    "harness": "pi",
+    "version": "1.7.0",
+    "platform": "darwin/arm64",
+    "capability": "relay.only_opted_in",
+    "result": "pass",
+    "last_run": "2026-11-27T17:16:44.100565Z",
+    "first_passed": "2026-11-27T17:16:44.100565Z",
+    "terma": "terma version dev",
+    "test": "TestRelayPiOutsideARepository/v1.7.0"
+  },
+  {
+    "harness": "pi",
+    "version": "1.7.0",
+    "platform": "darwin/arm64",
+    "capability": "relay.telemetry",
+    "result": "pass",
+    "last_run": "2026-11-27T17:16:57.0919Z",
+    "first_passed": "2026-11-27T17:16:57.0919Z",
+    "terma": "terma version dev",
+    "test": "TestRelayPi/v1.7.0"
+  },
+  {
     "harness": "t3",
     "version": "0.0.45",
     "platform": "darwin/arm64",

@@ -3,8 +3,8 @@
   "harness": "pi",
   "window": {
     "oldest": "1.2.0",
-    "newest": "1.6.1",
-    "builds": 8
+    "newest": "1.7.0",
+    "builds": 9
   },
   "items": {
     "cli.commands.pi auth": {
@@ -710,6 +710,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "cli.commands.pi.options.--agent-dir": {
+      "kind": "option",
+      "ranges": [
+        {
+          "since": "1.7.0",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "cli.commands.pi.options.--api-key": {
       "kind": "option",
@@ -1959,8 +1970,8 @@
       "ranges": [
         {
           "since": "1.5.0",
-          "until": null,
-          "removed": null
+          "until": "1.6.1",
+          "removed": "1.7.0"
         }
       ],
       "since_bounded": false
@@ -2597,8 +2608,8 @@
       "ranges": [
         {
           "since": "1.5.0",
-          "until": null,
-          "removed": null
+          "until": "1.6.1",
+          "removed": "1.7.0"
         }
       ],
       "since_bounded": false

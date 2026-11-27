@@ -11,23 +11,54 @@
       "language": "typescript"
     },
     "changelog": "https://github.com/earendil-works/pi/releases",
-    "latest": "1.6.1",
+    "latest": "1.7.0",
     "support": "supported",
-    "versions_tracked": 8,
+    "versions_tracked": 9,
     "first_tracked": "2026-10-12",
     "last_change": {
-      "from": "1.6.0",
-      "to": "1.6.1",
-      "at": "2026-11-26T02:23:47.07151937Z",
-      "released_at": "2026-11-25T13:41:09.982Z",
-      "changes": 9,
+      "from": "1.6.1",
+      "to": "1.7.0",
+      "at": "2026-11-27T17:17:43.546096674Z",
+      "released_at": "2026-11-27T16:58:41.018Z",
+      "changes": 6,
       "categories": {
-        "binary": 1,
-        "config": 8
+        "cli": 4,
+        "config": 2
       }
     }
   },
   "versions": [
+    {
+      "version": "1.7.0",
+      "released_at": "2026-11-27T16:58:41.018Z",
+      "captured_at": "2026-11-27T17:17:43.546096674Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.6.1",
+      "changes": 6,
+      "categories": {
+        "cli": 4,
+        "config": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 5,
+        "notable": 1
+      },
+      "undocumented": 1,
+      "highlights": [
+        "Setting no longer read: enableInstallTelemetry",
+        "Description of `pi` changed",
+        "New flag `pi --agent-dir`"
+      ],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-27T17:17:43.546096674Z",
+      "attempts": 1
+    },
     {
       "version": "1.6.1",
       "released_at": "2026-11-25T13:41:09.982Z",

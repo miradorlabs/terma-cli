@@ -1,7 +1,40 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-27T14:29:38.539543954Z",
+  "generated_at": "2026-11-27T17:17:43.546096674Z",
   "versions": [
+    {
+      "harness": "pi",
+      "name": "Pi",
+      "version": "1.7.0",
+      "released_at": "2026-11-27T16:58:41.018Z",
+      "captured_at": "2026-11-27T17:17:43.546096674Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.6.1",
+      "changes": 6,
+      "categories": {
+        "cli": 4,
+        "config": 2
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 5,
+        "notable": 1
+      },
+      "undocumented": 1,
+      "highlights": [
+        "Setting no longer read: enableInstallTelemetry",
+        "Description of `pi` changed",
+        "New flag `pi --agent-dir`"
+      ],
+      "signing": null,
+      "partial": true,
+      "attempted_at": "2026-11-27T17:17:43.546096674Z",
+      "attempts": 1
+    },
     {
       "harness": "copilot",
       "name": "GitHub Copilot CLI",
@@ -6185,41 +6218,6 @@
         "SendMessage tool parameter to: allOf added",
         "SendMessage tool parameter to: pattern removed",
         "New setting: autoContinueAtUsageLimit"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.233",
-      "released_at": "2026-08-14T18:50:44.102Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.232",
-      "changes": 26,
-      "categories": {
-        "behavior": 1,
-        "cli": 2,
-        "config": 9,
-        "hooks": 2,
-        "prompt": 8,
-        "tools": 4
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 11,
-        "notable": 15
-      },
-      "undocumented": 20,
-      "highlights": [
-        "Injected context changed (+49 −0 chars)",
-        "Interactive session's injected context changed (+934 −732 chars)",
-        "Interactive system prompt changed (+49 −0 chars)"
       ],
       "signing": "valid"
     }
