@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -100,7 +101,11 @@ func familyCutoff(
 		ids = append(ids, c.SessionID)
 	}
 	slices.Sort(ids)
+	cutoffs := ancestorCutoffs(f, companions)
 	key := f.SourceSystem + "\x00" + strings.Join(ids, "\x00")
+	if len(cutoffs) > 0 {
+		key += "\x00self:" + f.SessionID
+	}
 	state := fmt.Sprintf("%s:%d:%d", resolver.state.StateID, resolver.state.Generation, resolver.state.ConsentGeneration)
 
 	var at time.Time
@@ -110,21 +115,39 @@ func familyCutoff(
 	} else {
 		subagents := len(companions) > 0 || f.ParentSessionID != ""
 		var segs []segReachInfo
-		collect := func(seg agents.HistorySegment) error {
-			if err := ctx.Err(); err != nil {
-				return err
+		collectWithLimit := func(limit time.Time) func(agents.HistorySegment) error {
+			return func(seg agents.HistorySegment) error {
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+				subagents = subagents || seg.Subagent
+				earliest := earliestSegmentTime(seg)
+				reaches := seg.ToolReaches
+				if !limit.IsZero() {
+					if !earliest.IsZero() && !earliest.Before(limit) {
+						return nil
+					}
+					if len(reaches) > 0 {
+						filtered := make([]agents.HistoryToolReach, 0, len(reaches))
+						for _, tr := range reaches {
+							if tr.At.IsZero() || tr.At.Before(limit) {
+								filtered = append(filtered, tr)
+							}
+						}
+						reaches = filtered
+					}
+				}
+				target, _, _ := resolver.resolve(ctx, seg.Cwd, seg.FallbackRepoURL, seg.FallbackBranch)
+				segs = append(segs, segReachInfo{cwd: seg.Cwd, reaches: reaches, earliest: earliest, target: target})
+				return nil
 			}
-			subagents = subagents || seg.Subagent
-			target, _, _ := resolver.resolve(ctx, seg.Cwd, seg.FallbackRepoURL, seg.FallbackBranch)
-			segs = append(segs, segReachInfo{cwd: seg.Cwd, reaches: seg.ToolReaches, earliest: earliestSegmentTime(seg), target: target})
-			return nil
 		}
-		if err := src.ReadHistory(ctx, f, agents.HistoryReadOptions{IncludeSupplemental: false}, collect); err != nil {
+		if err := src.ReadHistory(ctx, f, agents.HistoryReadOptions{IncludeSupplemental: false}, collectWithLimit(time.Time{})); err != nil {
 			return time.Time{}, false, err
 		}
 		readAll := true
 		for _, comp := range companions {
-			if err := src.ReadHistory(ctx, comp, agents.HistoryReadOptions{IncludeSupplemental: false}, collect); err != nil {
+			if err := src.ReadHistory(ctx, comp, agents.HistoryReadOptions{IncludeSupplemental: false}, collectWithLimit(cutoffs[comp.SessionID])); err != nil {
 				if errors.Is(err, context.Canceled) {
 					return time.Time{}, false, err
 				}
@@ -145,7 +168,11 @@ func familyCutoff(
 	farPast := time.Unix(1, 0).UTC()
 	farFuture := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
 	for _, comp := range companions {
-		if mAt, m := runs.Read(opts.StateDir, comp.SessionID).MixedInterval(farPast, farFuture); m {
+		end := farFuture
+		if limit := cutoffs[comp.SessionID]; !limit.IsZero() {
+			end = limit.Add(-time.Nanosecond)
+		}
+		if mAt, m := runs.Read(opts.StateDir, comp.SessionID).MixedInterval(farPast, end); m {
 			at, mixed = mergeMixedCutoff(at, mixed, mAt, true)
 		}
 	}
@@ -278,6 +305,9 @@ func reachCrosses(tr agents.HistoryToolReach, baseRoot, goneRoot string, bases [
 		return true
 	}
 	for _, p := range expanded {
+		if runtime.GOOS != "windows" && isForeignWindowsPath(p) {
+			return true
+		}
 		if !filepath.IsAbs(p) && tr.Cwd != "" {
 			p = filepath.Join(tr.Cwd, p)
 		}
@@ -309,6 +339,15 @@ func reachCrosses(tr agents.HistoryToolReach, baseRoot, goneRoot string, bases [
 	return false
 }
 
+// isForeignWindowsPath reports whether p is a Windows drive or UNC path on a non-Windows
+// host so reachCrosses fails closed instead of joining C:/... under a POSIX cwd.
+func isForeignWindowsPath(p string) bool {
+	if strings.HasPrefix(p, `\\`) {
+		return true
+	}
+	return len(p) >= 2 && ((p[0] >= 'A' && p[0] <= 'Z') || (p[0] >= 'a' && p[0] <= 'z')) && p[1] == ':' && (len(p) == 2 || p[2] == '/' || p[2] == '\\')
+}
+
 // pathUnder reports whether path is root or lies below it, by name alone.
 func pathUnder(path, root string) bool {
 	rel, err := filepath.Rel(filepath.Clean(root), filepath.Clean(path))
@@ -316,7 +355,8 @@ func pathUnder(path, root string) bool {
 }
 
 // earliestSegmentTime returns when a segment started: the earliest timestamp among its log
-// records and tool reaches, or zero when any of them is untimed (its start is then unknown).
+// records, trace spans, and tool reaches, or zero when any of them is untimed (its start is
+// then unknown).
 func earliestSegmentTime(seg agents.HistorySegment) time.Time {
 	var best time.Time
 	untimed := false
@@ -338,6 +378,17 @@ func earliestSegmentTime(seg agents.HistorySegment) time.Time {
 	}
 	scan(seg.NativeLogs)
 	scan(seg.SupplementalLogs)
+	for _, rs := range seg.NativeTraces.GetResourceSpans() {
+		for _, ss := range rs.GetScopeSpans() {
+			for _, sp := range ss.GetSpans() {
+				t := spanStartTime(sp)
+				if t.IsZero() {
+					t = spanEndTime(sp)
+				}
+				consider(t)
+			}
+		}
+	}
 	for _, tr := range seg.ToolReaches {
 		consider(tr.At)
 	}
@@ -357,14 +408,30 @@ func prepareSegmentFiltered(
 	reachMixedAt time.Time,
 	hasReachMixed bool,
 	maxRecordTime time.Time,
-) (*logspb.LogsData, int, int) {
+) (PreparedSegment, int, int) {
 	prepared, _ := PrepareSegment(seg, filter, pol, stamp)
-	if prepared == nil {
-		return nil, 0, 0
+	if prepared.Empty() {
+		return PreparedSegment{}, 0, 0
 	}
-	kept, dropped := FilterMixedLogs(prepared, snap, lookup, reachMixedAt, hasReachMixed, maxRecordTime)
+	var kept, dropped int
+	if prepared.Logs != nil {
+		k, d := FilterMixedLogs(prepared.Logs, snap, lookup, reachMixedAt, hasReachMixed, maxRecordTime)
+		kept += k
+		dropped += d
+		if k == 0 {
+			prepared.Logs = nil
+		}
+	}
+	if prepared.Traces != nil {
+		k, d := FilterMixedTraces(prepared.Traces, snap, lookup, reachMixedAt, hasReachMixed, maxRecordTime)
+		kept += k
+		dropped += d
+		if k == 0 {
+			prepared.Traces = nil
+		}
+	}
 	if kept == 0 {
-		return nil, 0, dropped
+		return PreparedSegment{}, 0, dropped
 	}
 	return prepared, kept, dropped
 }

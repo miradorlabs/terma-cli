@@ -159,6 +159,7 @@ func uploadOneSession(
 		}
 		if err := pacer.Send(ctx, SendRequest{
 			Endpoint:      endpoint,
+			Path:          ch.Path,
 			TeamID:        b.team.TeamID,
 			Account:       opts.Account,
 			ServerKey:     serverKey,
@@ -181,11 +182,11 @@ func uploadOneSession(
 		}
 		prepared, n, dropped := prepareSegmentFiltered(seg, opts.Filter, preparedPolicy, buildStampOptions(opts, target, userIDFor), runSnap, lookupSnap, reachMixedAt, hasReachMixed, resumeMax)
 		mixedDropped += dropped
-		if n == 0 || prepared == nil {
+		if n == 0 || prepared.Empty() {
 			return nil
 		}
 		totalRecs += n
-		return chunker.Add(prepared)
+		return chunker.AddPrepared(prepared)
 	})
 	if streamErr == nil {
 		streamErr = chunker.Flush()

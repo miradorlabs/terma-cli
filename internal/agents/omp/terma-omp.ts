@@ -12,7 +12,8 @@
 // gives a session, which its telemetry never carries, goes to `terma hook omp-title`.
 //
 // Dependency-free: it uses only node:fs, node:path and node:child_process, and OMP's own
-// @oh-my-pi/pi-utils where OMP provides it.
+// @oh-my-pi/pi-utils where OMP provides it. Loaded by Pi, from an agent directory the two
+// share, it does nothing.
 
 const CONFIG: TermaConfig | null = null /* terma:config */
 
@@ -264,8 +265,24 @@ async function askForContent() {
   }
 }
 
+// inPi reports whether Pi is the host. Pi and OMP each answer this name with their own
+// package, whatever copy of it sits on disk (seen in Pi 1.5.0 and 1.6.1, OMP 18.18.2 and
+// 19.1.1), and the package names its host's config folder: .pi in Pi, .omp in OMP. A host
+// that has no such package, or gives any other answer, is not taken for Pi. The name stays
+// written out in the import: through a variable, OMP looks for the package on disk instead.
+async function inPi(): Promise<boolean> {
+  try {
+    const host: any = await import("@earendil-works/pi-coding-agent")
+    return host.CONFIG_DIR_NAME === ".pi"
+  } catch {
+    return false
+  }
+}
+
 export default async function (omp: any) {
-  if (!CONFIG) return
+  // Pi loads this file too from an agent directory it shares with OMP (PI_CODING_AGENT_DIR),
+  // and its session is not OMP's to hand over: no handler is registered, so no hook runs.
+  if (!CONFIG || (await inPi())) return
   await askForContent()
   // Serialize lifecycle and reach hooks so session-start always finishes (with confirmed
   // child exit) before tool-reach; titles keep their own queue.

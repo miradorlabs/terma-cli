@@ -155,6 +155,8 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 		Tool: antigravityTool, Source: sourceAntigravityHook, StateDir: antigravityObservationDir,
 		SessionID: id, Hook: "PreInvocation", TurnID: turn, Attrs: antigravityObservationAttrs(in, "PreInvocation", turn, read, version),
 	})
+	// A rename between turns, or a name agy gave after the last turn's Stop.
+	conv.spoolTitle()
 	return nil
 }
 
@@ -353,6 +355,10 @@ func antigravityObserve(ctx context.Context, env hookrun.Env, hook string) error
 		Tool: antigravityTool, Source: sourceAntigravityHook, StateDir: antigravityObservationDir,
 		SessionID: in.id(), Hook: hook, TurnID: turn, Attrs: antigravityObservationAttrs(in, hook, turn, read, lazyAntigravityVersion(ctx, env)),
 	})
+	if hook == "Stop" {
+		// agy names a conversation while its first turn runs.
+		conv.spoolTitle()
+	}
 	return nil
 }
 

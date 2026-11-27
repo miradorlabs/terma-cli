@@ -110,13 +110,16 @@ type verdict struct {
 	why, blocker, session string
 	ok, final             bool
 	mixedAt               time.Time
+	// mixedRun is the run mixedAt belongs to, which may not be the placement's (c.Run):
+	// a resumed process's record stamped before its new run began is in the paused one.
+	mixedRun string
 }
 
 func (r *Relay) judge(key string, p *part) verdict {
 	if r.teams() {
 		v := r.decideTeams(key, p)
 		if !v.mixedAt.IsZero() && v.session != "" {
-			r.dropMixed(v.session, v.c.Run, v.mixedAt)
+			r.dropMixed(v.session, v.mixedRun, v.mixedAt)
 		}
 		return v
 	}

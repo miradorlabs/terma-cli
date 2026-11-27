@@ -732,6 +732,104 @@ func TestTeamsMixedIntervalSpanningCleanResume(t *testing.T) {
 	}
 }
 
+// Route names the run its Mixed cutoff belongs to, which the relay's sweep is scoped by: the
+// paused run for a resumed process's record stamped before its new run began (placed in the
+// new run), and a Mixed placement's own run when the ledger has no crossing for the record.
+func TestTeamsRouteNamesTheMixedRun(t *testing.T) {
+	t.Parallel()
+	stateDir, cfgDir := t.TempDir(), t.TempDir()
+	t0 := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
+	now := t0.Add(time.Minute)
+	alice := testAccount("alice")
+	setupProfileDir(t, cfgDir, "default", []string{"claude"})
+	writeRoutingState(t, stateDir, routing.State{Profile: "default", Account: alice, Teams: []routing.Team{activeTeam("e1", "team-1", testOrgA, false, now, "github.com/a/r1")}})
+	paused, err := runs.Start(stateDir, "sess-pause", t0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mixedAt := t0.Add(10 * time.Second)
+	if err := runs.MarkMixed(stateDir, "sess-pause", mixedAt, runs.Why{Reason: runs.UnknownReach}); err != nil {
+		t.Fatal(err)
+	}
+	resumed, err := runs.Start(stateDir, "sess-pause", t0.Add(20*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := &config.Config{Dir: cfgDir, StateDir: stateDir, ProfileName: "default", AuthURL: testAuthURL, OTLPURL: testOTLPURL, Account: alice}
+	teams := NewTeams(cfg, TeamsDeps{Now: func() time.Time { return now }})
+	rec := relay.Record{
+		Session: "sess-pause", Account: alice, Placed: true, At: t0.Add(19 * time.Second),
+		Placement: claim.Claim{Profile: "default", Account: alice, Kind: claim.KindRepository, Run: resumed, Repository: config.Repository{Origin: "github.com/a/r1"}},
+	}
+	if got := teams.Route(rec); got.Outcome != relay.Drop || got.Why != relay.WhyMixed || !got.MixedAt.Equal(mixedAt) || got.MixedRun != paused {
+		t.Fatalf("stale record Route = %+v, want Drop(WhyMixed, %v) of run %s", got, mixedAt, paused)
+	}
+	rec.At = t0.Add(21 * time.Second)
+	if got := teams.Route(rec); got.Outcome != relay.Send || got.Queued.Run != resumed {
+		t.Fatalf("resumed record Route = %+v, want Send under run %s", got, resumed)
+	}
+	rec.Placement.Kind = claim.KindMixed
+	if got := teams.Route(rec); got.Outcome != relay.Drop || got.Why != relay.WhyMixed || !got.MixedAt.Equal(rec.At) || got.MixedRun != resumed {
+		t.Fatalf("Mixed placement Route = %+v, want Drop(WhyMixed, %v) of run %s", got, rec.At, resumed)
+	}
+}
+
+// A ledger read cached before a resumed process's session-start opened its new run does not
+// judge that run's records. One placed in a run the read does not hold reads the ledger again,
+// and the read is cached for the records after it. One not placed yet, because the relay's
+// claim cache predates the resume too, is judged on a fresh read before it is dropped. Either
+// way the resumed prompt is not dropped against the paused run.
+func TestTeamsRouteRereadsALedgerThatPredatesTheRun(t *testing.T) {
+	t.Parallel()
+	stateDir, cfgDir := t.TempDir(), t.TempDir()
+	t0 := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
+	alice := testAccount("alice")
+	setupProfileDir(t, cfgDir, "default", []string{"claude"})
+	writeRoutingState(t, stateDir, routing.State{Profile: "default", Account: alice, Teams: []routing.Team{activeTeam("e1", "team-1", testOrgA, false, t0.Add(time.Minute), "github.com/a/r1")}})
+	cfg := &config.Config{Dir: cfgDir, StateDir: stateDir, ProfileName: "default", AuthURL: testAuthURL, OTLPURL: testOTLPURL, Account: alice}
+	for _, placed := range []bool{true, false} {
+		session := "sess-unplaced"
+		if placed {
+			session = "sess-placed"
+		}
+		if _, err := runs.Start(stateDir, session, t0); err != nil {
+			t.Fatal(err)
+		}
+		if err := runs.MarkMixed(stateDir, session, t0.Add(10*time.Second), runs.Why{Reason: runs.UnknownReach}); err != nil {
+			t.Fatal(err)
+		}
+		clock := t0.Add(19 * time.Second)
+		teams := NewTeams(cfg, TeamsDeps{Now: func() time.Time { return clock }})
+		reads := 0
+		teams.readLedger = func(stateDir, id string) runs.Snapshot { reads++; return runs.Read(stateDir, id) }
+
+		// The resumed process's first record arrives before its session-start, unplaced.
+		if got := teams.Route(relay.Record{Session: session, Account: alice, At: t0.Add(19 * time.Second)}); got.Outcome != relay.Drop || got.Why != relay.WhyMixed {
+			t.Fatalf("placed=%t: record before the resume Route = %+v, want Drop(WhyMixed)", placed, got)
+		}
+		resumed, err := runs.Start(stateDir, session, t0.Add(20*time.Second))
+		if err != nil {
+			t.Fatal(err)
+		}
+		rec := relay.Record{Session: session, Account: alice, At: t0.Add(20*time.Second + 300*time.Millisecond)}
+		if placed {
+			rec.Placed = true
+			rec.Placement = claim.Claim{Profile: "default", Account: alice, Kind: claim.KindRepository, Run: resumed, Repository: config.Repository{Origin: "github.com/a/r1"}}
+		}
+		clock = t0.Add(19*time.Second + 500*time.Millisecond) // within ledgerTTL of the first read
+		if got := teams.Route(rec); got.Why == relay.WhyMixed || placed && (got.Outcome != relay.Send || got.Queued.Run != resumed) {
+			t.Fatalf("placed=%t: resumed record Route = %+v, want it not dropped as Mixed (and Send under run %s when placed)", placed, got, resumed)
+		}
+		clock = clock.Add(100 * time.Millisecond)
+		if got := teams.Route(rec); got.Why == relay.WhyMixed {
+			t.Fatalf("placed=%t: next resumed record Route = %+v, want it not dropped as Mixed", placed, got)
+		}
+		if reads != 2 {
+			t.Fatalf("placed=%t: ledger read %d times, want 2: once at first, once more for the resume", placed, reads)
+		}
+	}
+}
+
 // Pre-POST send fence reads fresh routing state even without Invalidate when CAS deselects
 // an enrollment while Token acquisition is blocked (within the 1s route cache TTL).
 func TestTeamsSendFenceReadsFreshStateWithoutInvalidate(t *testing.T) {

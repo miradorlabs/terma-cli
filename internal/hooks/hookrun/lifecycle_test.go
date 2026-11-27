@@ -143,8 +143,8 @@ func TestCheckoutIDPinsTheSharedVectors(t *testing.T) {
 		"/work/repo/.claude/worktrees/x": "181e983f33192a1a71e6bd8ce72e9776",
 		`C:\work\repo`:                   "1f2a010850eb4d2af56ef8a8ec4bd8e8",
 	} {
-		if got, helper := checkoutID(root), hookruntest.CheckoutID(root); got != want || helper != want {
-			t.Errorf("checkoutID(%q) = %s, hookruntest.CheckoutID = %s, want %s", root, got, helper, want)
+		if got, helper := CheckoutID(root), hookruntest.CheckoutID(root); got != want || helper != want {
+			t.Errorf("CheckoutID(%q) = %s, hookruntest.CheckoutID = %s, want %s", root, got, helper, want)
 		}
 	}
 }

@@ -489,7 +489,8 @@ export elsewhere or switches it off; setup does not check your shell, so it can 
 set up while such an export stands. A named profile (`omp --profile`) has a directory of its
 own that setup does not configure. A file one of OMP's shell commands writes is not
 attributed to its session. A `PI_CODING_AGENT_DIR` that Pi and OMP share holds both terma
-extensions, and each agent then loads the other's too.
+extensions, and each agent then loads the other's too. OMP's does nothing inside Pi, so a
+Pi session is not recorded as an OMP one.
 
 Antigravity's `agy` has no telemetry export, so nothing of it passes the relay. Setup adds
 one named hook, `terma`, to `~/.gemini/config/hooks.json`, which every `agy` session loads,
@@ -527,7 +528,10 @@ its text. A prompt or a reply longer than 16 KiB is cut there and marked as cut.
 cut at 16 KiB and ends with how many characters were dropped. Arguments longer than 16 KiB
 keep their short values, such as a path or a command, and each long value is cut to 2 KiB
 and ends the same way. Thinking is not sent. A tool's result on a transcript line over 8 MiB
-is lost.
+is lost. The name `agy` gives a conversation, or the one you rename it to, goes as the
+session's title under the same rules as a prompt, since it restates the first one. terma
+reads it from the conversation's file in `agy`'s `annotations` folder when a turn starts
+and when it ends. A headless `agy -p` names none.
 
 Two rules limit what a session sends of another repository's content. They do not cover
 every tool. terma checks what a call names for `agy`'s own file and folder tools only. A
@@ -601,7 +605,9 @@ the files grok's `search_replace` tool edits, for commit attribution. For a suba
 the session it was opened from and the call that launched it, and how a background one ended
 when its parent waits on it or kills it. grok's export can lose the prompt of a headless run,
 so the prompt comes from the hook: always counted, with its text only while you chose Grok
-Build at setup (or in global mode) and the team's policy collects prompts. grok also runs the
+Build at setup (or in global mode) and the team's policy collects prompts. The name grok gives
+a session, or the one you `/rename` it to, goes as the session's title under the same rules:
+terma reads it from the session's `summary.json` at the end of each turn. grok also runs the
 entries in Claude Code's and Cursor's hooks files; terma's Claude Code and Cursor hooks do
 nothing inside grok, so a grok session is never recorded as theirs.
 
@@ -653,7 +659,9 @@ sessions that OpenCode process knows: a parent session in another OpenCode proce
 back. On OpenCode 2, every session of the background service runs in one process. Also on
 OpenCode 2, the first model call or tool call of a session can be recorded a few tens of
 milliseconds shorter than it was: OpenCode does not wait for terma's first check of the
-session, and nothing is recorded as starting before the prompt that asked for it.
+session, and nothing is recorded as starting before the prompt that asked for it. On OpenCode
+1, the first prompt an OpenCode process sends in a session waits for terma to claim that
+session: usually a fraction of a second, a few seconds at most.
 
 On OpenCode 2, some attached files stop a session from being recorded. terma checks that a
 file an agent reads belongs to a repository your team collects, and for these OpenCode 2
