@@ -163,8 +163,8 @@ attributes:
     note: >
       Each agent has its own: claude_account, claude_statusline, claude_stop_failure,
       claude_transcript, codex_rollout, codex_hook, codex_session_index, copilot_workspace,
-      cursor_hook, antigravity_hook, antigravity_transcript, antigravity_statusline and
-      antigravity_annotations.
+      cursor_hook, antigravity_hook, antigravity_transcript, antigravity_statusline,
+      antigravity_annotations and grok_summary.
     examples: ["codex_rollout", "cursor_hook"]
   - key: terma.evidence.status
     type: string

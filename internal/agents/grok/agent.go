@@ -1,8 +1,9 @@
 // Package grok integrates xAI's grok CLI (Grok Build): its native OTLP log export, pointed at
 // the local relay through [telemetry] in grok's config.toml (harness.go), and terma's own
 // hooks file in grok's hooks directory, which claims each session for its repository, carries
-// the prompt (prompt.go), names a subagent's parent, the call that launched it and how a
-// background one ended (subagent.go), and reports file edits (handlers.go).
+// the prompt (prompt.go) and the session's name (title.go), names a subagent's parent, the
+// call that launched it and how a background one ended (subagent.go), and reports file edits
+// (handlers.go).
 package grok
 
 import (
@@ -88,11 +89,11 @@ func (a Agent) Harness() harness.Harness { return exporter{dir: a.ConfigDir} }
 // Coverage is how completely terma supports the agent.
 func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 	return agents.CapabilitySupport{Level: agents.SupportPartial, Note: "files its search_replace tool edits; a file a shell command or the write tool writes is not recorded"},
-		agents.CapabilitySupport{Level: agents.SupportFull, Note: "model calls with tokens and grok's own cost, replies, tool calls and compaction ride grok's native OTLP logs to the local relay; terma's hooks report sessions, prompts, subagent parents and edits. A sandboxed session is not collected"}
+		agents.CapabilitySupport{Level: agents.SupportFull, Note: "model calls with tokens and grok's own cost, replies, tool calls and compaction ride grok's native OTLP logs to the local relay; terma's hooks report sessions, prompts, the session's title, subagent parents and edits. A sandboxed session is not collected"}
 }
 
 // StateDirs are the directories its hooks keep state in.
-func (Agent) StateDirs() []string { return []string{subagentDir} }
+func (Agent) StateDirs() []string { return []string{subagentDir, titleDir} }
 
 // ContentConsented is the consent a prompt's text travels under: grok among the developer's
 // agents, or global mode.

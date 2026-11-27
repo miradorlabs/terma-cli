@@ -34,6 +34,8 @@ type grokHookInput struct {
 	SubagentID string `json:"subagentId"`
 	// SubagentType names the subagent's kind: on SubagentStart, and on every hook of a child.
 	SubagentType string `json:"subagentType"`
+	// TranscriptPath is the session's updates.jsonl, on every hook after SessionStart.
+	TranscriptPath string `json:"transcript_path"`
 }
 
 // child reports whether the payload is a subagent's own hook: grok names the kind on every
@@ -89,15 +91,24 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	if !ok {
 		return nil
 	}
+	captureTitle(env, r, in)
 	env.EndSession(r, in.SessionID, name)
 	return nil
 }
 
-// stop records nothing: dispatch claims the session from the payload and starts the flush.
-func stop(_ context.Context, env hookrun.Env) error {
-	_, err := readInput(env.Stdin)
+// stop spools the session's name when it is new or changed (title.go); dispatch claims the
+// session from the payload and starts the flush.
+func stop(ctx context.Context, env hookrun.Env) error {
+	in, err := readInput(env.Stdin)
 	if err != nil {
 		env.Logf("%v", err)
+		return nil
+	}
+	if !titled(in) {
+		return nil
+	}
+	if r, ok := env.Open(ctx, in.SessionID, in.Cwd); ok {
+		captureTitle(env, r, in)
 	}
 	return nil
 }
