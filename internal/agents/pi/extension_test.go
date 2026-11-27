@@ -356,9 +356,19 @@ func TestReplayForkFlag(t *testing.T) {
 		t.Fatalf("recording: source cwd %q", srcCwd)
 	}
 	if len(r.Hooks) < 2 || r.Hooks[0].Event != "pi-session-start" || r.Hooks[1].Event != "pi-tool-reach" ||
-		!slices.Equal(toStrings(r.Hooks[1].Payload["paths"]), []string{srcCwd}) {
+		!slices.Equal(toStrings(r.Hooks[1].Payload["lists"]), []string{srcCwd}) {
 		t.Errorf("hooks %+v", r.Hooks)
 	}
+	// A /resume back into the fork is a new run in terma, so its source is checked again.
+	start := events(lines, "session_start")[0]
+	resumed := append(slices.Clone(lines), line{"e": "session_start", "t": start["t"], "event": map[string]any{"reason": "resume"}, "ctx": start["ctx"]})
+	var checks int
+	for _, h := range replay(t, writeLines(t, resumed), replayOptions{}).Hooks {
+		if h.Event == "pi-tool-reach" && slices.Equal(toStrings(h.Payload["lists"]), []string{srcCwd}) {
+			checks++
+		}
+	}
+	eq(t, "source checks over two starts", checks, 2)
 	// The recording's source has no name: give the fork a copied one.
 	named := insertAt(lines, indexOf(lines, func(l line) bool { return l["e"] == "session_start" }), line{"e": "_entries", "sessionId": sid,
 		"entries": []any{map[string]any{"type": "session_info", "id": "i0000001", "parentId": nil, "timestamp": "2026-11-27T15:34:30.000Z", "name": "Source's name"}}})
@@ -385,7 +395,7 @@ func TestReplaySameDirectoryForkReachesNothing(t *testing.T) {
 				t.Fatal("recording: no fork names its source's directory")
 			}
 			for _, h := range replay(t, path, replayOptions{}).hooks("pi-tool-reach") {
-				if p := toStrings(h["paths"]); len(p) == 1 && sources[p[0]] {
+				if p := toStrings(h["lists"]); len(p) == 1 && sources[p[0]] {
 					t.Errorf("a reach for the source's directory %s", p[0])
 				}
 			}
@@ -1686,6 +1696,11 @@ func TestReplayReviewFixes(t *testing.T) {
 		result["details"] = map[string]any{"server": "s", "tool": "t"}
 		r := replay(t, writeLines(t, oneSession(toolTurn("custom", map[string]any{}, result)...)), replayOptions{})
 		if s := r.tool("custom"); len(s) != 1 || s[0].Attrs.has("pi.mcp.server") || s[0].Attrs.has("pi.mcp.tool") {
+			t.Errorf("spans %+v", s)
+		}
+		// Pi's own MCP resource tools are MCP tools without the mcp__ name.
+		r = replay(t, writeLines(t, oneSession(toolTurn("read_mcp_resource", map[string]any{}, result)...)), replayOptions{})
+		if s := r.tool("read_mcp_resource"); len(s) != 1 || s[0].Attrs.str("pi.mcp.server") != "s" || s[0].Attrs.str("pi.mcp.tool") != "t" {
 			t.Errorf("spans %+v", s)
 		}
 	})

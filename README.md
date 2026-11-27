@@ -689,7 +689,8 @@ repository, check what a read, search, list or shell tool (and your own `!` comm
 and record the files Pi's write and edit tools change, so those edits are stamped on your
 commits. A resumed session is the same session; a fork or clone is a new one that names the
 session it came from, as does a session an extension opens with a parent session named
-(`ctx.newSession({parentSession})`). A `pi` that a tool of another Pi session starts, such as a
+(`ctx.newSession({parentSession})`). One made from a session in another directory starts
+without that session's name. A `pi` that a tool of another Pi session starts, such as a
 subagent, is recorded as a run inside that session. Thinking text is never collected.
 
 terma needs Pi 1.5.0 or later: setup refuses an earlier one (upgrade with `pi update`, or

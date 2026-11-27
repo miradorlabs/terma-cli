@@ -82,9 +82,7 @@ const MAX_ISSUER_WALK = 256
 // The parent link: how many processes up the walk looks, and how long `ps` may take.
 const MAX_ANCESTORS = 32
 const PS_TIMEOUT_MS = 1000
-// The most files a prompt's command-line attachments are reach-checked for, and how much of
-// an MCP server's or tool's name is sent.
-const MAX_ATTACHMENTS = 32
+// How much of an MCP server's or tool's name is sent.
 const MAX_MCP_NAME = 256
 // A fork's source is the id in the first line of its file, read at most this far.
 const MAX_HEADER = 16 * 1024
@@ -95,6 +93,8 @@ const SPAN_KIND_INTERNAL = 1
 const SPAN_KIND_CLIENT = 3
 const FILE_TOOLS = new Set(["read", "write", "edit"])
 const EDIT_TOOLS = new Set(["write", "edit"])
+// Pi's own MCP tools that are not named mcp__<server>__<tool> (its isMcpToolName).
+const MCP_RESOURCE_TOOLS = new Set(["list_mcp_resources", "list_mcp_resource_templates", "read_mcp_resource"])
 // The shell command a session that failed closed sends as its reach: one terma cannot
 // follow, so the hook marks the run Mixed. OMP's and OpenCode's extensions send the same one.
 const REACH_FAILED_COMMAND = "eval $TERMA_REACH_FAILED"
@@ -773,7 +773,7 @@ function sight(ctx: any, viaStart = false): Session | null {
     const model = modelOf(ctx)
     void queuedHook("session-start", { session_id: id, cwd: cwdOf(ctx), model: str(model?.id) || undefined })
     // Queued behind the start; nothing waits for it.
-    if (elsewhere) void reach(s, cwdOf(ctx), "read", { paths: [s.forkedCwd] })
+    if (elsewhere) void reach(s, cwdOf(ctx), "ls", { lists: [s.forkedCwd] })
   }
   setPosition(s, ctx, !elsewhere)
   return s
@@ -1211,9 +1211,10 @@ export default async function (pi: any) {
       parent_session_id: s.parent || undefined,
     })
     // A fork of a session in another directory copied that directory's conversation: Pi
-    // waits for its reach check too.
+    // waits for its reach check too, at every start, since each start is a new run in terma.
+    // The directory is judged alone, not what lies below it.
     const cwd = cwdOf(ctx)
-    if (!known && forkedElsewhere(s, cwd)) return started.then(() => reach(s, cwd, "read", { paths: [s.forkedCwd] }))
+    if (forkedElsewhere(s, cwd)) return started.then(() => reach(s, cwd, "ls", { lists: [s.forkedCwd] }))
     return started
   })
 
@@ -1232,10 +1233,7 @@ export default async function (pi: any) {
     if (!s || s.tainted) return
     void queuedHook("prompt", { session_id: s.id, cwd: cwdOf(ctx) })
     if (typeof event?.prompt !== "string") return
-    const paths: string[] = []
-    for (const m of event.prompt.matchAll(/<file name="([^"\n]+)">/g)) {
-      if (!paths.includes(m[1]) && paths.length < MAX_ATTACHMENTS) paths.push(m[1])
-    }
+    const paths = [...new Set(Array.from(event.prompt.matchAll(/<file name="([^"\n]+)">/g), (m: RegExpMatchArray) => m[1]))]
     if (paths.length > 0) return reach(s, cwdOf(ctx), "read", { paths })
   })
 
@@ -1367,7 +1365,8 @@ export default async function (pi: any) {
     const isError = event?.isError === true
     const r = event?.result && typeof event.result === "object" ? event.result : {}
     // Only an MCP tool's details name its server and tool; any other tool's are its content.
-    const mcp = (str(event?.toolName) || t?.name || "").startsWith("mcp__")
+    const toolName = str(event?.toolName) || t?.name || ""
+    const mcp = toolName.startsWith("mcp__") || MCP_RESOURCE_TOOLS.has(toolName)
     const server = mcp ? r.details?.server : undefined
     const mcpTool = mcp ? r.details?.tool : undefined
     if (s.tainted) return
