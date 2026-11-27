@@ -328,6 +328,74 @@ export function claimOmpOtelEnvFileEntry(name, value) { globalThis.claimed = nam
 	}
 }
 
+// Pi loads the extension too from an agent directory it shares with OMP, and there it
+// registers no handler and runs no hook, a copy of OMP's module on disk beside it or not.
+// The stubs give the answers the real hosts gave (Pi 1.5.0 and 1.6.1, OMP 18.18.2 and
+// 19.1.1): each resolves the name of Pi's package to its own, which names its config
+// folder. OMP resolving that name does not silence the extension there, nor does a package
+// that names no folder.
+func TestExtensionStandsDownOnlyInPi(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is not installed")
+	}
+	if out, err := exec.Command(node, "-p", "process.features.typescript").Output(); err != nil || !slices.Contains([]string{"strip", "transform"}, strings.TrimSpace(string(out))) {
+		t.Skip("node does not run TypeScript")
+	}
+	const pi, ompUtils = "@earendil-works/pi-coding-agent", "@oh-my-pi/pi-utils"
+	const inPi, inOMP, utils = `export const CONFIG_DIR_NAME = ".pi"`, `export const CONFIG_DIR_NAME = ".omp"`, `export function $otelEnv() {}`
+	for host, c := range map[string]struct {
+		modules map[string]string
+		runs    bool
+	}{
+		"Pi":                           {map[string]string{pi: inPi}, false},
+		"Pi with OMP's module on disk": {map[string]string{pi: inPi, ompUtils: utils}, false},
+		"OMP":                          {map[string]string{pi: inOMP, ompUtils: utils}, true},
+		"a package naming no folder":   {map[string]string{pi: `export const VERSION = "1.0.0"`}, true},
+	} {
+		t.Run(host, func(t *testing.T) {
+			dir := t.TempDir()
+			for name, js := range c.modules {
+				mod := filepath.Join(dir, "node_modules", filepath.FromSlash(name))
+				if err := os.MkdirAll(mod, 0o700); err != nil {
+					t.Fatal(err)
+				}
+				for file, text := range map[string]string{"package.json": `{"name":"` + name + `","type":"module","main":"index.js"}`, "index.js": js} {
+					if err := os.WriteFile(filepath.Join(mod, file), []byte(text), 0o600); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			calls, hook := filepath.Join(dir, "calls"), filepath.Join(dir, "hook.sh")
+			if err := os.WriteFile(hook, []byte("#!/bin/sh\ncat > /dev/null\necho $1 >> "+calls+"\n"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			ext := filepath.Join(dir, "terma-ext.ts")
+			if _, err := writeExtension(ext, []string{hook}, relayConfig().Endpoint); err != nil {
+				t.Fatal(err)
+			}
+			script := `const mod = await import(process.argv[1]); const h = {}; await mod.default({ on: (n, fn) => { h[n] = fn } })
+const ctx = { cwd: "/work", sessionManager: { getSessionId: () => "s1" } }
+await h.session_start?.({ reason: "startup" }, ctx)
+await h.before_agent_start?.({ prompt: "do it" }, ctx)
+await h.session_shutdown?.({}, ctx)
+console.log(Object.keys(h).length)`
+			out, err := exec.Command(node, "--input-type=module", "-e", script, ext).CombinedOutput()
+			if err != nil {
+				t.Fatalf("node: %v\n%s", err, out)
+			}
+			handlers := strings.TrimSpace(string(out))
+			hooks, _ := os.ReadFile(calls)
+			if c.runs && (handlers == "0" || !strings.Contains(string(hooks), "omp-session-start")) {
+				t.Errorf("the extension registered %s handlers and ran the hooks %q, want it working", handlers, hooks)
+			}
+			if !c.runs && (handlers != "0" || len(hooks) > 0) {
+				t.Errorf("the extension registered %s handlers and ran the hooks %q, want none in Pi", handlers, hooks)
+			}
+		})
+	}
+}
+
 // A title whose hook fails is sent again at the next look, and once it lands, not again.
 func TestExtensionRetriesAFailedTitle(t *testing.T) {
 	node, err := exec.LookPath("node")
