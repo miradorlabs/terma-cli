@@ -3,8 +3,8 @@
   "harness": "copilot",
   "window": {
     "oldest": "1.0.105",
-    "newest": "1.0.116",
-    "builds": 12
+    "newest": "1.0.117",
+    "builds": 13
   },
   "items": {
     "cli.commands.copilot app": {
@@ -1695,8 +1695,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.116",
+          "removed": "1.0.117"
         }
       ],
       "since_bounded": false
@@ -1728,8 +1728,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.116",
+          "removed": "1.0.117"
         }
       ],
       "since_bounded": false
@@ -2724,6 +2724,17 @@
       ],
       "since_bounded": false
     },
+    "config.env_vars.COPILOT_SKILLS_DIRS": {
+      "kind": "env_var",
+      "ranges": [
+        {
+          "since": "1.0.117",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
+    },
     "config.env_vars.COPILOT_TASK_WAIT_TIMEOUT_SECONDS": {
       "kind": "env_var",
       "ranges": [
@@ -3345,8 +3356,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.116",
+          "removed": "1.0.117"
         }
       ],
       "since_bounded": false
@@ -3730,8 +3741,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.116",
+          "removed": "1.0.117"
         }
       ],
       "since_bounded": false
@@ -3741,8 +3752,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.116",
+          "removed": "1.0.117"
         }
       ],
       "since_bounded": false
@@ -3774,8 +3785,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.116",
+          "removed": "1.0.117"
         }
       ],
       "since_bounded": false
@@ -3796,8 +3807,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.116",
+          "removed": "1.0.117"
         }
       ],
       "since_bounded": false
@@ -3829,8 +3840,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.116",
+          "removed": "1.0.117"
         }
       ],
       "since_bounded": false
@@ -3994,8 +4005,8 @@
       "ranges": [
         {
           "since": "1.0.105",
-          "until": null,
-          "removed": null
+          "until": "1.0.116",
+          "removed": "1.0.117"
         }
       ],
       "since_bounded": false
@@ -4241,6 +4252,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.assistedApprovalShareFeedback": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.0.117",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.autoTier": {
       "kind": "setting",
@@ -5715,6 +5737,17 @@
         }
       ],
       "since_bounded": false
+    },
+    "config.options.sandbox.userPolicy.network.extraCaCertificates": {
+      "kind": "setting",
+      "ranges": [
+        {
+          "since": "1.0.117",
+          "until": null,
+          "removed": null
+        }
+      ],
+      "since_bounded": true
     },
     "config.options.sandbox.userPolicy.network.proxy.password": {
       "kind": "setting",

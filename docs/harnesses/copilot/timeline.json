@@ -3,6 +3,140 @@
   "harness": "copilot",
   "steps": [
     {
+      "version": "1.0.117",
+      "previous": "1.0.116",
+      "changes": [
+        {
+          "id": "cli.commands.copilot.options.--disable-mcp-server.description",
+          "category": "cli",
+          "op": "changed",
+          "title": "`copilot --disable-mcp-server`: description changed",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "cli.help.--help",
+          "category": "cli",
+          "op": "changed",
+          "title": "Full help text of `--help` changed (+101 −68 chars)",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.options.assistedApprovalShareFeedback",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: assistedApprovalShareFeedback",
+          "impact": "notable",
+          "documented": false
+        },
+        {
+          "id": "config.options.env.description",
+          "category": "config",
+          "op": "changed",
+          "title": "env description changed (+890 −208 chars)",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.options.sandbox.userPolicy.network.extraCaCertificates",
+          "category": "config",
+          "op": "added",
+          "title": "New setting: sandbox.userPolicy.network.extraCaCertificates",
+          "impact": "informational",
+          "documented": true
+        },
+        {
+          "id": "config.env_vars.COPILOT_SKILLS_DIRS",
+          "category": "config",
+          "op": "added",
+          "title": "New environment variable: COPILOT_SKILLS_DIRS",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.BUILD_NUMBER",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: BUILD_NUMBER",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.CI",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: CI",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.DISPLAY",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: DISPLAY",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.REMOTE_CONTAINERS",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: REMOTE_CONTAINERS",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.RUN_ID",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: RUN_ID",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.SSH_CLIENT",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: SSH_CLIENT",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.SSH_TTY",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: SSH_TTY",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.SYSTEM_COLLECTIONURI",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: SYSTEM_COLLECTIONURI",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "config.env_vars.WAYLAND_DISPLAY",
+          "category": "config",
+          "op": "removed",
+          "title": "Environment variable no longer read: WAYLAND_DISPLAY",
+          "impact": "informational",
+          "documented": false
+        },
+        {
+          "id": "storage.logs.path",
+          "category": "storage",
+          "op": "changed",
+          "title": "On-disk logs path changed",
+          "impact": "informational",
+          "documented": true
+        }
+      ]
+    },
+    {
       "version": "1.0.116",
       "previous": "1.0.115",
       "changes": [

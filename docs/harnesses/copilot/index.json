@@ -7,25 +7,56 @@
     "homepage": "https://github.com/github/copilot-cli",
     "source": null,
     "changelog": "https://github.com/github/copilot-cli/blob/main/changelog.md",
-    "latest": "1.0.116",
+    "latest": "1.0.117",
     "support": "supported",
-    "versions_tracked": 12,
+    "versions_tracked": 13,
     "first_tracked": "2026-10-28",
     "last_change": {
-      "from": "1.0.115",
-      "to": "1.0.116",
-      "at": "2026-11-26T12:01:18.28433114Z",
-      "released_at": "2026-11-25T17:02:41.755Z",
-      "changes": 12,
+      "from": "1.0.116",
+      "to": "1.0.117",
+      "at": "2026-11-27T13:21:17.320026454Z",
+      "released_at": "2026-11-27T13:04:16.464Z",
+      "changes": 16,
       "categories": {
-        "binary": 1,
-        "cli": 4,
-        "config": 6,
+        "cli": 2,
+        "config": 13,
         "storage": 1
       }
     }
   },
   "versions": [
+    {
+      "version": "1.0.117",
+      "released_at": "2026-11-27T13:04:16.464Z",
+      "captured_at": "2026-11-27T13:21:17.320026454Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.0.116",
+      "changes": 16,
+      "categories": {
+        "cli": 2,
+        "config": 13,
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 15,
+        "notable": 1
+      },
+      "undocumented": 12,
+      "highlights": [
+        "New setting: assistedApprovalShareFeedback",
+        "`copilot --disable-mcp-server`: description changed",
+        "Full help text of `--help` changed (+101 −68 chars)"
+      ],
+      "signing": "valid",
+      "partial": true,
+      "attempted_at": "2026-11-27T13:21:17.320026454Z",
+      "attempts": 1
+    },
     {
       "version": "1.0.116",
       "released_at": "2026-11-25T17:02:41.755Z",

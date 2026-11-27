@@ -1,7 +1,41 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-27T08:23:04.948370475Z",
+  "generated_at": "2026-11-27T13:21:17.320026454Z",
   "versions": [
+    {
+      "harness": "copilot",
+      "name": "GitHub Copilot CLI",
+      "version": "1.0.117",
+      "released_at": "2026-11-27T13:04:16.464Z",
+      "captured_at": "2026-11-27T13:21:17.320026454Z",
+      "platforms": [
+        "darwin/arm64"
+      ],
+      "support": "supported",
+      "previous": "1.0.116",
+      "changes": 16,
+      "categories": {
+        "cli": 2,
+        "config": 13,
+        "storage": 1
+      },
+      "impact": {
+        "breaking": 0,
+        "degrading": 0,
+        "informational": 15,
+        "notable": 1
+      },
+      "undocumented": 12,
+      "highlights": [
+        "New setting: assistedApprovalShareFeedback",
+        "`copilot --disable-mcp-server`: description changed",
+        "Full help text of `--help` changed (+101 −68 chars)"
+      ],
+      "signing": "valid",
+      "partial": true,
+      "attempted_at": "2026-11-27T13:21:17.320026454Z",
+      "attempts": 1
+    },
     {
       "harness": "t3",
       "name": "T3 Code",
@@ -6186,38 +6220,6 @@
         "Injected context changed (+49 −0 chars)",
         "Interactive session's injected context changed (+934 −732 chars)",
         "Interactive system prompt changed (+49 −0 chars)"
-      ],
-      "signing": "valid"
-    },
-    {
-      "harness": "claude",
-      "name": "Claude Code",
-      "version": "2.1.232",
-      "released_at": "2026-08-13T21:30:53.194Z",
-      "captured_at": "2026-11-05T09:54:28.532441Z",
-      "platforms": [
-        "darwin/arm64",
-        "linux/amd64"
-      ],
-      "support": "untested",
-      "previous": "2.1.231",
-      "changes": 23,
-      "categories": {
-        "config": 20,
-        "hooks": 2,
-        "network": 1
-      },
-      "impact": {
-        "breaking": 0,
-        "degrading": 0,
-        "informational": 21,
-        "notable": 2
-      },
-      "undocumented": 18,
-      "highlights": [
-        "New setting: allowedMarketplaces",
-        "New vendor telemetry event: tengu_turn_end",
-        "SessionEnd hook environment variable CLAUDE_CODE_MESSAGING_SOCKET added"
       ],
       "signing": "valid"
     }
