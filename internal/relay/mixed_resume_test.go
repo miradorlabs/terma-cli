@@ -20,7 +20,7 @@ import (
 // recheck makes every entry wait until released, then judges it on a fresh ledger read.
 func ledgerRouter(stateDir, endpoint string, released *atomic.Bool) *stubRouter {
 	mixed := func(session string, start, end time.Time) (string, time.Time, bool) {
-		run, at, ok := runs.Read(stateDir, session).MixedRun(start, end)
+		run, at, ok := runs.Read(stateDir, session).MixedIn(start, end)
 		if ok && at.IsZero() {
 			at = time.Unix(0, 1)
 		}

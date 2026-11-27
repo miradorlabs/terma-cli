@@ -82,7 +82,7 @@ func (p *recheck) mixedInterval(session string, start, end time.Time) (time.Time
 }
 
 func mixedIntervalFrom(l runs.Snapshot, start, end time.Time) (string, time.Time, bool) {
-	run, from, mixed := l.MixedRun(start, end)
+	run, from, mixed := l.MixedIn(start, end)
 	if !mixed {
 		return "", time.Time{}, false
 	}

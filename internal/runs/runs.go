@@ -178,13 +178,13 @@ func (s Snapshot) MixedAt(recordTime time.Time) (time.Time, bool) {
 // end, returning the earliest MixedAt across all intersecting Mixed runs. An unreadable
 // ledger fails closed (zero time, true).
 func (s Snapshot) MixedInterval(start, end time.Time) (time.Time, bool) {
-	_, at, mixed := s.MixedRun(start, end)
+	_, at, mixed := s.MixedIn(start, end)
 	return at, mixed
 }
 
-// MixedRun is MixedInterval that also names the run whose MixedAt it returns: empty when
+// MixedIn is MixedInterval that also names the run whose MixedAt it returns: empty when
 // the ledger is unreadable, so a caller scoping by run covers them all.
-func (s Snapshot) MixedRun(start, end time.Time) (string, time.Time, bool) {
+func (s Snapshot) MixedIn(start, end time.Time) (string, time.Time, bool) {
 	if s.unreadable || len(s.runs) == 0 {
 		return "", time.Time{}, s.unreadable
 	}
