@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -97,41 +96,6 @@ not_set_up 5, signed_out 6, and failed 1.`,
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "list what would be uploaded, to which team, and its estimated size without sending or writing state")
 	cmd.Flags().BoolVar(&retryFailed, "retry-failed", false, "try again the sessions a team rejected in an earlier run")
 	return cmd
-}
-
-// historyUsageError reports arguments `history upload` does not take. A --json-stream run
-// ends with an error line, as every other failure of one does. Flags are read up to the
-// one refused, so --json-stream after it is looked for in the process's arguments.
-func historyUsageError(cmd *cobra.Command, jsonStream bool, err error) error {
-	if !jsonStream && !argsAskForJSONStream(os.Args[1:]) {
-		return err
-	}
-	return newHistoryStream(cmd.OutOrStdout()).fail(cmd.ErrOrStderr(), err)
-}
-
-// argsAskForJSONStream reports whether args set --json-stream as a flag: not as the value of
-// a flag that takes one, and not set to false.
-func argsAskForJSONStream(args []string) bool {
-	takesValue := map[string]bool{
-		"--since": true, "--active-window": true, "--output": true, "-o": true, "--team": true, "-t": true,
-		"--profile": true, "--env": true, "--api-url": true, "--auth-url": true, "--app-url": true, "--otlp-url": true,
-	}
-	asked := false
-	for i := 0; i < len(args); i++ {
-		a := args[i]
-		switch {
-		case a == "--":
-			return asked
-		case takesValue[a]:
-			i++
-		case a == "--json-stream":
-			asked = true
-		case strings.HasPrefix(a, "--json-stream="):
-			v, err := strconv.ParseBool(strings.TrimPrefix(a, "--json-stream="))
-			asked = err == nil && v
-		}
-	}
-	return asked
 }
 
 // runHistoryUpload runs the upload, reporting to stream when it is not nil and to the

@@ -16,6 +16,7 @@ type routeWork struct {
 	resume  []*routeSessionPlan
 	upload  []*routeSessionPlan
 	skipped map[string]int // sessions planning left out, by skip reason
+	key     string         // the team's server key, on a server-key profile
 }
 
 // planRoute sorts one team's sessions into what was sent or failed before, what resumes
@@ -107,6 +108,14 @@ func planRoute(
 		w.resume = nil
 		return w, nil
 	}
+	// A server-key profile without this team's key can neither ask nor send: the team
+	// stops whole, before its server is asked.
+	key, keyOK := resolveRouteServerKey(opts, b, len(w.resume)+len(candidateQueue), report, sum)
+	if !keyOK {
+		w.resume = nil
+		return w, nil
+	}
+	w.key = key
 	if len(candidateQueue) == 0 {
 		return w, nil
 	}
@@ -199,10 +208,7 @@ func uploadRoute(
 	if opts.EndpointFor != nil {
 		endpoint = opts.EndpointFor(b.team.TeamID)
 	}
-	serverKey, keyOK := resolveRouteServerKey(opts, b, total, report, sum)
-	if !keyOK {
-		return nil
-	}
+	serverKey := w.key
 
 	for i, sp := range w.resume {
 		stopRoute, retErr := uploadOneSession(ctx, opts, &w.st, b, sp, pacer, endpoint, serverKey, activeWindow, maxReqBytes, i+1, len(w.resume), len(w.upload), userIDFor, nowFn, report, sum, orgBlocked, reachCache)

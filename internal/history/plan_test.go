@@ -241,3 +241,52 @@ func TestChangedWithinZeroWindow(t *testing.T) {
 		t.Error("a one-hour window misjudged a file")
 	}
 }
+
+// A server-key profile without the team's key stops the team whole while planning, in one
+// send_failed issue, without asking its server what it holds.
+func TestPlanStopsATeamWithoutItsServerKey(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	repoA := initTestGitRepo(t, "https://github.com/org-a/repo-a.git")
+	st := singleTeamRoutingState(now, "no_person", "org-a", "team-a", "github.com/org-a/repo-a", true, true)
+	stateDir := t.TempDir()
+	rs := NewRouteState("no_person", "default", "enr-team-a", "team-a")
+	rs.MarkInProgress("claude", "s-resume", now.Add(-time.Hour), 1, 100, time.Time{})
+	if err := SaveState(stateDir, rs); err != nil {
+		t.Fatal(err)
+	}
+	src := &stubHistorySource{
+		source: "claude",
+		files: []agents.HistoryFile{
+			{SourceSystem: "claude", SessionID: "s-resume", ModTime: now.Add(-5 * time.Hour)},
+			{SourceSystem: "claude", SessionID: "s-new", ModTime: now.Add(-4 * time.Hour)},
+		},
+		segments: map[string][]agents.HistorySegment{
+			"s-resume": {makeNativeSegment("claude", "s-resume", repoA, "r", now.Add(-5*time.Hour))},
+			"s-new":    {makeNativeSegment("claude", "s-new", repoA, "n", now.Add(-4*time.Hour))},
+		},
+	}
+	var asked []string
+	var events []ProgressEvent
+	sum, err := Upload(context.Background(), Options{
+		StateDir: stateDir, Profile: "default", Account: "no_person", AuthURL: "https://auth.example.com", Version: "test",
+		ServerKey: true, ServerKeyTeam: "team-a", ServerKeyAuthURL: "https://auth.example.com",
+		ServerKeyFor: func(string) (string, error) { return "", nil },
+		State:        st, Sources: []agents.HistorySource{src}, Filter: relay.NewContentFilter(nil),
+		Holdings:  checkerFunc(func(team routing.Team) error { asked = append(asked, team.TeamID); return nil }),
+		Transport: &Transport{Version: "test", HTTP: http.DefaultClient, BytesPerSec: 1 << 30},
+		Now:       func() time.Time { return now },
+		Progress:  func(ev ProgressEvent) { events = append(events, ev) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := checkPlanAccounting(t, events)
+	if len(asked) != 0 || plan.Sessions != 0 {
+		t.Errorf("holdings asked of %v and %d sessions planned, want neither", asked, plan.Sessions)
+	}
+	if len(sum.TeamIssues) != 1 || sum.TeamIssues[0].Skipped != 2 || sum.SkippedSessions[SkipSendFailed] != 2 ||
+		sum.TeamIssues[0].Reason != "no server key available for this team" {
+		t.Fatalf("issues = %+v skipped = %v, want one send_failed issue of both sessions", sum.TeamIssues, sum.SkippedSessions)
+	}
+}

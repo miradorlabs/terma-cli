@@ -423,7 +423,13 @@ func TestHistoryUploadJSONStreamUsageErrors(t *testing.T) {
 }
 
 func TestArgsAskForJSONStream(t *testing.T) {
-	t.Parallel()
+	useDirs(t, t.TempDir(), t.TempDir())
+	upload, _, err := testApp.NewRootCommand().Find([]string{"history", "upload"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	flags := upload.Flags()
+	flags.AddFlagSet(upload.InheritedFlags())
 	for _, c := range []struct {
 		args []string
 		want bool
@@ -433,9 +439,12 @@ func TestArgsAskForJSONStream(t *testing.T) {
 		{[]string{"history", "upload", "--json-stream=false", "--bogus"}, false},
 		{[]string{"history", "upload", "--since", "--json-stream", "--bogus"}, false},
 		{[]string{"history", "upload", "--bogus", "--", "--json-stream"}, false},
+		{[]string{"history", "upload", "-o", "--json-stream", "--bogus"}, false},
+		{[]string{"history", "upload", "--profile", "--json-stream", "--bogus"}, false},
+		{[]string{"history", "upload", "--dry-run", "--json-stream", "--bogus"}, true},
 		{[]string{"history", "upload", "--bogus"}, false},
 	} {
-		if got := argsAskForJSONStream(c.args); got != c.want {
+		if got := argsAskForJSONStream(flags, c.args); got != c.want {
 			t.Errorf("%v = %v, want %v", c.args, got, c.want)
 		}
 	}
