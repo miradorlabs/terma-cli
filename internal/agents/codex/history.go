@@ -39,10 +39,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 	if now.IsZero() {
 		now = time.Now()
 	}
-	activeWindow := opts.ActiveWindow
-	if activeWindow <= 0 {
-		activeWindow = time.Hour
-	}
+	activeWindow := max(0, opts.ActiveWindow)
 
 	bySession := map[string]agents.HistoryFile{}
 	// unreadable is the first rollout or directory discovery could not read. A rollout

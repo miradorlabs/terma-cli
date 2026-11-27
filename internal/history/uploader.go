@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"slices"
 	"time"
 
@@ -35,12 +36,14 @@ type Options struct {
 	UserIDFor        func(team routing.Team, endpoint string) string
 	TeamLabel        func(team routing.Team) string
 	Since            time.Time
-	ActiveWindow     time.Duration
-	MaxReqBytes      int
-	DryRun           bool
-	RetryFailed      bool // re-send sessions a team rejected before, with the in-progress ones
-	Now              func() time.Time
-	Progress         func(ProgressEvent)
+	// ActiveWindow is how recently a session's files may have changed for it to be left
+	// out as still in progress; nil means DefaultActiveWindow, and zero leaves none out.
+	ActiveWindow *time.Duration
+	MaxReqBytes  int
+	DryRun       bool
+	RetryFailed  bool // re-send sessions a team rejected before, with the in-progress ones
+	Now          func() time.Time
+	Progress     func(ProgressEvent)
 }
 
 type routeSessionPlan struct {
@@ -51,6 +54,8 @@ type routeSessionPlan struct {
 	source         agents.HistorySource
 	records        int
 	estimatedBytes int64
+	sourceBytes    int64 // the session's files on disk, as the plan reports them
+	overall        int   // 1-based position across every team's plan, 0 before the plan
 }
 
 type routeBucket struct {
@@ -71,9 +76,9 @@ func Upload(ctx context.Context, opts Options) (Summary, error) {
 		nowFn = time.Now
 	}
 	now := nowFn()
-	activeWindow := opts.ActiveWindow
-	if activeWindow <= 0 {
-		activeWindow = time.Hour
+	activeWindow := DefaultActiveWindow
+	if opts.ActiveWindow != nil {
+		activeWindow = max(0, *opts.ActiveWindow)
 	}
 	maxReqBytes := opts.MaxReqBytes
 	if maxReqBytes <= 0 {
@@ -87,10 +92,15 @@ func Upload(ctx context.Context, opts Options) (Summary, error) {
 		}
 		return t.TeamID
 	}
+	planTotal := 0
 	report := func(ev ProgressEvent) {
-		if opts.Progress != nil {
-			opts.Progress(ev)
+		if opts.Progress == nil {
+			return
 		}
+		if ev.Overall > 0 {
+			ev.OverallTotal = planTotal
+		}
+		opts.Progress(ev)
 	}
 
 	if !opts.DryRun {
@@ -126,7 +136,7 @@ func Upload(ctx context.Context, opts Options) (Summary, error) {
 	if err != nil {
 		return sum, err
 	}
-	report(ProgressEvent{Kind: ProgressDiscover, Total: sum.DiscoveredFiles})
+	report(ProgressEvent{Kind: ProgressDiscover, Total: sum.DiscoveredFiles, Skips: maps.Clone(sum.SkippedSessions)})
 
 	enrollmentIDs := make([]string, 0, len(buckets))
 	for id := range buckets {
@@ -134,13 +144,35 @@ func Upload(ctx context.Context, opts Options) (Summary, error) {
 	}
 	slices.Sort(enrollmentIDs)
 
+	// Every team's plan, and what its server already holds, is known before the first
+	// session is sent, so the plan line can say how much is left in all.
 	orgBlocked := map[string]string{}
+	works := make([]*routeWork, 0, len(enrollmentIDs))
 	for _, eid := range enrollmentIDs {
 		if err := ctx.Err(); err != nil {
 			sum.Interrupted = true
 			return sum, err
 		}
-		if err := processRoute(ctx, opts, existingStates, buckets[eid], activeWindow, maxReqBytes, cachedUserID, nowFn, report, orgBlocked, reachCache, &sum); err != nil {
+		w, err := planRoute(ctx, opts, existingStates, buckets[eid], nowFn, report, orgBlocked, &sum)
+		if err != nil {
+			return sum, err
+		}
+		works = append(works, w)
+	}
+	plan := buildUploadPlan(works, !opts.DryRun)
+	planTotal = plan.Sessions
+	report(ProgressEvent{Kind: ProgressPlan, Plan: &plan})
+	if opts.DryRun {
+		appendAgedOutFailures(opts.State.Teams, existingStates, labelFor, &sum)
+		return sum, nil
+	}
+
+	for _, w := range works {
+		if err := ctx.Err(); err != nil {
+			sum.Interrupted = true
+			return sum, err
+		}
+		if err := uploadRoute(ctx, opts, w, activeWindow, maxReqBytes, cachedUserID, nowFn, report, orgBlocked, reachCache, &sum); err != nil {
 			return sum, err
 		}
 	}
@@ -302,136 +334,4 @@ func discoverAndPlan(
 		}
 	}
 	return buckets, nil
-}
-
-func processRoute(
-	ctx context.Context,
-	opts Options,
-	existingStates map[string]RouteState,
-	b *routeBucket,
-	activeWindow time.Duration,
-	maxReqBytes int,
-	userIDFor func(routing.Team, string) string,
-	nowFn func() time.Time,
-	report func(ProgressEvent),
-	orgBlocked map[string]string,
-	reachCache map[string]familyVerdict,
-	sum *Summary,
-) error {
-	eid := b.team.EnrollmentID
-	st, ok := existingStates[eid]
-	if !ok {
-		var err error
-		st, _, err = LoadState(opts.StateDir, opts.Account, opts.Profile, eid, b.team.TeamID)
-		if err != nil {
-			return err
-		}
-	}
-
-	var resumeQueue, candidateQueue []*routeSessionPlan
-	for _, sp := range sortedPlans(b.sessions) {
-		if st.IsDone(sp.key) {
-			sum.addSkippedSession(SkipAlreadyDone, 1)
-			continue
-		}
-		if frec, failed := st.IsFailed(sp.key); failed && opts.RetryFailed {
-			resumeQueue = append(resumeQueue, sp) // no holdings check: part may be held already
-			continue
-		} else if failed {
-			sum.addSkippedSession(SkipFailedPreviously, 1)
-			sum.Failed = append(sum.Failed, FailedSession{
-				EnrollmentID:    eid,
-				TeamID:          b.team.TeamID,
-				TeamLabel:       b.label,
-				SourceSystem:    frec.SourceSystem,
-				SessionID:       frec.SessionID,
-				Reason:          frec.Reason,
-				RejectedRecords: frec.RejectedRecords,
-				Previously:      true,
-				FailedAt:        frec.FailedAt,
-			})
-			continue
-		}
-		if st.IsInProgress(sp.key) {
-			resumeQueue = append(resumeQueue, sp)
-		} else {
-			candidateQueue = append(candidateQueue, sp)
-		}
-	}
-
-	rp := RoutePlan{
-		EnrollmentID:   eid,
-		TeamID:         b.team.TeamID,
-		TeamLabel:      b.label,
-		Sessions:       len(resumeQueue) + len(candidateQueue),
-		ResumeSessions: len(resumeQueue),
-	}
-	for _, sp := range resumeQueue {
-		rp.Records += sp.records
-		rp.EstimatedBytes += sp.estimatedBytes
-	}
-	for _, sp := range candidateQueue {
-		rp.Records += sp.records
-		rp.EstimatedBytes += sp.estimatedBytes
-	}
-	if rp.Sessions > 0 {
-		sum.Planned = append(sum.Planned, rp)
-	}
-	if opts.DryRun || rp.Sessions == 0 {
-		return nil
-	}
-
-	if reason, blocked := orgBlocked[b.team.OrganizationID]; blocked {
-		totalSkip := len(resumeQueue) + len(candidateQueue)
-		sum.addSkippedSession(SkipOrgAccessLost, totalSkip)
-		sum.TeamIssues = append(sum.TeamIssues, TeamIssue{
-			EnrollmentID: eid, TeamID: b.team.TeamID, TeamLabel: b.label,
-			Skipped: totalSkip, Reason: reason,
-		})
-		return nil
-	}
-
-	pacer := opts.Transport.NewRoutePacer()
-	endpoint := ""
-	if opts.EndpointFor != nil {
-		endpoint = opts.EndpointFor(b.team.TeamID)
-	}
-	serverKey, keyOK := resolveRouteServerKey(opts, b, len(resumeQueue)+len(candidateQueue), report, sum)
-	if !keyOK {
-		return nil
-	}
-
-	// Re-send in_progress sessions FIRST and skip holdings check for them.
-	for i, sp := range resumeQueue {
-		stopRoute, retErr := uploadOneSession(ctx, opts, &st, b, sp, pacer, endpoint, serverKey, activeWindow, maxReqBytes, i+1, len(resumeQueue), len(candidateQueue), userIDFor, nowFn, report, sum, orgBlocked, reachCache)
-		if retErr != nil {
-			return retErr
-		}
-		if stopRoute {
-			return nil
-		}
-	}
-
-	if len(candidateQueue) == 0 {
-		return nil
-	}
-	freshState, _, checkSkip, checkReason, routeOK := recheckRouteTeam(opts, eid, nowFn())
-	if !routeOK {
-		stopRouteWithIssue(b, len(candidateQueue), checkSkip, checkReason, report, sum)
-		return nil
-	}
-	uploadQueue, err := filterHeldCandidates(ctx, opts, freshState, b, candidateQueue, nowFn, report, orgBlocked, sum)
-	if err != nil {
-		return err
-	}
-	for i, sp := range uploadQueue {
-		stopRoute, retErr := uploadOneSession(ctx, opts, &st, b, sp, pacer, endpoint, serverKey, activeWindow, maxReqBytes, i+1, len(uploadQueue), 0, userIDFor, nowFn, report, sum, orgBlocked, reachCache)
-		if retErr != nil {
-			return retErr
-		}
-		if stopRoute {
-			return nil
-		}
-	}
-	return nil
 }

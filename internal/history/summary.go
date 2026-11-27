@@ -31,31 +31,95 @@ const (
 	SkipTeamBlockedPrefix = "team_blocked:"
 )
 
+// DefaultActiveWindow is how recently a session's files may have changed for an upload to
+// leave it out as still in progress, unless Options.ActiveWindow says otherwise.
+const DefaultActiveWindow = time.Hour
+
 // ProgressKind identifies the phase of a ProgressEvent callback.
 type ProgressKind string
 
 // Progress event kinds delivered to Options.Progress.
 const (
-	ProgressDiscover      ProgressKind = "discover"
-	ProgressHoldings      ProgressKind = "holdings"
+	ProgressDiscover ProgressKind = "discover"
+	ProgressHoldings ProgressKind = "holdings"
+	// ProgressPlan comes once, after every team's holdings check and before the first
+	// session is sent, with what is left to send in Plan.
+	ProgressPlan          ProgressKind = "plan"
 	ProgressSessionStart  ProgressKind = "session_start"
 	ProgressSessionDone   ProgressKind = "session_done"
 	ProgressSessionFailed ProgressKind = "session_failed"
-	ProgressRouteBlocked  ProgressKind = "route_blocked"
+	// ProgressSessionSkipped is one session left out, its skip reason in SkipReason.
+	ProgressSessionSkipped ProgressKind = "session_skipped"
+	// ProgressRouteBlocked is a team whose remaining Skipped sessions wait for another run.
+	ProgressRouteBlocked ProgressKind = "route_blocked"
 )
 
 // ProgressEvent reports live upload progress to the CLI.
 type ProgressEvent struct {
 	Kind         ProgressKind
 	RouteLabel   string
+	EnrollmentID string
 	TeamID       string
 	SourceSystem string
 	SessionID    string
-	Index        int
-	Total        int
+	// Index and Total number a session within its team's resumed or new sessions.
+	Index int
+	Total int
+	// Overall numbers a planned session across every team's plan, of OverallTotal; zero
+	// for a session that was never in the plan.
+	Overall      int
+	OverallTotal int
 	Records      int
 	Bytes        int64
-	Reason       string
+	// SourceBytes is the size of the session's files on disk, as the plan counted them.
+	SourceBytes int64
+	Reason      string
+	// SkipReason is one of the Skip* reasons, for a skipped session or a blocked team.
+	SkipReason string
+	// Skipped is how many sessions a blocked team left out.
+	Skipped int
+	// Skips counts the sessions discovery left out, by skip reason.
+	Skips map[string]int
+	Plan  *UploadPlan
+}
+
+// UploadPlan is what a run has left to send, in all and per team: in a dry run, before any
+// server is asked what it holds.
+type UploadPlan struct {
+	HoldingsChecked bool  `json:"holdings_checked"`
+	Sessions        int   `json:"sessions"`
+	ResumeSessions  int   `json:"resume_sessions"`
+	Records         int   `json:"records"`
+	SourceBytes     int64 `json:"source_bytes"`
+	// EstimatedBytes is measured in a dry run only.
+	EstimatedBytes int64      `json:"estimated_bytes,omitempty"`
+	Teams          []PlanTeam `json:"teams"`
+}
+
+// PlanTeam is one team's share of an UploadPlan.
+type PlanTeam struct {
+	EnrollmentID   string `json:"enrollment_id"`
+	TeamID         string `json:"team_id"`
+	TeamLabel      string `json:"team_label"`
+	Sessions       int    `json:"sessions"`
+	ResumeSessions int    `json:"resume_sessions"`
+	Records        int    `json:"records"`
+	SourceBytes    int64  `json:"source_bytes"`
+	EstimatedBytes int64  `json:"estimated_bytes,omitempty"`
+}
+
+func sessionEvent(kind ProgressKind, b *routeBucket, sp *routeSessionPlan, skipReason string) ProgressEvent {
+	return ProgressEvent{
+		Kind:         kind,
+		RouteLabel:   b.label,
+		EnrollmentID: b.team.EnrollmentID,
+		TeamID:       b.team.TeamID,
+		SourceSystem: sp.file.SourceSystem,
+		SessionID:    sp.file.SessionID,
+		Overall:      sp.overall,
+		SourceBytes:  sp.sourceBytes,
+		SkipReason:   skipReason,
+	}
 }
 
 // RoutePlan summarizes what a run (or --dry-run) plans to upload to one destination team.

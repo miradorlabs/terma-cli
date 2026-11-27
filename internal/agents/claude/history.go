@@ -47,10 +47,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 	if now.IsZero() {
 		now = time.Now()
 	}
-	activeWindow := opts.ActiveWindow
-	if activeWindow <= 0 {
-		activeWindow = time.Hour
-	}
+	activeWindow := max(0, opts.ActiveWindow)
 	projEntries, err := os.ReadDir(projectsDir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

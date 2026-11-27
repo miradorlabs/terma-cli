@@ -24,7 +24,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
-const defaultHistorySince = "90d"
+const (
+	defaultHistorySince        = "90d"
+	defaultHistoryActiveWindow = "1h"
+)
 
 func (app *App) newHistoryCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -39,9 +42,11 @@ selected team's collection and content policy.`,
 
 func (app *App) newHistoryUploadCommand() *cobra.Command {
 	var (
-		sinceSpec   string
-		dryRun      bool
-		retryFailed bool
+		sinceSpec        string
+		activeWindowSpec string
+		dryRun           bool
+		retryFailed      bool
+		jsonStream       bool
 	)
 	cmd := &cobra.Command{
 		Use:   "upload",
@@ -51,21 +56,44 @@ recorded working directory, routes each part through your selected teams'
 policies, skips sessions each destination team already holds, and uploads the
 rest tagged as historical.
 
-Sessions modified within the last hour are skipped as still in progress.
-Press Ctrl-C to stop safely; running the command again resumes unfinished
-sessions first.`,
+Sessions modified within the last hour (--active-window) are skipped as
+still in progress. Press Ctrl-C to stop safely; running the command again
+resumes unfinished sessions first.
+
+--json-stream prints one JSON object per line on stdout as the upload goes,
+each with a "type": start, discover, holdings, plan (what is left to send, in
+all and per team, before the first session is sent), session_start,
+session_done, session_failed, session_skipped, team_blocked, and summary (the
+summary -o json prints). A run that cannot finish ends with an error line,
+{"code","message"} under "error"; its codes and exit codes: upload_running 4,
+not_set_up 5, signed_out 6, and failed 1.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return app.runHistoryUpload(cmd, sinceSpec, dryRun, retryFailed)
+			if !jsonStream {
+				return app.runHistoryUpload(cmd, sinceSpec, activeWindowSpec, dryRun, retryFailed, nil)
+			}
+			stream := newHistoryStream(cmd.OutOrStdout())
+			err := app.runHistoryUpload(cmd, sinceSpec, activeWindowSpec, dryRun, retryFailed, stream)
+			if _, coded := exitCodeOf(err); err != nil && !coded && !errors.Is(err, context.Canceled) {
+				err = stream.fail(cmd.ErrOrStderr(), err)
+			}
+			if err == nil && stream.err != nil {
+				return stream.err
+			}
+			return err
 		},
 	}
 	cmd.Flags().StringVar(&sinceSpec, "since", defaultHistorySince, "include sessions modified within this window (e.g. 90d, 48h, or 2026-08-01)")
+	cmd.Flags().StringVar(&activeWindowSpec, "active-window", defaultHistoryActiveWindow, "skip sessions modified within this window as still in progress (e.g. 1h, 30m, or 0 for none)")
+	cmd.Flags().BoolVar(&jsonStream, "json-stream", false, "print progress as JSON lines on stdout, ending with the summary or an error")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "list what would be uploaded, to which team, and its estimated size without sending or writing state")
 	cmd.Flags().BoolVar(&retryFailed, "retry-failed", false, "try again the sessions a team rejected in an earlier run")
 	return cmd
 }
 
-func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, retryFailed bool) error {
+// runHistoryUpload runs the upload, reporting to stream when it is not nil and to the
+// terminal otherwise.
+func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec, activeWindowSpec string, dryRun, retryFailed bool, stream *historyStream) error {
 	// git answers for the repository these name whatever folder is asked about, so every
 	// session's working directory would route as that one repository.
 	for _, name := range []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR"} {
@@ -78,8 +106,16 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, r
 	if err != nil {
 		return err
 	}
+	activeWindow, err := parseHistoryActiveWindow(activeWindowSpec)
+	if err != nil {
+		return err
+	}
 	asJSON := false
-	if app.flags.output != "" {
+	if stream != nil {
+		if app.flags.output != "" {
+			return errors.New("--json-stream prints JSON lines; leave out --output")
+		}
+	} else if app.flags.output != "" {
 		format, err := app.resolveFormat()
 		if err != nil {
 			return err
@@ -101,7 +137,14 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, r
 	serverKey := cfg.ServerKeySignIn || lane == sendas.NoPersonLane
 	st, found, loadErr := routing.Load(app.stateDir, cfg.ProfileName)
 	if stateReason, detail := routingStateProblem(st, found, loadErr, lane); stateReason != "" {
-		return fmt.Errorf("%s — run `%s`", detail, routeSetupFix(serverKey))
+		err := fmt.Errorf("%s — run `%s`", detail, routeSetupFix(serverKey))
+		switch stateReason {
+		case "missing", "wrong_account", "account_unreadable":
+			return &historyError{code: historyErrNotSetUp, exit: ExitNotSetUp, err: err}
+		case "signed_out":
+			return &historyError{code: historyErrSignedOut, exit: ExitSignedOut, err: err}
+		}
+		return err
 	}
 
 	sources := app.agents.With[agents.HistorySource]()
@@ -141,7 +184,10 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, r
 	}
 
 	var progress func(history.ProgressEvent)
-	if !asJSON && !dryRun {
+	if stream != nil {
+		stream.start(dryRun, since, activeWindow, app.agents)
+		progress = stream.progress
+	} else if !asJSON && !dryRun {
 		errOut := cmd.ErrOrStderr()
 		progress = func(ev history.ProgressEvent) {
 			renderHistoryProgress(errOut, ev)
@@ -186,18 +232,22 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, r
 			}
 			return ""
 		},
-		TeamLabel:   func(team routing.Team) string { return teamLabel(names, team) },
-		Since:       since,
-		DryRun:      dryRun,
-		RetryFailed: retryFailed,
-		Progress:    progress,
+		TeamLabel:    func(team routing.Team) string { return teamLabel(names, team) },
+		Since:        since,
+		ActiveWindow: &activeWindow,
+		DryRun:       dryRun,
+		RetryFailed:  retryFailed,
+		Progress:     progress,
 	})
 
-	if asJSON {
+	switch {
+	case stream != nil:
+		stream.summary(sum)
+	case asJSON:
 		if err := output.Render(cmd.OutOrStdout(), output.FormatJSON, output.Table{}, sum); err != nil {
 			return err
 		}
-	} else {
+	default:
 		renderHistorySummary(cmd.OutOrStdout(), sum)
 	}
 
@@ -206,7 +256,10 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, r
 			return uploadErr
 		}
 		if _, ok := errors.AsType[*history.SignInRetiredError](uploadErr); ok {
-			return auth.ErrSignInRetired
+			return &historyError{code: historyErrSignedOut, exit: ExitSignedOut, err: auth.ErrSignInRetired}
+		}
+		if errors.Is(uploadErr, history.ErrUploadRunning) {
+			return &historyError{code: historyErrUploadRunning, exit: ExitUploadRunning, err: uploadErr}
 		}
 		return uploadErr
 	}
@@ -254,6 +307,20 @@ func hasNewHistoryFailures(sum history.Summary) bool {
 	return false
 }
 
+// parseHistoryWindow reads a window as a number of days (90d) or a Go duration (48h, 30m,
+// 0). ok is false when spec is neither.
+func parseHistoryWindow(spec string) (d time.Duration, ok bool) {
+	if days, found := strings.CutSuffix(spec, "d"); found && days != "" {
+		n, err := strconv.Atoi(days)
+		if err != nil {
+			return 0, false
+		}
+		return time.Duration(n) * 24 * time.Hour, true
+	}
+	d, err := time.ParseDuration(spec)
+	return d, err == nil
+}
+
 // parseHistorySince parses --since as a positive relative window (e.g. 90d, 24h) or an
 // absolute date/timestamp (2006-01-02 or RFC3339).
 func parseHistorySince(spec string, now time.Time) (time.Time, error) {
@@ -261,16 +328,9 @@ func parseHistorySince(spec string, now time.Time) (time.Time, error) {
 	if s == "" {
 		return time.Time{}, errors.New("--since cannot be empty")
 	}
-	if strings.HasSuffix(s, "d") && len(s) > 1 {
-		days, err := strconv.Atoi(s[:len(s)-1])
-		if err != nil || days <= 0 {
-			return time.Time{}, fmt.Errorf("invalid --since %q: expected a positive number of days (e.g. 90d)", spec)
-		}
-		return now.Add(-time.Duration(days) * 24 * time.Hour), nil
-	}
-	if d, err := time.ParseDuration(s); err == nil {
+	if d, ok := parseHistoryWindow(s); ok {
 		if d <= 0 {
-			return time.Time{}, fmt.Errorf("invalid --since %q: duration must be positive", spec)
+			return time.Time{}, fmt.Errorf("invalid --since %q: the window must be positive", spec)
 		}
 		return now.Add(-d), nil
 	}
@@ -281,6 +341,18 @@ func parseHistorySince(spec string, now time.Time) (time.Time, error) {
 		return t.UTC(), nil
 	}
 	return time.Time{}, fmt.Errorf("invalid --since %q: use a duration like 90d or 48h, or a date like 2026-08-01", spec)
+}
+
+// parseHistoryActiveWindow parses --active-window as a window of zero or more (1h, 30m, 0).
+func parseHistoryActiveWindow(spec string) (time.Duration, error) {
+	d, ok := parseHistoryWindow(strings.TrimSpace(spec))
+	switch {
+	case !ok:
+		return 0, fmt.Errorf("invalid --active-window %q: use a duration like 1h or 30m, or 0 to skip none", spec)
+	case d < 0:
+		return 0, fmt.Errorf("invalid --active-window %q: the window cannot be negative", spec)
+	}
+	return d, nil
 }
 
 func renderHistoryProgress(w io.Writer, ev history.ProgressEvent) {

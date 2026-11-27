@@ -47,7 +47,45 @@ func TestParseHistorySince(t *testing.T) {
 	}
 }
 
-func TestHistoryUploadCLIDryRunAndEndToEndBothHarnesses(t *testing.T) {
+// historyFixture is a signed-in machine with two teams in two organizations, a Claude Code
+// session in team A's repository and a Codex session in team B's, both four hours old, and
+// a fake API that holds nothing and records what it is sent.
+type historyFixture struct {
+	stateDir string
+	srv      *httptest.Server
+	ccPath   string
+	cxPath   string
+	account  string
+	mu       sync.Mutex
+	holdings int
+	received map[string][]*logspb.LogsData
+	// held, holdingsStatus and logsStatus, by team, change what the fake API answers.
+	held           map[string][]map[string]any
+	holdingsStatus map[string]int
+	logsStatus     map[string]int
+}
+
+// answer sets what the fake API answers from now on.
+func (f *historyFixture) answer(set func(f *historyFixture)) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	set(f)
+}
+
+func (f *historyFixture) holdingsCalls() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.holdings
+}
+
+func (f *historyFixture) receivedBy(project string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.received[project])
+}
+
+func newHistoryFixture(t *testing.T) *historyFixture {
+	t.Helper()
 	// Sandboxed config/state/agent directories.
 	cfgDir := t.TempDir()
 	stateDir := t.TempDir()
@@ -74,20 +112,27 @@ func TestHistoryUploadCLIDryRunAndEndToEndBothHarnesses(t *testing.T) {
 		}
 	}
 
-	var mu sync.Mutex
-	var holdingsCalls int
-	receivedByProject := map[string][]*logspb.LogsData{}
+	fx := &historyFixture{stateDir: stateDir, received: map[string][]*logspb.LogsData{}}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v1/ai/sessions":
-			mu.Lock()
-			holdingsCalls++
-			mu.Unlock()
+			proj := r.Header.Get(sendas.ProjectHeader)
+			fx.mu.Lock()
+			fx.holdings++
+			status, held := fx.holdingsStatus[proj], fx.held[proj]
+			fx.mu.Unlock()
+			if status != 0 {
+				w.WriteHeader(status)
+				return
+			}
+			if held == nil {
+				held = []map[string]any{}
+			}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]any{
-				"project_id": r.Header.Get(sendas.ProjectHeader),
-				"sessions":   []any{},
+				"project_id": proj,
+				"sessions":   held,
 				"pagination": map[string]any{"page": 1, "per_page": 200, "total": 0, "total_pages": 1},
 			})
 		case "/v1/logs":
@@ -98,15 +143,23 @@ func TestHistoryUploadCLIDryRunAndEndToEndBothHarnesses(t *testing.T) {
 				return
 			}
 			proj := r.Header.Get(sendas.ProjectHeader)
-			mu.Lock()
-			receivedByProject[proj] = append(receivedByProject[proj], &logs)
-			mu.Unlock()
+			fx.mu.Lock()
+			status := fx.logsStatus[proj]
+			if status == 0 {
+				fx.received[proj] = append(fx.received[proj], &logs)
+			}
+			fx.mu.Unlock()
+			if status != 0 {
+				http.Error(w, "refused", status)
+				return
+			}
 			w.WriteHeader(http.StatusOK)
 		default:
 			http.NotFound(w, r)
 		}
 	}))
-	defer srv.Close()
+	t.Cleanup(srv.Close)
+	fx.srv = srv
 
 	t.Setenv("TERMA_API_URL", srv.URL)
 	t.Setenv("TERMA_AUTH_URL", srv.URL)
@@ -177,6 +230,13 @@ func TestHistoryUploadCLIDryRunAndEndToEndBothHarnesses(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = os.Chtimes(cxPath, oldTime, oldTime)
+	fx.ccPath, fx.cxPath, fx.account = ccPath, cxPath, cred.Account()
+	return fx
+}
+
+func TestHistoryUploadCLIDryRunAndEndToEndBothHarnesses(t *testing.T) {
+	fx := newHistoryFixture(t)
+	stateDir := fx.stateDir
 
 	// 1. Dry-run JSON: lists both teams, zero network calls, zero state writes.
 	out, _, err := termaRun{}.exec(t, "history", "upload", "--dry-run", "-o", "json")
@@ -190,8 +250,8 @@ func TestHistoryUploadCLIDryRunAndEndToEndBothHarnesses(t *testing.T) {
 	if !drySum.DryRun || len(drySum.Planned) != 2 {
 		t.Fatalf("dry-run planned = %+v, want 2 routes", drySum)
 	}
-	if holdingsCalls != 0 || len(receivedByProject) != 0 {
-		t.Fatalf("dry-run touched network: holdings=%d otlp=%d", holdingsCalls, len(receivedByProject))
+	if fx.holdingsCalls() != 0 || fx.receivedBy("team-a")+fx.receivedBy("team-b") != 0 {
+		t.Fatalf("dry-run touched network: holdings=%d", fx.holdingsCalls())
 	}
 	if _, err := os.Stat(filepath.Join(stateDir, history.Dir)); !os.IsNotExist(err) {
 		t.Fatalf("dry-run wrote state dir: %v", err)
@@ -205,14 +265,14 @@ func TestHistoryUploadCLIDryRunAndEndToEndBothHarnesses(t *testing.T) {
 	if !strings.Contains(out, "Sent: 2 session(s)") {
 		t.Errorf("unexpected upload summary:\n%s", out)
 	}
-	if holdingsCalls != 2 {
-		t.Errorf("holdingsCalls = %d, want 2 (once per destination team)", holdingsCalls)
+	if fx.holdingsCalls() != 2 {
+		t.Errorf("holdingsCalls = %d, want 2 (once per destination team)", fx.holdingsCalls())
 	}
-	if len(receivedByProject["team-a"]) != 1 || len(receivedByProject["team-b"]) != 1 {
-		t.Fatalf("receivedByProject counts: team-a=%d team-b=%d, want 1/1", len(receivedByProject["team-a"]), len(receivedByProject["team-b"]))
+	if fx.receivedBy("team-a") != 1 || fx.receivedBy("team-b") != 1 {
+		t.Fatalf("receivedByProject counts: team-a=%d team-b=%d, want 1/1", fx.receivedBy("team-a"), fx.receivedBy("team-b"))
 	}
 	// Verify historical marker on every uploaded record.
-	for proj, batches := range receivedByProject {
+	for proj, batches := range fx.received {
 		for _, b := range batches {
 			for _, rl := range b.ResourceLogs {
 				for _, sl := range rl.ScopeLogs {
@@ -233,13 +293,13 @@ func TestHistoryUploadCLIDryRunAndEndToEndBothHarnesses(t *testing.T) {
 	}
 
 	// 3. Repeat run: sends nothing (0 new OTLP requests, 0 new holdings requests).
-	prevHoldings := holdingsCalls
+	prevHoldings := fx.holdingsCalls()
 	out, _, err = termaRun{}.exec(t, "history", "upload")
 	if err != nil {
 		t.Fatalf("repeat upload failed: %v\n%s", err, out)
 	}
-	if holdingsCalls != prevHoldings || len(receivedByProject["team-a"]) != 1 || len(receivedByProject["team-b"]) != 1 {
-		t.Fatalf("repeat run sent unexpected requests: holdings=%d->%d", prevHoldings, holdingsCalls)
+	if fx.holdingsCalls() != prevHoldings || fx.receivedBy("team-a") != 1 || fx.receivedBy("team-b") != 1 {
+		t.Fatalf("repeat run sent unexpected requests: holdings=%d->%d", prevHoldings, fx.holdingsCalls())
 	}
 	if !strings.Contains(out, "Sent: 0 session(s)") || !strings.Contains(out, "already_done=2") {
 		t.Errorf("repeat run summary unexpected:\n%s", out)
