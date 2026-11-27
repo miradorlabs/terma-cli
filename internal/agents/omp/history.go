@@ -225,8 +225,12 @@ func findOmpSubagents(ctx context.Context, parentPath, stemDir string) (paths, w
 			if ent.IsDir() || ent.Type()&os.ModeSymlink != 0 || !strings.HasSuffix(ent.Name(), ".jsonl") {
 				continue
 			}
-			jsonStems[strings.TrimSuffix(ent.Name(), ".jsonl")] = true
 			subPath := filepath.Join(curDir, ent.Name())
+			if strings.EqualFold(ent.Name(), "changes.jsonl") {
+				seenWatch = append(seenWatch, subPath)
+				continue
+			}
+			jsonStems[strings.TrimSuffix(ent.Name(), ".jsonl")] = true
 			info, err := ent.Info()
 			if err != nil {
 				if !errors.Is(err, fs.ErrNotExist) && readErr == "" {
@@ -301,7 +305,7 @@ func findOrphanOmpSubagents(ctx context.Context, expectedParent, dir, missingPar
 		if ctx.Err() != nil {
 			return out
 		}
-		if ent.IsDir() || ent.Type()&os.ModeSymlink != 0 || !strings.HasSuffix(ent.Name(), ".jsonl") {
+		if ent.IsDir() || ent.Type()&os.ModeSymlink != 0 || !strings.HasSuffix(ent.Name(), ".jsonl") || strings.EqualFold(ent.Name(), "changes.jsonl") {
 			continue
 		}
 		subPath := filepath.Join(dir, ent.Name())
@@ -390,18 +394,13 @@ func (Agent) ReadHistory(ctx context.Context, file agents.HistoryFile, opts agen
 			return err
 		}
 		parentPath := filepath.Dir(subPath) + ".jsonl"
-		parentID := pathToID[filepath.Clean(parentPath)]
-		if parentID == "" {
-			parentID = ompSessionIDFromFilename(filepath.Base(parentPath))
-		}
+		parentID := cmp.Or(pathToID[filepath.Clean(parentPath)], ompSessionIDFromFilename(filepath.Base(parentPath)))
 		if parentID == "" {
 			if hdr, err := peekOmpSessionHeader(parentPath); err == nil && session.ValidID(hdr.ID) {
 				parentID = hdr.ID
 			}
 		}
-		if parentID == "" {
-			parentID = file.SessionID
-		}
+		parentID = cmp.Or(parentID, file.SessionID)
 		agentID := strings.TrimSuffix(filepath.Base(subPath), ".jsonl")
 		if err := p.readFile(ctx, subPath, "", parentID, agentID, true); err != nil {
 			return err

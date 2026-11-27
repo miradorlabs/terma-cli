@@ -433,7 +433,7 @@ func dirHasJSONLOrErr(ctx context.Context, dir string, depth int) bool {
 			}
 			continue
 		}
-		if strings.HasSuffix(ent.Name(), ".jsonl") {
+		if strings.HasSuffix(ent.Name(), ".jsonl") && !strings.EqualFold(ent.Name(), "changes.jsonl") {
 			return true
 		}
 	}

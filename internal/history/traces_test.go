@@ -1185,3 +1185,121 @@ func TestFamilyCutoffSharesCacheForBidirectionalFamily(t *testing.T) {
 		t.Errorf("ReadHistory calls = %d for %d bidirectional members, want %d (shared cache)", src.reads, len(files), len(files))
 	}
 }
+
+func TestUploadOmpWithChangesJournalSidecar(t *testing.T) {
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	oldTime := now.Add(-2 * time.Hour)
+	repoA := initTestGitRepo(t, "https://github.com/org-a/repo-a.git")
+	agentDir := t.TempDir()
+	t.Setenv("PI_CODING_AGENT_DIR", agentDir)
+	projDir := filepath.Join(agentDir, "sessions", "--repo-a--")
+	if err := os.MkdirAll(projDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeAged := func(rel, content string) {
+		full := filepath.Join(projDir, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(full, oldTime, oldTime); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	makeSess := func(id, reply string) string {
+		return strings.Join([]string{
+			`{"type":"session","version":3,"id":"` + id + `","timestamp":"2026-11-23T10:00:00Z","cwd":` + mustJSONTest(repoA) + `}`,
+			`{"type":"message","id":"u1","timestamp":"2026-11-23T10:00:01Z","message":{"role":"user","content":"edit file","timestamp":1795428001000}}`,
+			`{"type":"message","id":"a1","timestamp":"2026-11-23T10:00:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","duration":100,"timestamp":1795428001900,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"` + reply + `"}]}}`,
+		}, "\n") + "\n"
+	}
+
+	// 1. Session with normal OMP changes.jsonl sidecar.
+	writeAged("2026-11-23T10-00-00-000Z_s-journal.jsonl", makeSess("s-journal", "UPLOADED-WITH-CHANGES-JOURNAL"))
+	writeAged(filepath.Join("2026-11-23T10-00-00-000Z_s-journal", "changes.jsonl"),
+		"{\"type\":\"change\",\"path\":\"main.go\"}\n{\"type\":\"commit\",\"sha\":\"deadbeef\"}\n")
+
+	// 2. Session with oversized (> 1 MiB first line) changes.jsonl sidecar.
+	writeAged("2026-11-23T09-00-00-000Z_s-big-journal.jsonl", makeSess("s-big-journal", "UPLOADED-WITH-BIG-CHANGES-JOURNAL"))
+	writeAged(filepath.Join("2026-11-23T09-00-00-000Z_s-big-journal", "changes.jsonl"),
+		`{"type":"change","diff":"`+strings.Repeat("D", (1<<20)+64)+`"}`+"\n")
+
+	// 3. Session with freshly-started incomplete subagent transcript (must still skip as active).
+	writeAged("2026-11-23T08-00-00-000Z_s-incomplete-sub.jsonl", makeSess("s-incomplete-sub", "MUST-SKIP-INCOMPLETE-SUBAGENT"))
+	writeAged(filepath.Join("2026-11-23T08-00-00-000Z_s-incomplete-sub", "0-worker.jsonl"), "")
+
+	st := singleTeamRoutingState(now, "acc1", "org-a", "team-a", "github.com/org-a/repo-a", true, true)
+	reg := builtin.Agents("")
+	var ompSrc agents.HistorySource
+	for _, s := range reg.With[agents.HistorySource]() {
+		if s.SourceSystem() == "omp" {
+			ompSrc = s
+			break
+		}
+	}
+
+	// Verify --dry-run reports 2 sessions ready and 1 skipped as active.
+	drySum, err := Upload(context.Background(), Options{
+		StateDir: t.TempDir(), Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "0.4.0-test",
+		State: st, Sources: []agents.HistorySource{ompSrc}, Filter: relay.NewContentFilter(reg.With[shape.Capturer]()),
+		Holdings: stubHoldings{}, DryRun: true, Now: func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plannedSessions := 0
+	for _, p := range drySum.Planned {
+		plannedSessions += p.Sessions
+	}
+	if plannedSessions != 2 || drySum.SkippedSessions[SkipActive] != 1 {
+		t.Fatalf("dry-run summary = {Planned:%d Skipped:%v}, want Planned=2 Skipped[active]=1", plannedSessions, drySum.SkippedSessions)
+	}
+
+	// Verify real upload sends both changes.jsonl sessions and skips the incomplete-subagent session.
+	var mu sync.Mutex
+	var payloads [][]byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		payloads = append(payloads, b)
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	sum, err := Upload(context.Background(), Options{
+		StateDir: t.TempDir(), Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "0.4.0-test",
+		State: st, Sources: []agents.HistorySource{ompSrc}, Filter: relay.NewContentFilter(reg.With[shape.Capturer]()),
+		Holdings: stubHoldings{},
+		Transport: &Transport{
+			Version: "0.4.0-test", HTTP: srv.Client(), SignIn: &fakeSignIn{account: "acc1", tokens: []string{"tok1"}}, BytesPerSec: 1 << 30,
+		},
+		EndpointFor: func(string) string { return srv.URL },
+		Now:         func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.SentSessions != 2 || sum.SkippedSessions[SkipActive] != 1 {
+		t.Fatalf("upload summary = {SentSessions:%d Skipped:%v}, want SentSessions=2 Skipped[active]=1", sum.SentSessions, sum.SkippedSessions)
+	}
+	var foundNormal, foundBig bool
+	for _, b := range payloads {
+		s := string(b)
+		if strings.Contains(s, "MUST-SKIP-INCOMPLETE-SUBAGENT") {
+			t.Fatalf("incomplete subagent session must not upload: %q", s)
+		}
+		if strings.Contains(s, "UPLOADED-WITH-CHANGES-JOURNAL") {
+			foundNormal = true
+		}
+		if strings.Contains(s, "UPLOADED-WITH-BIG-CHANGES-JOURNAL") {
+			foundBig = true
+		}
+	}
+	if !foundNormal || !foundBig {
+		t.Errorf("missing expected uploaded sessions: normal=%v big=%v", foundNormal, foundBig)
+	}
+}

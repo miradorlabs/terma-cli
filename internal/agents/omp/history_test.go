@@ -809,6 +809,87 @@ func TestOmpRound6SecurityRegressions(t *testing.T) {
 	}
 }
 
+func TestOmpChangesJournalSidecar(t *testing.T) {
+	agentDir := t.TempDir()
+	t.Setenv("PI_CODING_AGENT_DIR", agentDir)
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	oldTime := now.Add(-2 * time.Hour)
+
+	projDir := filepath.Join(agentDir, "sessions", "--work-repo--")
+	if err := os.MkdirAll(projDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeAged := func(rel, content string, mt time.Time) string {
+		full := filepath.Join(projDir, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(full, mt, mt); err != nil {
+			t.Fatal(err)
+		}
+		return full
+	}
+
+	// 1. Normal session with <stem>/changes.jsonl (no session header) + orphan subdir holding only changes.jsonl.
+	writeAged("2026-11-23T10-00-00-000Z_s-changes.jsonl",
+		`{"type":"session","version":3,"id":"s-changes","timestamp":"2026-11-23T10:00:00Z","cwd":"/work/repo"}`+"\n", oldTime)
+	changesPath := writeAged(filepath.Join("2026-11-23T10-00-00-000Z_s-changes", "changes.jsonl"),
+		"{\"type\":\"change\",\"path\":\"a.go\"}\n{\"type\":\"commit\",\"sha\":\"abc\"}\n", now)
+	writeAged(filepath.Join("2026-11-23T10-00-00-000Z_s-changes", "0-deleted-sub", "changes.jsonl"),
+		"{\"type\":\"change\",\"path\":\"b.go\"}\n", oldTime)
+
+	// 2. Session with oversized (> 1 MiB first line) changes.jsonl must not trigger CompanionReadError.
+	writeAged("2026-11-23T09-00-00-000Z_s-big-changes.jsonl",
+		`{"type":"session","version":3,"id":"s-big-changes","timestamp":"2026-11-23T09:00:00Z","cwd":"/work/repo"}`+"\n", oldTime)
+	bigChangesPath := writeAged(filepath.Join("2026-11-23T09-00-00-000Z_s-big-changes", "changes.jsonl"),
+		`{"type":"change","diff":"`+strings.Repeat("X", (1<<20)+64)+`"}`+"\n", oldTime)
+
+	// 3. Session with freshly-started incomplete subagent transcript (not changes.jsonl) must NOT be exempted.
+	writeAged("2026-11-23T08-00-00-000Z_s-starting.jsonl",
+		`{"type":"session","version":3,"id":"s-starting","timestamp":"2026-11-23T08:00:00Z","cwd":"/work/repo"}`+"\n", oldTime)
+	startingSub := writeAged(filepath.Join("2026-11-23T08-00-00-000Z_s-starting", "1-starting.jsonl"),
+		`{"type":"session","id":`, oldTime)
+
+	files, err := (Agent{}).DiscoverHistory(context.Background(), agents.HistoryDiscoverOptions{Now: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	byID := map[string]agents.HistoryFile{}
+	for _, f := range files {
+		byID[f.SessionID] = f
+	}
+
+	sc := byID["s-changes"]
+	if !slices.Contains(sc.SeenWatchFiles, changesPath) {
+		t.Errorf("s-changes SeenWatchFiles = %v, want %q", sc.SeenWatchFiles, changesPath)
+	}
+	if len(sc.ExtraPaths) != 0 {
+		t.Errorf("s-changes ExtraPaths = %v, want empty", sc.ExtraPaths)
+	}
+	if sc.CompanionReadError != "" {
+		t.Errorf("s-changes CompanionReadError = %q, want empty", sc.CompanionReadError)
+	}
+	if sc.Active {
+		t.Errorf("s-changes Active = true; changes.jsonl mtime should not mark session active")
+	}
+
+	sb := byID["s-big-changes"]
+	if !slices.Contains(sb.SeenWatchFiles, bigChangesPath) {
+		t.Errorf("s-big-changes SeenWatchFiles = %v, want %q", sb.SeenWatchFiles, bigChangesPath)
+	}
+	if sb.CompanionReadError != "" {
+		t.Errorf("s-big-changes CompanionReadError = %q, want empty", sb.CompanionReadError)
+	}
+
+	ss := byID["s-starting"]
+	if slices.Contains(ss.SeenWatchFiles, startingSub) || slices.Contains(ss.ExtraPaths, startingSub) {
+		t.Errorf("incomplete subagent %q must remain un-exempted: seen=%v extra=%v", startingSub, ss.SeenWatchFiles, ss.ExtraPaths)
+	}
+}
+
 func mustJSON(v any) string {
 	b, _ := json.Marshal(v)
 	return string(b)
