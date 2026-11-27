@@ -14,7 +14,7 @@
     "last_change": {
       "from": "1.0.116",
       "to": "1.0.117",
-      "at": "2026-11-27T13:21:17.320026454Z",
+      "at": "2026-11-27T19:32:17.835020071Z",
       "released_at": "2026-11-27T13:04:16.464Z",
       "changes": 16,
       "categories": {
@@ -28,7 +28,7 @@
     {
       "version": "1.0.117",
       "released_at": "2026-11-27T13:04:16.464Z",
-      "captured_at": "2026-11-27T13:21:17.320026454Z",
+      "captured_at": "2026-11-27T19:32:17.835020071Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -54,8 +54,8 @@
       ],
       "signing": "valid",
       "partial": true,
-      "attempted_at": "2026-11-27T13:21:17.320026454Z",
-      "attempts": 1
+      "attempted_at": "2026-11-27T19:32:17.835020071Z",
+      "attempts": 2
     },
     {
       "version": "1.0.116",
