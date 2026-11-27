@@ -2,8 +2,6 @@ package history
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -448,8 +446,7 @@ func TestOmpHistoryUploadEndToEndPolicyHoldingsMixedAndOutboxIsolation(t *testin
 	// Verify supplemental logs: terma.session.title withheld (prompts=false),
 	// terma.session.start (subagent) and terma.files.touched (normalized) delivered.
 	var gotStart, gotTouch bool
-	wantCheckoutSum := sha256.Sum256([]byte(repoA))
-	wantCheckoutID := hex.EncodeToString(wantCheckoutSum[:16])
+	wantCheckoutID := hookrun.CheckoutID(resolvedTestPath(t, repoA))
 	for _, lr := range logRecords {
 		switch lr.GetEventName() {
 		case semconv.TermaSessionTitleEvent:
@@ -662,7 +659,7 @@ func TestOmpCouncilEndToEndSecurityAndWorktreeAttribution(t *testing.T) {
 		t.Errorf("copied stale subagent caused SkipActive=%d, want 0", sum.SkippedSessions[SkipActive])
 	}
 	// s-wt must upload with terma.files.touched stamped to wtDir's CheckoutID (not repoA's).
-	wantWTID := hookrun.CheckoutID(wtDir)
+	wantWTID := hookrun.CheckoutID(resolvedTestPath(t, wtDir))
 	foundWTTouch := false
 	for _, lr := range logRecords {
 		if lr.GetEventName() == semconv.TermaSessionStartEvent && logRecordAttrString(lr, semconv.SessionIDKey) == "s-cross-child" {
@@ -1301,5 +1298,188 @@ func TestUploadOmpWithChangesJournalSidecar(t *testing.T) {
 	}
 	if !foundNormal || !foundBig {
 		t.Errorf("missing expected uploaded sessions: normal=%v big=%v", foundNormal, foundBig)
+	}
+}
+
+func resolvedTestPath(t *testing.T, p string) string {
+	t.Helper()
+	if realPath, err := filepath.EvalSymlinks(p); err == nil {
+		return realPath
+	}
+	return p
+}
+
+func TestUploadOmpEvalAndEmbeddedPathGlobs(t *testing.T) {
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	oldTime := now.Add(-2 * time.Hour)
+
+	parentRoot := t.TempDir()
+	repoA := filepath.Join(parentRoot, "repo-a")
+	repoB := filepath.Join(parentRoot, "org-b")
+	nestedB := filepath.Join(repoA, "nested-org-b")
+	safeDir := filepath.Join(repoA, "safe")
+
+	// Also create a non-git workspace (routed to Personal) containing nested Org B checkouts
+	// and a clean subdir, so **/*.txt and sub/*.txt exercise sc.below nested-checkout walking.
+	wsRoot := t.TempDir()
+	wsOrgB := filepath.Join(wsRoot, "org-b")
+	wsSubOrgB := filepath.Join(wsRoot, "sub", "org-b")
+	wsSafe := filepath.Join(wsRoot, "safe")
+
+	initRepoAt := func(dir, remote string) {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for _, args := range [][]string{
+			{"init", "-q"},
+			{"remote", "add", "origin", remote},
+		} {
+			cmd := exec.Command("git", args...)
+			cmd.Dir = dir
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("git %v in %s: %v\n%s", args, dir, err, out)
+			}
+		}
+	}
+	initRepoAt(repoA, "https://github.com/org-a/repo-a.git")
+	initRepoAt(repoB, "https://github.com/org-b/repo-b.git")
+	initRepoAt(nestedB, "https://github.com/org-b/nested-b.git")
+	initRepoAt(wsOrgB, "https://github.com/org-b/ws-b.git")
+	initRepoAt(wsSubOrgB, "https://github.com/org-b/ws-sub-b.git")
+	for _, d := range []string{safeDir, wsSafe} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, f := range []string{
+		filepath.Join(repoB, "secret.txt"),
+		filepath.Join(nestedB, "secret.txt"),
+		filepath.Join(safeDir, "ok.txt"),
+		filepath.Join(wsOrgB, "secret.txt"),
+		filepath.Join(wsSubOrgB, "secret.txt"),
+		filepath.Join(wsSafe, "ok.txt"),
+	} {
+		if err := os.WriteFile(f, []byte("data\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	agentDir := t.TempDir()
+	t.Setenv("PI_CODING_AGENT_DIR", agentDir)
+	projDir := filepath.Join(agentDir, "sessions", "--repo-a--")
+	if err := os.MkdirAll(projDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeAged := func(name, content string) {
+		full := filepath.Join(projDir, name)
+		if err := os.WriteFile(full, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(full, oldTime, oldTime); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// 1. OMP eval reading an Org B file via Python code must trigger Mixed cutoff at eval time,
+	// preserving pre-eval Org A turn while dropping eval result and post-eval reply.
+	writeAged("2026-11-23T10-00-00-000Z_s-eval.jsonl", strings.Join([]string{
+		`{"type":"session","version":3,"id":"s-eval","timestamp":"2026-11-23T10:00:00Z","cwd":` + mustJSONTest(repoA) + `}`,
+		`{"type":"message","id":"eu0","timestamp":"2026-11-23T10:00:01Z","message":{"role":"user","content":"clean first turn","timestamp":1795428001000}}`,
+		`{"type":"message","id":"ea0","timestamp":"2026-11-23T10:00:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","duration":100,"timestamp":1795428001900,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"CLEAN-PRE-EVAL-TURN"}]}}`,
+		`{"type":"message","id":"eu1","timestamp":"2026-11-23T10:00:05Z","message":{"role":"user","content":"run eval","timestamp":1795428005000}}`,
+		`{"type":"message","id":"ea1","timestamp":"2026-11-23T10:00:06Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","duration":100,"timestamp":1795428005900,"usage":{"input":5,"output":5},"content":[{"type":"toolCall","id":"ev1","name":"eval","arguments":{"language":"py","code":` + mustJSONTest("print(open("+mustJSONTest(filepath.Join(repoB, "secret.txt"))+").read())") + `}}]}}`,
+		`{"type":"message","id":"etr1","timestamp":"2026-11-23T10:00:07Z","message":{"role":"toolResult","toolCallId":"ev1","toolName":"eval","content":[{"type":"text","text":"LEAKED-EVAL-RESULT"}],"isError":false,"timestamp":1795428007000}}`,
+		`{"type":"message","id":"ea2","timestamp":"2026-11-23T10:00:08Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","duration":100,"timestamp":1795428007900,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"LEAKED-EVAL-REPLY"}]}}`,
+	}, "\n")+"\n")
+
+	// 2. grep with embedded wildcards reaching nested/sibling Org B checkouts must withhold.
+	makeGrep := func(id, cwdDir, searchPath, marker string) string {
+		return strings.Join([]string{
+			`{"type":"session","version":3,"id":"` + id + `","timestamp":"2026-11-23T09:00:00Z","cwd":` + mustJSONTest(cwdDir) + `}`,
+			`{"type":"message","id":"u1","timestamp":"2026-11-23T09:00:01Z","message":{"role":"user","content":"search","timestamp":1795424401000}}`,
+			`{"type":"message","id":"a1","timestamp":"2026-11-23T09:00:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","duration":100,"timestamp":1795424401900,"usage":{"input":5,"output":5},"content":[{"type":"toolCall","id":"g1","name":"grep","arguments":{"pattern":"data","path":` + mustJSONTest(searchPath) + `}}]}}`,
+			`{"type":"message","id":"tr1","timestamp":"2026-11-23T09:00:03Z","message":{"role":"toolResult","toolCallId":"g1","toolName":"grep","content":[{"type":"text","text":"` + marker + `-RESULT"}],"isError":false,"timestamp":1795424403000}}`,
+			`{"type":"message","id":"a2","timestamp":"2026-11-23T09:00:04Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","duration":100,"timestamp":1795424403900,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"` + marker + `-REPLY"}]}}`,
+		}, "\n") + "\n"
+	}
+	// From Org A repo: parent traversal wildcard, direct sibling wildcard, and direct nested-repo wildcard.
+	writeAged("2026-11-23T09-00-00-000Z_s-glob-parent.jsonl", makeGrep("s-glob-parent", repoA, "../**/*.txt", "LEAKED-PARENT-GLOB"))
+	writeAged("2026-11-23T08-30-00-000Z_s-glob-nested.jsonl", makeGrep("s-glob-nested", repoA, "nested-org-b/*.txt", "LEAKED-NESTED-GLOB"))
+	writeAged("2026-11-23T08-00-00-000Z_s-glob-relb.jsonl", makeGrep("s-glob-relb", repoA, "../org-b/*.txt", "LEAKED-RELB"))
+	// From non-git Personal workspace: root wildcard and subdir wildcard over nested Org B checkouts.
+	writeAged("2026-11-23T07-30-00-000Z_s-ws-starstar.jsonl", makeGrep("s-ws-starstar", wsRoot, "**/*.txt", "LEAKED-WS-STARSTAR"))
+	writeAged("2026-11-23T07-00-00-000Z_s-ws-sub.jsonl", makeGrep("s-ws-sub", wsRoot, "sub/*.txt", "LEAKED-WS-SUB"))
+
+	// 3. Wildcard scoped strictly to a clean subdir must NOT false-positive despite sibling Org B checkouts.
+	writeAged("2026-11-23T06-30-00-000Z_s-glob-safe.jsonl", makeGrep("s-glob-safe", repoA, "safe/*.txt", "CLEAN-SAFE-SUBDIR-GLOB"))
+	writeAged("2026-11-23T06-00-00-000Z_s-ws-safe.jsonl", makeGrep("s-ws-safe", wsRoot, "safe/*.txt", "CLEAN-WS-SAFE-GLOB"))
+
+	stA := singleTeamRoutingState(now, "acc1", "org-a", "team-a", "github.com/org-a/repo-a", true, true)
+	stB := singleTeamRoutingState(now, "acc1", "org-b", "team-b", "github.com/org-b/repo-b", true, true)
+	stP := singleTeamRoutingState(now, "acc1", "org-personal", "team-personal", "", true, true)
+	stP.Teams[0].Personal = true
+	stP.Teams[0].Policy.Mode = "global"
+	stP.Teams[0].Policy.Repositories = nil
+	st := stA
+	st.Teams = append(st.Teams, stB.Teams...)
+	st.Teams[1].Policy.Repositories = append(st.Teams[1].Policy.Repositories, "github.com/org-b/nested-b", "github.com/org-b/ws-b", "github.com/org-b/ws-sub-b")
+	st.Teams = append(st.Teams, stP.Teams...)
+
+	reg := builtin.Agents("")
+	var ompSrc agents.HistorySource
+	for _, s := range reg.With[agents.HistorySource]() {
+		if s.SourceSystem() == "omp" {
+			ompSrc = s
+			break
+		}
+	}
+	var mu sync.Mutex
+	var payloads [][]byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		payloads = append(payloads, b)
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	_, err := Upload(context.Background(), Options{
+		StateDir: t.TempDir(), Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "0.4.0-test",
+		State: st, Sources: []agents.HistorySource{ompSrc}, Filter: relay.NewContentFilter(reg.With[shape.Capturer]()),
+		Holdings: stubHoldings{},
+		Transport: &Transport{
+			Version: "0.4.0-test", HTTP: srv.Client(), SignIn: &fakeSignIn{account: "acc1", tokens: []string{"tok1"}}, BytesPerSec: 1 << 30,
+		},
+		EndpointFor: func(string) string { return srv.URL },
+		Now:         func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var foundPreEval, foundSafeGlob, foundWsSafeGlob bool
+	for _, b := range payloads {
+		s := string(b)
+		if strings.Contains(s, "LEAKED-") {
+			t.Fatalf("leaked cross-org content in uploaded payload: %q", s)
+		}
+		if strings.Contains(s, "CLEAN-PRE-EVAL-TURN") {
+			foundPreEval = true
+		}
+		if strings.Contains(s, "CLEAN-SAFE-SUBDIR-GLOB-REPLY") {
+			foundSafeGlob = true
+		}
+		if strings.Contains(s, "CLEAN-WS-SAFE-GLOB-REPLY") {
+			foundWsSafeGlob = true
+		}
+	}
+	if !foundPreEval {
+		t.Errorf("pre-eval clean turn should still upload")
+	}
+	if !foundSafeGlob {
+		t.Errorf("safe/*.txt grep scoped strictly inside repoA should not false-positive")
+	}
+	if !foundWsSafeGlob {
+		t.Errorf("safe/*.txt grep scoped strictly inside wsRoot should not false-positive")
 	}
 }

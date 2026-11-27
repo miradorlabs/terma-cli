@@ -890,6 +890,67 @@ func TestOmpChangesJournalSidecar(t *testing.T) {
 	}
 }
 
+func TestOmpEvalFailClosedAndEmbeddedSearchGlobs(t *testing.T) {
+	cwd := t.TempDir()
+	hasUnknown := func(paths []string) bool {
+		return slices.ContainsFunc(paths, func(p string) bool { return strings.HasPrefix(p, "\x00unknown\x00") })
+	}
+
+	// 1. eval executes arbitrary Python/JS code and must always emit UnknownReach.
+	for _, raw := range []json.RawMessage{
+		json.RawMessage(`{"language":"py","code":"print(open('/work/org-b/secret.txt').read())"}`),
+		json.RawMessage(`{"language":"js","code":"console.log(1)"}`),
+		nil,
+		json.RawMessage(`{invalid`),
+	} {
+		got := ompToolCallReachPaths("eval", raw, cwd)
+		if !hasUnknown(got) {
+			t.Errorf("eval(%s) = %v, want UnknownReach", string(raw), got)
+		}
+	}
+
+	// 2. Embedded globs in search path/paths split to (baseDir, embeddedGlob) matching OMP's parseSearchPath.
+	if got := ompToolCallReachPaths("grep", json.RawMessage(`{"pattern":"x","path":"**/*.txt"}`), cwd); !slices.Contains(got, cwd) {
+		t.Errorf("grep path=**/*.txt = %v, want cwd %q so ExpandReachHistorical walks nested checkouts", got, cwd)
+	}
+	wantSafe := filepath.Join(cwd, "safe")
+	if got := ompToolCallReachPaths("grep", json.RawMessage(`{"pattern":"x","path":"safe/*.txt"}`), cwd); !slices.Equal(got, []string{wantSafe}) {
+		t.Errorf("grep path=safe/*.txt = %v, want [%q]", got, wantSafe)
+	}
+	wantSub := filepath.Join(cwd, "sub")
+	if got := ompToolCallReachPaths("grep", json.RawMessage(`{"pattern":"x","path":"sub/**/*.txt"}`), cwd); !slices.Equal(got, []string{wantSub}) {
+		t.Errorf("grep path=sub/**/*.txt = %v, want [%q]", got, wantSub)
+	}
+	wantRelB := filepath.Clean(filepath.Join(cwd, "..", "org-b"))
+	if got := ompToolCallReachPaths("grep", json.RawMessage(`{"pattern":"x","path":"../org-b/*.txt"}`), cwd); !slices.Contains(got, wantRelB) {
+		t.Errorf("grep path=../org-b/*.txt = %v, want %q", got, wantRelB)
+	}
+	if got := ompToolCallReachPaths("grep", json.RawMessage(`{"pattern":"x","path":"/abs/root/**/*.txt"}`), cwd); !slices.Contains(got, filepath.FromSlash("/abs/root")) {
+		t.Errorf("grep path=/abs/root/**/*.txt = %v, want /abs/root", got)
+	}
+	if got := ompToolCallReachPaths("grep", json.RawMessage(`{"pattern":"x","path":"{safe,../org-b}/*.txt"}`), cwd); !slices.Contains(got, wantRelB) {
+		t.Errorf("grep path={safe,../org-b}/*.txt = %v, want %q", got, wantRelB)
+	}
+	for _, failClosedPath := range []string{"/*/*.txt", "/**/*.txt", "{a,{b,c}}/*.txt"} {
+		raw := json.RawMessage(`{"pattern":"x","path":` + mustJSON(failClosedPath) + `}`)
+		if got := ompToolCallReachPaths("grep", raw, cwd); !hasUnknown(got) {
+			t.Errorf("grep path=%q = %v, want UnknownReach", failClosedPath, got)
+		}
+	}
+
+	// Literal directory/file containing glob metacharacters (e.g. apps/[id]/page.tsx) stays literal.
+	litFile := filepath.Join(cwd, "apps", "[id]", "page.tsx")
+	if err := os.MkdirAll(filepath.Dir(litFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(litFile, []byte("export default 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := ompToolCallReachPaths("grep", json.RawMessage(`{"pattern":"x","path":"apps/[id]/page.tsx"}`), cwd); !slices.Equal(got, []string{"apps/[id]/page.tsx"}) {
+		t.Errorf("literal existing path with brackets = %v, want [apps/[id]/page.tsx]", got)
+	}
+}
+
 func mustJSON(v any) string {
 	b, _ := json.Marshal(v)
 	return string(b)

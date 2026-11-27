@@ -79,10 +79,16 @@ type ompToolDetails struct {
 // without consulting the uploader's live shell environment, matching terma-omp.ts.
 func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string) []string {
 	if len(rawArgs) == 0 {
+		if toolName == "eval" {
+			return []string{hookrun.UnknownReach + "\x00eval"}
+		}
 		return nil
 	}
 	var in ompToolInput
 	if json.Unmarshal(rawArgs, &in) != nil {
+		if toolName == "eval" {
+			return []string{hookrun.UnknownReach + "\x00eval"}
+		}
 		return nil
 	}
 	var out []string
@@ -145,7 +151,19 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 			}
 		}
 		for _, d := range searchDirs() {
-			out = append(out, hookrun.SearchHistorical(d, globs...)...)
+			baseDir, embeddedGlob, unknown := parseOmpSearchPath(d, cwd)
+			if unknown {
+				out = append(out, hookrun.UnknownReach+"\x00"+d)
+				continue
+			}
+			if embeddedGlob != "" {
+				allGlobs := make([]string, 0, len(globs)+1)
+				allGlobs = append(allGlobs, embeddedGlob)
+				allGlobs = append(allGlobs, globs...)
+				out = append(out, hookrun.SearchHistorical(baseDir, allGlobs...)...)
+				continue
+			}
+			out = append(out, hookrun.SearchHistorical(baseDir, globs...)...)
 		}
 	}
 	switch toolName {
@@ -157,12 +175,7 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 	case "grep", "search", "ast_grep":
 		searchWithGlobs(cmp.Or(in.Glob, in.Include))
 	case "ast_edit":
-		for _, d := range searchDirs() {
-			out = append(out, hookrun.SearchHistorical(d)...)
-			if strings.ContainsAny(d, "*?[{") && cwd != "" {
-				out = append(out, hookrun.SearchHistorical(cwd, d)...)
-			}
-		}
+		searchWithGlobs("")
 	case "find", "glob":
 		searchWithGlobs(cmp.Or(in.Pattern, in.Glob))
 	case "ls":
@@ -182,6 +195,7 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 	case "eval":
 		addAlone(in.Filename)
 		addAlone(in.Cwd)
+		out = append(out, hookrun.UnknownReach+"\x00eval")
 	case "bash":
 		dir := cwd
 		if raw := strings.TrimSpace(in.Cwd); raw != "" {
@@ -221,6 +235,45 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 		}
 	}
 	return out
+}
+
+// parseOmpSearchPath mirrors OMP's parseSearchPathPreferringLiteral: when d contains glob
+// metacharacters (*, ?, [, {) and does not exist literally on disk, it splits d at the first
+// glob segment into (baseDir, embeddedGlob). Root-level globs (/*/*.txt, /**/*.txt, C:/*.txt)
+// return unknown=true so search reach fails closed immediately.
+func parseOmpSearchPath(d, cwd string) (baseDir, embeddedGlob string, unknown bool) {
+	if !strings.ContainsAny(d, "*?[{") || statReachExists(d, cwd) {
+		return d, "", false
+	}
+	slashed := filepath.ToSlash(d)
+	segs := strings.Split(slashed, "/")
+	firstGlob := slices.IndexFunc(segs, func(s string) bool { return strings.ContainsAny(s, "*?[{") })
+	if firstGlob < 0 {
+		return d, "", false
+	}
+	embeddedGlob = strings.Join(segs[firstGlob:], "/")
+	switch {
+	case firstGlob == 0:
+		baseDir = cmp.Or(cwd, ".")
+	case firstGlob == 1 && segs[0] == "":
+		return d, "", true
+	case firstGlob == 1 && len(segs[0]) == 2 && isASCIILetter(segs[0][0]) && segs[0][1] == ':':
+		return d, "", true
+	default:
+		baseDir = filepath.FromSlash(strings.Join(segs[:firstGlob], "/"))
+		if !isAbsToolPath(baseDir) && cwd != "" {
+			baseDir = filepath.Join(cwd, baseDir)
+		}
+		if isRootSearchDir(baseDir) {
+			return d, "", true
+		}
+	}
+	return baseDir, embeddedGlob, false
+}
+
+func isRootSearchDir(p string) bool {
+	c := filepath.ToSlash(filepath.Clean(p))
+	return c == "/" || (len(c) == 3 && isASCIILetter(c[0]) && c[1] == ':' && c[2] == '/')
 }
 
 // ompToolResultReachPaths extracts any resolved paths disclosed in a tool result's details.
