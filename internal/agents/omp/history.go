@@ -281,7 +281,7 @@ func findOmpSubagents(ctx context.Context, parentPath, parentID, stemDir string)
 				continue
 			}
 			orphanSubDir := filepath.Join(curDir, ent.Name())
-			if dirHasJSONLOrErr(ctx, orphanSubDir, depth+1) && readErr == "" {
+			if scanForTranscripts(ctx, orphanSubDir, depth+1, isOmpLocalDir(ent.Name(), jsonStems)) && readErr == "" {
 				readErr = orphanSubDir
 			}
 		}
@@ -361,7 +361,7 @@ func peekOmpSessionHeader(path string) (ompSessionHeader, error) {
 		}
 	}
 	if lr.N == 0 {
-		return ompSessionHeader{}, errors.New("omp session header exceeds 1 MiB")
+		return ompSessionHeader{}, errOmpHeaderTooLarge
 	}
 	return ompSessionHeader{}, nil
 }

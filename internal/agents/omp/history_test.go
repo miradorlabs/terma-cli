@@ -1174,3 +1174,84 @@ func spStrArr(sp *tracepb.Span, key string) []string {
 	}
 	return nil
 }
+
+// A sessions folder that moved keeps its subagents: their headers name the parent where it
+// used to be, and it is the same parent from the top-level transcript's name down. The
+// subagents OMP copied into a fork's folder name the original session and stay out.
+// OMP's local:// files, local://results.jsonl included, do not hold a session back, while a
+// session transcript left in that folder, or a task the model named "local", still counts.
+func TestOmpDiscoverHistoryRelocatedSessionsAndLocalFiles(t *testing.T) {
+	agentDir := t.TempDir()
+	t.Setenv("PI_CODING_AGENT_DIR", agentDir)
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	old := now.Add(-48 * time.Hour)
+	proj := filepath.Join(agentDir, "sessions", "--work-repo--")
+	write := func(rel, content string) string {
+		t.Helper()
+		full := filepath.Join(proj, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(full, old, old); err != nil {
+			t.Fatal(err)
+		}
+		return full
+	}
+	header := func(id, parent string) string {
+		return `{"type":"session","version":3,"id":"` + id + `","timestamp":"2026-11-20T10:00:00Z","cwd":"/work/repo","parentSession":` + mustJSON(parent) + `}` + "\n"
+	}
+	oldProj := "/Users/before/.omp/agent/sessions/--work-repo--/"
+
+	// Moved: the subagent and its own subagent name their parents under the old home.
+	write("2026-11-20T10-00-00-000Z_moved1.jsonl", `{"type":"session","version":3,"id":"moved1","timestamp":"2026-11-20T10:00:00Z","cwd":"/work/repo"}`+"\n")
+	sub := write(filepath.Join("2026-11-20T10-00-00-000Z_moved1", "0-explore.jsonl"), header("sub1", oldProj+"2026-11-20T10-00-00-000Z_moved1.jsonl"))
+	grand := write(filepath.Join("2026-11-20T10-00-00-000Z_moved1", "0-explore", "0-finder.jsonl"), header("grand1", oldProj+"2026-11-20T10-00-00-000Z_moved1/0-explore.jsonl"))
+	// A fork of it, whose folder holds OMP's copy of the original's subagent.
+	write("2026-11-21T10-00-00-000Z_fork1.jsonl", header("fork1", oldProj+"2026-11-20T10-00-00-000Z_moved1.jsonl"))
+	copied := write(filepath.Join("2026-11-21T10-00-00-000Z_fork1", "0-explore.jsonl"), header("sub1", oldProj+"2026-11-20T10-00-00-000Z_moved1.jsonl"))
+	// local:// files of a session and of its subagent.
+	write("2026-11-22T10-00-00-000Z_local1.jsonl", `{"type":"session","version":3,"id":"local1","timestamp":"2026-11-22T10:00:00Z","cwd":"/work/repo"}`+"\n")
+	write(filepath.Join("2026-11-22T10-00-00-000Z_local1", "local", "results.jsonl"), `{"row":1}`+"\n")
+	write(filepath.Join("2026-11-22T10-00-00-000Z_local1", "local", "mcp", "big.jsonl"), `{"blob":"`+strings.Repeat("x", 1<<20+10)+`"}`+"\n")
+	localSub := write(filepath.Join("2026-11-22T10-00-00-000Z_local1", "0-explore.jsonl"), header("lsub1", filepath.Join(proj, "2026-11-22T10-00-00-000Z_local1.jsonl")))
+	write(filepath.Join("2026-11-22T10-00-00-000Z_local1", "0-explore", "local", "notes.jsonl"), `{"note":1}`+"\n")
+	// A session transcript left in a local:// folder still holds its session back.
+	write("2026-11-23T10-00-00-000Z_local2.jsonl", `{"type":"session","version":3,"id":"local2","timestamp":"2026-11-23T10:00:00Z","cwd":"/work/repo"}`+"\n")
+	write(filepath.Join("2026-11-23T10-00-00-000Z_local2", "local", "0-gone.jsonl"), header("gone1", "/elsewhere/x.jsonl"))
+	// A task named "local" whose transcript was deleted leaves its subagent's transcript orphaned.
+	write("2026-11-24T10-00-00-000Z_local3.jsonl", `{"type":"session","version":3,"id":"local3","timestamp":"2026-11-24T10:00:00Z","cwd":"/work/repo"}`+"\n")
+	write(filepath.Join("2026-11-24T10-00-00-000Z_local3", "local", "0-kid.jsonl"), header("kid1", filepath.Join(proj, "2026-11-24T10-00-00-000Z_local3", "local.jsonl")))
+
+	files, err := Agent{}.DiscoverHistory(context.Background(), agents.HistoryDiscoverOptions{Now: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	by := map[string]agents.HistoryFile{}
+	for _, f := range files {
+		by[f.SessionID] = f
+	}
+	if f := by["moved1"]; !slices.Equal(f.ExtraPaths, []string{sub, grand}) || f.CompanionReadError != "" {
+		t.Errorf("moved1 extras = %v (error %q), want [%s %s]", f.ExtraPaths, f.CompanionReadError, sub, grand)
+	}
+	if f := by["fork1"]; len(f.ExtraPaths) != 0 || !slices.Contains(f.SeenWatchFiles, copied) || f.CompanionReadError != "" {
+		t.Errorf("fork1 extras = %v, seen = %v (error %q), want none and the copy seen", f.ExtraPaths, f.SeenWatchFiles, f.CompanionReadError)
+	}
+	if f := by["local1"]; !slices.Equal(f.ExtraPaths, []string{localSub}) || f.CompanionReadError != "" {
+		t.Errorf("local1 extras = %v (error %q), want [%s] and no error", f.ExtraPaths, f.CompanionReadError, localSub)
+	}
+	for _, id := range []string{"local2", "local3"} {
+		if by[id].CompanionReadError == "" {
+			t.Errorf("%s has no companion error; a session transcript in its local folder must hold it back", id)
+		}
+	}
+	// The same rule on Windows, case- and slash-insensitively.
+	if !sameParentSessionPath(`D:\Omp\Sessions\--r--\2026-11-20T10-00-00-000Z_s1\0-a.jsonl`, `D:\Omp\Sessions\--r--\2026-11-20T10-00-00-000Z_s1.jsonl`, `c:/users/old/.omp/agent/sessions/--r--/2026-11-20t10-00-00-000z_s1.jsonl`, true) {
+		t.Errorf("sameParentSessionPath should match a moved Windows sessions folder")
+	}
+	if sameParentSessionPath("/n/--r--/2026-11-21T10-00-00-000Z_f1/0-a.jsonl", "/n/--r--/2026-11-21T10-00-00-000Z_f1.jsonl", "/o/--r--/2026-11-20T10-00-00-000Z_s1.jsonl", false) {
+		t.Errorf("sameParentSessionPath matched another session's transcript")
+	}
+}

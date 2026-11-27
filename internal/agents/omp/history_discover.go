@@ -46,7 +46,36 @@ func sameParentSessionPath(subPath, parentPath, headerParent string, windows boo
 			return true
 		}
 	}
+	// A sessions folder that moved (another machine, a renamed home, a changed
+	// PI_CODING_AGENT_DIR) leaves each subagent's header naming its parent where it used to
+	// be. It is the same parent when the paths agree from the top-level session's transcript
+	// name down: that name carries the session's start time and ID, which the subagents OMP
+	// copies into a fork's folder do not share with the fork.
+	if tail := ompSessionTail(parentPath, windows); tail != "" && strings.HasSuffix(norm(headerParent), "/"+norm(tail)) {
+		return true
+	}
 	return false
+}
+
+// ompSessionTail is parentPath from its top-level session's transcript (or that transcript's
+// folder) down, "<time>_<id>.jsonl" or "<time>_<id>/0-explore.jsonl", or "" when no part of
+// it is named like a top-level transcript.
+func ompSessionTail(parentPath string, windows bool) string {
+	p := parentPath
+	if windows {
+		p = strings.ReplaceAll(p, `\`, "/")
+	}
+	parts := strings.Split(filepath.ToSlash(filepath.Clean(p)), "/")
+	for i := len(parts) - 1; i >= 0; i-- {
+		name := parts[i]
+		if i < len(parts)-1 {
+			name += ".jsonl"
+		}
+		if ompFilenameRe.MatchString(name) {
+			return strings.Join(parts[i:], "/")
+		}
+	}
+	return ""
 }
 
 // matchesParentSession reports whether a child transcript's header.parentSession links it to
@@ -100,16 +129,42 @@ func ompSessionIDFromFilename(base string) string {
 	return ""
 }
 
+// errOmpHeaderTooLarge is peekOmpSessionHeader's error for a file whose leading lines pass
+// 1 MiB without a session header.
+var errOmpHeaderTooLarge = errors.New("omp session header exceeds 1 MiB")
+
+// ompLocalDir is the folder of a session's (or subagent's) own folder that OMP keeps its
+// local:// files in: artifacts the agent wrote, such as local://results.jsonl, not transcripts.
+const ompLocalDir = "local"
+
+// isOmpLocalDir reports whether name, a folder beside the transcripts named in stems, is OMP's
+// local:// folder. A task the model named "local" has a local.jsonl beside its folder.
+func isOmpLocalDir(name string, stems map[string]bool) bool {
+	return name == ompLocalDir && !stems[ompLocalDir]
+}
+
 // dirHasJSONLOrErr reports whether dir (or any nested subdirectory up to depth 8) holds a
 // surviving .jsonl transcript or cannot be read, so a deleted intermediate subagent with
 // surviving grandchildren fails closed.
 func dirHasJSONLOrErr(ctx context.Context, dir string, depth int) bool {
+	return scanForTranscripts(ctx, dir, depth, false)
+}
+
+// scanForTranscripts is dirHasJSONLOrErr. Under a local:// folder (inLocal) a .jsonl file is
+// an artifact unless it opens as an OMP session transcript or cannot be read.
+func scanForTranscripts(ctx context.Context, dir string, depth int, inLocal bool) bool {
 	if depth > 8 || ctx.Err() != nil {
 		return true
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return true
+	}
+	stems := map[string]bool{}
+	for _, ent := range entries {
+		if !ent.IsDir() && strings.HasSuffix(ent.Name(), ".jsonl") {
+			stems[strings.TrimSuffix(ent.Name(), ".jsonl")] = true
+		}
 	}
 	for _, ent := range entries {
 		if ctx.Err() != nil {
@@ -118,13 +173,23 @@ func dirHasJSONLOrErr(ctx context.Context, dir string, depth int) bool {
 		if ent.Type()&os.ModeSymlink != 0 {
 			continue
 		}
+		path := filepath.Join(dir, ent.Name())
 		if ent.IsDir() {
-			if dirHasJSONLOrErr(ctx, filepath.Join(dir, ent.Name()), depth+1) {
+			if scanForTranscripts(ctx, path, depth+1, inLocal || isOmpLocalDir(ent.Name(), stems)) {
 				return true
 			}
 			continue
 		}
-		if strings.HasSuffix(ent.Name(), ".jsonl") && !isOmpChangesJournal(filepath.Join(dir, ent.Name()), ent.Name()) {
+		if !strings.HasSuffix(ent.Name(), ".jsonl") {
+			continue
+		}
+		if inLocal {
+			if hdr, err := peekOmpSessionHeader(path); hdr.Type == "session" || err != nil && !errors.Is(err, errOmpHeaderTooLarge) {
+				return true
+			}
+			continue
+		}
+		if !isOmpChangesJournal(path, ent.Name()) {
 			return true
 		}
 	}

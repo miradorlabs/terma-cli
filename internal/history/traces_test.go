@@ -1511,6 +1511,11 @@ func TestUploadOmpEvalAndEmbeddedPathGlobs(t *testing.T) {
 		`{"type":"message","id":"rda2","timestamp":"2026-11-23T01:00:04Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","duration":100,"timestamp":1795395603900,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"LEAKED-READ-DIR-REPLY"}]}}`,
 	}, "\n")+"\n")
 
+	// 7. A recursive search from the Org A checkout's own root reaches an Org B checkout nested
+	// deep inside it, below the depth a single scan walks.
+	initRepoAt(filepath.Join(repoA, "a", "b", "c", "d", "e", "deep-org-b"), "https://github.com/org-b/deep-b.git")
+	writeAged("2026-11-23T00-30-00-000Z_s-root-grep.jsonl", makeGrep("s-root-grep", repoA, ".", "LEAKED-ROOT-SEARCH"))
+
 	stA := singleTeamRoutingState(now, "acc1", "org-a", "team-a", "github.com/org-a/repo-a", true, true)
 	stB := singleTeamRoutingState(now, "acc1", "org-b", "team-b", "github.com/org-b/repo-b", true, true)
 	stP := singleTeamRoutingState(now, "acc1", "org-personal", "team-personal", "", true, true)
@@ -1519,7 +1524,7 @@ func TestUploadOmpEvalAndEmbeddedPathGlobs(t *testing.T) {
 	stP.Teams[0].Policy.Repositories = nil
 	st := stA
 	st.Teams = append(st.Teams, stB.Teams...)
-	st.Teams[1].Policy.Repositories = append(st.Teams[1].Policy.Repositories, "github.com/org-b/nested-b", "github.com/org-b/ws-b", "github.com/org-b/ws-sub-b")
+	st.Teams[1].Policy.Repositories = append(st.Teams[1].Policy.Repositories, "github.com/org-b/nested-b", "github.com/org-b/ws-b", "github.com/org-b/ws-sub-b", "github.com/org-b/deep-b")
 	st.Teams = append(st.Teams, stP.Teams...)
 
 	reg := builtin.Agents("")
