@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-27T19:32:17.835020071Z",
+  "generated_at": "2026-11-27T23:29:43.945104122Z",
   "versions": [
     {
       "harness": "pi",
       "name": "Pi",
       "version": "1.7.0",
       "released_at": "2026-11-27T16:58:41.018Z",
-      "captured_at": "2026-11-27T17:17:43.546096674Z",
+      "captured_at": "2026-11-27T23:29:43.945104122Z",
       "platforms": [
         "darwin/arm64"
       ],
@@ -32,8 +32,8 @@
       ],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-27T17:17:43.546096674Z",
-      "attempts": 1
+      "attempted_at": "2026-11-27T23:29:43.945104122Z",
+      "attempts": 2
     },
     {
       "harness": "copilot",
