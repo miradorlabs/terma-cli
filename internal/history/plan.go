@@ -11,12 +11,13 @@ import (
 // routeWork is one team's share of the plan: the sessions it resumes, sent first and
 // without a holdings check, and those left after the holdings check.
 type routeWork struct {
-	b       *routeBucket
-	st      RouteState
-	resume  []*routeSessionPlan
-	upload  []*routeSessionPlan
-	skipped map[string]int // sessions planning left out, by skip reason
-	key     string         // the team's server key, on a server-key profile
+	b          *routeBucket
+	st         RouteState
+	resume     []*routeSessionPlan
+	upload     []*routeSessionPlan
+	prevFailed []FailedSession // stored permanent failures, appended in route order
+	skipped    map[string]int  // sessions planning left out, by skip reason
+	key        string          // the team's server key, on a server-key profile
 }
 
 // planRoute sorts one team's sessions into what was sent or failed before, what resumes
@@ -59,7 +60,7 @@ func planRoute(
 			continue
 		} else if failed {
 			skipped(SkipFailedPreviously)
-			sum.Failed = append(sum.Failed, FailedSession{
+			w.prevFailed = append(w.prevFailed, FailedSession{
 				EnrollmentID:    eid,
 				TeamID:          b.team.TeamID,
 				TeamLabel:       b.label,
@@ -141,11 +142,35 @@ func planRoute(
 	return w, nil
 }
 
-// buildUploadPlan totals what is left to send to every team, numbering the sessions in the
-// order they will be sent. The sizes are each session's own files on disk, read now; a
-// session whose parts go to two teams counts under each.
+// applyOrgBlocksToPlanned blocks any earlier-planned team whose organization refused
+// access during a later team's holdings check, so the emitted plan counts only work that
+// will actually be attempted.
+func applyOrgBlocksToPlanned(works []*routeWork, orgBlocked map[string]string, report func(ProgressEvent), sum *Summary) {
+	if len(orgBlocked) == 0 {
+		return
+	}
+	for _, w := range works {
+		total := len(w.resume) + len(w.upload)
+		if total == 0 {
+			continue
+		}
+		reason, blocked := orgBlocked[w.b.team.OrganizationID]
+		if !blocked {
+			continue
+		}
+		stopRouteWithIssue(w.b, total, SkipOrgAccessLost, reason, report, sum)
+		w.resume = nil
+		w.upload = nil
+	}
+}
+
+// buildUploadPlan totals what is left to send to every team, numbering the session-team
+// uploads in the order they will be sent. SourceBytes is each transcript's own files on
+// disk, counted at most once in the top-level plan even when a transcript splits across
+// multiple teams.
 func buildUploadPlan(works []*routeWork, holdingsChecked bool) UploadPlan {
 	plan := UploadPlan{HoldingsChecked: holdingsChecked, Teams: []PlanTeam{}, SkippedSessions: map[string]int{}}
+	seenSource := map[string]bool{}
 	for _, w := range works {
 		team := PlanTeam{EnrollmentID: w.b.team.EnrollmentID, TeamID: w.b.team.TeamID, TeamLabel: w.b.label, ResumeSessions: len(w.resume), SkippedSessions: map[string]int{}}
 		for reason, n := range w.skipped {
@@ -165,13 +190,16 @@ func buildUploadPlan(works []*routeWork, holdingsChecked bool) UploadPlan {
 			team.Records += sp.records
 			team.SourceBytes += sp.sourceBytes
 			team.EstimatedBytes += sp.estimatedBytes
+			if !seenSource[sp.key] {
+				seenSource[sp.key] = true
+				plan.SourceBytes += sp.sourceBytes
+			}
 		}
 		if team.Sessions == 0 && len(team.SkippedSessions) == 0 {
 			continue
 		}
 		plan.ResumeSessions += team.ResumeSessions
 		plan.Records += team.Records
-		plan.SourceBytes += team.SourceBytes
 		plan.EstimatedBytes += team.EstimatedBytes
 		plan.Teams = append(plan.Teams, team)
 	}
@@ -193,6 +221,7 @@ func uploadRoute(
 	reachCache map[string]familyVerdict,
 	sum *Summary,
 ) error {
+	sum.Failed = append(sum.Failed, w.prevFailed...)
 	b := w.b
 	total := len(w.resume) + len(w.upload)
 	if total == 0 {

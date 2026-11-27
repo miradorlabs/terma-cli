@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"maps"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
@@ -132,17 +133,27 @@ func Upload(ctx context.Context, opts Options) (Summary, error) {
 
 	resolver := newCwdResolver(opts.State, opts.AuthURL, opts.ServerKey, opts.ServerKeyTeam, opts.ServerKeyAuthURL, now)
 	reachCache := map[string]familyVerdict{}
-	buckets, err := discoverAndPlan(ctx, opts, resolver, existingStates, resumableByRoute, resumableKeys, labelFor, cachedUserID, now, activeWindow, reachCache, &sum)
+	buckets, held, err := discoverAndPlan(ctx, opts, resolver, existingStates, resumableByRoute, resumableKeys, labelFor, cachedUserID, now, activeWindow, reachCache, &sum)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			sum.Interrupted = true
+		}
 		return sum, err
 	}
 	report(ProgressEvent{Kind: ProgressDiscover, Total: sum.DiscoveredFiles, Skips: maps.Clone(sum.SkippedSessions)})
+	emitDiscoveryBlocked(held, report)
 
 	enrollmentIDs := make([]string, 0, len(buckets))
 	for id := range buckets {
 		enrollmentIDs = append(enrollmentIDs, id)
 	}
 	slices.Sort(enrollmentIDs)
+
+	sortTeamIssues := func() {
+		slices.SortStableFunc(sum.TeamIssues, func(a, b TeamIssue) int {
+			return strings.Compare(a.EnrollmentID, b.EnrollmentID)
+		})
+	}
 
 	// Every team's plan, and what its server already holds, is known before the first
 	// session is sent, so the plan line can say how much is left in all.
@@ -151,33 +162,82 @@ func Upload(ctx context.Context, opts Options) (Summary, error) {
 	for _, eid := range enrollmentIDs {
 		if err := ctx.Err(); err != nil {
 			sum.Interrupted = true
+			sortTeamIssues()
 			return sum, err
 		}
 		w, err := planRoute(ctx, opts, existingStates, buckets[eid], nowFn, report, orgBlocked, &sum)
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				sum.Interrupted = true
+			}
+			sortTeamIssues()
 			return sum, err
 		}
 		works = append(works, w)
+	}
+	if !opts.DryRun {
+		applyOrgBlocksToPlanned(works, orgBlocked, report, &sum)
 	}
 	plan := buildUploadPlan(works, !opts.DryRun)
 	planTotal = plan.Sessions
 	report(ProgressEvent{Kind: ProgressPlan, Plan: &plan})
 	if opts.DryRun {
+		for _, w := range works {
+			sum.Failed = append(sum.Failed, w.prevFailed...)
+		}
 		appendAgedOutFailures(opts.State.Teams, existingStates, labelFor, &sum)
+		sortTeamIssues()
 		return sum, nil
 	}
 
 	for _, w := range works {
 		if err := ctx.Err(); err != nil {
 			sum.Interrupted = true
+			sortTeamIssues()
 			return sum, err
 		}
 		if err := uploadRoute(ctx, opts, w, activeWindow, maxReqBytes, cachedUserID, nowFn, report, orgBlocked, reachCache, &sum); err != nil {
+			if errors.Is(err, context.Canceled) {
+				sum.Interrupted = true
+			}
+			sortTeamIssues()
 			return sum, err
 		}
 	}
 	appendAgedOutFailures(opts.State.Teams, existingStates, labelFor, &sum)
+	sortTeamIssues()
 	return sum, nil
+}
+
+type heldRoute struct {
+	team       routing.Team
+	label      string
+	skipReason string
+	sessions   map[string]bool
+}
+
+func emitDiscoveryBlocked(held map[string]*heldRoute, report func(ProgressEvent)) {
+	if len(held) == 0 {
+		return
+	}
+	ids := make([]string, 0, len(held))
+	for id := range held {
+		ids = append(ids, id)
+	}
+	slices.Sort(ids)
+	for _, eid := range ids {
+		hr := held[eid]
+		state := strings.TrimPrefix(hr.skipReason, SkipTeamBlockedPrefix)
+		report(ProgressEvent{
+			Kind:         ProgressRouteBlocked,
+			RouteLabel:   hr.label,
+			EnrollmentID: hr.team.EnrollmentID,
+			TeamID:       hr.team.TeamID,
+			SkipReason:   hr.skipReason,
+			Reason:       "team is currently blocked (" + state + ")",
+			Skipped:      len(hr.sessions),
+		})
+	}
 }
 
 func discoverAndPlan(
@@ -193,8 +253,9 @@ func discoverAndPlan(
 	activeWindow time.Duration,
 	reachCache map[string]familyVerdict,
 	sum *Summary,
-) (map[string]*routeBucket, error) {
+) (map[string]*routeBucket, map[string]*heldRoute, error) {
 	buckets := map[string]*routeBucket{}
+	held := map[string]*heldRoute{}
 	addBucketPlan := func(eid string, team routing.Team, key string, f agents.HistoryFile, companions []agents.HistoryFile, missingParent string, src agents.HistorySource, recs int, bytes int64) {
 		b := buckets[eid]
 		if b == nil {
@@ -212,7 +273,7 @@ func discoverAndPlan(
 	for _, src := range opts.Sources {
 		if err := ctx.Err(); err != nil {
 			sum.Interrupted = true
-			return nil, err
+			return nil, nil, err
 		}
 		files, err := src.DiscoverHistory(ctx, agents.HistoryDiscoverOptions{
 			Since:        opts.Since,
@@ -220,14 +281,18 @@ func discoverAndPlan(
 			ActiveWindow: activeWindow,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("discover %s history: %w", src.SourceSystem(), err)
+			if errors.Is(err, context.Canceled) {
+				sum.Interrupted = true
+				return nil, nil, err
+			}
+			return nil, nil, fmt.Errorf("discover %s history: %w", src.SourceSystem(), err)
 		}
 		bySession := indexBySession(files)
 		childrenByParent := buildChildrenMap(files)
 		for _, f := range files {
 			if err := ctx.Err(); err != nil {
 				sum.Interrupted = true
-				return nil, err
+				return nil, nil, err
 			}
 			sum.DiscoveredFiles++
 			key := SessionKey(f.SourceSystem, f.SessionID)
@@ -266,7 +331,7 @@ func discoverAndPlan(
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					sum.Interrupted = true
-					return nil, err
+					return nil, nil, err
 				}
 				if errors.Is(err, fs.ErrNotExist) {
 					sum.addSkippedSession(SkipMissingFile, 1)
@@ -280,6 +345,19 @@ func discoverAndPlan(
 				if !rs.ok {
 					if !f.OutsideSince {
 						sum.addSkippedSegment(rs.skipReason, 1)
+						if eid := rs.target.Team.EnrollmentID; eid != "" && strings.HasPrefix(rs.skipReason, SkipTeamBlockedPrefix) {
+							hr := held[eid]
+							if hr == nil {
+								hr = &heldRoute{
+									team:       rs.target.Team,
+									label:      labelFor(rs.target.Team),
+									skipReason: rs.skipReason,
+									sessions:   map[string]bool{},
+								}
+								held[eid] = hr
+							}
+							hr.sessions[key] = true
+						}
 					}
 					continue
 				}
@@ -304,7 +382,7 @@ func discoverAndPlan(
 			if cerr != nil {
 				if errors.Is(cerr, context.Canceled) {
 					sum.Interrupted = true
-					return nil, cerr
+					return nil, nil, cerr
 				}
 				if errors.Is(cerr, fs.ErrNotExist) {
 					sum.addSkippedSession(SkipMissingFile, 1)
@@ -319,7 +397,7 @@ func discoverAndPlan(
 			if merr != nil {
 				if errors.Is(merr, context.Canceled) {
 					sum.Interrupted = true
-					return nil, merr
+					return nil, nil, merr
 				}
 				if errors.Is(merr, fs.ErrNotExist) {
 					sum.addSkippedSession(SkipMissingFile, 1)
@@ -333,5 +411,5 @@ func discoverAndPlan(
 			}
 		}
 	}
-	return buckets, nil
+	return buckets, held, nil
 }

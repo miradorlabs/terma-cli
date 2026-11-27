@@ -246,10 +246,10 @@ func TestHistoryUploadJSONStreamUpload(t *testing.T) {
 				t.Errorf("%s = %v, want %s, session %d of 2", l["type"], l, team, i+1)
 			}
 		}
-		if done["records"] != float64(3) || done["bytes"].(float64) <= 0 {
-			t.Errorf("session_done = %v, want 3 records and the bytes sent", done)
+		if done["records"] != float64(3) || done["sent_bytes"].(float64) <= 0 {
+			t.Errorf("session_done = %v, want 3 records and the sent_bytes", done)
 		}
-		sentBytes += done["bytes"].(float64)
+		sentBytes += done["sent_bytes"].(float64)
 	}
 	var sum history.Summary
 	if err := json.Unmarshal([]byte(summaryOf(t, out)), &sum); err != nil {

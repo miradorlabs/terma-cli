@@ -165,7 +165,8 @@ func TestPlanStopsATeamWholeWhenItCannotBeSent(t *testing.T) {
 	})
 
 	// team-b's holdings check finds the organization refusing access after team-a's passed:
-	// team-a, already in the plan, is blocked whole when its turn comes.
+	// the whole organization is blocked before the plan is emitted, so neither team is in the
+	// plan and nothing is attempted.
 	t.Run("organization refuses a later team", func(t *testing.T) {
 		t.Parallel()
 		lost := &api.Error{StatusCode: http.StatusForbidden, Reason: api.ReasonOrgNotAccessible, Message: "organization is not accessible"}
@@ -177,8 +178,12 @@ func TestPlanStopsATeamWholeWhenItCannotBeSent(t *testing.T) {
 		})
 		sum, events, sends := run(t, holdings, nil)
 		plan := checkPlanAccounting(t, events)
-		if plan.Sessions != 3 || sends != 0 {
-			t.Errorf("planned %d sessions and sent %d requests, want team-a's 3 planned and none sent", plan.Sessions, sends)
+		if plan.Sessions != 0 || plan.SourceBytes != 0 || sends != 0 {
+			t.Errorf("planned %d sessions (%d source bytes) and sent %d requests, want none", plan.Sessions, plan.SourceBytes, sends)
+		}
+		if len(sum.TeamIssues) != 2 || sum.TeamIssues[0].TeamID != "team-a" || sum.TeamIssues[0].Skipped != 3 ||
+			sum.TeamIssues[1].TeamID != "team-b" || sum.TeamIssues[1].Skipped != 1 {
+			t.Fatalf("issues = %+v, want team-a (3) and team-b (1) in route order", sum.TeamIssues)
 		}
 		if sum.SkippedSessions[SkipOrgAccessLost] != 4 || sum.SentSessions != 0 {
 			t.Fatalf("skipped = %v sent = %d, want all 4 sessions org_access_lost", sum.SkippedSessions, sum.SentSessions)

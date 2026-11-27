@@ -166,7 +166,7 @@ type historyStreamSession struct {
 	SessionID    string `json:"session_id"`
 	SourceBytes  int64  `json:"source_bytes"` // 0 when the session's files could not be read
 	Records      *int   `json:"records,omitempty"`
-	Bytes        *int64 `json:"bytes,omitempty"`
+	SentBytes    *int64 `json:"sent_bytes,omitempty"`
 	Reason       string `json:"reason,omitempty"`
 }
 
@@ -256,7 +256,7 @@ func (s *historyStream) progress(ev history.ProgressEvent) {
 		s.write(session(historyLineSessionStart))
 	case history.ProgressSessionDone:
 		line := session(historyLineSessionDone)
-		line.Records, line.Bytes = &ev.Records, &ev.Bytes
+		line.Records, line.SentBytes = &ev.Records, &ev.Bytes
 		s.write(line)
 	case history.ProgressSessionFailed:
 		line := session(historyLineSessionFailed)
