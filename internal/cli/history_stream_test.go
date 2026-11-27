@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
+	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/history"
 	"github.com/miradorlabs/terma-cli/internal/routing"
@@ -283,13 +284,16 @@ func TestHistoryUploadJSONStreamDryRun(t *testing.T) {
 		agent := a.(map[string]any)
 		withHistory[agent["name"].(string)] = agent["history"].(bool)
 	}
-	if !withHistory["claude"] || !withHistory["codex"] || len(withHistory) < 3 {
-		t.Errorf("agents = %v, want claude and codex with history among the others", withHistory)
+	wantHistory := map[string]bool{}
+	for _, a := range testApp.agentsFor(t.TempDir()).Supported() {
+		_, reads := a.(agents.HistorySource)
+		wantHistory[a.Name()] = reads
 	}
-	for name, reads := range withHistory {
-		if reads && name != "claude" && name != "codex" {
-			t.Errorf("agent %s says it has history", name)
-		}
+	if !withHistory["claude"] || !withHistory["codex"] || !withHistory["omp"] || len(withHistory) < 4 {
+		t.Errorf("agents = %v, want claude, codex, and omp with history among the others", withHistory)
+	}
+	if !maps.Equal(withHistory, wantHistory) {
+		t.Errorf("agents = %v, want %v", withHistory, wantHistory)
 	}
 	if fx.holdingsCalls() != 0 || fx.receivedBy("team-a")+fx.receivedBy("team-b") != 0 {
 		t.Errorf("the dry run reached the server")
