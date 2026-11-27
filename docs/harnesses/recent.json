@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-26T19:44:39.703894631Z",
+  "generated_at": "2026-11-27T01:59:01.469960153Z",
   "versions": [
     {
       "harness": "t3",
@@ -25,8 +25,8 @@
       "highlights": [],
       "signing": null,
       "partial": true,
-      "attempted_at": "2026-11-26T19:44:39.703894631Z",
-      "attempts": 1
+      "attempted_at": "2026-11-27T01:59:01.469960153Z",
+      "attempts": 2
     },
     {
       "harness": "copilot",
