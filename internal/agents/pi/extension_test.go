@@ -1251,11 +1251,6 @@ func TestReplayReload(t *testing.T) {
 		eq(t, "tools", len(r.tools()), len(events(lines, "tool_execution_end")))
 		eq(t, "prompts", len(r.records("pi.user_prompt")), 2)
 
-		// The floor's recording has no call a reach check sees (two writes), so the fence
-		// is replayed on 1.6.1's, whose first call is a bash.
-		if v != "1.6.1" {
-			return
-		}
 		f := replay(t, path, replayOptions{FailReach: true})
 		var fence, reaches int
 		for _, h := range f.hooks("pi-tool-reach") {

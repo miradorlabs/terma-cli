@@ -49,7 +49,7 @@ func TestRegistryIsConsistent(t *testing.T) {
 	if len(reg.Handlers()) != len(owners) {
 		t.Errorf("reg.Handlers() has %d entries, adapters declare %d", len(reg.Handlers()), len(owners))
 	}
-	for _, name := range []string{"claude", "cursor", "codex", "copilot", "opencode", "omp", "antigravity", "grok"} {
+	for _, name := range []string{"claude", "cursor", "codex", "copilot", "opencode", "omp", "pi", "antigravity", "grok"} {
 		if _, ok := reg.Lookup(name); !ok {
 			t.Errorf("reg.Lookup(%q) failed", name)
 		}
@@ -183,14 +183,14 @@ func TestEveryToolLabelIsASessionKey(t *testing.T) {
 	}
 }
 
-// Antigravity's hooks are checked with the POSIX command only, and Grok Build's hooks and
-// export are verified on Linux alone, so Windows offers both as Coming Soon; the agents
-// supported everywhere stay supported there.
+// Antigravity's hooks are checked with the POSIX command only, Grok Build's hooks and
+// export are verified on Linux alone, and nothing of Pi's extension was captured on Windows,
+// so Windows offers them as Coming Soon; the agents supported everywhere stay supported there.
 func TestAntigravityIsComingSoonOnWindows(t *testing.T) {
 	t.Parallel()
 	for goos, want := range map[string]bool{"linux": true, "darwin": true, "windows": false} {
 		r := AgentsOn("", goos)
-		for _, name := range []string{"antigravity", "grok"} {
+		for _, name := range []string{"antigravity", "grok", "pi"} {
 			if got := r.IsSupported(name); got != want {
 				t.Errorf("%s: %s supported = %v, want %v", goos, name, got, want)
 			}

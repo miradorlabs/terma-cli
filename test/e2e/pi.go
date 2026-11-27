@@ -5,22 +5,31 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // Pi (@earendil-works/pi-coding-agent) has no OpenTelemetry of its own: terma's
 // extension (internal/agents/pi/terma.ts), written into Pi's agent directory, is its
-// exporter and calls `terma hook pi-*`. `terma relay setup --harness pi` writes it
-// pointed at the relay; a direct run splices the same template pointed at the receiver,
-// so the two differ only in where the extension sends. The builds are the installed one, or
-// TERMA_E2E_PI_VERSIONS's from npm (the reference's frequent check captures each release).
+// exporter and calls `terma hook pi-*`. `terma setup --harness pi` writes it pointed at the
+// relay (UsePi); a direct run splices the same template pointed at the receiver, so the two
+// differ only in where the extension sends. The builds are the installed one, or
+// TERMA_E2E_PI_VERSIONS's from npm: CI runs the floor (internal/agents/pi/minimum_version.go)
+// and the latest captured.
 
 // piPackage is Pi's npm package.
 const piPackage = "@earendil-works/pi-coding-agent"
+
+// piScope is the instrumentation scope of everything terma's extension exports.
+const piScope = "terma-pi"
 
 func forEachPi(t *testing.T, run func(t *testing.T, b Binary)) {
 	t.Helper()
@@ -54,6 +63,60 @@ func (sb *Sandbox) UsePiProvider(url string) {
 	sb.writeAbs(filepath.Join(sb.piAgentDir(), "models.json"), string(data)+"\n")
 }
 
+// UsePiScript answers Pi's requests from each conversation's steps, picked by a key its
+// prompt holds (openCodeConversationProvider: the same OpenAI-compatible script). A failFirst
+// answers the first that many requests 500, which Pi retries.
+func (sb *Sandbox) UsePiScript(failFirst int, convs ...openCodeConversation) {
+	scripted := openCodeConversationProvider(convs)
+	var failed atomic.Int32
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/chat/completions") && int(failed.Add(1)) <= failFirst {
+			http.Error(w, `{"error":{"message":"scripted outage TERMA_PI_ERROR"}}`, http.StatusInternalServerError)
+			return
+		}
+		scripted.ServeHTTP(w, r)
+	}))
+	sb.T.Cleanup(provider.Close)
+	sb.UsePiProvider(provider.URL)
+}
+
+// piCall is a scripted reply asking for one call of Pi's tool name with args.
+func piCall(id, name string, args map[string]any) openCodeStep {
+	return openCodeStep{calls: []openCodeCall{{id: id, name: name, args: args}}}
+}
+
+// UsePi makes b the `pi` on the sandbox's PATH and sets the machine up again with Pi chosen,
+// as a developer would: `terma setup` writes the extension and records Pi in the profile.
+// It returns setup's output.
+func (sb *Sandbox) UsePi(b Binary) string {
+	t := sb.T
+	t.Helper()
+	link := filepath.Join(strings.TrimSuffix(sb.binDir(), ":"), "pi")
+	if _, err := os.Lstat(link); err != nil {
+		if err := os.Symlink(b.Path, link); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sb.SetupAgents = append(sb.SetupAgents, "pi")
+	sb.RelayAgents = append(sb.RelayAgents, "pi")
+	out := sb.Setup(nil, "--team", sb.ProjectID, "--harness", sb.setupList())
+	if !slices.Contains(sb.recordedHarnesses(), "pi") {
+		t.Fatalf("terma setup --harness %s did not record Pi: %v\n%s", sb.setupList(), sb.recordedHarnesses(), out)
+	}
+	sb.Receiver.Reset()
+	return out
+}
+
+// piRelayIn is sb with Pi set up through terma setup, answered by convs, and the relay
+// running under the policy o.
+func piRelayIn(sb *Sandbox, b Binary, o RelayOptions, convs ...openCodeConversation) *Sandbox {
+	sb.UsePiScript(0, convs...)
+	sb.UsePi(b)
+	o.Start = true
+	sb.UseRelay(o)
+	return sb
+}
+
 // UsePiExtensionDirect writes terma's Pi extension pointed straight at the receiver,
 // as the direct half of a comparison.
 func (sb *Sandbox) UsePiExtensionDirect() {
@@ -81,13 +144,14 @@ func (sb *Sandbox) writePiExtension(path string) {
 }
 
 // PiRun runs one `pi -p` in dir (the live tests run from test/e2e/, next to the template
-// UsePiExtensionDirect reads) and returns its output.
-func (sb *Sandbox) PiRun(b Binary, dir, prompt string) string {
+// UsePiExtensionDirect reads), extra flags before the prompt, and returns its output.
+func (sb *Sandbox) PiRun(b Binary, dir, prompt string, flags ...string) string {
 	t := sb.T
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), scenarioTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, b.Path, "-p", "--model", "fake/m", "--offline", "--no-context-files", "--no-skills", prompt)
+	args := append([]string{"-p", "--model", "fake/m", "--offline", "--no-context-files", "--no-skills"}, flags...)
+	cmd := exec.CommandContext(ctx, b.Path, append(args, prompt)...)
 	cmd.Dir = dir
 	cmd.Env = append(sb.termaEnv(), "PI_CODING_AGENT_DIR="+sb.piAgentDir())
 	cmd.Stdin = nil
@@ -97,4 +161,17 @@ func (sb *Sandbox) PiRun(b Binary, dir, prompt string) string {
 		t.Fatalf("pi -p: %v\n%s", err, out.String())
 	}
 	return out.String()
+}
+
+// PiSession runs one `pi -p` as PiRun does and returns the session its start hook announced.
+func (sb *Sandbox) PiSession(b Binary, dir, prompt string, flags ...string) string {
+	t := sb.T
+	t.Helper()
+	before := len(sb.Events("terma.session.start", ""))
+	sb.PiRun(b, dir, prompt, flags...)
+	starts := sb.WaitEvents("terma.session.start", "", 10*time.Second)
+	if len(starts) <= before {
+		t.Fatalf("Pi announced no session for %q; spool: %+v", prompt, sb.Spool())
+	}
+	return starts[len(starts)-1].SessionID
 }

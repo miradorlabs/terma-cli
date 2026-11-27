@@ -40,6 +40,8 @@ type RelayOptions struct {
 	// prompts and tool content through, or both withheld. Only the policy decides
 	// content.
 	Content bool
+	// Withhold, "prompts" or "tool content", withholds that alone, whatever Content says.
+	Withhold string
 }
 
 // UseRelay sets the relay up in the sandbox. It must run before the agent does.
@@ -47,7 +49,14 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 	t := sb.T
 	t.Helper()
 	acct := sb.StartAccount()
-	if acct.withholdContent.Swap(!o.Content) != !o.Content {
+	prompts, tools := !o.Content, !o.Content
+	switch o.Withhold {
+	case "prompts":
+		prompts, tools = true, false
+	case "tool content":
+		prompts, tools = false, true
+	}
+	if acct.withholdPrompts.Swap(prompts) != prompts || acct.withholdTools.Swap(tools) != tools {
 		// The team's policy changed since setup fetched it: set up again, as a developer would.
 		sb.Setup(nil, "--team", sb.ProjectID, "--harness", sb.setupList())
 		sb.Receiver.Reset()

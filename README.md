@@ -9,8 +9,9 @@ The `terma` cli connects coding agents to [Terma](https://terma.ai), then stamps
 they produce so agent spend can be traced to shipped code. It supports **Claude Code**
 (CLI and Desktop), **Codex** (CLI and Desktop), **GitHub Copilot** (CLI and VS Code),
 **[OMP](https://github.com/can1357/oh-my-pi)**, **Antigravity** (the `agy` CLI 1.2.4 or later, on macOS and Linux),
-**Grok Build** (xAI's `grok` CLI 1.0.92 or later, in beta, on macOS and Linux) and **OpenCode**
-(1.16.0 or later, or 2.0.0 or later, in beta, on macOS and Linux).
+**Grok Build** (xAI's `grok` CLI 1.0.92 or later, in beta, on macOS and Linux), **OpenCode**
+(1.16.0 or later, or 2.0.0 or later, in beta, on macOS and Linux) and **[Pi](https://pi.dev)**
+(1.5.0 or later, in beta, on macOS and Linux).
 
 ## Get started
 
@@ -105,7 +106,7 @@ instead: see [Scripted and headless setup](#scripted-and-headless-setup).
 
 ```mermaid
 flowchart LR
-  agent["Claude Code / Codex / Copilot / OMP / Grok Build / OpenCode"] -- "telemetry" --> relay["terma relay<br/>(127.0.0.1)"]
+  agent["Claude Code / Codex / Copilot / OMP / Grok Build / OpenCode / Pi"] -- "telemetry" --> relay["terma relay<br/>(127.0.0.1)"]
   agent -- "hook events" --> hook["terma hook"]
   git["git commit"] -- "commit hooks" --> hook
   hook -- "routes & claims session<br/>for matching team" --> relay
@@ -273,7 +274,7 @@ terma setup --org acme --team platform --harness claude,codex,copilot,omp --yes
   account; with `--yes` and no `--team`, setup keeps your current selection (or picks the
   only available team on a fresh machine). Use `terma teams` to tick or untick teams at
   any time.
-- `--harness <agents>` records those agents (`claude`, `codex`, `copilot`, `omp`, and on macOS and Linux `antigravity`, `grok` and `opencode`); with `--yes` or no
+- `--harness <agents>` records those agents (`claude`, `codex`, `copilot`, `omp`, and on macOS and Linux `antigravity`, `grok`, `opencode` and `pi`); with `--yes` or no
   terminal and no `--harness`, setup records the supported agents detected on this
   machine. The picker ticks the same agents, marked "detected", and nothing else.
 - `--yes` skips interactive prompts, keeping the teams already ticked (all of them on a first
@@ -678,10 +679,36 @@ claim the session in its new repository, and a model step or tool call that star
 within that time is recorded under the repository the session came from, which can be another
 team's or another organization's.
 
-On Windows, setup lists Antigravity, Grok Build and OpenCode as Coming Soon: `agy` runs its
+Pi (in beta) has no telemetry export of its own, so terma's extension is its exporter. Setup
+writes one file, `terma.ts`, into Pi's extensions folder (`~/.pi/agent/extensions`, or
+`$PI_CODING_AGENT_DIR/extensions`). The extension sends each model call with its tokens and the
+cost Pi reports, each reply, each tool call and MCP call, each prompt, each message another
+extension puts into the conversation, the name you give a session and each compaction to the
+relay, which forwards what your team's policy collects. Its hooks claim each session for its
+repository, check what a read, search, list or shell tool (and your own `!` command) reaches,
+and record the files Pi's write and edit tools change, so those edits are stamped on your
+commits. A resumed session is the same session; a fork or clone is a new one that names the
+session it came from, as does a session an extension opens with a parent session named
+(`ctx.newSession({parentSession})`). A `pi` that a tool of another Pi session starts, such as a
+subagent, is recorded as a run inside that session. Thinking text is never collected.
+
+terma needs Pi 1.5.0 or later: setup refuses an earlier one (upgrade with `pi update`, or
+`npm install -g @earendil-works/pi-coding-agent`), doctor fails it, and the extension records
+nothing in it. Pi loads extensions when it starts, so a Pi already running, a T3 Code Pi thread
+included, is recorded from its next start; T3 Code's Pi threads are then recorded like any other
+session. terma's Pi extension records nothing inside Oh My Pi, so a `PI_CODING_AGENT_DIR` the two
+share records each session once. `terma doctor` names the agent directory it checked: a Pi started
+with another `PI_CODING_AGENT_DIR` loads another folder.
+
+What terma does not see of Pi: a session of a Pi started with `--no-extensions`; a nested
+session's parent; a child whose spawner scrubs the environment or whose parent shell has exited;
+a subagent's name and outcome; a file a shell command writes; a person's `!` command; a `/tree`
+branch summary's spend; what another extension does outside Pi's tool events.
+
+On Windows, setup lists Antigravity, Grok Build, OpenCode and Pi as Coming Soon: `agy` runs its
 hooks with `cmd` there, and terma's hook command for it has been checked only on macOS and
-Linux; grok's hooks and export have been verified on Linux only; and OpenCode's plugin has
-not been tried on Windows.
+Linux; grok's hooks and export have been verified on Linux only; and neither OpenCode's plugin
+nor Pi's extension has been tried on Windows.
 
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`

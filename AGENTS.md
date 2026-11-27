@@ -162,7 +162,11 @@ team's policy (`PolicyFor`) and consent (`Consent`). OpenCode has no export of i
 terma's plugin (`internal/agents/opencode/plugin/terma.js`, one file with OpenCode 1's `server`
 entry and OpenCode 2's `setup` feeding one emitter) is its exporter, under scope
 `terma-opencode`, and its hook caller, and claims each session the first time a process sees
-it. Use `terma teams` to manage ticked teams, `terma route explain` to trace
+it. Pi has none either: terma's extension (`internal/agents/pi/terma.ts`) is its exporter, under
+scope `terma-pi`, and its hook caller. It claims each session at first sight, a session nested in
+the process included, names a child process's parent itself (`TERMA_PI_PARENT`, accepted only
+from an ancestor process), and sends the name a person gives a session on the wire
+(`pi.session.title`), so Pi needs no title hook. Use `terma teams` to manage ticked teams, `terma route explain` to trace
 `routing.Router.Route` for a path, and
 `terma doctor` to inspect routing state, per-enrollment health (including `OrgAccessLost`,
 policy conflicts, and single `terma setup` remediation for `SignInNeeded`), Mixed runs, and

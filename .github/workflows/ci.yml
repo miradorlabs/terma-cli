@@ -56,7 +56,7 @@ jobs:
 
       - run: go vet ./...
 
-      # OMP's extension test runs it under a Node that strips TypeScript types (22.18+).
+      # OMP's and Pi's extension tests run them under a Node that strips TypeScript types (22.18+).
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -200,6 +200,9 @@ jobs:
       TERMA_E2E_OMP_VERSIONS: "18.18.2,19.1.1"
       # Grok Build's oldest supported build (internal/agents/grok/minimum_version.go).
       TERMA_E2E_GROK_VERSIONS: "1.0.92"
+      # Pi's oldest supported build (internal/agents/pi/minimum_version.go) and the latest
+      # its extension was captured on.
+      TERMA_E2E_PI_VERSIONS: "1.5.0,1.6.1"
       # Copilot CLI runs against GitHub's service on this job's token, in the copilot shard
       # alone. A fork's pull request gets a read-only one, so there the Copilot tests skip
       # rather than fail.
@@ -221,17 +224,20 @@ jobs:
             test/e2e/go.sum
       - name: Build Terma
         run: go build -o test/e2e/bin/terma ./cmd/terma
-      # Pi has no exporter; terma's extension is one, tested only on the installed
-      # build (test/e2e/pi.go).
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - name: Install Pi and T3 Code
-        # Pi has no exporter (terma's extension is one); T3 Code runs Codex and Claude
-        # Code itself. Gemini CLI, DeepSeek Harness, OMP and Grok Build install on demand
-        # (test/e2e/gemini.go, test/e2e/dsh.go, test/e2e/omp.go, test/e2e/grok.go). Hermes and
-        # Cursor run only where installed or credentialed.
-        run: npm install -g @earendil-works/pi-coding-agent@0.99.1 t3@0.0.42
+      - name: Install T3 Code
+        # T3 Code runs Codex and Claude Code itself. Pi, Gemini CLI, DeepSeek Harness, OMP and
+        # Grok Build install on demand (test/e2e/pi.go, test/e2e/gemini.go, test/e2e/dsh.go,
+        # test/e2e/omp.go, test/e2e/grok.go). Hermes and Cursor run only where installed or
+        # credentialed.
+        run: npm install -g t3@0.0.42
+      - name: Install fd
+        # Pi's find tool downloads fd on first use, which an offline run cannot.
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fd-find
+          sudo ln -sf "$(command -v fdfind)" /usr/local/bin/fd
       - name: Assert harness telemetry (no provider credentials)
         env:
           SHARD: ${{ matrix.shard }}

@@ -238,7 +238,7 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 		chosen[name] = true
 	}
 	form := testApp.harnessSelectionForm(chosen)
-	wantOrder := []string{"claude", "codex", "copilot", "opencode", "omp", "antigravity", "grok", "cursor", "pi", "hermes", "gemini", "dsh"}
+	wantOrder := []string{"claude", "codex", "copilot", "opencode", "omp", "pi", "antigravity", "grok", "cursor", "hermes", "gemini", "dsh"}
 	if !testApp.agents.IsSupported("antigravity") {
 		// Coming Soon on Windows: with the other Coming Soon agents, in registry order.
 		wantOrder = []string{"claude", "codex", "copilot", "omp", "cursor", "opencode", "pi", "hermes", "gemini", "dsh", "antigravity", "grok"}
@@ -249,7 +249,7 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 	// The supported agents lead the list, each selectable, under the name setup shows.
 	leading := []string{"Claude Code & Desktop", "Codex TUI & Desktop", "Copilot (beta)", "OMP 18.18.2+ (beta)"}
 	if testApp.agents.IsSupported("antigravity") {
-		leading = []string{"Claude Code & Desktop", "Codex TUI & Desktop", "Copilot (beta)", "OpenCode (beta)", "OMP 18.18.2+ (beta)", "Antigravity 1.2.4+ (beta)", "Grok Build (beta)"}
+		leading = []string{"Claude Code & Desktop", "Codex TUI & Desktop", "Copilot (beta)", "OpenCode (beta)", "OMP 18.18.2+ (beta)", "Pi 1.5.0+ (beta)", "Antigravity 1.2.4+ (beta)", "Grok Build (beta)"}
 	}
 	for i, label := range leading {
 		if item := form.Items[i]; item.Label != label || item.Disabled || !testApp.agents.IsSupported(wantOrder[i]) {
@@ -279,13 +279,13 @@ func TestHarnessSelectionComingSoon(t *testing.T) {
 	}
 }
 
-// On Windows Antigravity, Grok Build and OpenCode are Coming Soon, listed under their own
+// On Windows Antigravity, Grok Build, OpenCode and Pi are Coming Soon, listed under their own
 // names: "(beta)" marks what setup offers, and it offers them on macOS and Linux only.
 func TestHarnessSelectionAntigravityOnWindows(t *testing.T) {
 	app := New(func(dir string) *agents.Registry { return builtin.AgentsOn(dir, "windows") }, "dev")
 	app.binDirs = func() []string { return nil }
 	app.configure(t.TempDir(), t.TempDir())
-	form := app.harnessSelectionForm(map[string]bool{"antigravity": true, "grok": true, "opencode": true})
+	form := app.harnessSelectionForm(map[string]bool{"antigravity": true, "grok": true, "opencode": true, "pi": true})
 	last := len(form.Items) - 2
 	for i, label := range []string{"Antigravity", "Grok Build"} {
 		item := form.Items[last+i]
@@ -298,22 +298,24 @@ func TestHarnessSelectionAntigravityOnWindows(t *testing.T) {
 			}
 		}
 	}
-	var openCode []string
-	for _, item := range form.Items {
-		if strings.Contains(item.Label, "OpenCode") {
-			openCode = append(openCode, item.Label)
-			if item.Label != "OpenCode" || !item.Disabled || item.Selected || item.Reason != "Coming Soon" {
-				t.Fatalf("OpenCode's row on Windows = %+v, want plain, disabled and Coming Soon", item)
+	for _, label := range []string{"OpenCode", "Pi"} {
+		var rows []string
+		for _, item := range form.Items {
+			if item.Label == label || strings.HasPrefix(item.Label, label+" ") {
+				rows = append(rows, item.Label)
+				if item.Label != label || !item.Disabled || item.Selected || item.Reason != "Coming Soon" {
+					t.Fatalf("%s's row on Windows = %+v, want plain, disabled and Coming Soon", label, item)
+				}
 			}
 		}
-	}
-	if len(openCode) != 1 {
-		t.Fatalf("OpenCode rows on Windows = %v, want one", openCode)
+		if len(rows) != 1 {
+			t.Fatalf("%s rows on Windows = %v, want one", label, rows)
+		}
 	}
 }
 
 func TestHarnessSelectionFlags(t *testing.T) {
-	for _, name := range []string{"cursor", "pi"} {
+	for _, name := range []string{"cursor", "hermes"} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := testApp.chooseHarnesses(&cobra.Command{}, setupFlags{harnesses: "claude," + name}); err == nil || !strings.Contains(err.Error(), "Coming Soon") {
 				t.Fatalf("setup error = %v", err)
@@ -327,7 +329,7 @@ func TestHarnessSelectionFlags(t *testing.T) {
 	if got, err := testApp.chooseHarnesses(&cobra.Command{}, setupFlags{harnesses: "omp,claude"}); err != nil || !slices.Equal(got, []string{"claude", "omp"}) {
 		t.Fatalf("--harness omp,claude = %v, %v", got, err)
 	}
-	for _, name := range []string{"antigravity", "grok", "opencode"} {
+	for _, name := range []string{"antigravity", "grok", "opencode", "pi"} {
 		got, err = testApp.chooseHarnesses(&cobra.Command{}, setupFlags{harnesses: name + ",claude"})
 		if !testApp.agents.IsSupported(name) {
 			if err == nil || !strings.Contains(err.Error(), "Coming Soon") {
