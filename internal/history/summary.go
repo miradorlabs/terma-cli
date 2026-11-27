@@ -40,6 +40,9 @@ type ProgressKind string
 
 // Progress event kinds delivered to Options.Progress.
 const (
+	// ProgressStart fires once the upload lock is held and resume state is loaded, just
+	// before discovery begins.
+	ProgressStart    ProgressKind = "start"
 	ProgressDiscover ProgressKind = "discover"
 	ProgressHoldings ProgressKind = "holdings"
 	// ProgressPlan comes once, after every team's holdings check and before the first

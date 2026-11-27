@@ -130,6 +130,7 @@ func Upload(ctx context.Context, opts Options) (Summary, error) {
 	if err != nil {
 		return sum, err
 	}
+	report(ProgressEvent{Kind: ProgressStart})
 
 	resolver := newCwdResolver(opts.State, opts.AuthURL, opts.ServerKey, opts.ServerKeyTeam, opts.ServerKeyAuthURL, now)
 	reachCache := map[string]familyVerdict{}

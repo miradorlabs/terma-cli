@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,54 +19,21 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/history"
 )
 
-// The --json-stream contract of `terma history upload`, read by Terma Desktop. Every line
-// on stdout is one JSON object whose "type" is one of the constants below; field names
-// never change, and a new field or type may be added, so a reader ignores what it does not
-// know. Nothing but these lines is written to stdout.
+// The --json-stream contract of `terma history upload`, read by Terma Desktop, is
+// documented in full in docs/history-upload-stream.md.
 //
-// Order: start; discover; then, team by team in a fixed order, holdings and team_blocked
-// as each team is planned; one plan; then, team by team, each planned session's
-// session_start and its session_done, session_failed or session_skipped, with
-// team_blocked when a team stops; and summary. Sessions planning leaves out (sent or
-// failed in an earlier run, or held by the server) are counted on plan, not reported one
-// by one, and blocks before plan are not in its totals. Each session plan
-// counts ends in exactly one session_done, session_failed or session_skipped line, or is
-// counted in a later team_blocked line's "skipped" (a session a team stopped on after its
-// session_start included). A dry run asks no server and sends nothing: start, discover,
-// plan, summary.
-//
-// How a run ends: summary is the last line of a run that finished, exit code 0, or 1 when
-// a session failed or a team was blocked in this run. A run stopped by Ctrl-C ends with a
-// summary whose "interrupted" is true, exit code 130 (143 on SIGTERM). A run that could
-// not finish ends with an error line: after the summary when the upload itself had begun
-// (upload_running, or signed_out for a sign-in the server retired), and as the only line
-// when it could not begin (not_set_up, signed_out with no sign-in, or failed for a bad
-// flag or environment). A plan line comes only when every team was planned.
-//
-// Fields, by type:
-//   - start: dry_run, since (RFC 3339), active_window_seconds, agents: [{name,
-//     display_name, history}] (history: terma can read this agent's past sessions).
-//   - discover: files (transcripts found), skipped_sessions ({skip reason: count}).
-//   - holdings: enrollment_id, team_id, team_label, sessions (asked about).
-//   - plan: holdings_checked (false in a dry run), sessions, resume_sessions, records
-//     (before content filtering in an upload), source_bytes (each session's own files on
-//     disk; a session split across two teams counts under each), estimated_bytes (request
-//     bytes, dry run only), skipped_sessions ({skip reason: count} of the sessions
-//     planning left out: already_done, failed_previously, already_held), teams:
-//     [{enrollment_id, team_id, team_label, sessions, resume_sessions, records,
-//     source_bytes, estimated_bytes, skipped_sessions}]: every team with sessions to send
-//     or sessions planning left out, so its sessions may be 0. A team blocked while
-//     planning is counted in its team_blocked line, and is listed here too only when it
-//     also left sessions out.
-//   - session_start, session_done, session_failed, session_skipped: index and total
-//     (the session's place in the plan), enrollment_id, team_id,
-//     team_label, source_system, session_id, source_bytes; session_done adds records and
-//     bytes (sent), session_failed reason (the server's words), session_skipped reason
-//     (one of the skip reasons the summary counts).
-//   - team_blocked: enrollment_id, team_id, team_label, reason_code (a skip reason),
-//     reason (words), skipped (sessions left for another run; may be 0).
-//   - summary: summary (the object -o json prints).
-//   - error: error: {code, message}; the codes below.
+// Summary of invariants enforced here:
+//   - Every line on stdout is one JSON object with a "type" from the constants below.
+//   - The last line of a completed stream is always exactly one of "summary" or "error".
+//     If "error" is present it is last and the run failed.
+//   - Fatal errors before work begins (upload_running, not_set_up, signed_out at start,
+//     bad flags/env) emit only "error" (no "start", no "summary").
+//   - Fatal errors after "start" emit "summary" of what happened so far, then "error".
+//   - A stream ending with neither "summary" nor "error" means the process died; the
+//     reader must treat that as a failure.
+//   - Progress counts ("sessions", "index", "total") are session-team uploads.
+//     "source_bytes" is an estimate from transcript files on disk (each transcript counted
+//     once in plan.source_bytes) and is not comparable to "sent_bytes".
 const (
 	// historyLineStart opens the run: what it asked for, and which agents have history
 	// terma can read (agents[].history).
@@ -96,7 +65,7 @@ const (
 const (
 	historyErrUploadRunning = "upload_running" // another upload holds this profile's lock
 	historyErrNotSetUp      = "not_set_up"     // no `terma setup` yet, or set up for another account
-	historyErrSignedOut     = "signed_out"     // not signed in, or the sign-in was retired
+	historyErrSignedOut     = "signed_out"     // not signed in, or the sign-in was lost or retired
 	historyErrFailed        = "failed"         // anything else; exit code 1
 )
 
@@ -193,25 +162,165 @@ type historyStreamError struct {
 	Error historyStreamFailure `json:"error"`
 }
 
-// historyStream writes the --json-stream lines. A write that fails is kept and reported
-// once the run ends. (A reader that closes the pipe ends the process with SIGPIPE; the
-// next run resumes.)
-type historyStream struct {
-	enc *json.Encoder
-	err error
+type writeDeadlineSetter interface {
+	SetWriteDeadline(time.Time) error
 }
 
-func newHistoryStream(w io.Writer) *historyStream {
-	return &historyStream{enc: json.NewEncoder(w)}
+type streamWriteReq struct {
+	data []byte
+	done chan error
+}
+
+// finalWriteTimeout bounds how long a cancelled run waits to flush its final summary or
+// error line when stdout is backed up by a reader that stopped draining the pipe.
+const finalWriteTimeout = 250 * time.Millisecond
+
+// historyStream writes the --json-stream lines through a dedicated writer goroutine so
+// cancelling the run context interrupts a blocked stdout pipe rather than holding the
+// upload lock forever. A write that fails is kept and reported once the run ends.
+type historyStream struct {
+	ctx        context.Context
+	w          io.Writer
+	reqs       chan streamWriteReq
+	writerDone chan struct{}
+	started    bool
+	aborted    bool
+	closed     bool
+	err        error
+}
+
+func newHistoryStream(ctx context.Context, w io.Writer) *historyStream {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	s := &historyStream{
+		ctx:        ctx,
+		w:          w,
+		reqs:       make(chan streamWriteReq),
+		writerDone: make(chan struct{}),
+	}
+	go s.runWriter()
+	return s
+}
+
+func (s *historyStream) runWriter() {
+	defer close(s.writerDone)
+	for req := range s.reqs {
+		_, err := s.w.Write(req.data)
+		req.done <- err
+	}
+}
+
+func (s *historyStream) cancelWrite() {
+	if d, ok := s.w.(writeDeadlineSetter); ok {
+		_ = d.SetWriteDeadline(time.Now())
+	}
+}
+
+func (s *historyStream) abort() {
+	s.aborted = true
+	s.cancelWrite()
+}
+
+func (s *historyStream) close() {
+	if s.closed {
+		return
+	}
+	s.closed = true
+	if !s.aborted {
+		close(s.reqs)
+		<-s.writerDone
+		return
+	}
+	s.cancelWrite()
+	close(s.reqs)
+	timer := time.NewTimer(50 * time.Millisecond)
+	defer timer.Stop()
+	select {
+	case <-s.writerDone:
+	case <-timer.C:
+	}
+}
+
+func encodeStreamLine(v any) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(v); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func (s *historyStream) write(v any) {
-	if err := s.enc.Encode(v); err != nil && s.err == nil {
-		s.err = err
+	if s.aborted || s.closed || s.ctx.Err() != nil {
+		return
+	}
+	data, err := encodeStreamLine(v)
+	if err != nil {
+		if s.err == nil {
+			s.err = err
+		}
+		return
+	}
+	req := streamWriteReq{data: data, done: make(chan error, 1)}
+	select {
+	case s.reqs <- req:
+	case <-s.ctx.Done():
+		s.abort()
+		return
+	}
+	select {
+	case err := <-req.done:
+		if err != nil && s.err == nil {
+			s.err = err
+		}
+	case <-s.ctx.Done():
+		s.abort()
+	}
+}
+
+// writeFinal delivers the terminal summary or error line even after ctx is cancelled (for
+// example on Ctrl-C), while bounding the wait so a stalled reader cannot block exit.
+func (s *historyStream) writeFinal(v any) {
+	if s.aborted || s.closed {
+		return
+	}
+	if s.ctx.Err() == nil {
+		s.write(v)
+		return
+	}
+	data, err := encodeStreamLine(v)
+	if err != nil {
+		if s.err == nil {
+			s.err = err
+		}
+		return
+	}
+	if d, ok := s.w.(writeDeadlineSetter); ok {
+		_ = d.SetWriteDeadline(time.Now().Add(finalWriteTimeout))
+	}
+	req := streamWriteReq{data: data, done: make(chan error, 1)}
+	timer := time.NewTimer(finalWriteTimeout)
+	defer timer.Stop()
+	select {
+	case s.reqs <- req:
+	case <-timer.C:
+		s.abort()
+		return
+	}
+	select {
+	case err := <-req.done:
+		if err != nil && s.err == nil {
+			s.err = err
+		}
+	case <-timer.C:
+		s.abort()
 	}
 }
 
 func (s *historyStream) start(dryRun bool, since time.Time, activeWindow time.Duration, reg *agents.Registry) {
+	if s.aborted || s.ctx.Err() != nil {
+		return
+	}
 	line := historyStreamStart{
 		Type:                historyLineStart,
 		DryRun:              dryRun,
@@ -224,6 +333,9 @@ func (s *historyStream) start(dryRun bool, since time.Time, activeWindow time.Du
 		line.Agents = append(line.Agents, historyStreamAgent{Name: a.Name(), DisplayName: a.DisplayName(), History: reads})
 	}
 	s.write(line)
+	if !s.aborted {
+		s.started = true
+	}
 }
 
 func (s *historyStream) progress(ev history.ProgressEvent) {
@@ -272,7 +384,7 @@ func (s *historyStream) progress(ev history.ProgressEvent) {
 }
 
 func (s *historyStream) summary(sum history.Summary) {
-	s.write(historyStreamSummary{Type: historyLineSummary, Summary: sum})
+	s.writeFinal(historyStreamSummary{Type: historyLineSummary, Summary: sum})
 }
 
 // fail writes err as the run's last line, its message on stderr too, and ends with err's
@@ -280,7 +392,7 @@ func (s *historyStream) summary(sum history.Summary) {
 func (s *historyStream) fail(stderr io.Writer, err error) error {
 	code, exit := historyErrorOf(err)
 	fmt.Fprintf(stderr, "terma history upload: %s: %v\n", code, err)
-	s.write(historyStreamError{Type: historyLineError, Error: historyStreamFailure{Code: code, Message: err.Error()}})
+	s.writeFinal(historyStreamError{Type: historyLineError, Error: historyStreamFailure{Code: code, Message: err.Error()}})
 	return exitWith(exit)
 }
 
@@ -291,7 +403,9 @@ func historyUsageError(cmd *cobra.Command, jsonStream bool, err error) error {
 	if !jsonStream && !argsAskForJSONStream(cmd.Flags(), os.Args[1:]) {
 		return err
 	}
-	return newHistoryStream(cmd.OutOrStdout()).fail(cmd.ErrOrStderr(), err)
+	s := newHistoryStream(cmd.Context(), cmd.OutOrStdout())
+	defer s.close()
+	return s.fail(cmd.ErrOrStderr(), err)
 }
 
 // argsAskForJSONStream reports whether args set --json-stream as a flag: not as the value of

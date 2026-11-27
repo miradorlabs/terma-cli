@@ -62,10 +62,11 @@ resumes unfinished sessions first.
 --json-stream prints one JSON object per line on stdout as the upload goes,
 each with a "type": start, discover, holdings, plan (what is left to send, in
 all and per team, before the first session is sent), session_start,
-session_done, session_failed, session_skipped, team_blocked, and summary (the
-summary -o json prints). A run that cannot finish ends with an error line,
-{"code","message"} under "error"; its codes and exit codes: upload_running 4,
-not_set_up 5, signed_out 6, and failed 1.`,
+session_done, session_failed, session_skipped, team_blocked, summary (the
+summary -o json prints), and error. The last line is always summary or error;
+if error is present it is last, and fatal errors before work begins emit no
+summary. Error codes and exit codes: upload_running 4, not_set_up 5,
+signed_out 6, and failed 1.`,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if err := cobra.NoArgs(cmd, args); err != nil {
 				return historyUsageError(cmd, jsonStream, err)
@@ -76,7 +77,8 @@ not_set_up 5, signed_out 6, and failed 1.`,
 			if !jsonStream {
 				return app.runHistoryUpload(cmd, sinceSpec, activeWindowSpec, dryRun, retryFailed, nil)
 			}
-			stream := newHistoryStream(cmd.OutOrStdout())
+			stream := newHistoryStream(cmd.Context(), cmd.OutOrStdout())
+			defer stream.close()
 			err := app.runHistoryUpload(cmd, sinceSpec, activeWindowSpec, dryRun, retryFailed, stream)
 			if _, coded := exitCodeOf(err); err != nil && !coded && !errors.Is(err, context.Canceled) {
 				err = stream.fail(cmd.ErrOrStderr(), err)
@@ -192,8 +194,13 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec, activeWindowSpec
 
 	var progress func(history.ProgressEvent)
 	if stream != nil {
-		stream.start(dryRun, since, activeWindow, app.agents)
-		progress = stream.progress
+		progress = func(ev history.ProgressEvent) {
+			if ev.Kind == history.ProgressStart {
+				stream.start(dryRun, since, activeWindow, app.agents)
+				return
+			}
+			stream.progress(ev)
+		}
 	} else if !asJSON && !dryRun {
 		errOut := cmd.ErrOrStderr()
 		progress = func(ev history.ProgressEvent) {
@@ -249,7 +256,9 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec, activeWindowSpec
 
 	switch {
 	case stream != nil:
-		stream.summary(sum)
+		if stream.started {
+			stream.summary(sum)
+		}
 	case asJSON:
 		if err := output.Render(cmd.OutOrStdout(), output.FormatJSON, output.Table{}, sum); err != nil {
 			return err
