@@ -488,7 +488,8 @@ export elsewhere or switches it off; setup does not check your shell, so it can 
 set up while such an export stands. A named profile (`omp --profile`) has a directory of its
 own that setup does not configure. A file one of OMP's shell commands writes is not
 attributed to its session. A `PI_CODING_AGENT_DIR` that Pi and OMP share holds both terma
-extensions, and each agent then loads the other's too.
+extensions, and each agent then loads the other's too. OMP's does nothing inside Pi, so a
+Pi session is not recorded as an OMP one.
 
 Antigravity's `agy` has no telemetry export, so nothing of it passes the relay. Setup adds
 one named hook, `terma`, to `~/.gemini/config/hooks.json`, which every `agy` session loads,
