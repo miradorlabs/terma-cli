@@ -46,9 +46,10 @@ import (
 //     bytes, dry run only), skipped_sessions ({skip reason: count} of the sessions
 //     planning left out: already_done, failed_previously, already_held), teams:
 //     [{enrollment_id, team_id, team_label, sessions, resume_sessions, records,
-//     source_bytes, estimated_bytes, skipped_sessions}]: a team with sessions to send or
-//     sessions planning left out, so its sessions may be 0; a team blocked while planning
-//     is in its team_blocked line instead.
+//     source_bytes, estimated_bytes, skipped_sessions}]: every team with sessions to send
+//     or sessions planning left out, so its sessions may be 0. A team blocked while
+//     planning is counted in its team_blocked line, and is listed here too only when it
+//     also left sessions out.
 //   - session_start, session_done, session_failed, session_skipped: index and total
 //     (the session's place in the plan), enrollment_id, team_id,
 //     team_label, source_system, session_id, source_bytes; session_done adds records and
@@ -157,7 +158,7 @@ type historyStreamSession struct {
 	historyStreamTeam
 	SourceSystem string `json:"source_system"`
 	SessionID    string `json:"session_id"`
-	SourceBytes  int64  `json:"source_bytes,omitempty"`
+	SourceBytes  int64  `json:"source_bytes"` // 0 when the session's files could not be read
 	Records      *int   `json:"records,omitempty"`
 	Bytes        *int64 `json:"bytes,omitempty"`
 	Reason       string `json:"reason,omitempty"`

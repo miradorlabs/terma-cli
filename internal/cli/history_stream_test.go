@@ -398,6 +398,49 @@ func TestHistoryUploadJSONStreamErrorCodes(t *testing.T) {
 	})
 }
 
+// Arguments the command does not take end a --json-stream run with an error line too.
+func TestHistoryUploadJSONStreamUsageErrors(t *testing.T) {
+	useDirs(t, t.TempDir(), t.TempDir())
+	for _, args := range [][]string{
+		{"history", "upload", "--json-stream", "--no-such-flag"},
+		{"history", "upload", "--json-stream", "--active-window"},
+		{"history", "upload", "--json-stream", "extra"},
+	} {
+		out, _, err := termaRun{}.exec(t, args...)
+		if code, ok := exitCodeOf(err); !ok || code != 1 {
+			t.Fatalf("%v: exit = %v, want 1\n%s", args, err, out)
+		}
+		if code, _ := lastError(t, out); code != historyErrFailed {
+			t.Errorf("%v: error code %s, want %s", args, code, historyErrFailed)
+		}
+	}
+	_, _, err := termaRun{}.exec(t, "history", "upload", "--no-such-flag")
+	if err == nil {
+		t.Error("text mode took an unknown flag")
+	} else if _, coded := exitCodeOf(err); coded {
+		t.Errorf("text mode's flag error ended with an exit code of its own: %v", err)
+	}
+}
+
+func TestArgsAskForJSONStream(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		args []string
+		want bool
+	}{
+		{[]string{"history", "upload", "--no-such-flag", "--json-stream"}, true},
+		{[]string{"history", "upload", "--json-stream=true", "--bogus"}, true},
+		{[]string{"history", "upload", "--json-stream=false", "--bogus"}, false},
+		{[]string{"history", "upload", "--since", "--json-stream", "--bogus"}, false},
+		{[]string{"history", "upload", "--bogus", "--", "--json-stream"}, false},
+		{[]string{"history", "upload", "--bogus"}, false},
+	} {
+		if got := argsAskForJSONStream(c.args); got != c.want {
+			t.Errorf("%v = %v, want %v", c.args, got, c.want)
+		}
+	}
+}
+
 // --active-window sets how recently a session may have changed for it to be left out as
 // still running: one hour by default, none at zero.
 func TestHistoryUploadActiveWindow(t *testing.T) {
@@ -454,7 +497,7 @@ func TestParseHistoryActiveWindow(t *testing.T) {
 			t.Errorf("%q = (%v, %v), want %v", spec, got, err, want)
 		}
 	}
-	for _, bad := range []string{"", "-1h", "-1d", "soon", "1x"} {
+	for _, bad := range []string{"", "-1h", "-1d", "soon", "1x", "999999999d"} {
 		if _, err := parseHistoryActiveWindow(bad); err == nil {
 			t.Errorf("%q: no error", bad)
 		}

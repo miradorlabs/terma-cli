@@ -60,7 +60,7 @@ func uploadOneSession(
 		return false, nil
 	}
 	now := nowFn()
-	if now.Sub(preSnap.modTime) < activeWindow {
+	if changedWithin(now, preSnap.modTime, activeWindow) {
 		skipped(SkipActive)
 		return false, nil
 	}
@@ -100,7 +100,7 @@ func uploadOneSession(
 		skipped(statSkip)
 		return false, nil
 	}
-	if afterReadSnap != preSnap || nowFn().Sub(afterReadSnap.modTime) < activeWindow {
+	if afterReadSnap != preSnap || changedWithin(nowFn(), afterReadSnap.modTime, activeWindow) {
 		skipped(SkipActive)
 		return false, nil
 	}
@@ -118,7 +118,7 @@ func uploadOneSession(
 		if statSkip != "" {
 			return &preAttemptStopError{skipReason: statSkip, reason: "session transcript changed or removed during upload", active: true}
 		}
-		if snap != preSnap || curNow.Sub(snap.modTime) < activeWindow {
+		if snap != preSnap || changedWithin(curNow, snap.modTime, activeWindow) {
 			return &preAttemptStopError{skipReason: SkipActive, reason: "session transcript modified during upload", active: true}
 		}
 		checkState, checkTeam, checkSkip, checkReason, ok := recheckRouteTeam(opts, b.team.EnrollmentID, curNow)
@@ -262,7 +262,7 @@ func uploadOneSession(
 		skipped(statSkip)
 		return false, nil
 	}
-	if postSnap != preSnap || nowFn().Sub(postSnap.modTime) < activeWindow {
+	if postSnap != preSnap || changedWithin(nowFn(), postSnap.modTime, activeWindow) {
 		skipped(SkipActive)
 		return false, nil
 	}
@@ -280,6 +280,13 @@ func uploadOneSession(
 	done.Index, done.Total, done.Records, done.Bytes = idx, total, totalRecs, totalBytes
 	report(done)
 	return false, nil
+}
+
+// changedWithin reports whether files changed at mod are still within window of now. A
+// zero window counts nothing as changed within it, a modification time in the future
+// included.
+func changedWithin(now, mod time.Time, window time.Duration) bool {
+	return window > 0 && now.Sub(mod) < window
 }
 
 func stopRouteWithIssue(b *routeBucket, remaining int, skipReason, reason string, report func(ProgressEvent), sum *Summary) bool {

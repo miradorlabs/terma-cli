@@ -92,7 +92,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 				return nil
 			}
 			modTime := info.ModTime()
-			active := now.Sub(modTime) < activeWindow
+			active := activeWindow > 0 && now.Sub(modTime) < activeWindow
 			outside := !opts.Since.IsZero() && modTime.Before(opts.Since)
 			sid := codexSessionIDFromFilename(base)
 			metaID, parentID, peekFailed := peekCodexRolloutMeta(path)

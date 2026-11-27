@@ -194,3 +194,50 @@ func (f checkerFunc) Check(_ context.Context, team routing.Team, _ []string) (He
 	}
 	return NewHeldSet(), nil
 }
+
+// A planned session that turns out to be in progress when its turn comes ends in a
+// session_skipped event with its place in the plan.
+func TestPlannedSessionSkippedDuringUploadIsReported(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	repoA := initTestGitRepo(t, "https://github.com/org-a/repo-a.git")
+	st := singleTeamRoutingState(now, "acc1", "org-a", "team-a", "github.com/org-a/repo-a", true, true)
+	// Discovery does not mark it active; the uploader's own check, just before reading,
+	// finds it changed within the window.
+	src := &stubHistorySource{
+		source: "claude",
+		files:  []agents.HistoryFile{{SourceSystem: "claude", SessionID: "s-live", ModTime: now.Add(-10 * time.Minute)}},
+		segments: map[string][]agents.HistorySegment{
+			"s-live": {makeNativeSegment("claude", "s-live", repoA, "p", now.Add(-10*time.Minute))},
+		},
+	}
+	var events []ProgressEvent
+	sum, err := Upload(context.Background(), Options{
+		StateDir: t.TempDir(), Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
+		State: st, Sources: []agents.HistorySource{src}, Filter: relay.NewContentFilter(nil), Holdings: stubHoldings{},
+		Transport: &Transport{Version: "test", HTTP: http.DefaultClient, BytesPerSec: 1 << 30},
+		Now:       func() time.Time { return now },
+		Progress:  func(ev ProgressEvent) { events = append(events, ev) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := checkPlanAccounting(t, events)
+	last := events[len(events)-1]
+	if plan.Sessions != 1 || last.Kind != ProgressSessionSkipped || last.SkipReason != SkipActive || last.Overall != 1 || sum.SkippedSessions[SkipActive] != 1 {
+		t.Fatalf("plan %d sessions, last event %+v, skipped %v; want the one planned session skipped as active", plan.Sessions, last, sum.SkippedSessions)
+	}
+}
+
+// A zero window counts nothing as changed within it, a modification time in the future
+// (clock skew, a restored file) included.
+func TestChangedWithinZeroWindow(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	if changedWithin(now, now.Add(time.Hour), 0) || changedWithin(now, now, 0) {
+		t.Error("a zero window counted a file as changed within it")
+	}
+	if !changedWithin(now, now.Add(-time.Minute), time.Hour) || changedWithin(now, now.Add(-2*time.Hour), time.Hour) {
+		t.Error("a one-hour window misjudged a file")
+	}
+}

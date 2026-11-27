@@ -88,7 +88,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 			if extraMod.After(modTime) {
 				modTime = extraMod
 			}
-			active := now.Sub(modTime) < activeWindow
+			active := activeWindow > 0 && now.Sub(modTime) < activeWindow
 			outside := !opts.Since.IsZero() && modTime.Before(opts.Since)
 			sid := stem
 			if !session.ValidID(sid) && !outside && !active {

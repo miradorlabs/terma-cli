@@ -75,6 +75,18 @@ func TestCodexDiscoverHistoryFiltersDeduplicatesAndMarksActive(t *testing.T) {
 	if f := byID["33333333-3333-3333-3333-333333333333"]; f.Active || !f.OutsideSince {
 		t.Errorf("old file = %+v, want OutsideSince=true", f)
 	}
+
+	// A zero window marks nothing active, a rollout dated in the future included.
+	writeRollout("sessions/2026/11/25/rollout-2026-11-25T13-00-00-44444444-4444-4444-4444-444444444444.jsonl", "44444444-4444-4444-4444-444444444444", now.Add(time.Hour))
+	files, err = (Agent{}).DiscoverHistory(context.Background(), agents.HistoryDiscoverOptions{Since: now.Add(-90 * 24 * time.Hour), Now: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range files {
+		if f.Active {
+			t.Errorf("with a zero window, %s is active", f.SessionID)
+		}
+	}
 }
 
 func TestCodexReadHistoryResumedRolloutFidelityAndContentFilter(t *testing.T) {

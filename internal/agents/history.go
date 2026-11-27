@@ -45,7 +45,7 @@ type HistoryDiscoverOptions struct {
 	// Now is the reference wall clock for ActiveWindow; defaults to time.Now when zero.
 	Now time.Time
 	// ActiveWindow is how recently a file must be modified to count as still in progress;
-	// zero (or less) counts none as in progress.
+	// zero (or less) counts none as in progress, a modification time in the future included.
 	ActiveWindow time.Duration
 }
 

@@ -67,7 +67,12 @@ session_done, session_failed, session_skipped, team_blocked, and summary (the
 summary -o json prints). A run that cannot finish ends with an error line,
 {"code","message"} under "error"; its codes and exit codes: upload_running 4,
 not_set_up 5, signed_out 6, and failed 1.`,
-		Args: cobra.NoArgs,
+		Args: func(cmd *cobra.Command, args []string) error {
+			if err := cobra.NoArgs(cmd, args); err != nil {
+				return historyUsageError(cmd, jsonStream, err)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if !jsonStream {
 				return app.runHistoryUpload(cmd, sinceSpec, activeWindowSpec, dryRun, retryFailed, nil)
@@ -86,9 +91,47 @@ not_set_up 5, signed_out 6, and failed 1.`,
 	cmd.Flags().StringVar(&sinceSpec, "since", defaultHistorySince, "include sessions modified within this window (e.g. 90d, 48h, or 2026-08-01)")
 	cmd.Flags().StringVar(&activeWindowSpec, "active-window", defaultHistoryActiveWindow, "skip sessions modified within this window as still in progress (e.g. 1h, 30m, or 0 for none)")
 	cmd.Flags().BoolVar(&jsonStream, "json-stream", false, "print progress as JSON lines on stdout, ending with the summary or an error")
+	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		return historyUsageError(cmd, jsonStream, err)
+	})
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "list what would be uploaded, to which team, and its estimated size without sending or writing state")
 	cmd.Flags().BoolVar(&retryFailed, "retry-failed", false, "try again the sessions a team rejected in an earlier run")
 	return cmd
+}
+
+// historyUsageError reports arguments `history upload` does not take. A --json-stream run
+// ends with an error line, as every other failure of one does. Flags are read up to the
+// one refused, so --json-stream after it is looked for in the process's arguments.
+func historyUsageError(cmd *cobra.Command, jsonStream bool, err error) error {
+	if !jsonStream && !argsAskForJSONStream(os.Args[1:]) {
+		return err
+	}
+	return newHistoryStream(cmd.OutOrStdout()).fail(cmd.ErrOrStderr(), err)
+}
+
+// argsAskForJSONStream reports whether args set --json-stream as a flag: not as the value of
+// a flag that takes one, and not set to false.
+func argsAskForJSONStream(args []string) bool {
+	takesValue := map[string]bool{
+		"--since": true, "--active-window": true, "--output": true, "-o": true, "--team": true, "-t": true,
+		"--profile": true, "--env": true, "--api-url": true, "--auth-url": true, "--app-url": true, "--otlp-url": true,
+	}
+	asked := false
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--":
+			return asked
+		case takesValue[a]:
+			i++
+		case a == "--json-stream":
+			asked = true
+		case strings.HasPrefix(a, "--json-stream="):
+			v, err := strconv.ParseBool(strings.TrimPrefix(a, "--json-stream="))
+			asked = err == nil && v
+		}
+	}
+	return asked
 }
 
 // runHistoryUpload runs the upload, reporting to stream when it is not nil and to the
@@ -305,54 +348,6 @@ func hasNewHistoryFailures(sum history.Summary) bool {
 		}
 	}
 	return false
-}
-
-// parseHistoryWindow reads a window as a number of days (90d) or a Go duration (48h, 30m,
-// 0). ok is false when spec is neither.
-func parseHistoryWindow(spec string) (d time.Duration, ok bool) {
-	if days, found := strings.CutSuffix(spec, "d"); found && days != "" {
-		n, err := strconv.Atoi(days)
-		if err != nil {
-			return 0, false
-		}
-		return time.Duration(n) * 24 * time.Hour, true
-	}
-	d, err := time.ParseDuration(spec)
-	return d, err == nil
-}
-
-// parseHistorySince parses --since as a positive relative window (e.g. 90d, 24h) or an
-// absolute date/timestamp (2006-01-02 or RFC3339).
-func parseHistorySince(spec string, now time.Time) (time.Time, error) {
-	s := strings.TrimSpace(spec)
-	if s == "" {
-		return time.Time{}, errors.New("--since cannot be empty")
-	}
-	if d, ok := parseHistoryWindow(s); ok {
-		if d <= 0 {
-			return time.Time{}, fmt.Errorf("invalid --since %q: the window must be positive", spec)
-		}
-		return now.Add(-d), nil
-	}
-	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t, nil
-	}
-	if t, err := time.Parse("2006-01-02", s); err == nil {
-		return t.UTC(), nil
-	}
-	return time.Time{}, fmt.Errorf("invalid --since %q: use a duration like 90d or 48h, or a date like 2026-08-01", spec)
-}
-
-// parseHistoryActiveWindow parses --active-window as a window of zero or more (1h, 30m, 0).
-func parseHistoryActiveWindow(spec string) (time.Duration, error) {
-	d, ok := parseHistoryWindow(strings.TrimSpace(spec))
-	switch {
-	case !ok:
-		return 0, fmt.Errorf("invalid --active-window %q: use a duration like 1h or 30m, or 0 to skip none", spec)
-	case d < 0:
-		return 0, fmt.Errorf("invalid --active-window %q: the window cannot be negative", spec)
-	}
-	return d, nil
 }
 
 func renderHistoryProgress(w io.Writer, ev history.ProgressEvent) {
