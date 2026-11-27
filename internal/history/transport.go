@@ -29,6 +29,7 @@ const (
 	defaultMaxRetries     = 5
 	maxResponseBytes      = 64 << 10
 	otlpLogsPath          = "/v1/logs"
+	otlpTracesPath        = "/v1/traces"
 )
 
 // PermanentError reports that the ingest gateway permanently rejected records (for example,
@@ -112,9 +113,10 @@ type TransientError struct {
 func (e *TransientError) Error() string { return e.Err.Error() }
 func (e *TransientError) Unwrap() error { return e.Err }
 
-// SendRequest describes one OTLP /v1/logs POST on a route.
+// SendRequest describes one OTLP POST (/v1/logs or /v1/traces) on a route.
 type SendRequest struct {
 	Endpoint      string
+	Path          string
 	TeamID        string
 	Account       string
 	ServerKey     string
@@ -122,8 +124,16 @@ type SendRequest struct {
 	BeforeAttempt func(ctx context.Context) error
 }
 
-// Transport delivers historical OTLP log chunks directly to /v1/logs without touching the
-// shared live relay outbox. One pacer instance per route enforces serial delivery at 2 MiB/s.
+func (r SendRequest) signalPath() string {
+	if r.Path != "" {
+		return r.Path
+	}
+	return otlpLogsPath
+}
+
+// Transport delivers historical OTLP chunks directly to /v1/logs or /v1/traces without
+// touching the shared live relay outbox. One pacer instance per route enforces serial
+// delivery at 2 MiB/s.
 type Transport struct {
 	Version        string
 	HTTP           *http.Client
@@ -263,7 +273,7 @@ func (p *RoutePacer) Send(ctx context.Context, req SendRequest) error {
 				return ctx.Err()
 			}
 			if attempt >= maxRetries {
-				return &TransientError{Err: fmt.Errorf("post %s: %w", otlpLogsPath, doErr)}
+				return &TransientError{Err: fmt.Errorf("post %s: %w", req.signalPath(), doErr)}
 			}
 			if err := t.sleep(ctx, backoff); err != nil {
 				return err
@@ -364,7 +374,7 @@ func (t *Transport) credential(ctx context.Context, req SendRequest) (bearer str
 }
 
 func (t *Transport) postOnce(ctx context.Context, client *http.Client, req SendRequest, bearer string, nameProject bool) (int, []byte, string, error) {
-	target := strings.TrimRight(req.Endpoint, "/") + otlpLogsPath
+	target := strings.TrimRight(req.Endpoint, "/") + req.signalPath()
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, target, bytes.NewReader(req.Body))
 	if err != nil {
 		return 0, nil, "", err

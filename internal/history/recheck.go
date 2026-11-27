@@ -62,6 +62,9 @@ func statHistoryFile(f agents.HistoryFile) (fileSnapshot, string) {
 			return fileSnapshot{}, reason
 		}
 	}
+	for _, p := range f.SeenWatchFiles {
+		known[filepath.Clean(p)] = true
+	}
 	for _, dir := range f.WatchDirs {
 		entries, err := os.ReadDir(dir)
 		if err != nil {
@@ -323,7 +326,7 @@ func measureDryRunSession(
 		}
 		prepared, n, mixedDropped := prepareSegmentFiltered(seg, opts.Filter, target.Team.Policy, buildStampOptions(opts, target, userIDFor), snap, lookup, reachMixedAt, hasReachMixed, resumeMax)
 		sum.WithheldRecords += mixedDropped
-		if n == 0 || prepared == nil {
+		if n == 0 || prepared.Empty() {
 			if mixedDropped > 0 {
 				sum.addSkippedSegment(SkipMixed, 1)
 			} else {
@@ -338,7 +341,7 @@ func measureDryRunSession(
 		if tooLarge[eid] {
 			return nil
 		}
-		return noteChunkErr(eid, writerFor(eid).Add(prepared))
+		return noteChunkErr(eid, writerFor(eid).AddPrepared(prepared))
 	})
 	if err != nil {
 		return byRoute, err

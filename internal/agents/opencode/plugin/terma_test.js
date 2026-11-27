@@ -1038,8 +1038,9 @@ test("a session under one that went dark is not exported", async () => {
 test("the exit waits a bounded time for its own sessions' queues, and not for another entry's", async () => {
   const { mod, hooks: b } = await start({}, { source: SOURCE.replace("const EXIT_QUEUE_MS = 8000", "const EXIT_QUEUE_MS = 1000") })
   const a = await mod.default.server({ client: fakeClient(null), directory: "/other", worktree: "/other" })
-  // b's session waits RECORD_WAIT_MS, 5 s, for a record that never comes.
-  await b["chat.message"]({ sessionID: "ses_wait" }, { message: { id: "msg_u" }, parts: [{ type: "text", text: "hi" }] })
+  // b's session waits RECORD_WAIT_MS, 5 s, for a record that never comes (and so does the
+  // prompt hook, for the first claim: the exit does not wait for it).
+  void b["chat.message"]({ sessionID: "ses_wait" }, { message: { id: "msg_u" }, parts: [{ type: "text", text: "hi" }] })
   let began = Date.now()
   await a.dispose()
   expect(Date.now() - began).toBeLessThan(500)
@@ -1381,12 +1382,13 @@ test("a prompt with an attachment waits for its reach check and is stamped after
   const delayed = { "opencode-tool-reach": 0.3, "opencode-session-start": 0.3 }
   const { r, hooks } = await start({}, { terma: { delayed } })
   const done = (e) => finishedAt(r.dir, e)
-  const message = (id, parts) => ({ message: { id, time: { created: 1500 } }, parts })
+  const message = (id, parts, created = 1500) => ({ message: { id, time: { created } }, parts })
 
-  // No attachment: OpenCode goes on at once, before the slow claim, at the message's time.
+  // No attachment, once the session is claimed: OpenCode goes on at once, at the message's time.
   await hooks.event(sessionCreated("ses_plain"))
+  await hooks["chat.message"]({ sessionID: "ses_plain" }, message("msg_first", [{ type: "text", text: "first" }]))
   const t0 = Date.now()
-  await hooks["chat.message"]({ sessionID: "ses_plain" }, message("msg_plain", [{ type: "text", text: "hi" }]))
+  await hooks["chat.message"]({ sessionID: "ses_plain" }, message("msg_plain", [{ type: "text", text: "hi" }], t0))
   expect(Date.now() - t0).toBeLessThan(200)
 
   await hooks.event(sessionCreated("ses_att"))
@@ -1402,8 +1404,50 @@ test("a prompt with an attachment waits for its reach check and is stamped after
   await hooks.dispose()
 
   const at = (id) => Number(BigInt(named(r.logs(), "opencode.user_prompt").find((l) => A(l)["opencode.message.id"] === id).timeUnixNano) / 1000000n)
-  expect(at("msg_plain")).toBe(1500)
+  expect(at("msg_plain")).toBe(t0)
   expect(at("msg_att")).toBeGreaterThan(finished)
+}, 15_000)
+
+// A resumed session's run starts at its claim; the run before may be paused. OpenCode 1 stamps
+// the prompt with its own time, before this process claimed the session.
+test("a resumed session's first prompt is stamped after its claim, and no call or tool of its turn starts before it", async () => {
+  const record = { id: "ses_res", directory: "/repo", version: "1.19.6", title: "Resumed title", time: { created: 1000 } }
+  const { r, hooks } = await start({}, { client: fakeClient((id) => (id === "ses_res" ? record : null)), terma: { delayed: { "opencode-session-start": 0.3 } } })
+  const ms = (ns) => Number(BigInt(ns) / 1000000n)
+  const asked = Date.now()
+  await hooks["chat.message"]({ sessionID: "ses_res" }, { message: { id: "msg_u", time: { created: asked - 20 } }, parts: [{ type: "text", text: "again" }] })
+  // OpenCode 1 waits for the hook before it starts the turn: the turn's call and tool start now.
+  const turn = Date.now()
+  const claimed = finishedAt(r.dir, "opencode-session-start")
+  expect(claimed).toBeNumber()
+  expect(turn).toBeGreaterThanOrEqual(Math.floor(claimed))
+  const msg = { id: "msg_a", sessionID: "ses_res", role: "assistant", parentID: "msg_u", modelID: "m1", providerID: "p1", mode: "build", time: { created: turn } }
+  await hooks.event(ev("message.updated", { info: msg }))
+  await hooks["tool.execute.before"]({ tool: "read", sessionID: "ses_res", callID: "c1" }, { args: { filePath: "/repo/a.txt" } })
+  await hooks.event(toolPart("ses_res", "msg_a", "c1", "read", done({ filePath: "/repo/a.txt" }, "a", { time: { start: turn + 1, end: turn + 2 } })))
+  await hooks.event(ev("message.updated", { info: { ...msg, cost: 0, tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } }, finish: "stop", time: { created: turn, completed: turn + 3 } } }))
+  // A later prompt OpenCode gave no time is stamped when it came, never back at the claim.
+  await new Promise((done) => setTimeout(done, 50))
+  const untimed = Date.now()
+  await hooks["chat.message"]({ sessionID: "ses_res" }, { message: { id: "msg_v" }, parts: [{ type: "text", text: "no time" }] })
+  await hooks.dispose()
+
+  const prompts = named(r.logs(), "opencode.user_prompt")
+  const p = prompts.find((l) => A(l)["opencode.message.id"] === "msg_u")
+  const v = prompts.find((l) => A(l)["opencode.message.id"] === "msg_v")
+  expect(ms(v.timeUnixNano)).toBeGreaterThanOrEqual(untimed)
+  const at = ms(p.timeUnixNano)
+  expect(at).toBeGreaterThanOrEqual(Math.floor(claimed))
+  expect(at).toBeLessThanOrEqual(turn)
+  // The title the session came with is not held to the claim: it may have been given while
+  // the session was paused, and the relay judges it by when it was seen, before the claim.
+  const [titled] = named(r.logs(), "opencode.session.title")
+  expect(titled.body.stringValue).toBe("Resumed title")
+  expect(ms(titled.timeUnixNano)).toBeGreaterThanOrEqual(asked)
+  expect(ms(titled.timeUnixNano)).toBeLessThan(Math.floor(claimed))
+  const turnSpans = r.spans().filter((sp) => A(sp)["opencode.parent_message.id"] === "msg_u")
+  expect(turnSpans.map((sp) => sp.name).sort()).toEqual(["chat m1", "execute_tool read"])
+  for (const sp of turnSpans) expect(ms(sp.startTimeUnixNano)).toBeGreaterThanOrEqual(at)
 }, 15_000)
 
 test("a patch that moves a file names both paths", async () => {
@@ -1660,13 +1704,15 @@ test("waiting batches are dropped by size too, oldest first, and the bytes waiti
 
 test("a record that arrives while a session waits for one is picked up when it arrives", async () => {
   const { r, hooks } = await start()
-  // No record and no way to ask OpenCode for one: the session waits.
-  await hooks["chat.message"]({ sessionID: "ses_late" }, { message: { id: "msg_u" }, parts: [{ type: "text", text: "hi" }] })
+  // No record and no way to ask OpenCode for one: the session waits, and its first prompt
+  // with it, for the claim.
+  const asked = hooks["chat.message"]({ sessionID: "ses_late" }, { message: { id: "msg_u" }, parts: [{ type: "text", text: "hi" }] })
   await Bun.sleep(100)
   const began = Date.now()
   await hooks.event(sessionCreated("ses_late"))
   for (let i = 0; i < 200 && !r.terma.calls().some((c) => c.event === "opencode-session-start"); i++) await Bun.sleep(10)
   expect(Date.now() - began).toBeLessThan(1000)
+  await asked
   await hooks.dispose()
   expect(r.terma.calls().map((c) => c.event)).toEqual(["opencode-session-start", "opencode-prompt"])
   expect(globalThis[KEY].sessions.get("ses_late").recordArrived).toBeNull()
@@ -3386,6 +3432,31 @@ test("a call that ends while its session is still being claimed is held to its p
   expect(ms(t.timeUnixNano)).toBeGreaterThanOrEqual(at)
 })
 
+// A resumed session's title comes with its record, read before the claim. It keeps the time
+// it was seen, as it may have been given while the session was paused: the relay judges it
+// by that. The prompt is held to the claim.
+test("a resumed session's title read before its claim keeps its time; its prompt is stamped after the claim; a later rename keeps its time", async () => {
+  const { r, oc, close } = await start2({}, { get: (id) => (id === sid2 ? record2({ title: "Resumed title" }) : null), terma: { delayed: { "opencode-session-start": 0.2 } } })
+  const ms = (ns) => Number(BigInt(ns) / 1000000n)
+  const asked = Date.now()
+  await oc.hook("session.prompt", { sessionID: sid2, messageID: "msg_A", prompt: { text: "hi" } })
+  await oc.event(e2("session.inbox.delivered", asked + 5, { inboxID: "msg_A" }))
+  await each(step2(oc, "msg_s1", { start: asked + 20, end: asked + 400 }))
+  await quiet2()
+  // Once claimed, as on a session that never paused: the rename's own time.
+  const renamed = Date.now() + 50
+  await oc.event(e2("session.renamed", renamed, { title: "A new title" }))
+  await close()
+
+  const claimed = Math.floor(finishedAt(r.dir, "opencode-session-start"))
+  const titles = Object.fromEntries(named(r.logs(), "opencode.session.title").map((l) => [l.body.stringValue, ms(l.timeUnixNano)]))
+  expect(Object.keys(titles).sort()).toEqual(["A new title", "Resumed title"])
+  expect(titles["Resumed title"]).toBeLessThan(claimed)
+  expect(titles["A new title"]).toBe(renamed)
+  const [p] = named(r.logs(), "opencode.user_prompt")
+  expect(ms(p.timeUnixNano)).toBeGreaterThanOrEqual(claimed)
+})
+
 test("a title call never ends before it began, whatever time OpenCode gave the rename", async () => {
   const { r, oc, close } = await start2()
   const ms = (ns) => Number(BigInt(ns) / 1000000n)
@@ -4002,11 +4073,19 @@ async function sameThrough1() {
   const mod = await load(r.config)
   const h = await mod.default.server({ client: fakeClient(null), directory: SAME.directory, worktree: SAME.directory })
   const info = { id: SAME.id, directory: SAME.directory, version: "1.19.6", title: "New session - 2026-11-25T00:00:00.000Z", time: { created: SAME.created } }
-  await h.event(ev("session.created", { info }))
-  await h["chat.message"](
-    { sessionID: SAME.id },
-    { message: { id: SAME.prompt.id, agent: "build", model: { modelID: "m1", providerID: "p1" }, time: { created: SAME.prompt.time } }, parts: [{ type: "text", text: SAME.prompt.text }] },
-  )
+  // The prompt is stamped no earlier than the session's claim, which in this scenario is
+  // done at the prompt's moment, as on OpenCode 2.
+  const realNow = Date.now
+  Date.now = () => SAME.prompt.time
+  try {
+    await h.event(ev("session.created", { info }))
+    await h["chat.message"](
+      { sessionID: SAME.id },
+      { message: { id: SAME.prompt.id, agent: "build", model: { modelID: "m1", providerID: "p1" }, time: { created: SAME.prompt.time } }, parts: [{ type: "text", text: SAME.prompt.text }] },
+    )
+  } finally {
+    Date.now = realNow
+  }
   await h["chat.params"]({ sessionID: SAME.id, agent: "title", model: { id: SAME.title.model, providerID: SAME.title.provider }, message: { id: SAME.prompt.id } }, {})
   for (const step of SAME.steps) {
     const msg = { id: step.id, sessionID: SAME.id, role: "assistant", parentID: SAME.prompt.id, modelID: step.model, providerID: step.provider, mode: step.agent, time: { created: step.start } }
