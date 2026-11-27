@@ -1,0 +1,90 @@
+{
+ "cwd": "/home/user/work/repo",
+ "home": "/home/user",
+ "cases": [
+  {
+   "input": "notes.txt",
+   "resolved": "/home/user/work/repo/notes.txt"
+  },
+  {
+   "input": "./src/a.go",
+   "resolved": "/home/user/work/repo/src/a.go"
+  },
+  {
+   "input": "../other/secret.go",
+   "resolved": "/home/user/work/other/secret.go"
+  },
+  {
+   "input": "/abs/file.txt",
+   "resolved": "/abs/file.txt"
+  },
+  {
+   "input": "/abs/../up.txt",
+   "resolved": "/up.txt"
+  },
+  {
+   "input": "@notes.txt",
+   "resolved": "/home/user/work/repo/notes.txt"
+  },
+  {
+   "input": "@/abs/at.txt",
+   "resolved": "/abs/at.txt"
+  },
+  {
+   "input": "@../other/x.txt",
+   "resolved": "/home/user/work/other/x.txt"
+  },
+  {
+   "input": "~",
+   "resolved": "/home/user"
+  },
+  {
+   "input": "~/notes.txt",
+   "resolved": "/home/user/notes.txt"
+  },
+  {
+   "input": "@~/notes.txt",
+   "resolved": "/home/user/notes.txt"
+  },
+  {
+   "input": "~other/x.txt",
+   "resolved": "/home/user/work/repo/~other/x.txt"
+  },
+  {
+   "input": "file:///home/user/work/other/secret.go",
+   "resolved": "/home/user/work/other/secret.go"
+  },
+  {
+   "input": "file:///home/user/with%20space/a.txt",
+   "resolved": "/home/user/with space/a.txt"
+  },
+  {
+   "input": "@file:///home/user/work/other/at.txt",
+   "resolved": "/home/user/work/other/at.txt"
+  },
+  {
+   "input": "a b.txt",
+   "resolved": "/home/user/work/repo/a b.txt"
+  },
+  {
+   "input": "dir name/x　y.txt",
+   "resolved": "/home/user/work/repo/dir name/x y.txt"
+  },
+  {
+   "input": "src//double///slash.go",
+   "resolved": "/home/user/work/repo/src/double/slash.go"
+  },
+  {
+   "input": "trailing/",
+   "resolved": "/home/user/work/repo/trailing"
+  },
+  {
+   "input": ".",
+   "resolved": "/home/user/work/repo"
+  },
+  {
+   "input": "",
+   "resolved": "/home/user/work/repo"
+  }
+ ]
+}

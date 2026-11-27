@@ -9,8 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -130,7 +128,7 @@ export default function () {}
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"/custom/terma"`, `"http://127.0.0.1:43180"`, `"-tool-reach"`} {
+	for _, want := range []string{`"/custom/terma"`, `"http://127.0.0.1:43180"`, `"tool-reach"`} {
 		if !strings.Contains(string(data), want) {
 			t.Errorf("refreshed extension missing %s", want)
 		}
@@ -140,19 +138,12 @@ export default function () {}
 	}
 }
 
-func TestPiToolReachFailsClosedAndResultFallbackAwaitsUnderNode(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("POSIX shell hook test")
-	}
-	node, err := exec.LookPath("node")
-	if err != nil {
-		t.Skip("node is not installed")
-	}
-	if out, err := exec.Command(node, "-p", "process.features.typescript").Output(); err != nil || !slices.Contains([]string{"strip", "transform"}, strings.TrimSpace(string(out))) {
-		t.Skip("node does not run TypeScript")
-	}
+// A failed reach check fences the session: nothing more of it is exported until a new run
+// starts it again; and a tool span ends only after its reach check has answered.
+func TestPiToolReachFailsClosedUnderNode(t *testing.T) {
+	node := nodeForTest(t)
 	dir := t.TempDir()
-	reachDoneMarker := filepath.Join(dir, "fallback.done")
+	reachDoneMarker := filepath.Join(dir, "reach.done")
 
 	type seenSpan struct {
 		Name    string
@@ -161,7 +152,6 @@ func TestPiToolReachFailsClosedAndResultFallbackAwaitsUnderNode(t *testing.T) {
 	}
 	var mu sync.Mutex
 	var spans []seenSpan
-	var sawMarkerBeforeFallbackSpan bool
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		if r.URL.Path == "/v1/traces" {
@@ -182,7 +172,6 @@ func TestPiToolReachFailsClosedAndResultFallbackAwaitsUnderNode(t *testing.T) {
 				} `json:"resourceSpans"`
 			}
 			if json.Unmarshal(body, &req) == nil {
-				_, markerErr := os.Stat(reachDoneMarker)
 				mu.Lock()
 				for _, rs := range req.ResourceSpans {
 					for _, ss := range rs.ScopeSpans {
@@ -195,9 +184,6 @@ func TestPiToolReachFailsClosedAndResultFallbackAwaitsUnderNode(t *testing.T) {
 							}
 							endNano, _ := strconv.ParseInt(sp.EndTimeUnixNano, 10, 64)
 							spans = append(spans, seenSpan{Name: sp.Name, EndNano: endNano, Session: sid})
-							if sid == "s-fallback" && sp.Name == "execute_tool read" && markerErr == nil {
-								sawMarkerBeforeFallbackSpan = true
-							}
 						}
 					}
 				}
@@ -211,15 +197,11 @@ func TestPiToolReachFailsClosedAndResultFallbackAwaitsUnderNode(t *testing.T) {
 	hook := filepath.Join(dir, "hook.sh")
 	hookSrc := "#!/bin/sh\n" +
 		"payload=$(cat)\n" +
-		"if [ \"$1\" = \"pi-session-start\" ]; then\n" +
-		"  case \"$payload\" in\n" +
-		"    *'\"reason\":\"resume-fail\"'*) exit 1 ;;\n" +
-		"  esac\n" +
-		"fi\n" +
 		"if [ \"$1\" = \"pi-tool-reach\" ]; then\n" +
 		"  case \"$payload\" in\n" +
+		"    *TERMA_REACH_FAILED*) exit 0 ;;\n" +
 		"    *'\"session_id\":\"s-fail\"'*) exit 1 ;;\n" +
-		"    *'\"session_id\":\"s-fallback\"'*) sleep 0.15; touch " + strconv.Quote(reachDoneMarker) + " ;;\n" +
+		"    *'\"session_id\":\"s-slow\"'*) sleep 0.15; touch " + strconv.Quote(reachDoneMarker) + " ;;\n" +
 		"  esac\n" +
 		"fi\n"
 	if err := os.WriteFile(hook, []byte(hookSrc), 0o700); err != nil {
@@ -229,30 +211,45 @@ func TestPiToolReachFailsClosedAndResultFallbackAwaitsUnderNode(t *testing.T) {
 	if _, err := writeExtension(ext, relayExtension(agents.RelayConfig{Endpoint: srv.URL, Token: "relay-token", HookCommand: []string{hook}})); err != nil {
 		t.Fatal(err)
 	}
+	host := filepath.Join(dir, "node_modules", "@earendil-works", "pi-coding-agent")
+	if err := os.MkdirAll(host, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(host, "package.json"), []byte(`{"name":"@earendil-works/pi-coding-agent","type":"module","main":"index.js"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(host, "index.js"), []byte("export const VERSION = \"1.6.1\"\nexport const CONFIG_DIR_NAME = \".pi\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	driver := `
 import { pathToFileURL } from "node:url"
 const mod = await import(pathToFileURL(process.argv[2]).href)
 const handlers = {}
-mod.default({ on: (name, fn) => { handlers[name] = fn } })
-const mkCtx = (id) => ({ cwd: "/repoA", sessionManager: { getSessionId: () => id } })
+await mod.default({ on: (name, fn) => { handlers[name] = fn } })
+const sm = (id) => ({ getSessionId: () => id, getEntries: () => [], getEntry: () => undefined, getLeafId: () => null, getHeader: () => null })
+const ctx = (id) => ({ cwd: "/repoA", mode: "print", model: { provider: "fake", id: "m" }, sessionManager: sm(id) })
+const reply = (model) => ({ role: "assistant", provider: "fake", model, stopReason: "stop", timestamp: Date.now(), durationMs: 1, content: [{ type: "text", text: "SECRET" }] })
+const read = async (id, call, path) => {
+  await handlers.tool_execution_start({ toolCallId: call, toolName: "read", args: { path } }, ctx(id))
+  await handlers.tool_call({ toolCallId: call, toolName: "read", input: { path } }, ctx(id))
+  await handlers.tool_execution_end({ toolCallId: call, toolName: "read", result: { content: [{ type: "text", text: "SECRET" }] }, isError: false, durationMs: 1 }, ctx(id))
+}
 
-// 1. Reach exits 1 -> execute_tool AND follow-up chat span for s-fail must be suppressed.
-await handlers.session_start({ reason: "startup" }, mkCtx("s-fail"))
-await handlers.tool_call({ toolCallId: "c1", toolName: "read", input: { path: "/repoB/secret.go" } }, mkCtx("s-fail"))
-await handlers.tool_result({ toolCallId: "c1", toolName: "read", input: { path: "/repoB/secret.go" }, content: "SECRET" }, mkCtx("s-fail"))
-handlers.message_end({ message: { role: "assistant", model: "m-tainted", content: [{ type: "text", text: "SECRET" }] } }, mkCtx("s-fail"))
+// 1. The reach check fails: the read and the reply that follows are not exported.
+await handlers.session_start({ reason: "startup" }, ctx("s-fail"))
+await read("s-fail", "c1", "/repoB/secret.go")
+await handlers.turn_end({ messageEntryId: "e1", message: reply("m-tainted") }, ctx("s-fail"))
 
-// 1b. A failing session_start on resume keeps s-fail tainted; a succeeding session_start clears it.
-await handlers.session_start({ reason: "resume-fail" }, mkCtx("s-fail"))
-handlers.message_end({ message: { role: "assistant", model: "m-still-tainted", content: [{ type: "text", text: "SECRET" }] } }, mkCtx("s-fail"))
-await handlers.session_start({ reason: "resume" }, mkCtx("s-fail"))
-handlers.message_end({ message: { role: "assistant", model: "m-resumed", content: [{ type: "text", text: "clean" }] } }, mkCtx("s-fail"))
+// 2. A new run of the session (a resume) starts clean.
+await handlers.session_start({ reason: "resume" }, ctx("s-fail"))
+await handlers.turn_end({ messageEntryId: "e2", message: reply("m-resumed") }, ctx("s-fail"))
 
-// 2. tool_result-only fallback (no tool_call) awaits reach BEFORE assigning end timestamp.
-await handlers.session_start({ reason: "startup" }, mkCtx("s-fallback"))
-await handlers.tool_result({ toolCallId: "c2", toolName: "read", input: { path: "/repoB/secret.go" }, content: "ok" }, mkCtx("s-fallback"))
-
-await handlers.session_shutdown({}, mkCtx("s-fallback"))
+// 3. A slow reach check: the read's span ends after it answered.
+await handlers.session_start({ reason: "startup" }, ctx("s-slow"))
+await read("s-slow", "c2", "/repoA/x.go")
+await handlers.turn_end({ messageEntryId: "e3", message: reply("m-slow") }, ctx("s-slow"))
+await handlers.session_shutdown({ reason: "quit" }, ctx("s-slow"))
+await handlers.session_shutdown({ reason: "quit" }, ctx("s-fail"))
 `
 	script := filepath.Join(dir, "driver.mjs")
 	if err := os.WriteFile(script, []byte(driver), 0o600); err != nil {
@@ -263,29 +260,25 @@ await handlers.session_shutdown({}, mkCtx("s-fallback"))
 	}
 	markerInfo, err := os.Stat(reachDoneMarker)
 	if err != nil {
-		t.Fatalf("fallback reach marker not written: %v", err)
+		t.Fatalf("slow reach marker not written: %v", err)
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if !sawMarkerBeforeFallbackSpan {
-		t.Fatalf("expected execute_tool read span for s-fallback only after reach finished; spans=%+v", spans)
-	}
-	sawResumed := false
+	var sawResumed, sawSlowRead bool
 	for _, sp := range spans {
-		if sp.Session == "s-fail" {
-			if sp.Name == "chat m-resumed" {
-				sawResumed = true
-				continue
-			}
-			t.Fatalf("failed pi-tool-reach leaked span %+v for tainted session s-fail", sp)
-		}
-		if sp.Session == "s-fallback" && sp.Name == "execute_tool read" {
+		switch {
+		case sp.Session == "s-fail" && sp.Name == "chat m-resumed":
+			sawResumed = true
+		case sp.Session == "s-fail":
+			t.Errorf("failed pi-tool-reach leaked span %+v", sp)
+		case sp.Session == "s-slow" && sp.Name == "execute_tool read":
+			sawSlowRead = true
 			if sp.EndNano < markerInfo.ModTime().UnixNano()-int64(50*time.Millisecond) {
-				t.Fatalf("fallback span end %d precedes reach completion %d", sp.EndNano, markerInfo.ModTime().UnixNano())
+				t.Errorf("read span end %d precedes its reach check %d", sp.EndNano, markerInfo.ModTime().UnixNano())
 			}
 		}
 	}
-	if !sawResumed {
-		t.Fatalf("expected resumed s-fail session to clear taint after session_start succeeded; spans=%+v", spans)
+	if !sawResumed || !sawSlowRead {
+		t.Fatalf("resumed reply %v, slow read %v; spans=%+v", sawResumed, sawSlowRead, spans)
 	}
 }
