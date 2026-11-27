@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -24,7 +23,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
-const defaultHistorySince = "90d"
+const (
+	defaultHistorySince        = "90d"
+	defaultHistoryActiveWindow = "1h"
+)
 
 func (app *App) newHistoryCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -39,9 +41,11 @@ selected team's collection and content policy.`,
 
 func (app *App) newHistoryUploadCommand() *cobra.Command {
 	var (
-		sinceSpec   string
-		dryRun      bool
-		retryFailed bool
+		sinceSpec        string
+		activeWindowSpec string
+		dryRun           bool
+		retryFailed      bool
+		jsonStream       bool
 	)
 	cmd := &cobra.Command{
 		Use:   "upload",
@@ -51,21 +55,46 @@ recorded working directory, routes each part through your selected teams'
 policies, skips sessions each destination team already holds, and uploads the
 rest tagged as historical.
 
-Sessions modified within the last hour are skipped as still in progress.
-Press Ctrl-C to stop safely; running the command again resumes unfinished
-sessions first.`,
-		Args: cobra.NoArgs,
+Sessions modified within the last hour (--active-window) are skipped as
+still in progress. Press Ctrl-C to stop safely; running the command again
+resumes unfinished sessions first.
+
+--json-stream prints one JSON object per line on stdout as the upload goes,
+each with a "type": start, discover, holdings, plan (what is left to send, in
+all and per team, before the first session is sent), session_start,
+session_done, session_failed, session_skipped, team_blocked, summary (the
+summary -o json prints), and error. The last line is always summary or error;
+if error is present it is last, and fatal errors before work begins emit no
+summary. Error codes and exit codes: upload_running 4, not_set_up 5,
+signed_out 6, and failed 1.`,
+		PersistentPreRunE: func(*cobra.Command, []string) error { return nil },
+		Args: func(cmd *cobra.Command, args []string) error {
+			if err := cobra.NoArgs(cmd, args); err != nil {
+				return historyUsageError(cmd, jsonStream, err)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return app.runHistoryUpload(cmd, sinceSpec, dryRun, retryFailed)
+			if !jsonStream {
+				return app.runHistoryUpload(cmd, sinceSpec, activeWindowSpec, dryRun, retryFailed, nil)
+			}
+			return app.runHistoryUploadStream(cmd, sinceSpec, activeWindowSpec, dryRun, retryFailed)
 		},
 	}
 	cmd.Flags().StringVar(&sinceSpec, "since", defaultHistorySince, "include sessions modified within this window (e.g. 90d, 48h, or 2026-08-01)")
+	cmd.Flags().StringVar(&activeWindowSpec, "active-window", defaultHistoryActiveWindow, "skip sessions modified within this window as still in progress (e.g. 1h, 30m, or 0 for none)")
+	cmd.Flags().BoolVar(&jsonStream, "json-stream", false, "print progress as JSON lines on stdout, ending with the summary or an error")
+	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		return historyUsageError(cmd, jsonStream, err)
+	})
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "list what would be uploaded, to which team, and its estimated size without sending or writing state")
 	cmd.Flags().BoolVar(&retryFailed, "retry-failed", false, "try again the sessions a team rejected in an earlier run")
 	return cmd
 }
 
-func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, retryFailed bool) error {
+// runHistoryUpload runs the upload, reporting to stream when it is not nil and to the
+// terminal otherwise.
+func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec, activeWindowSpec string, dryRun, retryFailed bool, stream *historyStream) error {
 	// git answers for the repository these name whatever folder is asked about, so every
 	// session's working directory would route as that one repository.
 	for _, name := range []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR"} {
@@ -78,8 +107,16 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, r
 	if err != nil {
 		return err
 	}
+	activeWindow, err := parseHistoryActiveWindow(activeWindowSpec)
+	if err != nil {
+		return err
+	}
 	asJSON := false
-	if app.flags.output != "" {
+	if stream != nil {
+		if cmd.Flags().Changed("output") || app.flags.output != "" {
+			return errors.New("--json-stream prints JSON lines; leave out --output")
+		}
+	} else if app.flags.output != "" {
 		format, err := app.resolveFormat()
 		if err != nil {
 			return err
@@ -92,6 +129,9 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, r
 			return fmt.Errorf("history upload supports table and json output, not %s", format)
 		}
 	}
+	if app.dirErr != nil {
+		return app.dirErr
+	}
 
 	cfg, err := app.loadConfig()
 	if err != nil {
@@ -101,7 +141,19 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, r
 	serverKey := cfg.ServerKeySignIn || lane == sendas.NoPersonLane
 	st, found, loadErr := routing.Load(app.stateDir, cfg.ProfileName)
 	if stateReason, detail := routingStateProblem(st, found, loadErr, lane); stateReason != "" {
-		return fmt.Errorf("%s — run `%s`", detail, routeSetupFix(serverKey))
+		err := fmt.Errorf("%s — run `%s`", detail, routeSetupFix(serverKey))
+		switch stateReason {
+		case "missing", "wrong_account", "account_unreadable":
+			return &historyError{code: historyErrNotSetUp, exit: ExitNotSetUp, err: err}
+		case "signed_out":
+			return &historyError{code: historyErrSignedOut, exit: ExitSignedOut, err: err}
+		}
+		return err
+	}
+	if stream != nil && !serverKey {
+		if err := checkStreamSignIn(cfg.Dir, cfg.ProfileName); err != nil {
+			return err
+		}
 	}
 
 	sources := app.agents.With[agents.HistorySource]()
@@ -135,13 +187,25 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, r
 	httpClient := history.NewHTTPClient()
 	defer httpClient.CloseIdleConnections()
 	transport := &history.Transport{
-		Version: app.version,
-		HTTP:    httpClient,
-		SignIn:  signIn,
+		Version:          app.version,
+		HTTP:             httpClient,
+		SignIn:           signIn,
+		FailOnSignInLost: stream != nil,
+	}
+	if stream != nil && !serverKey {
+		transport.ClassifyNoToken = classifyHistoryNoToken(signIn)
 	}
 
 	var progress func(history.ProgressEvent)
-	if !asJSON && !dryRun {
+	if stream != nil {
+		progress = func(ev history.ProgressEvent) {
+			if ev.Kind == history.ProgressStart {
+				stream.start(dryRun, since, activeWindow, app.agents)
+				return
+			}
+			stream.progress(ev)
+		}
+	} else if !asJSON && !dryRun {
 		errOut := cmd.ErrOrStderr()
 		progress = func(ev history.ProgressEvent) {
 			renderHistoryProgress(errOut, ev)
@@ -159,7 +223,7 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, r
 		Version:          app.version,
 		State:            st,
 		ReloadState: func() (routing.State, error) {
-			return app.reloadHistoryState(cfg.ProfileName, lane, laneGen)
+			return app.reloadHistoryState(cfg.ProfileName, lane, laneGen, stream != nil)
 		},
 		OnOrgAccessLost: func(orgID, authURL string, epochs map[string]int64, at time.Time) {
 			if serverKey || len(epochs) == 0 {
@@ -186,18 +250,25 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, r
 			}
 			return ""
 		},
-		TeamLabel:   func(team routing.Team) string { return teamLabel(names, team) },
-		Since:       since,
-		DryRun:      dryRun,
-		RetryFailed: retryFailed,
-		Progress:    progress,
+		TeamLabel:        func(team routing.Team) string { return teamLabel(names, team) },
+		Since:            since,
+		ActiveWindow:     &activeWindow,
+		DryRun:           dryRun,
+		RetryFailed:      retryFailed,
+		FailOnSignInLost: stream != nil,
+		Progress:         progress,
 	})
 
-	if asJSON {
+	switch {
+	case stream != nil:
+		if stream.started {
+			stream.summary(sum)
+		}
+	case asJSON:
 		if err := output.Render(cmd.OutOrStdout(), output.FormatJSON, output.Table{}, sum); err != nil {
 			return err
 		}
-	} else {
+	default:
 		renderHistorySummary(cmd.OutOrStdout(), sum)
 	}
 
@@ -206,7 +277,13 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, r
 			return uploadErr
 		}
 		if _, ok := errors.AsType[*history.SignInRetiredError](uploadErr); ok {
-			return auth.ErrSignInRetired
+			return &historyError{code: historyErrSignedOut, exit: ExitSignedOut, err: auth.ErrSignInRetired}
+		}
+		if lost, ok := errors.AsType[*history.SignInLostError](uploadErr); ok {
+			return &historyError{code: historyErrSignedOut, exit: ExitSignedOut, err: lost}
+		}
+		if errors.Is(uploadErr, history.ErrUploadRunning) {
+			return &historyError{code: historyErrUploadRunning, exit: ExitUploadRunning, err: uploadErr}
 		}
 		return uploadErr
 	}
@@ -221,7 +298,7 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec string, dryRun, r
 // under the first profile, so it must not be checked against another's routing. The
 // sign-in's generation is compared as well as its lane, since a switch to someone else and
 // back leaves the lane the same.
-func (app *App) reloadHistoryState(profile, lane string, laneGen uint64) (routing.State, error) {
+func (app *App) reloadHistoryState(profile, lane string, laneGen uint64, failOnSignInLost bool) (routing.State, error) {
 	freshCfg, err := app.loadConfig()
 	if err != nil {
 		return routing.State{}, err
@@ -229,14 +306,24 @@ func (app *App) reloadHistoryState(profile, lane string, laneGen uint64) (routin
 	if freshCfg.ProfileName != profile {
 		return routing.State{}, errors.New("active profile changed during upload")
 	}
-	if app.profileLane(freshCfg) != lane {
+	freshLane := app.profileLane(freshCfg)
+	if freshLane != lane {
+		if failOnSignInLost && freshLane == "" {
+			return routing.State{}, fmt.Errorf("%w: signed out during upload", auth.ErrNotLoggedIn)
+		}
 		return routing.State{}, errors.New("active sign-in account changed during upload")
+	}
+	if failOnSignInLost && !freshCfg.ServerKeySignIn && auth.Retired(freshCfg.Dir, freshCfg.ProfileName) {
+		return routing.State{}, auth.ErrSignInRetired
 	}
 	if _, gen := app.signInSource(freshCfg).Lane(); gen != laneGen {
 		return routing.State{}, errors.New("active sign-in changed during upload")
 	}
 	fresh, found, loadErr := routing.Load(app.stateDir, freshCfg.ProfileName)
 	if reason, detail := routingStateProblem(fresh, found, loadErr, lane); reason != "" {
+		if failOnSignInLost && reason == "signed_out" {
+			return routing.State{}, fmt.Errorf("%w: %s", auth.ErrNotLoggedIn, detail)
+		}
 		return routing.State{}, errors.New(detail)
 	}
 	return fresh, nil
@@ -254,35 +341,6 @@ func hasNewHistoryFailures(sum history.Summary) bool {
 	return false
 }
 
-// parseHistorySince parses --since as a positive relative window (e.g. 90d, 24h) or an
-// absolute date/timestamp (2006-01-02 or RFC3339).
-func parseHistorySince(spec string, now time.Time) (time.Time, error) {
-	s := strings.TrimSpace(spec)
-	if s == "" {
-		return time.Time{}, errors.New("--since cannot be empty")
-	}
-	if strings.HasSuffix(s, "d") && len(s) > 1 {
-		days, err := strconv.Atoi(s[:len(s)-1])
-		if err != nil || days <= 0 {
-			return time.Time{}, fmt.Errorf("invalid --since %q: expected a positive number of days (e.g. 90d)", spec)
-		}
-		return now.Add(-time.Duration(days) * 24 * time.Hour), nil
-	}
-	if d, err := time.ParseDuration(s); err == nil {
-		if d <= 0 {
-			return time.Time{}, fmt.Errorf("invalid --since %q: duration must be positive", spec)
-		}
-		return now.Add(-d), nil
-	}
-	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t, nil
-	}
-	if t, err := time.Parse("2006-01-02", s); err == nil {
-		return t.UTC(), nil
-	}
-	return time.Time{}, fmt.Errorf("invalid --since %q: use a duration like 90d or 48h, or a date like 2026-08-01", spec)
-}
-
 func renderHistoryProgress(w io.Writer, ev history.ProgressEvent) {
 	switch ev.Kind {
 	case history.ProgressHoldings:
@@ -293,7 +351,9 @@ func renderHistoryProgress(w io.Writer, ev history.ProgressEvent) {
 	case history.ProgressSessionFailed:
 		fmt.Fprintf(w, "  failed %s:%s for %s: %s\n", ev.SourceSystem, ev.SessionID, ev.RouteLabel, ev.Reason)
 	case history.ProgressRouteBlocked:
-		fmt.Fprintf(w, "  skipped %s: %s\n", ev.RouteLabel, ev.Reason)
+		if ev.Phase != history.BlockPhaseDiscovery {
+			fmt.Fprintf(w, "  skipped %s: %s\n", ev.RouteLabel, ev.Reason)
+		}
 	}
 }
 

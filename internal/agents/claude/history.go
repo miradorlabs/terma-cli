@@ -47,10 +47,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 	if now.IsZero() {
 		now = time.Now()
 	}
-	activeWindow := opts.ActiveWindow
-	if activeWindow <= 0 {
-		activeWindow = time.Hour
-	}
+	activeWindow := max(0, opts.ActiveWindow)
 	projEntries, err := os.ReadDir(projectsDir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -91,7 +88,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 			if extraMod.After(modTime) {
 				modTime = extraMod
 			}
-			active := now.Sub(modTime) < activeWindow
+			active := activeWindow > 0 && now.Sub(modTime) < activeWindow
 			outside := !opts.Since.IsZero() && modTime.Before(opts.Since)
 			sid := stem
 			if !session.ValidID(sid) && !outside && !active {

@@ -12,6 +12,15 @@ const (
 	ExitBackoff = 2
 	// ExitIncomplete means the command ran and did not fail, but left work undone.
 	ExitIncomplete = 3
+	// ExitUploadRunning: `terma history upload --json-stream` found another upload of this
+	// profile running.
+	ExitUploadRunning = 4
+	// ExitNotSetUp: `terma history upload --json-stream` found no `terma setup` for the
+	// signed-in account.
+	ExitNotSetUp = 5
+	// ExitSignedOut: `terma history upload --json-stream` found no sign-in, or one the server
+	// retired.
+	ExitSignedOut = 6
 	// ExitRestart asks the service manager to start a newer binary (EX_TEMPFAIL).
 	ExitRestart = 75
 )

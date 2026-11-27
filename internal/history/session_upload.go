@@ -47,37 +47,38 @@ func uploadOneSession(
 		return true, err
 	}
 	remaining := max(1, total-idx+1) + max(0, extraRemaining)
+	skipped := func(reason string) {
+		sum.addSkippedSession(reason, 1)
+		report(sessionEvent(ProgressSessionSkipped, b, sp, reason))
+	}
 
 	// Re-stat transcript and spawn-family files right before reading so a session resumed
 	// while earlier routes were draining is never uploaded mid-write or marked done early.
 	preSnap, statSkip := statSessionFiles(sp.file, sp.companions)
 	if statSkip != "" {
-		sum.addSkippedSession(statSkip, 1)
+		skipped(statSkip)
 		return false, nil
 	}
 	now := nowFn()
-	if now.Sub(preSnap.modTime) < activeWindow {
-		sum.addSkippedSession(SkipActive, 1)
+	if changedWithin(now, preSnap.modTime, activeWindow) {
+		skipped(SkipActive)
 		return false, nil
 	}
 
 	// Recheck live routing state and team policy before reading and preparing segments.
-	freshState, freshTeam, skipReason, reasonDetail, ok := recheckRouteTeam(opts, b.team.EnrollmentID, now)
+	freshState, freshTeam, skipReason, reasonDetail, ok, fatalErr := recheckRouteTeam(opts, b.team.EnrollmentID, now)
+	if fatalErr != nil {
+		return true, fatalErr
+	}
 	if !ok {
-		return stopRouteWithIssue(b, remaining, skipReason, reasonDetail, report, sum), nil
+		return stopRouteWithIssue(b, remaining, skipReason, reasonDetail, BlockPhaseUpload, report, sum), nil
 	}
 	sessionResolver := newCwdResolver(freshState, opts.AuthURL, opts.ServerKey, opts.ServerKeyTeam, opts.ServerKeyAuthURL, now)
 	preparedPolicy := freshTeam.Policy
 
-	report(ProgressEvent{
-		Kind:         ProgressSessionStart,
-		RouteLabel:   b.label,
-		TeamID:       b.team.TeamID,
-		SourceSystem: sp.file.SourceSystem,
-		SessionID:    sp.file.SessionID,
-		Index:        idx,
-		Total:        total,
-	})
+	start := sessionEvent(ProgressSessionStart, b, sp, "")
+	start.Index, start.Total = idx, total
+	report(start)
 
 	runSnap, lookupSnap := newRunSnapLookup(opts.StateDir, sp.file.SessionID)
 
@@ -89,9 +90,9 @@ func uploadOneSession(
 			return true, readErr
 		}
 		if errors.Is(readErr, fs.ErrNotExist) {
-			sum.addSkippedSession(SkipMissingFile, 1)
+			skipped(SkipMissingFile)
 		} else {
-			sum.addSkippedSession(SkipUnreadable, 1)
+			skipped(SkipUnreadable)
 		}
 		return false, nil
 	}
@@ -99,11 +100,11 @@ func uploadOneSession(
 	// Re-stat immediately after Pass 1 so a turn appended while reading never leaves.
 	afterReadSnap, statSkip := statSessionFiles(sp.file, sp.companions)
 	if statSkip != "" {
-		sum.addSkippedSession(statSkip, 1)
+		skipped(statSkip)
 		return false, nil
 	}
-	if afterReadSnap != preSnap || nowFn().Sub(afterReadSnap.modTime) < activeWindow {
-		sum.addSkippedSession(SkipActive, 1)
+	if afterReadSnap != preSnap || changedWithin(nowFn(), afterReadSnap.modTime, activeWindow) {
+		skipped(SkipActive)
 		return false, nil
 	}
 
@@ -120,10 +121,13 @@ func uploadOneSession(
 		if statSkip != "" {
 			return &preAttemptStopError{skipReason: statSkip, reason: "session transcript changed or removed during upload", active: true}
 		}
-		if snap != preSnap || curNow.Sub(snap.modTime) < activeWindow {
+		if snap != preSnap || changedWithin(curNow, snap.modTime, activeWindow) {
 			return &preAttemptStopError{skipReason: SkipActive, reason: "session transcript modified during upload", active: true}
 		}
-		checkState, checkTeam, checkSkip, checkReason, ok := recheckRouteTeam(opts, b.team.EnrollmentID, curNow)
+		checkState, checkTeam, checkSkip, checkReason, ok, fatalErr := recheckRouteTeam(opts, b.team.EnrollmentID, curNow)
+		if fatalErr != nil {
+			return fatalErr
+		}
 		if !ok {
 			return &preAttemptStopError{skipReason: checkSkip, reason: checkReason}
 		}
@@ -201,23 +205,26 @@ func uploadOneSession(
 		}
 		if preStop, ok := errors.AsType[*preAttemptStopError](streamErr); ok {
 			if preStop.active {
-				sum.addSkippedSession(preStop.skipReason, 1)
+				skipped(preStop.skipReason)
 				return false, nil
 			}
-			return stopRouteWithIssue(b, remaining, preStop.skipReason, preStop.reason, report, sum), nil
+			return stopRouteWithIssue(b, remaining, preStop.skipReason, preStop.reason, BlockPhaseUpload, report, sum), nil
 		}
 		if retired, ok := errors.AsType[*SignInRetiredError](streamErr); ok {
 			return true, retired
+		}
+		if lost, ok := errors.AsType[*SignInLostError](streamErr); ok {
+			return true, lost
 		}
 		if lost, ok := errors.AsType[*OrgAccessLostError](streamErr); ok {
 			orgBlocked[b.team.OrganizationID] = lost.Error()
 			if opts.OnOrgAccessLost != nil {
 				opts.OnOrgAccessLost(lastCheckTeam.OrganizationID, lastCheckTeam.AuthURL, lastOrgEpochs, nowFn().UTC())
 			}
-			return stopRouteWithIssue(b, remaining, SkipOrgAccessLost, lost.Error(), report, sum), nil
+			return stopRouteWithIssue(b, remaining, SkipOrgAccessLost, lost.Error(), BlockPhaseUpload, report, sum), nil
 		}
 		if routeErr, ok := errors.AsType[*RouteError](streamErr); ok {
-			return stopRouteWithIssue(b, remaining, SkipSendFailed, routeErr.Error(), report, sum), nil
+			return stopRouteWithIssue(b, remaining, SkipSendFailed, routeErr.Error(), BlockPhaseUpload, report, sum), nil
 		}
 		if perm, ok := errors.AsType[*PermanentError](streamErr); ok {
 			if err := markSessionFailed(opts.StateDir, st, b, sp, perm, nowFn(), report, sum); err != nil || perm.Status == 0 {
@@ -226,19 +233,19 @@ func uploadOneSession(
 			// A server that rejects session after session will likely reject the rest too.
 			if b.rejected++; b.rejected >= maxConsecutiveRejections {
 				reason := fmt.Sprintf("the server rejected %d sessions in a row (last: %s); fix the cause and run `terma history upload --retry-failed`", b.rejected, perm.Reason)
-				return stopRouteWithIssue(b, remaining-1, SkipSendFailed, reason, report, sum), nil
+				return stopRouteWithIssue(b, remaining-1, SkipSendFailed, reason, BlockPhaseUpload, report, sum), nil
 			}
 			return false, nil
 		}
 		if !markedInProgress {
 			if errors.Is(streamErr, fs.ErrNotExist) {
-				sum.addSkippedSession(SkipMissingFile, 1)
+				skipped(SkipMissingFile)
 			} else {
-				sum.addSkippedSession(SkipUnreadable, 1)
+				skipped(SkipUnreadable)
 			}
 			return false, nil
 		}
-		return stopRouteWithIssue(b, remaining, SkipSendFailed, streamErr.Error(), report, sum), nil
+		return stopRouteWithIssue(b, remaining, SkipSendFailed, streamErr.Error(), BlockPhaseUpload, report, sum), nil
 	}
 
 	sum.WithheldRecords += mixedDropped
@@ -251,9 +258,9 @@ func uploadOneSession(
 			}
 		}
 		if mixedDropped > 0 {
-			sum.addSkippedSession(SkipMixed, 1)
+			skipped(SkipMixed)
 		} else {
-			sum.addSkippedSession(SkipEmptyAfterFilter, 1)
+			skipped(SkipEmptyAfterFilter)
 		}
 		return false, nil
 	}
@@ -262,11 +269,11 @@ func uploadOneSession(
 	// uploading it, keep it in_progress so later turns are never skipped.
 	postSnap, statSkip := statSessionFiles(sp.file, sp.companions)
 	if statSkip != "" {
-		sum.addSkippedSession(statSkip, 1)
+		skipped(statSkip)
 		return false, nil
 	}
-	if postSnap != preSnap || nowFn().Sub(postSnap.modTime) < activeWindow {
-		sum.addSkippedSession(SkipActive, 1)
+	if postSnap != preSnap || changedWithin(nowFn(), postSnap.modTime, activeWindow) {
+		skipped(SkipActive)
 		return false, nil
 	}
 
@@ -279,21 +286,20 @@ func uploadOneSession(
 	sum.SentSessions++
 	sum.SentRecords += totalRecs
 	sum.SentBytes += totalBytes
-	report(ProgressEvent{
-		Kind:         ProgressSessionDone,
-		RouteLabel:   b.label,
-		TeamID:       b.team.TeamID,
-		SourceSystem: sp.file.SourceSystem,
-		SessionID:    sp.file.SessionID,
-		Index:        idx,
-		Total:        total,
-		Records:      totalRecs,
-		Bytes:        totalBytes,
-	})
+	done := sessionEvent(ProgressSessionDone, b, sp, "")
+	done.Index, done.Total, done.Records, done.Bytes = idx, total, totalRecs, totalBytes
+	report(done)
 	return false, nil
 }
 
-func stopRouteWithIssue(b *routeBucket, remaining int, skipReason, reason string, report func(ProgressEvent), sum *Summary) bool {
+// changedWithin reports whether files changed at mod are still within window of now. A
+// zero window counts nothing as changed within it, a modification time in the future
+// included.
+func changedWithin(now, mod time.Time, window time.Duration) bool {
+	return window > 0 && now.Sub(mod) < window
+}
+
+func stopRouteWithIssue(b *routeBucket, remaining int, skipReason, reason, phase string, report func(ProgressEvent), sum *Summary) bool {
 	sum.addSkippedSession(skipReason, remaining)
 	sum.TeamIssues = append(sum.TeamIssues, TeamIssue{
 		EnrollmentID: b.team.EnrollmentID,
@@ -302,7 +308,16 @@ func stopRouteWithIssue(b *routeBucket, remaining int, skipReason, reason string
 		Skipped:      remaining,
 		Reason:       reason,
 	})
-	report(ProgressEvent{Kind: ProgressRouteBlocked, RouteLabel: b.label, TeamID: b.team.TeamID, Reason: reason})
+	report(ProgressEvent{
+		Kind:         ProgressRouteBlocked,
+		RouteLabel:   b.label,
+		EnrollmentID: b.team.EnrollmentID,
+		TeamID:       b.team.TeamID,
+		Reason:       reason,
+		SkipReason:   skipReason,
+		Phase:        phase,
+		Skipped:      remaining,
+	})
 	return true
 }
 
@@ -330,18 +345,13 @@ func markSessionFailed(
 		RejectedRecords: perm.Rejected,
 		FailedAt:        at.UTC(),
 	})
-	report(ProgressEvent{
-		Kind:         ProgressSessionFailed,
-		RouteLabel:   b.label,
-		TeamID:       b.team.TeamID,
-		SourceSystem: sp.file.SourceSystem,
-		SessionID:    sp.file.SessionID,
-		Reason:       perm.Reason,
-	})
+	failed := sessionEvent(ProgressSessionFailed, b, sp, "")
+	failed.Reason = perm.Reason
+	report(failed)
 	return nil
 }
 
-func resolveRouteServerKey(opts Options, b *routeBucket, totalSkip int, report func(ProgressEvent), sum *Summary) (string, bool) {
+func resolveRouteServerKey(opts Options, b *routeBucket, totalSkip int, phase string, report func(ProgressEvent), sum *Summary) (string, bool) {
 	if !opts.ServerKey || opts.ServerKeyFor == nil {
 		return "", true
 	}
@@ -353,7 +363,7 @@ func resolveRouteServerKey(opts Options, b *routeBucket, totalSkip int, report f
 	if err != nil {
 		reason = err.Error()
 	}
-	stopRouteWithIssue(b, totalSkip, SkipSendFailed, reason, report, sum)
+	stopRouteWithIssue(b, totalSkip, SkipSendFailed, reason, phase, report, sum)
 	return "", false
 }
 
@@ -363,54 +373,61 @@ func filterHeldCandidates(
 	freshState routing.State,
 	b *routeBucket,
 	candidateQueue []*routeSessionPlan,
+	resumed int,
 	nowFn func() time.Time,
 	report func(ProgressEvent),
 	orgBlocked map[string]string,
 	sum *Summary,
-) ([]*routeSessionPlan, error) {
+) (upload []*routeSessionPlan, held int, blocked bool, err error) {
 	ids := make([]string, 0, len(candidateQueue))
 	for _, sp := range candidateQueue {
 		ids = append(ids, sp.file.SessionID)
 	}
-	report(ProgressEvent{Kind: ProgressHoldings, RouteLabel: b.label, TeamID: b.team.TeamID, Total: len(ids)})
+	report(ProgressEvent{Kind: ProgressHoldings, RouteLabel: b.label, EnrollmentID: b.team.EnrollmentID, TeamID: b.team.TeamID, Total: len(ids)})
 	if opts.Holdings == nil {
-		stopRouteWithIssue(b, len(candidateQueue), SkipHoldingsFailed, "holdings check is unavailable", report, sum)
-		return nil, nil
+		stopRouteWithIssue(b, resumed+len(candidateQueue), SkipHoldingsFailed, "holdings check is unavailable", BlockPhasePlan, report, sum)
+		return nil, 0, true, nil
 	}
 	orgEpochs := orgEpochSnapshot(freshState.Teams, b.team.OrganizationID, b.team.AuthURL)
-	held, err := opts.Holdings.Check(ctx, b.team, ids)
+	heldSet, err := opts.Holdings.Check(ctx, b.team, ids)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			sum.Interrupted = true
-			return nil, err
+			return nil, 0, false, err
 		}
 		if errors.Is(err, auth.ErrSignInRetired) {
-			return nil, &SignInRetiredError{Detail: err.Error()}
+			return nil, 0, false, &SignInRetiredError{Detail: err.Error()}
+		}
+		if opts.FailOnSignInLost {
+			if fatal := signInGoneError(err); fatal != nil {
+				return nil, 0, false, fatal
+			}
 		}
 		if apiErr, ok := errors.AsType[*api.Error](err); ok {
 			if apiErr.SignInRetired() {
-				return nil, &SignInRetiredError{Detail: apiErr.Error()}
+				return nil, 0, false, &SignInRetiredError{Detail: apiErr.Error()}
 			}
 			if apiErr.OrgNotAccessible() {
 				orgBlocked[b.team.OrganizationID] = apiErr.Error()
 				if opts.OnOrgAccessLost != nil {
 					opts.OnOrgAccessLost(b.team.OrganizationID, b.team.AuthURL, orgEpochs, nowFn().UTC())
 				}
-				stopRouteWithIssue(b, len(candidateQueue), SkipOrgAccessLost, apiErr.Error(), report, sum)
-				return nil, nil
+				// The team's resumed sessions would be refused too.
+				stopRouteWithIssue(b, resumed+len(candidateQueue), SkipOrgAccessLost, apiErr.Error(), BlockPhasePlan, report, sum)
+				return nil, 0, true, nil
 			}
 		}
-		stopRouteWithIssue(b, len(candidateQueue), SkipHoldingsFailed, fmt.Sprintf("holdings check failed: %v", err), report, sum)
-		return nil, nil
+		stopRouteWithIssue(b, resumed+len(candidateQueue), SkipHoldingsFailed, fmt.Sprintf("holdings check failed: %v", err), BlockPhasePlan, report, sum)
+		return nil, 0, true, nil
 	}
 
-	var uploadQueue []*routeSessionPlan
 	for _, sp := range candidateQueue {
-		if held.Contains(sp.file.SourceSystem, sp.file.SessionID) {
+		if heldSet.Contains(sp.file.SourceSystem, sp.file.SessionID) {
 			sum.addSkippedSession(SkipAlreadyHeld, 1)
+			held++
 			continue
 		}
-		uploadQueue = append(uploadQueue, sp)
+		upload = append(upload, sp)
 	}
-	return uploadQueue, nil
+	return upload, held, false, nil
 }

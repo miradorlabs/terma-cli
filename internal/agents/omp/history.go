@@ -66,10 +66,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 	if now.IsZero() {
 		now = time.Now()
 	}
-	activeWindow := opts.ActiveWindow
-	if activeWindow <= 0 {
-		activeWindow = time.Hour
-	}
+	activeWindow := max(0, opts.ActiveWindow)
 
 	bySession := map[string]agents.HistoryFile{}
 	addFile := func(hf agents.HistoryFile) {
@@ -137,7 +134,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 				if extraMod.After(modTime) {
 					modTime = extraMod
 				}
-				active := now.Sub(modTime) < activeWindow
+				active := activeWindow > 0 && now.Sub(modTime) < activeWindow
 				outside := !opts.Since.IsZero() && modTime.Before(opts.Since)
 				addFile(agents.HistoryFile{
 					SourceSystem:       ompSourceSystem,
@@ -327,7 +324,7 @@ func findOrphanOmpSubagents(ctx context.Context, expectedParent, dir, missingPar
 			ParentSessionID: missingParentID,
 			Path:            subPath,
 			ModTime:         modTime,
-			Active:          now.Sub(modTime) < activeWindow,
+			Active:          activeWindow > 0 && now.Sub(modTime) < activeWindow,
 			OutsideSince:    !since.IsZero() && modTime.Before(since),
 		})
 	}

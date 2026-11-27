@@ -39,10 +39,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 	if now.IsZero() {
 		now = time.Now()
 	}
-	activeWindow := opts.ActiveWindow
-	if activeWindow <= 0 {
-		activeWindow = time.Hour
-	}
+	activeWindow := max(0, opts.ActiveWindow)
 
 	bySession := map[string]agents.HistoryFile{}
 	// unreadable is the first rollout or directory discovery could not read. A rollout
@@ -95,7 +92,7 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 				return nil
 			}
 			modTime := info.ModTime()
-			active := now.Sub(modTime) < activeWindow
+			active := activeWindow > 0 && now.Sub(modTime) < activeWindow
 			outside := !opts.Since.IsZero() && modTime.Before(opts.Since)
 			sid := codexSessionIDFromFilename(base)
 			metaID, parentID, peekFailed := peekCodexRolloutMeta(path)

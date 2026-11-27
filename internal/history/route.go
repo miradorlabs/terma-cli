@@ -103,6 +103,9 @@ func (r *cwdResolver) resolveUncached(ctx context.Context, cwd, fallbackRepoURL,
 		}
 		return RouteTarget{Team: team, Location: loc, Checkout: checkout}, true, ""
 	case routing.Hold:
+		if team, ok := r.state.Team(d.EnrollmentID); ok {
+			baseTarget.Team = team
+		}
 		if d.Blocked != "" {
 			return baseTarget, false, SkipTeamBlockedPrefix + string(d.Blocked)
 		}

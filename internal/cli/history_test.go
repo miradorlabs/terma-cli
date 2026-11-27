@@ -32,6 +32,10 @@ func TestParseHistorySince(t *testing.T) {
 	if err != nil || !got.Equal(now.Add(-90*24*time.Hour)) {
 		t.Errorf("90d = (%v, %v)", got, err)
 	}
+	got, err = parseHistorySince("40000d", now)
+	if err != nil || !got.Equal(now.Add(-time.Duration(40000)*24*time.Hour)) {
+		t.Errorf("40000d = (%v, %v)", got, err)
+	}
 	got, err = parseHistorySince("48h", now)
 	if err != nil || !got.Equal(now.Add(-48*time.Hour)) {
 		t.Errorf("48h = (%v, %v)", got, err)
@@ -40,14 +44,74 @@ func TestParseHistorySince(t *testing.T) {
 	if err != nil || !got.Equal(time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)) {
 		t.Errorf("2026-08-01 = (%v, %v)", got, err)
 	}
-	for _, bad := range []string{"", "0d", "-5d", "-1h", "nonsense"} {
-		if _, err := parseHistorySince(bad, now); err == nil {
-			t.Errorf("expected error for invalid --since %q", bad)
+	wantErrs := map[string]string{
+		"":         "--since cannot be empty",
+		"0d":       `invalid --since "0d": expected a positive number of days (e.g. 90d)`,
+		"-1d":      `invalid --since "-1d": expected a positive number of days (e.g. 90d)`,
+		"-5d":      `invalid --since "-5d": expected a positive number of days (e.g. 90d)`,
+		"abcd":     `invalid --since "abcd": expected a positive number of days (e.g. 90d)`,
+		"0":        `invalid --since "0": duration must be positive`,
+		"-1h":      `invalid --since "-1h": duration must be positive`,
+		"nonsense": `invalid --since "nonsense": use a duration like 90d or 48h, or a date like 2026-08-01`,
+	}
+	for spec, want := range wantErrs {
+		if _, err := parseHistorySince(spec, now); err == nil || err.Error() != want {
+			t.Errorf("parseHistorySince(%q) err = %v, want %q", spec, err, want)
 		}
 	}
 }
 
-func TestHistoryUploadCLIDryRunAndEndToEndBothHarnesses(t *testing.T) {
+// historyFixture is a signed-in machine with two teams in two organizations, a Claude Code
+// session in team A's repository and a Codex session in team B's, both four hours old, and
+// a fake API that holds nothing and records what it is sent.
+type historyFixture struct {
+	cfgDir    string
+	stateDir  string
+	claudeDir string
+	codexDir  string
+	repoA     string
+	repoB     string
+	srv       *httptest.Server
+	ccPath    string
+	cxPath    string
+	account   string
+	mu        sync.Mutex
+	holdings  int
+	received  map[string][]*logspb.LogsData
+	// held, holdingsStatus, holdingsBody, logsStatus, logsBody, refreshStatus, refreshBody,
+	// and onHoldings/onLogs change what the fake API answers.
+	held           map[string][]map[string]any
+	holdingsStatus map[string]int
+	holdingsBody   map[string]string
+	logsStatus     map[string]int
+	logsBody       map[string]string
+	refreshStatus  int
+	refreshBody    string
+	onHoldings     func(proj string)
+	onLogs         func(proj string)
+}
+
+// answer sets what the fake API answers from now on.
+func (f *historyFixture) answer(set func(f *historyFixture)) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	set(f)
+}
+
+func (f *historyFixture) holdingsCalls() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.holdings
+}
+
+func (f *historyFixture) receivedBy(project string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.received[project])
+}
+
+func newHistoryFixture(t *testing.T) *historyFixture {
+	t.Helper()
 	// Sandboxed config/state/agent directories.
 	cfgDir := t.TempDir()
 	stateDir := t.TempDir()
@@ -74,20 +138,57 @@ func TestHistoryUploadCLIDryRunAndEndToEndBothHarnesses(t *testing.T) {
 		}
 	}
 
-	var mu sync.Mutex
-	var holdingsCalls int
-	receivedByProject := map[string][]*logspb.LogsData{}
+	fx := &historyFixture{
+		cfgDir:    cfgDir,
+		stateDir:  stateDir,
+		claudeDir: claudeDir,
+		codexDir:  codexDir,
+		repoA:     repoA,
+		repoB:     repoB,
+		received:  map[string][]*logspb.LogsData{},
+	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case "/v1/auth/user/token":
+			fx.mu.Lock()
+			status, body := fx.refreshStatus, fx.refreshBody
+			fx.mu.Unlock()
+			if status == 0 {
+				http.NotFound(w, r)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(status)
+			if body != "" {
+				_, _ = io.WriteString(w, body)
+			}
 		case "/v1/ai/sessions":
-			mu.Lock()
-			holdingsCalls++
-			mu.Unlock()
+			proj := r.Header.Get(sendas.ProjectHeader)
+			fx.mu.Lock()
+			fx.holdings++
+			status, body, held, hook := fx.holdingsStatus[proj], fx.holdingsBody[proj], fx.held[proj], fx.onHoldings
+			fx.mu.Unlock()
+			if hook != nil {
+				hook(proj)
+			}
+			if status != 0 {
+				if body != "" {
+					w.Header().Set("Content-Type", "application/json")
+				}
+				w.WriteHeader(status)
+				if body != "" {
+					_, _ = io.WriteString(w, body)
+				}
+				return
+			}
+			if held == nil {
+				held = []map[string]any{}
+			}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]any{
-				"project_id": r.Header.Get(sendas.ProjectHeader),
-				"sessions":   []any{},
+				"project_id": proj,
+				"sessions":   held,
 				"pagination": map[string]any{"page": 1, "per_page": 200, "total": 0, "total_pages": 1},
 			})
 		case "/v1/logs":
@@ -98,15 +199,32 @@ func TestHistoryUploadCLIDryRunAndEndToEndBothHarnesses(t *testing.T) {
 				return
 			}
 			proj := r.Header.Get(sendas.ProjectHeader)
-			mu.Lock()
-			receivedByProject[proj] = append(receivedByProject[proj], &logs)
-			mu.Unlock()
+			fx.mu.Lock()
+			status, respBody, hook := fx.logsStatus[proj], fx.logsBody[proj], fx.onLogs
+			if status == 0 {
+				fx.received[proj] = append(fx.received[proj], &logs)
+			}
+			fx.mu.Unlock()
+			if hook != nil {
+				hook(proj)
+			}
+			if status != 0 {
+				if respBody != "" {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(status)
+					_, _ = io.WriteString(w, respBody)
+					return
+				}
+				http.Error(w, "refused", status)
+				return
+			}
 			w.WriteHeader(http.StatusOK)
 		default:
 			http.NotFound(w, r)
 		}
 	}))
-	defer srv.Close()
+	t.Cleanup(srv.Close)
+	fx.srv = srv
 
 	t.Setenv("TERMA_API_URL", srv.URL)
 	t.Setenv("TERMA_AUTH_URL", srv.URL)
@@ -177,6 +295,13 @@ func TestHistoryUploadCLIDryRunAndEndToEndBothHarnesses(t *testing.T) {
 		t.Fatal(err)
 	}
 	_ = os.Chtimes(cxPath, oldTime, oldTime)
+	fx.ccPath, fx.cxPath, fx.account = ccPath, cxPath, cred.Account()
+	return fx
+}
+
+func TestHistoryUploadCLIDryRunAndEndToEndBothHarnesses(t *testing.T) {
+	fx := newHistoryFixture(t)
+	stateDir := fx.stateDir
 
 	// 1. Dry-run JSON: lists both teams, zero network calls, zero state writes.
 	out, _, err := termaRun{}.exec(t, "history", "upload", "--dry-run", "-o", "json")
@@ -190,8 +315,8 @@ func TestHistoryUploadCLIDryRunAndEndToEndBothHarnesses(t *testing.T) {
 	if !drySum.DryRun || len(drySum.Planned) != 2 {
 		t.Fatalf("dry-run planned = %+v, want 2 routes", drySum)
 	}
-	if holdingsCalls != 0 || len(receivedByProject) != 0 {
-		t.Fatalf("dry-run touched network: holdings=%d otlp=%d", holdingsCalls, len(receivedByProject))
+	if fx.holdingsCalls() != 0 || fx.receivedBy("team-a")+fx.receivedBy("team-b") != 0 {
+		t.Fatalf("dry-run touched network: holdings=%d", fx.holdingsCalls())
 	}
 	if _, err := os.Stat(filepath.Join(stateDir, history.Dir)); !os.IsNotExist(err) {
 		t.Fatalf("dry-run wrote state dir: %v", err)
@@ -205,14 +330,14 @@ func TestHistoryUploadCLIDryRunAndEndToEndBothHarnesses(t *testing.T) {
 	if !strings.Contains(out, "Sent: 2 session(s)") {
 		t.Errorf("unexpected upload summary:\n%s", out)
 	}
-	if holdingsCalls != 2 {
-		t.Errorf("holdingsCalls = %d, want 2 (once per destination team)", holdingsCalls)
+	if fx.holdingsCalls() != 2 {
+		t.Errorf("holdingsCalls = %d, want 2 (once per destination team)", fx.holdingsCalls())
 	}
-	if len(receivedByProject["team-a"]) != 1 || len(receivedByProject["team-b"]) != 1 {
-		t.Fatalf("receivedByProject counts: team-a=%d team-b=%d, want 1/1", len(receivedByProject["team-a"]), len(receivedByProject["team-b"]))
+	if fx.receivedBy("team-a") != 1 || fx.receivedBy("team-b") != 1 {
+		t.Fatalf("receivedByProject counts: team-a=%d team-b=%d, want 1/1", fx.receivedBy("team-a"), fx.receivedBy("team-b"))
 	}
 	// Verify historical marker on every uploaded record.
-	for proj, batches := range receivedByProject {
+	for proj, batches := range fx.received {
 		for _, b := range batches {
 			for _, rl := range b.ResourceLogs {
 				for _, sl := range rl.ScopeLogs {
@@ -233,13 +358,13 @@ func TestHistoryUploadCLIDryRunAndEndToEndBothHarnesses(t *testing.T) {
 	}
 
 	// 3. Repeat run: sends nothing (0 new OTLP requests, 0 new holdings requests).
-	prevHoldings := holdingsCalls
+	prevHoldings := fx.holdingsCalls()
 	out, _, err = termaRun{}.exec(t, "history", "upload")
 	if err != nil {
 		t.Fatalf("repeat upload failed: %v\n%s", err, out)
 	}
-	if holdingsCalls != prevHoldings || len(receivedByProject["team-a"]) != 1 || len(receivedByProject["team-b"]) != 1 {
-		t.Fatalf("repeat run sent unexpected requests: holdings=%d->%d", prevHoldings, holdingsCalls)
+	if fx.holdingsCalls() != prevHoldings || fx.receivedBy("team-a") != 1 || fx.receivedBy("team-b") != 1 {
+		t.Fatalf("repeat run sent unexpected requests: holdings=%d->%d", prevHoldings, fx.holdingsCalls())
 	}
 	if !strings.Contains(out, "Sent: 0 session(s)") || !strings.Contains(out, "already_done=2") {
 		t.Errorf("repeat run summary unexpected:\n%s", out)
@@ -388,11 +513,11 @@ func TestReloadHistoryStateFailsWhenProfileChanges(t *testing.T) {
 	}
 	lane := testApp.profileLane(cfg)
 	_, gen := testApp.signInSource(cfg).Lane()
-	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen); err == nil || strings.Contains(err.Error(), "profile changed") {
+	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen, false); err == nil || strings.Contains(err.Error(), "profile changed") {
 		t.Fatalf("same profile, no routing state: %v, want a routing-state error", err)
 	}
 	t.Setenv("TERMA_PROFILE", "other")
-	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen); err == nil || !strings.Contains(err.Error(), "active profile changed") {
+	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen, false); err == nil || !strings.Contains(err.Error(), "active profile changed") {
 		t.Fatalf("after a profile switch: %v, want active profile changed", err)
 	}
 }
@@ -418,7 +543,7 @@ func TestReloadHistoryStateFailsWhenTheSignInChangedAndCameBack(t *testing.T) {
 	if _, err := routing.Replace(testApp.stateDir, cfg.ProfileName, nil, lane, func(*routing.State) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen); err != nil {
+	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen, false); err != nil {
 		t.Fatalf("nothing changed: %v, want the routing state", err)
 	}
 	if err := saveSignIn(testApp.dir, storedSessionOf(f, "u-2")); err != nil {
@@ -433,7 +558,7 @@ func TestReloadHistoryStateFailsWhenTheSignInChangedAndCameBack(t *testing.T) {
 	if got := testApp.profileLane(cfg); got != lane {
 		t.Fatalf("after a switch and back, lane = %q, want %q", got, lane)
 	}
-	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen); err == nil || err.Error() != "active sign-in changed during upload" {
+	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen, false); err == nil || err.Error() != "active sign-in changed during upload" {
 		t.Fatalf("after a switch and back: %v, want active sign-in changed during upload", err)
 	}
 }

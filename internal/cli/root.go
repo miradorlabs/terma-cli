@@ -65,6 +65,9 @@ Every command is safe to run again.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Version:       app.version,
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			return app.dirErr
+		},
 		PersistentPostRun: func(cmd *cobra.Command, _ []string) {
 			app.tellSignInAfterUpdate(cmd, canPrompt())
 			app.printUpdateNotice(cmd)
@@ -217,6 +220,7 @@ type App struct {
 	// dir is terma's config directory and stateDir its state directory, resolved once by
 	// Execute and handed to all below.
 	dir, stateDir string
+	dirErr        error
 	agentsFor     func(configDir string) *agents.Registry
 	agents        *agents.Registry
 	version       string
@@ -293,16 +297,17 @@ func (app *App) Execute() int {
 	if err == nil {
 		stateDir, err = config.StateDir()
 	}
+	app.dirErr = nil
 	if err != nil {
 		// A hook or a flush has no one to tell, and must never fail what called it.
 		if quietCommand(os.Args[1:]) {
 			return 0
 		}
 		// The developer typed their agent's command, not terma's: it starts all the same,
-		// with nothing of terma's in its environment.
+		// with nothing of terma's in its environment. Every other command receives dirErr
+		// once its flags are parsed, so JSON stream mode can report it on stdout.
 		if !launchCommand(os.Args[1:]) {
-			fmt.Fprintf(style.Highlight(os.Stderr), "%s %v\n", style.For(os.Stderr).Fail("Error:"), err)
-			return 1
+			app.dirErr = err
 		}
 		dir, stateDir = "", ""
 	}

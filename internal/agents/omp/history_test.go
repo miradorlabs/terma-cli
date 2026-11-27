@@ -156,6 +156,22 @@ func TestOmpDiscoverHistorySubagentsForksContinuationsAndOrphans(t *testing.T) {
 	if orph, ok := byID["orphan1"]; !ok || orph.ParentSessionID != "goneparent" {
 		t.Errorf("orphan1 should carry ParentSessionID=goneparent for fail-closed handling, got %+v", orph)
 	}
+
+	// A zero window marks nothing active, a transcript dated in the future included.
+	futurePath := filepath.Join(agentDir, "sessions", proj, "2026-11-26T13-00-00-000Z_future1.jsonl")
+	writeFile(futurePath, `{"type":"session","id":"future1","cwd":"/work/repo-a"}`+"\n", now.Add(time.Hour))
+	zeroFiles, err := (Agent{}).DiscoverHistory(context.Background(), agents.HistoryDiscoverOptions{
+		Since: now.Add(-90 * 24 * time.Hour),
+		Now:   now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range zeroFiles {
+		if f.Active {
+			t.Errorf("with a zero window, %s is active", f.SessionID)
+		}
+	}
 }
 
 func TestOmpDiscoverHistoryUnreadableSubagentDirSetsCompanionReadError(t *testing.T) {
