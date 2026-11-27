@@ -600,7 +600,9 @@ the files grok's `search_replace` tool edits, for commit attribution. For a suba
 the session it was opened from and the call that launched it, and how a background one ended
 when its parent waits on it or kills it. grok's export can lose the prompt of a headless run,
 so the prompt comes from the hook: always counted, with its text only while you chose Grok
-Build at setup (or in global mode) and the team's policy collects prompts. grok also runs the
+Build at setup (or in global mode) and the team's policy collects prompts. The name grok gives
+a session, or the one you `/rename` it to, goes as the session's title under the same rules:
+terma reads it from the session's `summary.json` at the end of each turn. grok also runs the
 entries in Claude Code's and Cursor's hooks files; terma's Claude Code and Cursor hooks do
 nothing inside grok, so a grok session is never recorded as theirs.
 
