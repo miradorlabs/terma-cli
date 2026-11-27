@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -91,11 +92,18 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 			}
 		}
 	}
-	// The relay withholds a claimed session of an agent the developer did not choose, and
-	// setup records only the agents it offers (the rest are Coming Soon): the profile
-	// names every agent pointed at the relay, as setup would once it offers them.
-	agents := append([]string{"claude", "codex", "opencode"}, sb.RelayAgents...)
-	sb.recordHarnesses(agents)
+	// The relay withholds a claimed session of an agent the developer did not choose. Setup
+	// recorded the agents it offers that the scenario chose (SetupAgents); the profile names
+	// the others pointed at the relay too, which setup does not offer yet (Coming Soon), as
+	// setup would once it offers them.
+	agents := append([]string{"claude", "codex"}, sb.RelayAgents...)
+	recorded := sb.recordedHarnesses()
+	for _, a := range agents {
+		if !slices.Contains(recorded, a) && !slices.Contains(sb.SetupAgents, a) {
+			recorded = append(recorded, a)
+		}
+	}
+	sb.recordHarnesses(recorded)
 	// --no-start: the scenario decides whether the relay runs before the agent.
 	// One setup for every agent: a second would stop the relay StartRelay runs.
 	sb.terma(sb.Repo, "relay", "setup", "--no-start", "--addr", sb.relayAddr, "--harness", strings.Join(agents, ","))
@@ -163,6 +171,23 @@ func (sb *Sandbox) StartServiceRelay(manager ServiceManager) {
 		data, _ := os.ReadFile(logPath)
 		t.Fatalf("the service's relay never came up on %s:\n%s", sb.relayAddr, data)
 	}
+}
+
+// recordedHarnesses are the default profile's chosen agents.
+func (sb *Sandbox) recordedHarnesses() []string {
+	data, err := os.ReadFile(filepath.Join(sb.TermaConfig, "config.json"))
+	if err != nil {
+		sb.T.Fatal(err)
+	}
+	var file struct {
+		Profiles map[string]struct {
+			Harnesses []string `json:"harnesses"`
+		} `json:"profiles"`
+	}
+	if err := json.Unmarshal(data, &file); err != nil {
+		sb.T.Fatal(err)
+	}
+	return file.Profiles["default"].Harnesses
 }
 
 // recordHarnesses sets the default profile's chosen agents.

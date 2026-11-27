@@ -72,7 +72,10 @@ func volatile(key string) bool {
 // IDs). Direct and relayed runs have different IDs, so their samples can differ.
 // See Codex rust-v0.158.0, codex-rs/rollout/src/persistence_metrics.rs.
 func sometimes(key string) bool {
-	return key == "log retention_sweep" || strings.HasPrefix(key, "metric codex.rollout.persistence.")
+	return key == "log retention_sweep" || strings.HasPrefix(key, "metric codex.rollout.persistence.") ||
+		// A one-shot `opencode run` can end before its title call answers: the call's span is
+		// sent, closed at exit, and OpenCode never renames the session in that process.
+		key == "log opencode.session.title"
 }
 
 // endedCleanly reports whether the agent ran its session-end hook: Codex sometimes
@@ -366,15 +369,6 @@ func TestRelayWorkloadsCodex(t *testing.T) {
 
 // --- OpenCode ----------------------------------------------------------------------
 
-// openAIToolProvider asks OpenCode's bash tool to run cmd on the first call, then
-// replies.
-func openAIToolProvider(calls *atomic.Int32, cmd string) http.Handler {
-	if cmd == "" {
-		return openAIToolCallProvider(calls, "", nil)
-	}
-	return openAIToolCallProvider(calls, "bash", map[string]any{"command": cmd, "description": "workload"})
-}
-
 // openAIToolCallProvider asks for one call of tool with args on the first request
 // (none when tool is empty), then replies.
 func openAIToolCallProvider(calls *atomic.Int32, tool string, args map[string]any) http.Handler {
@@ -404,16 +398,30 @@ func TestRelayWorkloadsOpenCode(t *testing.T) {
 		for _, w := range []struct{ name, cmd string }{{"reply", ""}, {"bash", "printf ok"}} {
 			t.Run(w.name, func(t *testing.T) {
 				var provider *httptest.Server
+				var calls atomic.Int32
 				runBoth(t, b, func(t *testing.T) *Sandbox {
 					sb := New(t, Isolated)
-					var calls atomic.Int32
-					provider = httptest.NewServer(openAIToolProvider(&calls, w.cmd))
+					calls.Store(0)
+					// The workload's shell call, in the build's own tool name; none for a reply. The
+					// scripted provider keeps it for the conversation: OpenCode's title request can
+					// reach a provider first, and one that answers its first request with the call
+					// then has none left for the conversation, so the session never runs it.
+					var steps []openCodeStep
+					if w.cmd != "" {
+						steps = []openCodeStep{{calls: []openCodeCall{openCodeCallFor(b, "call_oc_1", openCodeIntent{shell: w.cmd, description: "workload"})}}}
+					}
+					provider = httptest.NewServer(openCodeScriptedProvider(&calls, steps...))
 					t.Cleanup(provider.Close)
 					sb.UseOpenCodeProvider(provider.URL)
+					sb.UseOpenCode(b)
 					return sb
 				}, func(t *testing.T, sb *Sandbox) {
 					sb.directOpenCode()
 					sb.OpenCodeRun(b, sb.Repo, "", "Do the task. TERMA_WORKLOAD")
+					// The call's request, then the one that carries its result back.
+					if w.cmd != "" && calls.Load() < 2 {
+						t.Errorf("the workload's shell call did not run: %d conversation requests", calls.Load())
+					}
 				})
 			})
 		}

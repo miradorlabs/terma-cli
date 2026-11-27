@@ -499,6 +499,14 @@ are golden files too. The complete Codex installation matters: the companion hos
 work on 0.153.3 and 0.153.4 too. Missing edit events fail the attribution contract;
 they must not count as a pass for an assumed unsupported version.
 
+OpenCode's list holds both majors: OpenCode 1 is published as `opencode-ai`, OpenCode 2 as
+`@opencode/cli`, and a build is fetched from its major's package. OpenCode 2 shares OpenCode 1's
+config and data folders and database, so every OpenCode process runs with the four XDG folders
+set inside the sandbox, and OpenCode 2 runs nowhere else. Its `opencode run` gets
+`--standalone`, a private server; only `TestOpenCodeBackgroundService` starts the background
+service, and it stops it. CI runs OpenCode's scenarios in two shards, `opencode-1` and
+`opencode-2`, each with its major's oldest supported build and its latest.
+
 ## Adding a harness
 
 One driver file (start it, get past its dialogs, send a prompt, exit), one

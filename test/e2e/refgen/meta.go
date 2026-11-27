@@ -23,6 +23,7 @@ import (
 type harnessMeta struct {
 	name, vendor, homepage string
 	npm                    string // the package it is published as, for release dates
+	npmNext                string // a later major's package, where it changed (OpenCode 2's)
 	repo, language, tag    string // its public source, and a version's tag (%s)
 	changelog              string // a page a person reads
 	changelogRaw           string // a markdown changelog with a heading a version, where there is one
@@ -42,7 +43,7 @@ var harnesses = map[string]harnessMeta{
 	"codex-desktop": {name: "Codex app", vendor: "OpenAI", homepage: "https://openai.com/codex", feed: "codex-desktop"},
 	"gemini": {name: "Gemini CLI", vendor: "Google", homepage: "https://github.com/google-gemini/gemini-cli", npm: "@google/gemini-cli",
 		repo: "google-gemini/gemini-cli", language: "typescript", tag: "v%s", changelog: "https://github.com/google-gemini/gemini-cli/releases"},
-	"opencode": {name: "OpenCode", vendor: "Anomaly", homepage: "https://opencode.ai", npm: "opencode-ai",
+	"opencode": {name: "OpenCode", vendor: "Anomaly", homepage: "https://opencode.ai", npm: "opencode-ai", npmNext: "@opencode/cli",
 		repo: "anomalyco/opencode", language: "typescript", tag: "v%s", changelog: "https://github.com/anomalyco/opencode/releases"},
 	"pi": {name: "Pi", vendor: "Earendil", homepage: "https://github.com/earendil-works/pi", npm: "@earendil-works/pi-coding-agent",
 		repo: "earendil-works/pi", language: "typescript", tag: "v%s", changelog: "https://github.com/earendil-works/pi/releases"},
@@ -114,7 +115,21 @@ func releaseDates(m harnessMeta) map[string]time.Time {
 	if m.npm == "" {
 		return nil
 	}
-	data, err := fetcher("https://registry.npmjs.org/" + strings.ReplaceAll(m.npm, "/", "%2F"))
+	dates := npmDates(m.npm)
+	if dates == nil || m.npmNext == "" {
+		return dates
+	}
+	for v, at := range npmDates(m.npmNext) {
+		if _, ok := dates[v]; !ok {
+			dates[v] = at
+		}
+	}
+	return dates
+}
+
+// npmDates are when each version of pkg was published, or nil when the registry cannot say.
+func npmDates(pkg string) map[string]time.Time {
+	data, err := fetcher("https://registry.npmjs.org/" + strings.ReplaceAll(pkg, "/", "%2F"))
 	if err != nil {
 		return nil
 	}

@@ -85,9 +85,10 @@ func TestOpenCodeProfile(t *testing.T) {
 		var calls atomic.Int32
 		harnessProfile(t, b, openAIChatProvider(&calls), func(sb *Sandbox, url string) []string {
 			sb.UseOpenCodeProvider(url)
-			return []string{"XDG_CONFIG_HOME=" + filepath.Join(sb.Home, ".config")}
+			return nil
 		}, func(sb *Sandbox) []string {
-			return []string{"run", "--format", "json", "--dir", sb.Repo, profilePrompt}
+			sb.requireOpenCodeSandbox(b)
+			return append(openCodeRunArgs(b, sb.Repo, false), profilePrompt)
 		}, []string{"--help"}, []string{"run", "--help"})
 		requireCalls(t, b, &calls)
 	})
@@ -112,7 +113,7 @@ func TestPiProfile(t *testing.T) {
 func TestOmpProfile(t *testing.T) {
 	forEachOmp(t, func(t *testing.T, b Binary) {
 		var calls atomic.Int32
-		harnessProfile(t, b, openAIToolProvider(&calls, ""), func(sb *Sandbox, url string) []string {
+		harnessProfile(t, b, openAIToolCallProvider(&calls, "", nil), func(sb *Sandbox, url string) []string {
 			sb.UseOmpProvider(url)
 			return nil
 		}, func(*Sandbox) []string {

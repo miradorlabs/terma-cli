@@ -8,8 +8,9 @@
 The `terma` cli connects coding agents to [Terma](https://terma.ai), then stamps the commits
 they produce so agent spend can be traced to shipped code. It supports **Claude Code**
 (CLI and Desktop), **Codex** (CLI and Desktop), **GitHub Copilot** (CLI and VS Code),
-**[OMP](https://github.com/can1357/oh-my-pi)**, **Antigravity** (the `agy` CLI 1.2.4 or later, on macOS and Linux)
-and **Grok Build** (xAI's `grok` CLI 1.0.92 or later, in beta, on macOS and Linux).
+**[OMP](https://github.com/can1357/oh-my-pi)**, **Antigravity** (the `agy` CLI 1.2.4 or later, on macOS and Linux),
+**Grok Build** (xAI's `grok` CLI 1.0.92 or later, in beta, on macOS and Linux) and **OpenCode**
+(1.16.0 or later, or 2.0.0 or later, in beta, on macOS and Linux).
 
 ## Get started
 
@@ -104,7 +105,7 @@ instead: see [Scripted and headless setup](#scripted-and-headless-setup).
 
 ```mermaid
 flowchart LR
-  agent["Claude Code / Codex / Copilot / OMP / Grok Build"] -- "telemetry" --> relay["terma relay<br/>(127.0.0.1)"]
+  agent["Claude Code / Codex / Copilot / OMP / Grok Build / OpenCode"] -- "telemetry" --> relay["terma relay<br/>(127.0.0.1)"]
   agent -- "hook events" --> hook["terma hook"]
   git["git commit"] -- "commit hooks" --> hook
   hook -- "routes & claims session<br/>for matching team" --> relay
@@ -272,7 +273,7 @@ terma setup --org acme --team platform --harness claude,codex,copilot,omp --yes
   account; with `--yes` and no `--team`, setup keeps your current selection (or picks the
   only available team on a fresh machine). Use `terma teams` to tick or untick teams at
   any time.
-- `--harness <agents>` records those agents (`claude`, `codex`, `copilot`, `omp`, and on macOS and Linux `antigravity` and `grok`); with `--yes` or no
+- `--harness <agents>` records those agents (`claude`, `codex`, `copilot`, `omp`, and on macOS and Linux `antigravity`, `grok` and `opencode`); with `--yes` or no
   terminal and no `--harness`, setup records the supported agents detected on this
   machine. The picker ticks the same agents, marked "detected", and nothing else.
 - `--yes` skips interactive prompts, keeping the teams already ticked (all of them on a first
@@ -626,9 +627,61 @@ session. grok writes your home directory as `~` in the paths it exports, so the 
 own home directory beside them, with tool content only. Grok Build should work on macOS, but
 has been verified on Linux only.
 
-On Windows, setup lists Antigravity and Grok Build as Coming Soon: `agy` runs its hooks with
-`cmd` there, and terma's hook command for it has been checked only on macOS and Linux; grok's
-hooks and export have been verified on Linux only.
+OpenCode (in beta) has no telemetry export of its own, so terma's plugin is its exporter.
+Setup writes one file, `terma.js`, into OpenCode's plugins folder (`~/.config/opencode/plugins`,
+or `$XDG_CONFIG_HOME/opencode/plugins`), and that one file serves OpenCode 1 and OpenCode 2.
+The plugin sends each model call with its tokens and the cost OpenCode reports, each reply,
+each tool call and MCP call, each subagent with the session that opened it, each prompt and
+each session title to the relay, which forwards what your team's policy collects. It also runs
+terma's hooks: they claim each session for its repository, check what a read, search or shell
+tool reaches, and record the files OpenCode's edit tools change, with their repository, so
+those edits are stamped on your commits.
+
+terma needs OpenCode 1.16.0 or later on OpenCode 1, and 2.0.0 or later on OpenCode 2: setup
+refuses an earlier one and doctor fails it. OpenCode loads its plugins when it starts, so
+restart OpenCode after setup, including a long-running `opencode serve`, OpenCode 2's
+background service and T3 Code's OpenCode server. A run started with `opencode --pure` loads
+no plugins and is not recorded.
+
+OpenCode's known limits: on OpenCode 1, the call that writes a session's title has no tokens
+or cost. On OpenCode 2.0.0, MCP calls made in code mode are recorded only as the code-mode
+call that made them. Reasoning text is never collected, and a file one of OpenCode's shell
+commands writes is not attributed to its session. When a reach is checked only after its call
+ran, what the session and the sessions above it send waits for the check, but only for the
+sessions that OpenCode process knows: a parent session in another OpenCode process is not held
+back. On OpenCode 2, every session of the background service runs in one process. Also on
+OpenCode 2, the first model call or tool call of a session can be recorded a few tens of
+milliseconds shorter than it was: OpenCode does not wait for terma's first check of the
+session, and nothing is recorded as starting before the prompt that asked for it.
+
+On OpenCode 2, some attached files stop a session from being recorded. terma checks that a
+file an agent reads belongs to a repository your team collects, and for these OpenCode 2
+gives the plugin the file's content but not where the file is, so it cannot be checked:
+
+- a file attached with `opencode run -f`;
+- on OpenCode 2.0.0, an image or PDF attached by its path.
+
+From such a prompt on, nothing of the session is recorded until the session is next resumed,
+and `terma doctor` lists it under "Paused sessions", as for any reach terma cannot place. A file
+attached with `@file` is checked and recorded as usual, and so is an image or PDF attached
+by its path on OpenCode 2.4.1. An image pasted from the clipboard has no file behind it: it
+is treated as your own input, like pasted text, and nothing of the image is sent. Text that
+OpenCode puts into the prompt itself, with nothing to say it came from a file, cannot be told
+from what you typed or pasted, and is recorded as your prompt: OpenCode 2.4.1's own code
+does this with an SVG dragged into the prompt (read in its code, not seen in a run).
+
+A session you move to another repository on OpenCode 2 is recorded under that repository's
+rules from the move on. What was said before the move stays as it was recorded, but the
+session's title, and replies that draw on the earlier conversation, are recorded under the
+new repository's rules once the session is there. terma takes a few tens of milliseconds to
+claim the session in its new repository, and a model step or tool call that starts and ends
+within that time is recorded under the repository the session came from, which can be another
+team's or another organization's.
+
+On Windows, setup lists Antigravity, Grok Build and OpenCode as Coming Soon: `agy` runs its
+hooks with `cmd` there, and terma's hook command for it has been checked only on macOS and
+Linux; grok's hooks and export have been verified on Linux only; and OpenCode's plugin has
+not been tried on Windows.
 
 `terma setup` runs the relay as a per-user background service, so it is up before any
 agent starts; with `--relay-service off`, hooks start it on demand. `terma update`

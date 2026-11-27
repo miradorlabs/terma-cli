@@ -4,11 +4,15 @@
 # every test with the shard it runs in. A test runs in the first shard whose pattern matches
 # its name; `others` takes the rest, so a new test always runs somewhere. The shards are
 # balanced by the times CI measured (about four to five minutes each).
+#
+# OpenCode's tests run twice, once per major: opencode-1 and opencode-2 are the same tests,
+# and CI gives each shard its own builds (TERMA_E2E_OPENCODE_VERSIONS).
 set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SHARDS="claude codex-a codex-b copilot opencode others"
 
-[ $# -eq 2 ] || { echo "usage: $0 <$(echo "$SHARDS" | tr ' ' '|')|list> '<go test -run pattern>'" >&2; exit 2; }
+[ $# -eq 2 ] || { echo "usage: $0 <claude|codex-a|codex-b|copilot|opencode-1|opencode-2|others|list> '<go test -run pattern>'" >&2; exit 2; }
+case "$1" in opencode-1 | opencode-2) set -- opencode "$2" ;; esac
 
 pattern() {
 	case "$1" in
@@ -20,10 +24,11 @@ pattern() {
 	codex-b) echo 'Codex|Dsh|Pi([A-Z]|$)|Omp|Grok' ;;
 	# GitHub Copilot, which runs against GitHub's service: its own check.
 	copilot) echo 'Copilot' ;;
-	# OpenCode, on its oldest supported build and its latest: every scenario runs twice.
+	# OpenCode, on its oldest supported build and its latest of one major (opencode-1,
+	# opencode-2): every scenario runs twice in each.
 	opencode) echo 'OpenCode' ;;
 	others) echo '.' ;;
-	*) echo "unknown shard $1; one of: $SHARDS" >&2; exit 2 ;;
+	*) echo "unknown shard $1; one of: claude codex-a codex-b copilot opencode-1 opencode-2 others" >&2; exit 2 ;;
 	esac
 }
 
