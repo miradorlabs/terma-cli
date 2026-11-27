@@ -766,22 +766,20 @@ function sight(ctx: any, viaStart = false): Session | null {
   }
   const s = newSession(id, ctx)
   remember(st.sessions, id, s, MAX_SESSIONS)
-  const elsewhere = forkedElsewhere(s, cwdOf(ctx))
   if (viaStart) {
     s.parent = link()
   } else {
     const model = modelOf(ctx)
     void queuedHook("session-start", { session_id: id, cwd: cwdOf(ctx), model: str(model?.id) || undefined })
     // Queued behind the start; nothing waits for it.
-    if (elsewhere) void reach(s, cwdOf(ctx), "ls", { lists: [s.forkedCwd] })
+    if (forkedElsewhere(s, cwdOf(ctx))) void reach(s, cwdOf(ctx), "ls", { lists: [s.forkedCwd] })
   }
-  setPosition(s, ctx, !elsewhere)
+  setPosition(s, ctx)
   return s
 }
 
 // forkedElsewhere reports whether s is a fork of a session that ran in another directory: the
-// conversation it copied is that directory's, so its name is not sent at first sight and the
-// directory is reach-checked.
+// conversation it copied is that directory's, so the directory is reach-checked.
 function forkedElsewhere(s: Session, cwd: string): boolean {
   if (!s.forkedCwd) return false
   try {
@@ -791,18 +789,23 @@ function forkedElsewhere(s: Session, cwd: string): boolean {
   }
 }
 
-// setPosition starts the read of a session's entries at their end, and, with named, sends
-// the session's current name: a name set before this process looked (--name, a fork's, a
-// name another process gave it) has no event of its own here. The same entry is the same
-// event. A name the person cleared is not replaced by an older one.
-function setPosition(s: Session, ctx: any, named = true) {
+// setPosition starts the read of a session's entries at their end, and sends the name the
+// session set itself before this process looked (--name, another process), the same entry
+// as the same event; never a cleared name's predecessor, nor one a fork or clone copied
+// from its source: Pi copies entries with their times, and a fork's header is when it was
+// made.
+function setPosition(s: Session, ctx: any) {
   const entries = entriesOf(ctx)
   s.read = entries.length
-  if (s.parent || !named) return
+  if (s.parent) return
+  let made = 0
+  try {
+    made = Date.parse(ctx?.sessionManager?.getHeader?.()?.timestamp) || 0
+  } catch {}
   for (let i = entries.length - 1; i >= 0; i--) {
     const e = entries[i]
     if (e && e.type === "session_info") {
-      if (typeof e.name === "string" && e.name.trim()) title(s, e)
+      if (typeof e.name === "string" && e.name.trim() && timeOf(e) >= made) title(s, e)
       return
     }
   }
@@ -1198,9 +1201,8 @@ export default async function (pi: any) {
       s.parent = link()
       if (!s.parent) s.tainted = false
       // A /resume back into a session opens its file afresh: what another process wrote to
-      // it meanwhile is not this process's to send. A fork from another directory still
-      // holds that directory's name.
-      setPosition(s, ctx, !forkedElsewhere(s, cwdOf(ctx)))
+      // it meanwhile is not this process's to send.
+      setPosition(s, ctx)
     }
     const model = modelOf(ctx)
     const started = queuedHook("session-start", {

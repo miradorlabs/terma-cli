@@ -231,7 +231,7 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 					return err
 				}
 			}
-			return app.connectMachineRelay(ctx, names, f.relayService, relayReport{
+			err := app.connectMachineRelay(ctx, names, f.relayService, relayReport{
 				ok: func(label, what string) {
 					if label == "Relay" {
 						ui.Summary(label, what)
@@ -245,6 +245,11 @@ func (app *App) runSetup(cmd *cobra.Command, f setupFlags) error {
 				then:   ui.Then,
 				detail: ui.Detail(),
 			})
+			if err != nil {
+				// An agent the relay refused (one too old, say) was not set up after all.
+				ui.drop("Agents")
+			}
+			return err
 		},
 		MachineHooks: func(_ context.Context, names []string) error {
 			phase("Writing agent hooks…")

@@ -24,9 +24,10 @@ type setupUI struct {
 	detail io.Writer
 	p      style.Palette
 	warned bool
-	// lines are the checklist, printed together at finish so prompts never split it.
-	lines []string
-	next  []string
+	// lines are the checklist, printed together at finish so prompts never split it, and
+	// labels the label of each line's step (a wrapped line's too).
+	lines, labels []string
+	next          []string
 	// title closes a run that needs nothing more; warnTitle, when set, one that does.
 	title, warnTitle string
 }
@@ -62,9 +63,22 @@ func (u *setupUI) keep(mark, label, what string) {
 	const indent = 2 + 1 + 1 + stepLabelWidth + 1
 	lines := wrapStep(what, style.Columns(u.out)-indent)
 	u.lines = append(u.lines, fmt.Sprintf("  %s %-*s %s", mark, stepLabelWidth, label, u.p.Commands(lines[0])))
+	u.labels = append(u.labels, label)
 	for _, l := range lines[1:] {
 		u.lines = append(u.lines, strings.Repeat(" ", indent)+u.p.Commands(l))
+		u.labels = append(u.labels, label)
 	}
+}
+
+// drop takes back the checklist lines of label: a step a later one undid.
+func (u *setupUI) drop(label string) {
+	var lines, labels []string
+	for i, l := range u.lines {
+		if u.labels[i] != label {
+			lines, labels = append(lines, l), append(labels, u.labels[i])
+		}
+	}
+	u.lines, u.labels = lines, labels
 }
 
 // Detail takes the long form, shown under --verbose.
@@ -182,7 +196,7 @@ func (u *setupUI) printLines() {
 			fmt.Fprintln(u.out, l)
 		}
 	}
-	u.lines = nil
+	u.lines, u.labels = nil, nil
 }
 
 // headline opens the summary: the title in bold green, or the warn title in bold yellow

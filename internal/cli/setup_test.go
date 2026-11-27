@@ -509,6 +509,29 @@ func TestSetupWritesAgyHooksIntoT3CodesHomes(t *testing.T) {
 // An agy on PATH too old for terma's hooks holds back only ~/.gemini, the home it uses:
 // setup leaves that out, says why, and still writes T3 Code's home, which runs T3 Code's
 // own agy.
+// Setup that refuses an agent too old for terma does not tick it among the agents it set up.
+func TestSetupRefusingAnOldPiTicksNoAgents(t *testing.T) {
+	if !testApp.agents.IsSupported("pi") || runtime.GOOS == "windows" {
+		t.Skip("Pi is Coming Soon on Windows")
+	}
+	gateway := newFakeAuth(t)
+	authSandbox(t, gateway)
+	sandboxMachine(t)
+	signInTo(t, gateway, orgA())
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "pi"), []byte("#!/bin/sh\necho 1.4.0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	out, err := runTerma(t, "setup", "--harness", "pi", "--yes")
+	if err == nil || !strings.Contains(out+err.Error(), "Pi 1.5.0 or later is required (found 1.4.0)") {
+		t.Fatalf("setup: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "Agents") || !strings.Contains(out, "Signed in") {
+		t.Errorf("setup's summary:\n%s", out)
+	}
+}
+
 func TestSetupWithAnOldAgyWritesT3CodesHomes(t *testing.T) {
 	if !testApp.agents.IsSupported("antigravity") || runtime.GOOS == "windows" {
 		t.Skip("Antigravity is Coming Soon on Windows")

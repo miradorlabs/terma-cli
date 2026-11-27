@@ -463,8 +463,8 @@ func TestReplayNewForkCloneTree(t *testing.T) {
 			}
 			seen[id] = true
 		}
-		// Every name a session holds is its title: the rename in the source, and the name a
-		// clone or fork starts with, under its own session.
+		// The rename in the source is its title; the name a clone or fork starts with is its
+		// source's, and none of them names itself here.
 		titles := map[string]otlpRecord{}
 		for _, rec := range r.records("pi.session.title") {
 			k := rec.Attrs.str("session.id") + "/" + rec.Attrs.str("pi.entry.id")
@@ -475,7 +475,7 @@ func TestReplayNewForkCloneTree(t *testing.T) {
 		}
 		want := 0
 		for _, e := range entries(lines) {
-			if gstr(e.Entry, "type") != "session_info" {
+			if gstr(e.Entry, "type") != "session_info" || forked[e.Session] != "" {
 				continue
 			}
 			want++
@@ -487,7 +487,7 @@ func TestReplayNewForkCloneTree(t *testing.T) {
 			eq(t, "title body", rec.Body, gstr(e.Entry, "name"))
 			eq(t, "title time", rec.Time, isoNanos(t, gstr(e.Entry, "timestamp")))
 		}
-		if want < 2 || len(titles) != want {
+		if want < 1 || len(titles) != want {
 			t.Errorf("titles = %d, want %d", len(titles), want)
 		}
 	})
@@ -1750,6 +1750,37 @@ func TestReplayReviewFixes(t *testing.T) {
 		lines = insertAt(lines, 2, line{"e": "_entries", "sessionId": gstr(lines[1], "sessionId"), "entries": []any{named("i0000001", "Old"), named("i0000002", "")}})
 		if n := len(replay(t, writeLines(t, lines), replayOptions{}).records("pi.session.title")); n != 0 {
 			t.Errorf("titles %d", n)
+		}
+	})
+}
+
+// A fork or clone sends only a name it set itself, never the one it copied from its source.
+func TestReplayForkNames(t *testing.T) {
+	t.Parallel()
+	both(t, func(t *testing.T, v string) {
+		r := replay(t, recording(v, "25-fork-named.2"), replayOptions{})
+		titles := r.records("pi.session.title")
+		if len(titles) != 1 || titles[0].Body != "Named at the fork" || strings.Contains(r.allBodies(), "Source name") {
+			t.Errorf("fork named at start: titles %+v", titles)
+		}
+		path := recording(v, "26-clone-of-fork.2")
+		ids := sessionIDs(loadLines(t, path))
+		fork, clone := ids[0], ids[1]
+		r = replay(t, path, replayOptions{})
+		titles = r.records("pi.session.title")
+		if len(titles) != 1 || titles[0].Attrs.str("session.id") != clone || titles[0].Body != "Named in the clone" ||
+			strings.Contains(r.allBodies(), "Source name two") {
+			t.Errorf("clone of a fork: titles %+v", titles)
+		}
+		// The fork's source ran in another directory; the clone's, the fork, in its own.
+		var reached []string
+		for _, h := range r.hooks("pi-tool-reach") {
+			if len(toStrings(h["lists"])) > 0 {
+				reached = append(reached, gstr(h, "session_id"))
+			}
+		}
+		if !slices.Contains(reached, fork) || slices.Contains(reached, clone) {
+			t.Errorf("the source's directory was reach-checked for %v; fork %s, clone %s", reached, fork, clone)
 		}
 	})
 }

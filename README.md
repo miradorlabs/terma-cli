@@ -689,8 +689,8 @@ repository, check what a read, search, list or shell tool (and your own `!` comm
 and record the files Pi's write and edit tools change, so those edits are stamped on your
 commits. A resumed session is the same session; a fork or clone is a new one that names the
 session it came from, as does a session an extension opens with a parent session named
-(`ctx.newSession({parentSession})`). One made from a session in another directory starts
-without that session's name. A `pi` that a tool of another Pi session starts, such as a
+(`ctx.newSession({parentSession})`). A fork or clone starts without its source's name, and is
+named when you name it. A `pi` that a tool of another Pi session starts, such as a
 subagent, is recorded as a run inside that session. Thinking text is never collected.
 
 terma needs Pi 1.5.0 or later: setup refuses an earlier one (upgrade with `pi update`, or
@@ -704,7 +704,9 @@ with another `PI_CODING_AGENT_DIR` loads another folder.
 What terma does not see of Pi: a session of a Pi started with `--no-extensions`; a nested
 session's parent; a child whose spawner scrubs the environment or whose parent shell has exited;
 a subagent's name and outcome; a file a shell command writes; a person's `!` command; a `/tree`
-branch summary's spend; what another extension does outside Pi's tool events.
+branch summary's spend; what another extension does outside Pi's tool events; the conversation a
+fork copied from its source, beyond the source's own directory (a clone of a session forked from
+another team's checkout is recorded for the team of the directory it runs in).
 
 On Windows, setup lists Antigravity, Grok Build, OpenCode and Pi as Coming Soon: `agy` runs its
 hooks with `cmd` there, and terma's hook command for it has been checked only on macOS and
