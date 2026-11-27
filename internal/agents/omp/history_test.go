@@ -702,9 +702,9 @@ func TestOmpRound6SecurityRegressions(t *testing.T) {
 	if !slices.ContainsFunc(scanPaths, func(s string) bool { return strings.HasSuffix(s, "/work/org-b/src") }) {
 		t.Errorf("security_scan missing include_paths reach: %v", scanPaths)
 	}
-	evalPaths := ompToolCallReachPaths("eval", json.RawMessage(`{"filename":"/work/org-b/script.py"}`), "/work/org-a/repo")
-	if !slices.ContainsFunc(evalPaths, func(s string) bool { return strings.HasSuffix(s, "/work/org-b/script.py") }) {
-		t.Errorf("eval missing filename reach: %v", evalPaths)
+	evalPaths := ompToolCallReachPaths("eval", json.RawMessage(`{"language":"py","code":"print(1)"}`), "/work/org-a/repo")
+	if !slices.ContainsFunc(evalPaths, func(s string) bool { return strings.HasPrefix(s, "\x00unknown\x00") }) {
+		t.Errorf("eval should fail closed with UnknownReach: %v", evalPaths)
 	}
 
 	// 2. @../, @./, @.., and quotes after @ / :.
@@ -948,6 +948,58 @@ func TestOmpEvalFailClosedAndEmbeddedSearchGlobs(t *testing.T) {
 	}
 	if got := ompToolCallReachPaths("grep", json.RawMessage(`{"pattern":"x","path":"apps/[id]/page.tsx"}`), cwd); !slices.Equal(got, []string{"apps/[id]/page.tsx"}) {
 		t.Errorf("literal existing path with brackets = %v, want [apps/[id]/page.tsx]", got)
+	}
+
+	// 3. Round 7 blockers & should: debug fail-closed, ssh:// fail-closed, backslash glob paths
+	// on Linux/WSL, Changes.jsonl vs changes.jsonl content check, and multi-level spaced dirs.
+	if got := ompToolCallReachPaths("debug", json.RawMessage(`{"action":"launch","cwd":"/work/org-b","program":"app"}`), cwd); !hasUnknown(got) {
+		t.Errorf("debug should fail closed with UnknownReach: %v", got)
+	}
+	if _, unk := resolveReachPath("ssh://client-host/work/repo/README.md"); !unk {
+		t.Errorf("ssh:// URI should fail closed with unknown=true")
+	}
+	if _, unk := resolveReachPath("vault://notes/secret.md"); !unk {
+		t.Errorf("vault:// URI should fail closed with unknown=true")
+	}
+	if got, unk := resolveReachPath("agent://worker/out.md"); unk || got != "" {
+		t.Errorf("agent:// URI should be safely ignored, got (%q, %v)", got, unk)
+	}
+	if got := ompToolCallReachPaths("glob", json.RawMessage(`{"path":"..\\org-b\\*.go"}`), cwd); !slices.Contains(got, wantRelB) {
+		t.Errorf("backslash glob path ..\\org-b\\*.go = %v, want %q", got, wantRelB)
+	}
+	// Multi-level glob and deleted subdir under a spaced parent directory stay unsplit.
+	spacedRoot := filepath.Join(cwd, "My Projects", "org-a", "repo")
+	if err := os.MkdirAll(filepath.Join(spacedRoot, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	spacedGlob := filepath.Join(spacedRoot, "src", "**", "*.go")
+	if got := splitOmpDelimitedPaths(spacedGlob, spacedRoot); !slices.Equal(got, []string{spacedGlob}) {
+		t.Errorf("splitOmpDelimitedPaths(spaced multi-level glob) = %v, want [%q]", got, spacedGlob)
+	}
+	spacedDeletedSub := filepath.Join(spacedRoot, "old-dir", "file.go")
+	if got := splitOmpDelimitedPaths(spacedDeletedSub, spacedRoot); !slices.Equal(got, []string{spacedDeletedSub}) {
+		t.Errorf("splitOmpDelimitedPaths(spaced deleted subdir) = %v, want [%q]", got, spacedDeletedSub)
+	}
+	// Changes.jsonl (task subagent named Changes) is NOT exempted even alongside changes.jsonl.
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		subDir := filepath.Join(cwd, "sub-case")
+		if err := os.MkdirAll(subDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		capSub := filepath.Join(subDir, "Changes.jsonl")
+		if err := os.WriteFile(capSub, []byte(`{"type":"session","id":"s-cap","timestamp":"2026-11-23T10:00:00Z","cwd":"/work/repo"}`+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if isOmpChangesJournal(capSub, "Changes.jsonl") {
+			t.Errorf("Changes.jsonl subagent should not be treated as changes.jsonl journal")
+		}
+	}
+	sessionNamedChanges := filepath.Join(cwd, "changes.jsonl")
+	if err := os.WriteFile(sessionNamedChanges, []byte(`{"type":"session","id":"s-lower","timestamp":"2026-11-23T10:00:00Z","cwd":"/work/repo"}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if isOmpChangesJournal(sessionNamedChanges, "changes.jsonl") {
+		t.Errorf("session transcript starting with type=session must never be treated as changes.jsonl journal")
 	}
 }
 

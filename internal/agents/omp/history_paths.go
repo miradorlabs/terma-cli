@@ -96,8 +96,12 @@ func decodeReachPath(raw string) (string, bool) {
 		}
 		return stripWindowsExtendedPrefix(decoded), false
 	}
-	if ompInternalURLRe.MatchString(p) {
-		return "", false
+	if idx := strings.Index(p, "://"); idx > 0 && ompInternalURLRe.MatchString(p) {
+		switch strings.ToLower(p[:idx]) {
+		case "agent", "attachment", "cfg", "conflict", "help", "local", "memory", "omp", "out", "rule", "security", "skill", "http", "https":
+			return "", false
+		}
+		return p, true
 	}
 	return p, false
 }
@@ -132,27 +136,6 @@ func isWindowsDrivePath(p string) bool {
 
 func isAbsToolPath(p string) bool {
 	return filepath.IsAbs(p) || (len(p) >= 3 && isWindowsDrivePath(p))
-}
-
-func translateWindowsDriveOnLinux(p string) (string, bool) {
-	if strings.HasPrefix(p, `\\`) {
-		return p, true
-	}
-	if !isWindowsDrivePath(p) {
-		return p, false
-	}
-	if os.Getenv("WSL_DISTRO_NAME") != "" || os.Getenv("WSL_INTEROP") != "" {
-		drive := strings.ToLower(p[:1])
-		mount := "/mnt/" + drive
-		if fi, err := os.Stat(mount); err == nil && fi.IsDir() {
-			rest := strings.TrimLeft(strings.ReplaceAll(p[2:], `\`, "/"), "/")
-			if rest == "" {
-				return mount, false
-			}
-			return mount + "/" + rest, false
-		}
-	}
-	return p, true
 }
 
 // resolveReachPath normalizes OMP path shorthands, decodes local file:// URLs, filters
@@ -222,7 +205,7 @@ func splitOmpDelimitedPaths(entry, cwd string) []string {
 					break
 				}
 			}
-			if !anyLive && spacedEnclosingDirExists(seg, ws[1:], cwd) {
+			if !anyLive && spacedEnclosingDirExists(seg, ws, cwd) {
 				add(seg)
 				continue
 			}
@@ -239,8 +222,8 @@ func splitOmpDelimitedPaths(entry, cwd string) []string {
 	return out
 }
 
-func spacedEnclosingDirExists(seg string, tailTokens []string, cwd string) bool {
-	for _, tok := range tailTokens {
+func spacedEnclosingDirExists(seg string, ws []string, cwd string) bool {
+	for _, tok := range ws[1:] {
 		p := normalizeOmpPath(tok)
 		if p == "~" || p == ".." || strings.HasPrefix(p, "/") || strings.HasPrefix(p, `\`) ||
 			strings.HasPrefix(p, "~/") || strings.HasPrefix(p, `~\`) ||
@@ -249,20 +232,33 @@ func spacedEnclosingDirExists(seg string, tailTokens []string, cwd string) bool 
 			return false
 		}
 	}
-	p, unknown := resolveReachPath(seg)
-	if unknown || p == "" {
+	joinCwd := func(raw string) (string, bool) {
+		p, unk := resolveReachPath(raw)
+		if unk || p == "" {
+			return "", false
+		}
+		p = stripPathSelector(p)
+		if !isAbsToolPath(p) && cwd != "" {
+			p = filepath.Join(cwd, p)
+		}
+		return filepath.Clean(p), true
+	}
+	cand, ok1 := joinCwd(seg)
+	firstTok, ok2 := joinCwd(ws[0])
+	if !ok1 || !ok2 {
 		return false
 	}
-	cand := stripPathSelector(p)
-	if !isAbsToolPath(cand) && cwd != "" {
-		cand = filepath.Join(cwd, cand)
+	for dir := filepath.Dir(cand); len(dir) > len(firstTok); {
+		if fi, err := os.Stat(dir); err == nil && fi.IsDir() {
+			return strings.HasPrefix(dir, firstTok) && (dir[len(firstTok)] == ' ' || dir[len(firstTok)] == '\t')
+		}
+		if parent := filepath.Dir(dir); parent != dir {
+			dir = parent
+		} else {
+			break
+		}
 	}
-	dir := filepath.Dir(cand)
-	if !strings.ContainsAny(dir, " \t") {
-		return false
-	}
-	fi, err := os.Stat(dir)
-	return err == nil && fi.IsDir()
+	return false
 }
 
 func splitTopLevel(s string, whitespace, comma bool) []string {
@@ -433,7 +429,7 @@ func dirHasJSONLOrErr(ctx context.Context, dir string, depth int) bool {
 			}
 			continue
 		}
-		if strings.HasSuffix(ent.Name(), ".jsonl") && !strings.EqualFold(ent.Name(), "changes.jsonl") {
+		if strings.HasSuffix(ent.Name(), ".jsonl") && !isOmpChangesJournal(filepath.Join(dir, ent.Name()), ent.Name()) {
 			return true
 		}
 	}

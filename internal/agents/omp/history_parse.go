@@ -307,6 +307,8 @@ func (p *ompHistoryParser) handleMessage(rec *ompLine, entryTS time.Time) error 
 				p.segReaches = append(p.segReaches, agents.HistoryToolReach{At: ts, Cwd: p.cwd, Paths: paths})
 			}
 		}
+	case "pythonExecution":
+		p.segReaches = append(p.segReaches, agents.HistoryToolReach{At: messageTime(msg.Timestamp, entryTS), Cwd: p.cwd, Paths: []string{hookrun.UnknownReach + "\x00pythonExecution"}})
 	}
 	return nil
 }

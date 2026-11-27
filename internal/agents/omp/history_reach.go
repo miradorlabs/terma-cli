@@ -1,10 +1,15 @@
 package omp
 
 import (
+	"bytes"
 	"cmp"
 	"encoding/json"
+	"errors"
+	"io"
+	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"unicode"
@@ -48,7 +53,6 @@ type ompToolInput struct {
 	Action             string   `json:"action,omitempty"`
 	File               string   `json:"file,omitempty"`
 	NewName            string   `json:"new_name,omitempty"`
-	Filename           string   `json:"filename,omitempty"`
 	IncludePaths       []string `json:"include_paths,omitempty"`
 	KnowledgeBasePaths []string `json:"knowledge_base_paths,omitempty"`
 }
@@ -78,16 +82,17 @@ type ompToolDetails struct {
 // ompToolCallReachPaths extracts filesystem paths reached by a tool call's arguments
 // without consulting the uploader's live shell environment, matching terma-omp.ts.
 func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string) []string {
+	if toolName == "eval" || toolName == "debug" {
+		return []string{hookrun.UnknownReach + "\x00" + toolName}
+	}
 	if len(rawArgs) == 0 {
-		if toolName == "eval" {
-			return []string{hookrun.UnknownReach + "\x00eval"}
-		}
 		return nil
 	}
 	var in ompToolInput
 	if json.Unmarshal(rawArgs, &in) != nil {
-		if toolName == "eval" {
-			return []string{hookrun.UnknownReach + "\x00eval"}
+		switch toolName {
+		case "read", "grep", "search", "ast_grep", "ast_edit", "find", "glob", "ls", "lsp", "security_scan", "bash", "write", "edit", "apply_patch":
+			return []string{hookrun.UnknownReach + "\x00" + toolName}
 		}
 		return nil
 	}
@@ -172,10 +177,8 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 		for _, p := range in.Paths {
 			addDelimited(p)
 		}
-	case "grep", "search", "ast_grep":
+	case "grep", "search", "ast_grep", "ast_edit":
 		searchWithGlobs(cmp.Or(in.Glob, in.Include))
-	case "ast_edit":
-		searchWithGlobs("")
 	case "find", "glob":
 		searchWithGlobs(cmp.Or(in.Pattern, in.Glob))
 	case "ls":
@@ -192,10 +195,6 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 		for _, p := range in.KnowledgeBasePaths {
 			addDelimited(p)
 		}
-	case "eval":
-		addAlone(in.Filename)
-		addAlone(in.Cwd)
-		out = append(out, hookrun.UnknownReach+"\x00eval")
 	case "bash":
 		dir := cwd
 		if raw := strings.TrimSpace(in.Cwd); raw != "" {
@@ -237,19 +236,22 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 	return out
 }
 
-// parseOmpSearchPath mirrors OMP's parseSearchPathPreferringLiteral: when d contains glob
-// metacharacters (*, ?, [, {) and does not exist literally on disk, it splits d at the first
-// glob segment into (baseDir, embeddedGlob). Root-level globs (/*/*.txt, /**/*.txt, C:/*.txt)
-// return unknown=true so search reach fails closed immediately.
+// parseOmpSearchPath mirrors OMP's parseSearchPathPreferringLiteral: it preserves existing
+// literal paths, otherwise normalizes backslashes to forward slashes (matching OMP's
+// normalizePathSeparators on every OS) and splits at the first glob segment (*, ?, [, {) into
+// (baseDir, embeddedGlob). Root-level globs (/*/*.txt, /**/*.txt, C:/*.txt) fail closed.
 func parseOmpSearchPath(d, cwd string) (baseDir, embeddedGlob string, unknown bool) {
-	if !strings.ContainsAny(d, "*?[{") || statReachExists(d, cwd) {
+	if statReachExists(d, cwd) {
 		return d, "", false
 	}
-	slashed := filepath.ToSlash(d)
+	slashed := strings.ReplaceAll(d, `\`, "/")
+	if !strings.ContainsAny(slashed, "*?[{") {
+		return filepath.FromSlash(slashed), "", false
+	}
 	segs := strings.Split(slashed, "/")
 	firstGlob := slices.IndexFunc(segs, func(s string) bool { return strings.ContainsAny(s, "*?[{") })
 	if firstGlob < 0 {
-		return d, "", false
+		return filepath.FromSlash(slashed), "", false
 	}
 	embeddedGlob = strings.Join(segs[firstGlob:], "/")
 	switch {
@@ -274,6 +276,66 @@ func parseOmpSearchPath(d, cwd string) (baseDir, embeddedGlob string, unknown bo
 func isRootSearchDir(p string) bool {
 	c := filepath.ToSlash(filepath.Clean(p))
 	return c == "/" || (len(c) == 3 && isASCIILetter(c[0]) && c[1] == ':' && c[2] == '/')
+}
+
+func translateWindowsDriveOnLinux(p string) (string, bool) {
+	if strings.HasPrefix(p, `\\`) {
+		return p, true
+	}
+	if !isWindowsDrivePath(p) {
+		return p, false
+	}
+	if os.Getenv("WSL_DISTRO_NAME") != "" || os.Getenv("WSL_INTEROP") != "" {
+		drive := strings.ToLower(p[:1])
+		mount := "/mnt/" + drive
+		if fi, err := os.Stat(mount); err == nil && fi.IsDir() {
+			rest := strings.TrimLeft(strings.ReplaceAll(p[2:], `\`, "/"), "/")
+			if rest == "" {
+				return mount, false
+			}
+			return mount + "/" + rest, false
+		}
+	}
+	return p, true
+}
+
+// isOmpChangesJournal reports whether path is OMP's non-session commit/selective change
+// journal (<session-stem>/changes.jsonl). It requires the exact lowercase filename on
+// case-sensitive OSes and checks the leading 512 bytes so a task subagent named Changes
+// (or any session transcript) is never exempted while oversized journal lines still match.
+func isOmpChangesJournal(path, name string) bool {
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+		if !strings.EqualFold(name, "changes.jsonl") {
+			return false
+		}
+	} else if name != "changes.jsonl" {
+		return false
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	var buf [512]byte
+	n, err := f.Read(buf[:])
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false
+	}
+	head := bytes.TrimSpace(buf[:n])
+	if len(head) == 0 {
+		return true
+	}
+	if nl := bytes.IndexByte(head, '\n'); nl >= 0 {
+		head = bytes.TrimSpace(head[:nl])
+	}
+	var kind struct {
+		Type string `json:"type"`
+	}
+	if json.Unmarshal(head, &kind) == nil && kind.Type != "" {
+		return kind.Type == "change" || kind.Type == "commit"
+	}
+	return bytes.Contains(head, []byte(`"type":"change"`)) || bytes.Contains(head, []byte(`"type": "change"`)) ||
+		bytes.Contains(head, []byte(`"type":"commit"`)) || bytes.Contains(head, []byte(`"type": "commit"`))
 }
 
 // ompToolResultReachPaths extracts any resolved paths disclosed in a tool result's details.

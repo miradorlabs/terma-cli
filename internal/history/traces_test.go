@@ -1414,6 +1414,54 @@ func TestUploadOmpEvalAndEmbeddedPathGlobs(t *testing.T) {
 	writeAged("2026-11-23T06-30-00-000Z_s-glob-safe.jsonl", makeGrep("s-glob-safe", repoA, "safe/*.txt", "CLEAN-SAFE-SUBDIR-GLOB"))
 	writeAged("2026-11-23T06-00-00-000Z_s-ws-safe.jsonl", makeGrep("s-ws-safe", wsRoot, "safe/*.txt", "CLEAN-WS-SAFE-GLOB"))
 
+	// 4. Round 7 blockers end-to-end: pythonExecution, ssh:// read, debug tool, backslash glob,
+	// and a task subagent named Changes (Changes.jsonl) crossing into Org B.
+	writeAged("2026-11-23T05-30-00-000Z_s-pyexec.jsonl", strings.Join([]string{
+		`{"type":"session","version":3,"id":"s-pyexec","timestamp":"2026-11-23T05:30:00Z","cwd":` + mustJSONTest(repoA) + `}`,
+		`{"type":"message","id":"py1","timestamp":"2026-11-23T05:30:01Z","message":{"role":"pythonExecution","code":"print(open('../org-b/secret.txt').read())","output":"LEAKED-PYEXEC","timestamp":1795411801000}}`,
+		`{"type":"message","id":"pyu","timestamp":"2026-11-23T05:30:02Z","message":{"role":"user","content":"summarize","timestamp":1795411802000}}`,
+		`{"type":"message","id":"pya","timestamp":"2026-11-23T05:30:03Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","duration":100,"timestamp":1795411802900,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"LEAKED-PYEXEC-SUMMARY"}]}}`,
+	}, "\n")+"\n")
+
+	writeAged("2026-11-23T05-00-00-000Z_s-ssh-read.jsonl", strings.Join([]string{
+		`{"type":"session","version":3,"id":"s-ssh-read","timestamp":"2026-11-23T05:00:00Z","cwd":` + mustJSONTest(repoA) + `}`,
+		`{"type":"message","id":"su1","timestamp":"2026-11-23T05:00:01Z","message":{"role":"user","content":"read ssh","timestamp":1795410001000}}`,
+		`{"type":"message","id":"sa1","timestamp":"2026-11-23T05:00:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","duration":100,"timestamp":1795410001900,"usage":{"input":5,"output":5},"content":[{"type":"toolCall","id":"sr1","name":"read","arguments":{"path":"ssh://client-host/work/repo/README.md"}}]}}`,
+		`{"type":"message","id":"str1","timestamp":"2026-11-23T05:00:03Z","message":{"role":"toolResult","toolCallId":"sr1","toolName":"read","content":[{"type":"text","text":"LEAKED-SSH-CONTENT"}],"isError":false,"timestamp":1795410003000}}`,
+	}, "\n")+"\n")
+
+	writeAged("2026-11-23T04-30-00-000Z_s-debug.jsonl", strings.Join([]string{
+		`{"type":"session","version":3,"id":"s-debug","timestamp":"2026-11-23T04:30:00Z","cwd":` + mustJSONTest(repoA) + `}`,
+		`{"type":"message","id":"du1","timestamp":"2026-11-23T04:30:01Z","message":{"role":"user","content":"debug","timestamp":1795408201000}}`,
+		`{"type":"message","id":"da1","timestamp":"2026-11-23T04:30:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","duration":100,"timestamp":1795408201900,"usage":{"input":5,"output":5},"content":[{"type":"toolCall","id":"db1","name":"debug","arguments":{"action":"launch","cwd":` + mustJSONTest(repoB) + `,"program":"app"}}]}}`,
+		`{"type":"message","id":"dtr1","timestamp":"2026-11-23T04:30:03Z","message":{"role":"toolResult","toolCallId":"db1","toolName":"debug","content":[{"type":"text","text":"LEAKED-DEBUG-OUT"}],"isError":false,"timestamp":1795408203000}}`,
+	}, "\n")+"\n")
+
+	writeAged("2026-11-23T04-00-00-000Z_s-bs-glob.jsonl", makeGrep("s-bs-glob", repoA, `..\org-b\*.txt`, "LEAKED-BACKSLASH-GLOB"))
+
+	changesParent := filepath.Join(projDir, "2026-11-23T03-30-00-000Z_s-cap-changes.jsonl")
+	writeAged("2026-11-23T03-30-00-000Z_s-cap-changes.jsonl", strings.Join([]string{
+		`{"type":"session","version":3,"id":"s-cap-changes","timestamp":"2026-11-23T03:30:00Z","cwd":` + mustJSONTest(repoA) + `}`,
+		`{"type":"message","id":"cu1","timestamp":"2026-11-23T03:30:01Z","message":{"role":"user","content":"spawn Changes","timestamp":1795404601000}}`,
+		`{"type":"message","id":"ca1","timestamp":"2026-11-23T03:30:05Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","duration":100,"timestamp":1795404604900,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"LEAKED-CAP-CHANGES-SUBAGENT"}]}}`,
+	}, "\n")+"\n")
+	capSubDir := filepath.Join(projDir, "2026-11-23T03-30-00-000Z_s-cap-changes")
+	if err := os.MkdirAll(capSubDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range []struct{ name, content string }{
+		{"changes.jsonl", `{"type":"change","path":"a.go"}` + "\n"},
+		{"Changes.jsonl", `{"type":"session","version":3,"id":"s-cap-child","timestamp":"2026-11-23T03:30:02Z","cwd":` + mustJSONTest(repoB) + `,"parentSession":` + mustJSONTest(changesParent) + `}` + "\n"},
+	} {
+		full := filepath.Join(capSubDir, entry.name)
+		if err := os.WriteFile(full, []byte(entry.content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(full, oldTime, oldTime); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	stA := singleTeamRoutingState(now, "acc1", "org-a", "team-a", "github.com/org-a/repo-a", true, true)
 	stB := singleTeamRoutingState(now, "acc1", "org-b", "team-b", "github.com/org-b/repo-b", true, true)
 	stP := singleTeamRoutingState(now, "acc1", "org-personal", "team-personal", "", true, true)

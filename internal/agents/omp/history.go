@@ -226,7 +226,7 @@ func findOmpSubagents(ctx context.Context, parentPath, stemDir string) (paths, w
 				continue
 			}
 			subPath := filepath.Join(curDir, ent.Name())
-			if strings.EqualFold(ent.Name(), "changes.jsonl") {
+			if isOmpChangesJournal(subPath, ent.Name()) {
 				seenWatch = append(seenWatch, subPath)
 				continue
 			}
@@ -305,12 +305,12 @@ func findOrphanOmpSubagents(ctx context.Context, expectedParent, dir, missingPar
 		if ctx.Err() != nil {
 			return out
 		}
-		if ent.IsDir() || ent.Type()&os.ModeSymlink != 0 || !strings.HasSuffix(ent.Name(), ".jsonl") || strings.EqualFold(ent.Name(), "changes.jsonl") {
+		if ent.IsDir() || ent.Type()&os.ModeSymlink != 0 || !strings.HasSuffix(ent.Name(), ".jsonl") {
 			continue
 		}
 		subPath := filepath.Join(dir, ent.Name())
 		info, err := ent.Info()
-		if err != nil || !info.Mode().IsRegular() {
+		if err != nil || !info.Mode().IsRegular() || isOmpChangesJournal(subPath, ent.Name()) {
 			continue
 		}
 		hdr, err := peekOmpSessionHeader(subPath)
