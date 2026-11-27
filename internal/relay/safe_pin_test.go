@@ -79,6 +79,8 @@ var pinnedSafeKeys = []string{
 	"originator", "os", "os.type", "os.version", "os_arch", "os_platform", "os_release",
 	"os_version", "outcome", "output_format", "output_token_count", "output_tokens",
 	"output_truncated", "parent.source", "permission_mode", "phase", "phases",
+	"pi.call.id", "pi.call.kind", "pi.compaction.reason", "pi.entry.id", "pi.mcp.server", "pi.mcp.tool", "pi.mode",
+	"pi.parent_session.id", "pi.session.forked_from.id", "pi.thinking_level", "pi.tool.outcome", "pi.turn.id", "pi.version",
 	"plugin.name", "plugin.scope",
 	"plugin_id_hash", "process.command", "process.executable.name", "process.executable.path",
 	"process.exit.code",

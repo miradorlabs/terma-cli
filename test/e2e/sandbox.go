@@ -272,6 +272,17 @@ func New(t *testing.T, mode Mode, opts ...Option) *Sandbox {
 func (sb *Sandbox) Setup(env []string, args ...string) string {
 	t := sb.T
 	t.Helper()
+	out, err := sb.trySetup(env, args...)
+	if err != nil {
+		t.Fatalf("terma setup %s: %v\n%s", strings.Join(args, " "), err, out)
+	}
+	return out
+}
+
+// trySetup is Setup for a scenario that expects setup to refuse: its output and error.
+func (sb *Sandbox) trySetup(env []string, args ...string) (string, error) {
+	t := sb.T
+	t.Helper()
 	shim := filepath.Join(strings.TrimSuffix(sb.binDir(), ":"), "terma")
 	data, err := os.ReadFile(sb.Terma)
 	if err != nil {
@@ -297,12 +308,12 @@ func (sb *Sandbox) Setup(env []string, args ...string) string {
 	out, err := cmd.CombinedOutput()
 	sb.writeShim()
 	if err != nil {
-		t.Fatalf("terma setup %s: %v\n%s", strings.Join(args, " "), err, out)
+		return string(out), err
 	}
 	if sb.waitRelay(5 * time.Second) {
 		sb.StopRelay()
 	}
-	return string(out)
+	return string(out), nil
 }
 
 // Delivered waits for Terma's own flush to have delivered a spooled event of

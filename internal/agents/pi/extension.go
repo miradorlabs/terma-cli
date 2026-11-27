@@ -9,6 +9,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
+	"github.com/miradorlabs/terma-cli/internal/procinfo"
 )
 
 // Pi has no OpenTelemetry of its own, so terma's extension is its exporter, spliced with
@@ -62,23 +63,40 @@ func writeExtension(path string, cfg extensionConfig) (string, error) {
 	return path, relayexport.WriteOwn(path, []byte(text), 0o600)
 }
 
-// refreshExtension re-splices an installed Pi extension's configuration into this build's template.
+// readExtensionConfig is the configuration an extension file was written with: the JSON
+// on its config line, version 1 (the config's shape, the same at every wire version).
+func readExtensionConfig(data []byte) (*extensionConfig, bool) {
+	_, rest, ok := strings.Cut(string(data), extensionConfigPrefix)
+	if !ok {
+		return nil, false
+	}
+	literal, _, ok := strings.Cut(rest, extensionConfigSuffix)
+	var cfg extensionConfig
+	if !ok || json.Unmarshal([]byte(literal), &cfg) != nil || cfg.Version != 1 || cfg.Endpoint == "" {
+		return nil, false
+	}
+	return &cfg, true
+}
+
+// refreshExtension re-splices an installed Pi extension's configuration into this build's
+// template, an earlier wire version's included, and puts this terma in place of a hook
+// command that names a bare terma or one that is gone.
 func refreshExtension() (string, bool, error) {
-	dir, err := agentDir()
+	path, err := extensionFile()
 	if err != nil {
 		return "", false, err
 	}
-	return relayexport.RefreshTemplate(filepath.Join(dir, "extensions", "terma.ts"), func(data []byte) ([]byte, bool, error) {
-		_, rest, ok := strings.Cut(string(data), extensionConfigPrefix)
+	return relayexport.RefreshTemplate(path, func(data []byte) ([]byte, bool, error) {
+		cfg, ok := readExtensionConfig(data)
 		if !ok {
 			return nil, false, nil
 		}
-		literal, _, ok := strings.Cut(rest, extensionConfigSuffix)
-		var cfg extensionConfig
-		if !ok || json.Unmarshal([]byte(literal), &cfg) != nil || cfg.Version != 1 || cfg.Endpoint == "" {
-			return nil, false, nil
+		if len(cfg.HookCommand) == 0 || !filepath.IsAbs(cfg.HookCommand[0]) || !executable(cfg.HookCommand[0]) {
+			if terma, err := procinfo.AbsExecutable(); err == nil {
+				cfg.HookCommand = []string{terma, "hook"}
+			}
 		}
-		text, err := renderExtension(cfg)
+		text, err := renderExtension(*cfg)
 		return []byte(text), err == nil, err
 	})
 }

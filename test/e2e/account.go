@@ -23,9 +23,10 @@ import (
 type Account struct {
 	srv   *httptest.Server
 	token string
-	// withholdContent is the team's collection policy: no prompts, no tool content.
-	withholdContent atomic.Bool
-	mu              sync.Mutex
+	// withholdPrompts and withholdTools are the team's collection policy: no prompts, no
+	// tool content.
+	withholdPrompts, withholdTools atomic.Bool
+	mu                             sync.Mutex
 	// desktopRefresh is Terma Desktop's refresh token, which /v1/auth/user/delegate rotates;
 	// delegated are its unredeemed codes, each bound to the CLI's challenge, and delegations
 	// counts its calls.
@@ -144,7 +145,6 @@ func (sb *Sandbox) StartAccount() *Account {
 				http.Error(w, "missing policy project_id", http.StatusBadRequest)
 				return
 			}
-			withhold := a.withholdContent.Load()
 			list := sb.Repositories
 			if r.URL.Query().Get("project_id") == otherOrgProject {
 				list = sb.OtherOrganization
@@ -152,7 +152,7 @@ func (sb *Sandbox) StartAccount() *Account {
 			repos, _ := json.Marshal(append([]string{}, list...))
 			// git_hooks on: the scenarios commit by hand and expect the trailer, which only
 			// the hooks terma installs in the repository can add.
-			fmt.Fprintf(w, `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":%s},"git_hooks":true,"capture":{"exclude_prompts":%t,"exclude_tool_content":%t}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`, repos, withhold, withhold)
+			fmt.Fprintf(w, `{"policy":{"version":"1.1","terma":{"per_repository":{"repositories":%s},"git_hooks":true,"capture":{"exclude_prompts":%t,"exclude_tool_content":%t}}},"revision":1,"updated_at":"2026-09-30T12:27:05Z"}`, repos, a.withholdPrompts.Load(), a.withholdTools.Load())
 		default:
 			http.NotFound(w, r)
 		}
