@@ -88,6 +88,10 @@ type HarnessDrift struct {
 	// still sends, and surfaces. See fieldDrift for when a build is judged.
 	Removed []FieldChange `json:"removed,omitempty"`
 	Unseen  []GoneSurface `json:"unseen,omitempty"`
+	// Moved are span events the last build judged sends on another span than the build it was
+	// judged against did: a gone surface and a new one with the same event name and keys, taken
+	// out of Unseen and NewSurfaces (pairMoves).
+	Moved []MovedEvent `json:"moved,omitempty"`
 	// Compare links the source's changes from Previous to Version, where it is public.
 	Compare string `json:"compare,omitempty"`
 	// Withheld are the unclassified keys the relay drops, of the same builds as Added, that the
@@ -98,15 +102,17 @@ type HarnessDrift struct {
 
 // changed reports whether h has anything new to say.
 func (h HarnessDrift) changed() bool {
-	return h.First || h.Partial || h.Unreached != "" || len(h.NewSurfaces)+len(h.Added)+len(h.Removed)+len(h.Unseen)+len(h.Withheld) > 0
+	return h.First || h.Partial || h.Unreached != "" || len(h.NewSurfaces)+len(h.Added)+len(h.Removed)+len(h.Unseen)+len(h.Moved)+len(h.Withheld) > 0
 }
 
 // FieldChange is one key on one surface.
 type FieldChange struct {
-	Surface string   `json:"surface"`
-	Key     string   `json:"key"`
-	Class   string   `json:"class,omitempty"`
-	Kinds   []string `json:"kinds,omitempty"`
+	Surface string `json:"surface"`
+	Key     string `json:"key"`
+	// Event is the span event's name, for a key on one (e2e.FieldRow.Event).
+	Event string   `json:"event,omitempty"`
+	Class string   `json:"class,omitempty"`
+	Kinds []string `json:"kinds,omitempty"`
 	// From is the build that sent it, of an addition, where it is not Version. In is the build
 	// that no longer sends it, of a removal, where it is not the last build judged; Back the
 	// later build judged that sends it again, if one does.
@@ -137,6 +143,14 @@ type GoneSurface struct {
 	In     string      `json:"in,omitempty"`
 	Back   string      `json:"back,omitempty"`
 	Source *SourceSays `json:"source,omitempty"`
+}
+
+// MovedEvent is a span event sent on span To, where the build before sent it on span From.
+type MovedEvent struct {
+	Event string `json:"event"`
+	From  string `json:"from"`
+	To    string `json:"to"`
+	Keys  int    `json:"keys"`
 }
 
 // Quiet reports a night that took the census of every harness it should have, every harness
