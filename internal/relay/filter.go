@@ -43,8 +43,24 @@ func (f *ContentFilter) FilterLogs(msg *logspb.LogsData, prompts, toolContent bo
 	return changed, unclassified
 }
 
-// CheckoutInfo carries the repository and checkout metadata stamped onto historical logs,
-// matching the fields live claims carry into stampCheckout.
+// FilterTraces applies prompts and toolContent withholding to msg in place using the same
+// rules as the live relay, preserving safe operational metadata such as
+// terma.session.historical and terma.session.parent.id. It returns the number of changed
+// spans/resources and any unclassified keys dropped.
+func (f *ContentFilter) FilterTraces(msg *tracepb.TracesData, prompts, toolContent bool) (int, map[string]int) {
+	if f == nil || f.rules == nil || msg == nil {
+		return 0, nil
+	}
+	unclassified := map[string]int{}
+	changed := f.rules.withhold(&part{signal: Traces, msg: msg}, prompts, toolContent, unclassified)
+	if len(unclassified) == 0 {
+		return changed, nil
+	}
+	return changed, unclassified
+}
+
+// CheckoutInfo carries the repository and checkout metadata stamped onto historical logs
+// and traces, matching the fields live claims carry into stampCheckout.
 type CheckoutInfo struct {
 	Remote   string
 	Origin   string
@@ -54,7 +70,7 @@ type CheckoutInfo struct {
 	Worktree string
 }
 
-// StampOptions describes the terma resource stamps applied to an uploaded OTLP log batch.
+// StampOptions describes the terma resource stamps applied to an uploaded OTLP batch.
 type StampOptions struct {
 	ProjectID          string
 	Version            string
@@ -75,7 +91,25 @@ func StampLogs(msg *logspb.LogsData, opts StampOptions) {
 			rl.Resource = &resourcepb.Resource{}
 		}
 	}
-	p := &part{signal: Logs, msg: msg}
+	stampPart(&part{signal: Logs, msg: msg}, opts)
+}
+
+// StampTraces stamps project, version, checkout, and optional user attributes onto every
+// resource in msg using the same rules as the live relay. Run after FilterTraces so stamped
+// keys reflect the destination policy and never rely on agent-supplied values.
+func StampTraces(msg *tracepb.TracesData, opts StampOptions) {
+	if msg == nil {
+		return
+	}
+	for _, rs := range msg.GetResourceSpans() {
+		if rs.Resource == nil {
+			rs.Resource = &resourcepb.Resource{}
+		}
+	}
+	stampPart(&part{signal: Traces, msg: msg}, opts)
+}
+
+func stampPart(p *part, opts StampOptions) {
 	if opts.ProjectID != "" {
 		stamp(p, semconv.MiradorProjectIDKey, opts.ProjectID)
 	}
@@ -97,10 +131,11 @@ func StampLogs(msg *logspb.LogsData, opts StampOptions) {
 	}
 }
 
-// ParsePartialSuccess validates and reads an OTLP ExportLogsServiceResponse protobuf body
-// (field 1 partial_success: field 1 rejected_log_records varint, field 2 error_message
-// string) without pulling gRPC dependencies. An empty body is a valid zero-rejection
-// response; malformed or non-protobuf bytes (such as proxy HTML) return an error.
+// ParsePartialSuccess validates and reads an OTLP ExportLogsServiceResponse or
+// ExportTraceServiceResponse protobuf body (field 1 partial_success: field 1
+// rejected_log_records/rejected_spans varint, field 2 error_message string) without pulling
+// gRPC dependencies. An empty body is a valid zero-rejection response; malformed or
+// non-protobuf bytes (such as proxy HTML) return an error.
 func ParsePartialSuccess(body []byte) (rejected int64, errMsg string, err error) {
 	for b := body; len(b) > 0; {
 		num, typ, n := protowire.ConsumeTag(b)
