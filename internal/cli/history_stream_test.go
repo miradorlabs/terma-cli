@@ -632,7 +632,7 @@ func TestHistoryUploadJSONStreamSignInLostMidRun(t *testing.T) {
 		}
 		fx.answer(func(f *historyFixture) {
 			f.refreshStatus = http.StatusUnauthorized
-			f.refreshBody = `{"error":"invalid_grant"}`
+			f.refreshBody = `{"error":{"code":"UNAUTHENTICATED","message":"refresh token expired"}}`
 		})
 		out, _, err := termaRun{}.exec(t, "history", "upload", "--json-stream")
 		if code, ok := exitCodeOf(err); !ok || code != 6 {
@@ -656,7 +656,7 @@ func TestHistoryUploadJSONStreamSignInLostMidRun(t *testing.T) {
 		}
 		fx.answer(func(f *historyFixture) {
 			f.refreshStatus = http.StatusUnauthorized
-			f.refreshBody = `{"error":"invalid_grant"}`
+			f.refreshBody = `{"error":{"code":"UNAUTHENTICATED","message":"refresh token expired"}}`
 		})
 		_, _, err := termaRun{}.exec(t, "history", "upload")
 		if err == nil {
@@ -693,7 +693,7 @@ func TestHistoryUploadJSONStreamSignInLostMidRun(t *testing.T) {
 		fx := newHistoryFixture(t)
 		fx.answer(func(f *historyFixture) {
 			f.logsStatus = map[string]int{"team-a": http.StatusUnauthorized}
-			f.logsBody = map[string]string{"team-a": `{"reason":"SIGN_IN_RETIRED"}`}
+			f.logsBody = map[string]string{"team-a": `{"message":"sign-in retired","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SIGN_IN_RETIRED"}]}`}
 		})
 		out, _, err := termaRun{}.exec(t, "history", "upload", "--json-stream")
 		if code, ok := exitCodeOf(err); !ok || code != 6 {
@@ -761,7 +761,7 @@ func TestHistoryUploadJSONStreamOrgBlockedPlan(t *testing.T) {
 	}
 	fx.answer(func(f *historyFixture) {
 		f.holdingsStatus = map[string]int{"team-b": http.StatusForbidden}
-		f.holdingsBody = map[string]string{"team-b": `{"error":"ORG_NOT_ACCESSIBLE","message":"organization is not accessible"}`}
+		f.holdingsBody = map[string]string{"team-b": `{"error":{"code":"PERMISSION_DENIED","reason":"ORG_NOT_ACCESSIBLE","message":"organization is not accessible"}}`}
 	})
 	out, _, err := termaRun{}.exec(t, "history", "upload", "--json-stream")
 	if code, ok := exitCodeOf(err); !ok || code != 1 {
