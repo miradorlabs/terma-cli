@@ -10,6 +10,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/procinfo"
+	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
 const relayAddr = "127.0.0.1:43180"
@@ -94,7 +95,7 @@ func TestRelayProblem(t *testing.T) {
 			if problem && fix != "terma setup" {
 				t.Errorf("fix %q", fix)
 			}
-			if c.name == "missing" && !strings.Contains(detail, dir) {
+			if c.name == "missing" && !strings.Contains(detail, output.TildePath(dir)) {
 				t.Errorf("doctor does not name the agent directory %s: %q", dir, detail)
 			}
 			piOnPath(t, "")

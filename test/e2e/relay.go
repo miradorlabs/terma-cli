@@ -56,7 +56,9 @@ func (sb *Sandbox) UseRelay(o RelayOptions) {
 	case "tool content":
 		prompts, tools = false, true
 	}
-	if acct.withholdPrompts.Swap(prompts) != prompts || acct.withholdTools.Swap(tools) != tools {
+	// Both swaps run: a || would leave the second switch as it was whenever the first changed.
+	promptsWas, toolsWas := acct.withholdPrompts.Swap(prompts), acct.withholdTools.Swap(tools)
+	if promptsWas != prompts || toolsWas != tools {
 		// The team's policy changed since setup fetched it: set up again, as a developer would.
 		sb.Setup(nil, "--team", sb.ProjectID, "--harness", sb.setupList())
 		sb.Receiver.Reset()

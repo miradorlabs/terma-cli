@@ -29,10 +29,11 @@ func (Agent) DisplayName() string { return displayName }
 // Installed reports whether a Pi terma can set up is on the PATH: one older than the
 // minimum is not, so setup --yes leaves it out rather than stopping at its refusal.
 func (Agent) Installed(ctx context.Context) bool {
-	if _, old := tooOld(ctx); old {
+	d := detect(ctx)
+	if _, old := tooOldVersion(d.Version); old {
 		return false
 	}
-	return detect(ctx).Found
+	return d.Found
 }
 
 // DetectedVersion is the version of the Pi on PATH, for doctor; "" when it cannot tell.

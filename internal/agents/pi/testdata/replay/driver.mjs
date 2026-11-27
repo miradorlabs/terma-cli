@@ -155,7 +155,7 @@ for (const l of lines) {
     s.header = l.header ? { ...l.header } : null
     if (s.header && s.header.parentSession && l.parentHeaderId) {
       const p = join(opts.out, "parent-" + ++standIns + ".jsonl")
-      writeFileSync(p, JSON.stringify({ type: "session", version: 3, id: l.parentHeaderId }) + "\n")
+      writeFileSync(p, JSON.stringify({ type: "session", version: 3, id: l.parentHeaderId, cwd: l.parentHeaderCwd }) + "\n")
       s.header.parentSession = p
     }
     continue

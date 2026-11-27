@@ -82,6 +82,10 @@ const MAX_ISSUER_WALK = 256
 // The parent link: how many processes up the walk looks, and how long `ps` may take.
 const MAX_ANCESTORS = 32
 const PS_TIMEOUT_MS = 1000
+// The most files a prompt's command-line attachments are reach-checked for, and how much of
+// an MCP server's or tool's name is sent.
+const MAX_ATTACHMENTS = 32
+const MAX_MCP_NAME = 256
 // A fork's source is the id in the first line of its file, read at most this far.
 const MAX_HEADER = 16 * 1024
 
@@ -126,8 +130,8 @@ type Session = {
   read: number
   mode: string
   forkedFrom: string
-  // Whether a session_start opened it here; only then does it carry the inherited link.
-  started: boolean
+  // The directory the session a fork came from ran in, "" when unknown.
+  forkedCwd: string
   parent: string
   tools: Map<string, Tool>
   held: Held[]
@@ -655,24 +659,25 @@ function leafOf(ctx: any): string {
   }
 }
 
-// forkSource is the id of the session a fork or clone came from: its header names the
-// source's file, and the source's id is the one in that file's own header line, never the
-// file's name (a session opened with --session can have any name).
-function forkSource(ctx: any): string {
+// forkSource is the id and directory of the session a fork or clone came from: its header
+// names the source's file, and the source's id is the one in that file's own header line,
+// never the file's name (a session opened with --session can have any name).
+function forkSource(ctx: any): { id: string; cwd: string } {
+  const none = { id: "", cwd: "" }
   let fd: number | undefined
   try {
     const parent = ctx?.sessionManager?.getHeader?.()?.parentSession
-    if (typeof parent !== "string" || !parent) return ""
+    if (typeof parent !== "string" || !parent) return none
     const head = Buffer.alloc(MAX_HEADER)
     fd = openSync(parent, "r")
     const n = readSync(fd, head, 0, head.length, 0)
     const text = head.subarray(0, n).toString("utf8")
     const nl = text.indexOf("\n")
-    if (nl < 0 && n === head.length) return ""
-    const id = JSON.parse(nl < 0 ? text : text.slice(0, nl))?.id
-    return typeof id === "string" ? id : ""
+    if (nl < 0 && n === head.length) return none
+    const header = JSON.parse(nl < 0 ? text : text.slice(0, nl))
+    return typeof header?.id === "string" ? { id: header.id, cwd: str(header.cwd) } : none
   } catch {
-    return ""
+    return none
   } finally {
     if (fd !== undefined) {
       try {
@@ -727,12 +732,13 @@ function link(): string {
 }
 
 function newSession(id: string, ctx: any): Session {
+  const source = forkSource(ctx)
   return {
     id,
     read: 0,
     mode: modeOf(ctx),
-    forkedFrom: forkSource(ctx),
-    started: false,
+    forkedFrom: source.id,
+    forkedCwd: source.cwd,
     parent: "",
     tools: new Map(),
     held: [],
@@ -760,28 +766,43 @@ function sight(ctx: any, viaStart = false): Session | null {
   }
   const s = newSession(id, ctx)
   remember(st.sessions, id, s, MAX_SESSIONS)
+  const elsewhere = forkedElsewhere(s, cwdOf(ctx))
   if (viaStart) {
-    s.started = true
     s.parent = link()
   } else {
     const model = modelOf(ctx)
     void queuedHook("session-start", { session_id: id, cwd: cwdOf(ctx), model: str(model?.id) || undefined })
+    // Queued behind the start; nothing waits for it.
+    if (elsewhere) void reach(s, cwdOf(ctx), "read", { paths: [s.forkedCwd] })
   }
-  setPosition(s, ctx)
+  setPosition(s, ctx, !elsewhere)
   return s
 }
 
-// setPosition starts the read of a session's entries at their end, and sends the session's
-// current name: a name set before this process looked (--name, a fork's, a name another
-// process gave it) has no event of its own here. The same entry is the same event.
-function setPosition(s: Session, ctx: any) {
+// forkedElsewhere reports whether s is a fork of a session that ran in another directory: the
+// conversation it copied is that directory's, so its name is not sent at first sight and the
+// directory is reach-checked.
+function forkedElsewhere(s: Session, cwd: string): boolean {
+  if (!s.forkedCwd) return false
+  try {
+    return where(".", cwd) !== where(".", s.forkedCwd)
+  } catch {
+    return true
+  }
+}
+
+// setPosition starts the read of a session's entries at their end, and, with named, sends
+// the session's current name: a name set before this process looked (--name, a fork's, a
+// name another process gave it) has no event of its own here. The same entry is the same
+// event. A name the person cleared is not replaced by an older one.
+function setPosition(s: Session, ctx: any, named = true) {
   const entries = entriesOf(ctx)
   s.read = entries.length
-  if (s.parent) return
+  if (s.parent || !named) return
   for (let i = entries.length - 1; i >= 0; i--) {
     const e = entries[i]
-    if (e && e.type === "session_info" && typeof e.name === "string" && e.name.trim()) {
-      title(s, e)
+    if (e && e.type === "session_info") {
+      if (typeof e.name === "string" && e.name.trim()) title(s, e)
       return
     }
   }
@@ -1015,6 +1036,8 @@ function toolReach(name: string, input: any, cwd: string): Record<string, unknow
   const path = typeof a.path === "string" ? a.path : ""
   switch (name) {
     case "read":
+    case "write":
+    case "edit":
       return path ? { paths: [where(path, cwd)] } : null
     case "grep": {
       const out: Record<string, unknown> = { paths: [where(path, cwd)] }
@@ -1154,7 +1177,9 @@ export default async function (pi: any) {
   on("session_start", (event, ctx) => {
     const id = sessionIdOf(ctx)
     if (!id) return
-    if (str(event?.reason) === "reload") {
+    // A reload of a session this process has never seen is a Pi that was open before setup
+    // wrote the extension: its first start here.
+    if (str(event?.reason) === "reload" && st.sessions.has(id)) {
       sight(ctx, true)
       return
     }
@@ -1167,23 +1192,29 @@ export default async function (pi: any) {
     s.fenced = -1
     s.fencing = null
     s.unfenced = false
+    s.compact = null
     if (known) {
       s.mode = modeOf(ctx) || s.mode
-      s.started = true
       s.parent = link()
       if (!s.parent) s.tainted = false
       // A /resume back into a session opens its file afresh: what another process wrote to
-      // it meanwhile is not this process's to send.
-      setPosition(s, ctx)
+      // it meanwhile is not this process's to send. A fork from another directory still
+      // holds that directory's name.
+      setPosition(s, ctx, !forkedElsewhere(s, cwdOf(ctx)))
     }
     const model = modelOf(ctx)
-    return queuedHook("session-start", {
+    const started = queuedHook("session-start", {
       session_id: id,
       cwd: cwdOf(ctx),
       model: str(model?.id) || undefined,
       reason: str(event?.reason) || undefined,
       parent_session_id: s.parent || undefined,
     })
+    // A fork of a session in another directory copied that directory's conversation: Pi
+    // waits for its reach check too.
+    const cwd = cwdOf(ctx)
+    if (!known && forkedElsewhere(s, cwd)) return started.then(() => reach(s, cwd, "read", { paths: [s.forkedCwd] }))
+    return started
   })
 
   // A session nested inside the process fires no start; its first event is its input, which
@@ -1194,10 +1225,18 @@ export default async function (pi: any) {
 
   // Every prompt is a claim too: a session whose start was missed, or a relay that stopped
   // between turns, is covered before the turn exports anything.
-  on("before_agent_start", (_event, ctx) => {
+  // A file the person attached on the command line (`pi @file`) is in the prompt as
+  // <file name="<absolute path>">: Pi waits for its reach check before it stores the prompt.
+  on("before_agent_start", (event, ctx) => {
     const s = sight(ctx)
     if (!s || s.tainted) return
     void queuedHook("prompt", { session_id: s.id, cwd: cwdOf(ctx) })
+    if (typeof event?.prompt !== "string") return
+    const paths: string[] = []
+    for (const m of event.prompt.matchAll(/<file name="([^"\n]+)">/g)) {
+      if (!paths.includes(m[1]) && paths.length < MAX_ATTACHMENTS) paths.push(m[1])
+    }
+    if (paths.length > 0) return reach(s, cwdOf(ctx), "read", { paths })
   })
 
   on("turn_end", (event, ctx) => {
@@ -1249,7 +1288,7 @@ export default async function (pi: any) {
     try {
       what = toolReach(tool, event?.input, cwd)
     } catch {
-      await taint(s, cwd, s.gen)
+      // A path Pi's own resolver cannot read either: the tool fails and opens nothing.
       return
     }
     if (what) await reach(s, cwd, tool, what)
@@ -1327,8 +1366,10 @@ export default async function (pi: any) {
     const start = duration !== undefined ? end - duration : (t?.start ?? end)
     const isError = event?.isError === true
     const r = event?.result && typeof event.result === "object" ? event.result : {}
-    const server = r.details?.server
-    const mcpTool = r.details?.tool
+    // Only an MCP tool's details name its server and tool; any other tool's are its content.
+    const mcp = (str(event?.toolName) || t?.name || "").startsWith("mcp__")
+    const server = mcp ? r.details?.server : undefined
+    const mcpTool = mcp ? r.details?.tool : undefined
     if (s.tainted) return
     s.held.push({
       toolCallId: id,
@@ -1340,8 +1381,8 @@ export default async function (pi: any) {
       attrs: {
         "pi.tool.outcome": !isError ? "ok" : duration !== undefined ? "error" : "not_run",
         "pi.tool.exit_code": num(r.structuredContent?.exit_code),
-        "pi.mcp.server": typeof server === "string" ? server : undefined,
-        "pi.mcp.tool": typeof mcpTool === "string" ? mcpTool : undefined,
+        "pi.mcp.server": typeof server === "string" ? cut(server, MAX_MCP_NAME) : undefined,
+        "pi.mcp.tool": typeof mcpTool === "string" ? cut(mcpTool, MAX_MCP_NAME) : undefined,
         "pi.tool.files": cfg.includeToolContent ? (t?.files ?? undefined) : undefined,
         "gen_ai.tool.call.arguments": cfg.includeToolContent && t && t.args !== undefined ? cut(JSON.stringify(t.args), MAX_TOOL_CONTENT) : undefined,
         "gen_ai.tool.call.result": cfg.includeToolContent ? cut(textOf(r.content), MAX_TOOL_CONTENT) : undefined,

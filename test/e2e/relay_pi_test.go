@@ -264,12 +264,22 @@ func TestRelayPiChildren(t *testing.T) {
 				piCall("call_linked", "bash", map[string]any{"command": flags + " TERMA_CHILD_LINKED"}),
 				piCall("call_orphan", "bash", map[string]any{"command": "(sleep 2; " + flags + " TERMA_CHILD_ORPHAN) >/dev/null 2>&1 &"}),
 			}})
-		parent := sb.PiSession(b, sb.Repo, "TERMA_PARENT")
+		// The children announce their sessions too, so the parent is the session of its prompt.
+		sb.PiRun(b, sb.Repo, "TERMA_PARENT")
 		var e telemetryEvidence
 		waitUntil(60*time.Second, func() bool {
 			e = sb.Receiver.evidence()
 			return len(piRecords(e, "", "pi.user_prompt")) >= 3
 		})
+		parent := ""
+		for _, r := range piRecords(e, "", "pi.user_prompt") {
+			if strings.Contains(r.Body, "TERMA_PARENT") {
+				parent = r.Attrs["session.id"]
+			}
+		}
+		if parent == "" {
+			t.Fatalf("the parent's prompt did not arrive: relay %v", sb.RelayStats())
+		}
 		e = sb.waitPi(parent)
 		for _, r := range piRecords(e, "", "pi.user_prompt") {
 			linked := r.Attrs["pi.parent_session.id"]
@@ -291,8 +301,10 @@ func TestRelayPiChildren(t *testing.T) {
 }
 
 // A read into another organization's checkout, named as Pi names paths: absolute, a file
-// URL, @ before a file URL, ~, and a grep whose path starts ~/. Each is judged as the place
-// Pi opens, the run goes Mixed at the check, and nothing the read returned leaves.
+// URL, @ before a file URL, ~, and a grep whose path starts ~/ (grep is opt-in: --tools);
+// an edit whose text is not there, a write, and a file attached on the command line. Each
+// is judged as the place Pi opens, the run goes Mixed at the check, and nothing of the
+// other checkout leaves: no tool span, no attached prompt, none of the file.
 func TestRelayPiReadIntoAnotherCheckout(t *testing.T) {
 	forEachPi(t, func(t *testing.T, b Binary) {
 		const otherOrigin = "github.com/someone/other"
@@ -305,16 +317,29 @@ func TestRelayPiReadIntoAnotherCheckout(t *testing.T) {
 		sb.gitIn(other, "remote", "add", "origin", "https://"+otherOrigin+".git")
 		secret := filepath.Join(other, "secret.txt")
 		sb.writeAbs(secret, "TERMA_CROSS_SECRET\n")
-		forms := map[string]openCodeStep{
-			"TERMA_FORM_ABS":     piCall("c1", "read", map[string]any{"path": secret}),
-			"TERMA_FORM_URL":     piCall("c2", "read", map[string]any{"path": "file://" + secret}),
-			"TERMA_FORM_AT_URL":  piCall("c3", "read", map[string]any{"path": "@file://" + secret}),
-			"TERMA_FORM_TILDE":   piCall("c4", "read", map[string]any{"path": "~/other/secret.txt"}),
-			"TERMA_FORM_GREP_TD": piCall("c5", "grep", map[string]any{"pattern": "TERMA_CROSS", "path": "~/other"}),
+		type form struct {
+			step  *openCodeStep
+			flags []string
+		}
+		call := func(id, name string, args map[string]any, flags ...string) form {
+			step := piCall(id, name, args)
+			return form{&step, flags}
+		}
+		forms := map[string]form{
+			"TERMA_FORM_ABS":     call("c1", "read", map[string]any{"path": secret}),
+			"TERMA_FORM_URL":     call("c2", "read", map[string]any{"path": "file://" + secret}),
+			"TERMA_FORM_AT_URL":  call("c3", "read", map[string]any{"path": "@file://" + secret}),
+			"TERMA_FORM_TILDE":   call("c4", "read", map[string]any{"path": "~/other/secret.txt"}),
+			"TERMA_FORM_GREP_TD": call("c5", "grep", map[string]any{"pattern": "TERMA_CROSS", "path": "~/other"}, "--tools", "read,grep"),
+			"TERMA_FORM_EDIT":    call("c6", "edit", map[string]any{"path": secret, "edits": []any{map[string]any{"oldText": "NOT THERE", "newText": "x"}}}),
+			"TERMA_FORM_WRITE":   call("c7", "write", map[string]any{"path": filepath.Join(other, "new.txt"), "content": "TERMA_CROSS_WRITE\n"}),
+			"TERMA_FORM_ATTACH":  {flags: []string{"@" + secret}},
 		}
 		var convs []openCodeConversation
-		for key, step := range forms {
-			convs = append(convs, openCodeConversation{key: key, steps: []openCodeStep{step}})
+		for key, f := range forms {
+			if f.step != nil {
+				convs = append(convs, openCodeConversation{key: key, steps: []openCodeStep{*f.step}})
+			}
 		}
 		track(t)
 		piRelayIn(sb, b, RelayOptions{Content: true}, convs...)
@@ -324,12 +349,15 @@ func TestRelayPiReadIntoAnotherCheckout(t *testing.T) {
 			t.Fatalf("terma teams: %v\n%s", err, out)
 		}
 		sessions := map[string]string{}
-		for key := range forms {
-			sessions[key] = sb.PiSession(b, sb.Repo, "Read it. "+key)
+		for key, f := range forms {
+			sessions[key] = sb.PiSession(b, sb.Repo, "Read it. "+key, f.flags...)
 		}
 		time.Sleep(8 * time.Second)
 		e := sb.Receiver.evidence()
-		if leaked := leakedFieldsOf(e, "TERMA_CROSS_SECRET"); len(leaked) > 0 {
+		if n := len(piRecords(e, sessions["TERMA_FORM_ATTACH"], "pi.user_prompt")); n > 0 {
+			t.Errorf("the prompt with another checkout's file attached reached upstream")
+		}
+		if leaked := leakedFieldsOf(e, "TERMA_CROSS_SECRET", "TERMA_CROSS_WRITE"); len(leaked) > 0 {
 			t.Errorf("what the reads returned reached upstream: %v", leaked)
 		}
 		for key, sid := range sessions {

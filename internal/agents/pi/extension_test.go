@@ -233,17 +233,19 @@ func TestReplayPrintBaseline(t *testing.T) {
 			t.Errorf("the thinking text was exported")
 		}
 
-		for e, n := range map[string]int{"pi-session-start": 1, "pi-prompt": 1, "pi-session-end": 1, "pi-tool-reach": 5, "pi-file-edit": 2} {
+		for e, n := range map[string]int{"pi-session-start": 1, "pi-prompt": 1, "pi-session-end": 1, "pi-tool-reach": 7, "pi-file-edit": 2} {
 			if got := len(r.hooks(e)); got != n {
 				t.Errorf("%s calls = %d, want %d", e, got, n)
 			}
 		}
 		want := map[string]map[string]any{
-			"read": {"paths": []string{cwd + "/notes.txt"}},
-			"grep": {"paths": []string{cwd}, "globs": []string{"*.txt"}},
-			"find": {"paths": []string{cwd}, "globs": []string{"*.py"}},
-			"ls":   {"lists": []string{cwd}},
-			"bash": {"command": "echo before-fail; exit 3"},
+			"read":  {"paths": []string{cwd + "/notes.txt"}},
+			"write": {"paths": []string{cwd + "/new.txt"}},
+			"edit":  {"paths": []string{cwd + "/notes.txt"}},
+			"grep":  {"paths": []string{cwd}, "globs": []string{"*.txt"}},
+			"find":  {"paths": []string{cwd}, "globs": []string{"*.py"}},
+			"ls":    {"lists": []string{cwd}},
+			"bash":  {"command": "echo before-fail; exit 3"},
 		}
 		for _, h := range r.hooks("pi-tool-reach") {
 			tool := gstr(h, "tool")
@@ -346,6 +348,48 @@ func TestReplayForkFlag(t *testing.T) {
 				t.Errorf("the fork sent the copied entry %s", a.str(k))
 			}
 		}
+	}
+	// Its source ran in another directory: that directory is reach-checked right after the
+	// start, and the name the fork copied is not sent.
+	srcCwd := gstr(sess, "parentHeaderCwd")
+	if srcCwd == "" || srcCwd == gstr(events(lines, "session_start")[0], "ctx", "cwd") {
+		t.Fatalf("recording: source cwd %q", srcCwd)
+	}
+	if len(r.Hooks) < 2 || r.Hooks[0].Event != "pi-session-start" || r.Hooks[1].Event != "pi-tool-reach" ||
+		!slices.Equal(toStrings(r.Hooks[1].Payload["paths"]), []string{srcCwd}) {
+		t.Errorf("hooks %+v", r.Hooks)
+	}
+	// The recording's source has no name: give the fork a copied one.
+	named := insertAt(lines, indexOf(lines, func(l line) bool { return l["e"] == "session_start" }), line{"e": "_entries", "sessionId": sid,
+		"entries": []any{map[string]any{"type": "session_info", "id": "i0000001", "parentId": nil, "timestamp": "2026-11-27T15:34:30.000Z", "name": "Source's name"}}})
+	if n := len(replay(t, writeLines(t, named), replayOptions{}).records("pi.session.title")); n != 0 {
+		t.Errorf("the fork sent %d inherited titles", n)
+	}
+}
+
+// A clone or fork in its source's directory reaches nothing for its source.
+func TestReplaySameDirectoryForkReachesNothing(t *testing.T) {
+	t.Parallel()
+	for _, c := range []string{"1.6.1/04-new-fork-clone-tree", "1.5.0/04-new-fork-clone-tree", "1.6.1/22-clone-after-custom"} {
+		t.Run(c, func(t *testing.T) {
+			t.Parallel()
+			v, name, _ := strings.Cut(c, "/")
+			path := recording(v, name+".1")
+			sources := map[string]bool{}
+			for _, l := range events(loadLines(t, path), "_session") {
+				if cwd := gstr(l, "parentHeaderCwd"); cwd != "" {
+					sources[cwd] = true
+				}
+			}
+			if len(sources) == 0 {
+				t.Fatal("recording: no fork names its source's directory")
+			}
+			for _, h := range replay(t, path, replayOptions{}).hooks("pi-tool-reach") {
+				if p := toStrings(h["paths"]); len(p) == 1 && sources[p[0]] {
+					t.Errorf("a reach for the source's directory %s", p[0])
+				}
+			}
+		})
 	}
 }
 
@@ -849,8 +893,8 @@ func TestReplayPaths(t *testing.T) {
 	}
 }
 
-// The resolver table: Pi's own resolveToCwd on each input, for read (paths and files), grep
-// and find (paths) and ls (lists).
+// The resolver table: Pi's own resolveToCwd on each input, for read (paths and files), edit,
+// write, grep and find (paths) and ls (lists).
 func TestReplayPathTable(t *testing.T) {
 	t.Parallel()
 	data, err := os.ReadFile(filepath.Join("testdata", "resolve_paths.json"))
@@ -899,6 +943,10 @@ func TestReplayPathTable(t *testing.T) {
 			)
 			wants = append(wants, want{"read", "paths", []string{c.Resolved}})
 			files = append(files, []string{c.Resolved})
+			for _, tool := range []string{"edit", "write"} {
+				lines = append(lines, ev("tool_call", map[string]any{"toolCallId": id + "_" + tool, "toolName": tool, "input": map[string]any{"path": c.Input}}))
+				wants = append(wants, want{tool, "paths", []string{c.Resolved}})
+			}
 		}
 		lines = append(lines,
 			ev("tool_call", map[string]any{"toolCallId": id + "_grep", "toolName": "grep", "input": map[string]any{"pattern": "x", "path": c.Input}}),
@@ -1574,4 +1622,119 @@ func TestReplayContentSwitches(t *testing.T) {
 			}
 		})
 	}
+}
+
+// oneSession is a recording of one Pi 1.6.1 process in /home/user/work/repo: the lines
+// given (an event as {"e", "event"}, entries as {"e": "_entries", "entries"}), then a
+// shutdown. It starts with a session_start unless the first line is an event of its own.
+func oneSession(lines ...line) []line {
+	const sid = "01a21daf-0000-7000-8000-0000000000f1"
+	ctx := map[string]any{"sessionId": sid, "leafId": nil, "mode": "print", "modelProvider": "fake", "modelId": "m", "cwd": "/home/user/work/repo", "oauth": false}
+	out := []line{
+		{"e": "_process", "pid": 1.0, "ppid": 1.0, "argv": []any{}, "version": "1.6.1", "inheritedParent": nil},
+		{"e": "_session", "sessionId": sid, "sessionFile": "", "header": map[string]any{"type": "session", "id": sid, "cwd": "/home/user/work/repo"}},
+	}
+	if len(lines) == 0 || lines[0]["e"] != "session_start" {
+		lines = append([]line{{"e": "session_start", "event": map[string]any{"reason": "startup"}}}, lines...)
+	}
+	at := 1795793600000.0
+	for _, l := range append(lines, line{"e": "session_shutdown", "event": map[string]any{"reason": "quit"}}) {
+		if l["e"] == "_entries" {
+			l["sessionId"] = sid
+		} else {
+			at++
+			l["t"], l["ctx"] = at, ctx
+		}
+		out = append(out, l)
+	}
+	return out
+}
+
+// A tool call and the turn that issued it: an assistant entry, the call's start and end with
+// result, and its turn_end.
+func toolTurn(name string, args, result map[string]any) []line {
+	return []line{
+		{"e": "_entries", "entries": []any{map[string]any{"type": "message", "id": "a0000001", "parentId": nil, "timestamp": "2026-11-27T15:40:00.000Z",
+			"message": map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "toolCall", "id": "c1", "name": name}}}}}},
+		{"e": "tool_execution_start", "event": map[string]any{"toolCallId": "c1", "toolName": name, "args": args}},
+		{"e": "tool_call", "event": map[string]any{"toolCallId": "c1", "toolName": name, "input": args}},
+		{"e": "tool_execution_end", "event": map[string]any{"toolCallId": "c1", "toolName": name, "result": result, "isError": false, "durationMs": 1.0}},
+		{"e": "turn_end", "event": map[string]any{"messageEntryId": "a0000001", "message": map[string]any{"role": "assistant", "provider": "fake", "model": "m",
+			"stopReason": "toolUse", "timestamp": 1795793600000.0, "durationMs": 1.0, "content": []any{}}}},
+	}
+}
+
+// The fixes after the first review, each on a synthetic recording.
+func TestReplayReviewFixes(t *testing.T) {
+	t.Parallel()
+	text := func(s string) map[string]any {
+		return map[string]any{"content": []any{map[string]any{"type": "text", "text": s}}}
+	}
+	t.Run("a path Pi cannot open is no failed reach", func(t *testing.T) {
+		t.Parallel()
+		r := replay(t, writeLines(t, oneSession(toolTurn("read", map[string]any{"path": "file://host/x"}, text("no such file"))...)), replayOptions{})
+		if n := len(r.hooks("pi-tool-reach")); n != 0 {
+			t.Errorf("reach calls = %d", n)
+		}
+		if len(r.tool("read")) != 1 {
+			t.Errorf("the session stopped exporting: tool spans %d", len(r.tools()))
+		}
+	})
+	t.Run("only an MCP tool names a server", func(t *testing.T) {
+		t.Parallel()
+		result := text("done")
+		result["details"] = map[string]any{"server": "s", "tool": "t"}
+		r := replay(t, writeLines(t, oneSession(toolTurn("custom", map[string]any{}, result)...)), replayOptions{})
+		if s := r.tool("custom"); len(s) != 1 || s[0].Attrs.has("pi.mcp.server") || s[0].Attrs.has("pi.mcp.tool") {
+			t.Errorf("spans %+v", s)
+		}
+	})
+	attach := func(prompt string) []line {
+		return oneSession(line{"e": "before_agent_start", "event": map[string]any{"messageType": "user", "prompt": prompt}},
+			line{"e": "_entries", "entries": []any{map[string]any{"type": "message", "id": "u0000001", "parentId": nil, "timestamp": "2026-11-27T15:40:00.000Z",
+				"message": map[string]any{"role": "user", "content": prompt}}}},
+			line{"e": "turn_end", "event": map[string]any{"messageEntryId": "u0000001", "message": map[string]any{"role": "assistant", "provider": "fake", "model": "m",
+				"stopReason": "stop", "timestamp": 1795793600000.0, "durationMs": 1.0, "content": []any{}}}})
+	}
+	const files = `<file name="/other/a.go">x</file> <file name="/other/b.go">y</file> <file name="/other/a.go">x</file> go`
+	t.Run("attached files are reach-checked", func(t *testing.T) {
+		t.Parallel()
+		r := replay(t, writeLines(t, attach(files)), replayOptions{})
+		var order []string
+		for _, h := range r.Hooks {
+			order = append(order, h.Event)
+		}
+		reaches := r.hooks("pi-tool-reach")
+		if len(reaches) != 1 || !slices.Equal(toStrings(reaches[0]["paths"]), []string{"/other/a.go", "/other/b.go"}) ||
+			slices.Index(order, "pi-prompt") > slices.Index(order, "pi-tool-reach") {
+			t.Errorf("hooks %v, reaches %v", order, reaches)
+		}
+		f := replay(t, writeLines(t, attach(files)), replayOptions{FailReach: true})
+		if len(f.records("pi.user_prompt")) != 0 || len(f.Spans) != 0 {
+			t.Errorf("a fenced session exported its prompt")
+		}
+		if n := len(replay(t, writeLines(t, attach("no files")), replayOptions{}).hooks("pi-tool-reach")); n != 0 {
+			t.Errorf("a prompt with no file: %d reach calls", n)
+		}
+	})
+	t.Run("a reload of an unseen session is a start", func(t *testing.T) {
+		t.Parallel()
+		lines := oneSession(line{"e": "session_start", "event": map[string]any{"reason": "reload"}})
+		r := replay(t, writeLines(t, lines), replayOptions{})
+		sid := gstr(lines[1], "sessionId")
+		if n := len(r.hooks("pi-session-start")); n != 1 || r.EnvParent == nil || *r.EnvParent != fmt.Sprintf("%d:%s", r.PID, sid) {
+			t.Errorf("starts %d, TERMA_PI_PARENT %v", n, r.EnvParent)
+		}
+	})
+	t.Run("a cleared name is no title", func(t *testing.T) {
+		t.Parallel()
+		named := func(id, name string) map[string]any {
+			return map[string]any{"type": "session_info", "id": id, "parentId": nil, "timestamp": "2026-11-27T15:39:00.000Z", "name": name}
+		}
+		lines := oneSession()
+		lines = insertAt(lines, 2, line{"e": "_entries", "sessionId": gstr(lines[1], "sessionId"), "entries": []any{named("i0000001", "Old"), named("i0000002", "")}})
+		if n := len(replay(t, writeLines(t, lines), replayOptions{}).records("pi.session.title")); n != 0 {
+			t.Errorf("titles %d", n)
+		}
+	})
 }

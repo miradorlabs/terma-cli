@@ -11,6 +11,7 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/relayexport"
+	"github.com/miradorlabs/terma-cli/internal/harness"
 	"github.com/miradorlabs/terma-cli/internal/ui/output"
 )
 
@@ -49,11 +50,12 @@ func (Agent) UnconfigureRelay(context.Context, string) (agents.RelayResult, erro
 // RelayPointed reports whether terma's extension sends Pi's sessions to the relay at addr:
 // the extension this build writes, pointed there, on a Pi new enough to run it, with a terma
 // it can run. It is unknown where Pi is not on the PATH.
-func (a Agent) RelayPointed(addr string) (bool, bool) {
-	if !detect(context.Background()).Found {
+func (Agent) RelayPointed(addr string) (bool, bool) {
+	d := detect(context.Background())
+	if !d.Found {
 		return false, false
 	}
-	_, _, problem := a.RelayProblem(addr)
+	_, _, problem := relayProblem(d, addr)
 	return !problem, true
 }
 
@@ -61,10 +63,16 @@ func (a Agent) RelayPointed(addr string) (bool, bool) {
 // Pi too old for the extension; the extension missing, not this build's or pointed elsewhere;
 // a terma it cannot run. A Pi not on the PATH has none.
 func (Agent) RelayProblem(addr string) (detail, fix string, problem bool) {
-	if !detect(context.Background()).Found {
+	d := detect(context.Background())
+	if !d.Found {
 		return "", "", false
 	}
-	if why, old := tooOld(context.Background()); old {
+	return relayProblem(d, addr)
+}
+
+// relayProblem is RelayProblem for the pi d found, so one check runs pi --version once.
+func relayProblem(d harness.Detection, addr string) (detail, fix string, problem bool) {
+	if why, old := tooOldVersion(d.Version); old {
 		return why, "upgrade Pi, then run terma setup", true
 	}
 	path, err := extensionFile()
