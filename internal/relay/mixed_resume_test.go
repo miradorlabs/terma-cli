@@ -174,6 +174,60 @@ func TestMixedSweepIsScopedToTheMixedRun(t *testing.T) {
 		}
 	})
 
+	// The relay's claim was cached before the resume: the resumed process's prompt comes from a
+	// process that cached claim does not name. It is placed in the new run all the same, so a
+	// stale record's sweep of the paused run (and of entries with no run) leaves it.
+	t.Run("claim cached before the resume", func(t *testing.T) {
+		t.Parallel()
+		stateDir := t.TempDir()
+		up := newSignInUpstream(t)
+		var released atomic.Bool
+		paused, err := runs.Start(stateDir, "s-cached", t0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var cl atomic.Pointer[claim.Claim]
+		place := func(pls ...claim.Placement) {
+			c := claim.Claim{Tool: "claude-code", Placements: pls}
+			for _, p := range pls {
+				c.PIDs = append(c.PIDs, p.PIDs...)
+			}
+			cl.Store(&c)
+		}
+		repo := func(pid int, run string, since time.Time) claim.Placement {
+			return claim.Placement{Since: since, Kind: claim.KindRepository, ProjectID: "proj", Tool: "claude-code", Run: run, PIDs: []int{pid}}
+		}
+		place(repo(old, paused, t0))
+		r, _ := startTeamRelay(t, Options{
+			Dir: t.TempDir(), SignIn: &testSignIn{account: accountA}, Router: ledgerRouter(stateDir, up.srv.URL, &released),
+			ClaimCacheTTL: time.Hour,
+			Lookup: func(session string, _ time.Time) (claim.Claim, bool) {
+				if c := cl.Load(); session == "s-cached" && c != nil {
+					return *c, true
+				}
+				return claim.Claim{}, false
+			},
+		})
+		send := func(pid int, body string, at time.Time) {
+			r.route(&part{signal: Logs, msg: bodyLog("s-cached", body, at), records: 1, pid: pid, session: "s-cached", account: accountA, arrived: time.Now(), at: at, startAt: at, endAt: at})
+		}
+
+		send(old, "paused", t0.Add(12*time.Second)) // the claim is cached here
+		if err := runs.MarkMixed(stateDir, "s-cached", t0.Add(10*time.Second), runs.Why{Reason: runs.UnknownReach}); err != nil {
+			t.Fatal(err)
+		}
+		next, err := runs.Start(stateDir, "s-cached", t0.Add(20*time.Second))
+		if err != nil {
+			t.Fatal(err)
+		}
+		place(repo(old, paused, t0), repo(resumed, next, t0.Add(20*time.Second)))
+		send(resumed, "resumed", t0.Add(21*time.Second))
+		send(resumed, "stale", t0.Add(19*time.Second))
+		if got := queuedBodies(t, r); !slices.Equal(got, []string{"resumed"}) {
+			t.Fatalf("queued after the stale record's Mixed verdict = %v, want [resumed]", got)
+		}
+	})
+
 	// A session that crosses organizations, with no resume: the sweep is as it was.
 	t.Run("crossed", func(t *testing.T) {
 		t.Parallel()
@@ -214,4 +268,36 @@ func TestMixedSweepIsScopedToTheMixedRun(t *testing.T) {
 			t.Fatalf("upstream got %q, want only the record before the crossing", all)
 		}
 	})
+}
+
+// A process the cached claim does not name reads the claim again once, not for every part:
+// one that never claims the session costs one more read a cache period.
+func TestClaimReadAgainOncePerUnnamedProcess(t *testing.T) {
+	t.Parallel()
+	t0 := time.Now().Add(-time.Minute).Truncate(time.Second)
+	up := newSignInUpstream(t)
+	var released atomic.Bool
+	var lookups atomic.Int32
+	c := claim.Claim{Tool: "claude-code", PIDs: []int{100}, Placements: []claim.Placement{
+		{Since: t0, Kind: claim.KindRepository, ProjectID: "proj", Tool: "claude-code", Run: "r1", PIDs: []int{100}},
+	}}
+	r, _ := startTeamRelay(t, Options{
+		Dir: t.TempDir(), SignIn: &testSignIn{account: accountA}, Router: ledgerRouter(t.TempDir(), up.srv.URL, &released),
+		ClaimCacheTTL: time.Hour,
+		Lookup: func(session string, _ time.Time) (claim.Claim, bool) {
+			lookups.Add(1)
+			return c, session == "s-unnamed"
+		},
+	})
+	for i := range 4 {
+		at := t0.Add(time.Duration(i) * time.Second)
+		pid := 999
+		if i == 0 {
+			pid = 100
+		}
+		r.route(&part{signal: Logs, msg: bodyLog("s-unnamed", "x", at), records: 1, pid: pid, session: "s-unnamed", account: accountA, arrived: time.Now(), at: at, startAt: at, endAt: at})
+	}
+	if got := lookups.Load(); got != 2 {
+		t.Fatalf("claim read %d times for one named and three parts of one unnamed process, want 2", got)
+	}
 }

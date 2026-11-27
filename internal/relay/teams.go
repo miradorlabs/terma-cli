@@ -187,9 +187,9 @@ func (r *Relay) decideTeams(key string, p *part) verdict {
 			how = attribution{how: semconv.TermaRelayAttributionProcess, session: rec.Session}
 		}
 		held = whyUnclaimed
-		if raw, ok := r.lookup(rec.Session); ok {
+		if raw, ok, c, placed := r.lookupFor(rec.Session, p.pid, p.startAt); ok {
 			held = whyProcess
-			if c, ok := raw.At(p.pid, p.startAt); ok {
+			if placed {
 				if c.Kind == "" && c.ProjectID == "" {
 					return verdict{why: whyNotCollected, final: true}
 				}
