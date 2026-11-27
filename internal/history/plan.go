@@ -11,10 +11,11 @@ import (
 // routeWork is one team's share of the plan: the sessions it resumes, sent first and
 // without a holdings check, and those left after the holdings check.
 type routeWork struct {
-	b      *routeBucket
-	st     RouteState
-	resume []*routeSessionPlan
-	upload []*routeSessionPlan
+	b       *routeBucket
+	st      RouteState
+	resume  []*routeSessionPlan
+	upload  []*routeSessionPlan
+	skipped map[string]int // sessions planning left out, by skip reason
 }
 
 // planRoute sorts one team's sessions into what was sent or failed before, what resumes
@@ -38,23 +39,25 @@ func planRoute(
 			return nil, err
 		}
 	}
-	w := &routeWork{b: b, st: st}
-	skipped := func(sp *routeSessionPlan, reason string) {
+	w := &routeWork{b: b, st: st, skipped: map[string]int{}}
+	// Sessions left out while planning are counted on the plan, not reported one by one: a
+	// machine that uploaded thousands before would otherwise repeat them on every run.
+	skipped := func(reason string) {
 		sum.addSkippedSession(reason, 1)
-		report(sessionEvent(ProgressSessionSkipped, b, sp, reason))
+		w.skipped[reason]++
 	}
 
 	var candidateQueue []*routeSessionPlan
 	for _, sp := range sortedPlans(b.sessions) {
 		if st.IsDone(sp.key) {
-			skipped(sp, SkipAlreadyDone)
+			skipped(SkipAlreadyDone)
 			continue
 		}
 		if frec, failed := st.IsFailed(sp.key); failed && opts.RetryFailed {
 			w.resume = append(w.resume, sp) // no holdings check: part may be held already
 			continue
 		} else if failed {
-			skipped(sp, SkipFailedPreviously)
+			skipped(SkipFailedPreviously)
 			sum.Failed = append(sum.Failed, FailedSession{
 				EnrollmentID:    eid,
 				TeamID:          b.team.TeamID,
@@ -93,10 +96,18 @@ func planRoute(
 	if rp.Sessions > 0 {
 		sum.Planned = append(sum.Planned, rp)
 	}
-	// A team whose organization refused access is stopped whole when its turn to send
-	// comes, so its server is not asked.
-	if _, blocked := orgBlocked[b.team.OrganizationID]; opts.DryRun || len(candidateQueue) == 0 || blocked {
+	if opts.DryRun || rp.Sessions == 0 {
 		w.upload = candidateQueue
+		return w, nil
+	}
+	// An organization that refused access for an earlier team refuses this one too: it
+	// stops whole, and its server is not asked.
+	if reason, blocked := orgBlocked[b.team.OrganizationID]; blocked {
+		stopRouteWithIssue(b, len(w.resume)+len(candidateQueue), SkipOrgAccessLost, reason, report, sum)
+		w.resume = nil
+		return w, nil
+	}
+	if len(candidateQueue) == 0 {
 		return w, nil
 	}
 	// A team that cannot be sent to now stops whole, its resumed sessions with it, as the
@@ -107,9 +118,12 @@ func planRoute(
 		w.resume = nil
 		return w, nil
 	}
-	upload, err := filterHeldCandidates(ctx, opts, freshState, b, candidateQueue, len(w.resume), nowFn, report, orgBlocked, sum)
+	upload, held, err := filterHeldCandidates(ctx, opts, freshState, b, candidateQueue, len(w.resume), nowFn, report, orgBlocked, sum)
 	if err != nil {
 		return nil, err
+	}
+	if held > 0 {
+		w.skipped[SkipAlreadyHeld] += held
 	}
 	if _, blocked := orgBlocked[b.team.OrganizationID]; blocked {
 		w.resume = nil // counted in the team's org_access_lost issue
@@ -122,9 +136,15 @@ func planRoute(
 // order they will be sent. The sizes are each session's own files on disk, read now; a
 // session whose parts go to two teams counts under each.
 func buildUploadPlan(works []*routeWork, holdingsChecked bool) UploadPlan {
-	plan := UploadPlan{HoldingsChecked: holdingsChecked, Teams: []PlanTeam{}}
+	plan := UploadPlan{HoldingsChecked: holdingsChecked, Teams: []PlanTeam{}, SkippedSessions: map[string]int{}}
 	for _, w := range works {
-		team := PlanTeam{EnrollmentID: w.b.team.EnrollmentID, TeamID: w.b.team.TeamID, TeamLabel: w.b.label, ResumeSessions: len(w.resume)}
+		team := PlanTeam{EnrollmentID: w.b.team.EnrollmentID, TeamID: w.b.team.TeamID, TeamLabel: w.b.label, ResumeSessions: len(w.resume), SkippedSessions: map[string]int{}}
+		for reason, n := range w.skipped {
+			if n > 0 {
+				team.SkippedSessions[reason] += n
+				plan.SkippedSessions[reason] += n
+			}
+		}
 		for _, sp := range slices.Concat(w.resume, w.upload) {
 			// The session's own files: a subagent's transcript is a session of its own.
 			if snap, reason := statHistoryFile(sp.file); reason == "" {
@@ -137,7 +157,7 @@ func buildUploadPlan(works []*routeWork, holdingsChecked bool) UploadPlan {
 			team.SourceBytes += sp.sourceBytes
 			team.EstimatedBytes += sp.estimatedBytes
 		}
-		if team.Sessions == 0 {
+		if team.Sessions == 0 && len(team.SkippedSessions) == 0 {
 			continue
 		}
 		plan.ResumeSessions += team.ResumeSessions

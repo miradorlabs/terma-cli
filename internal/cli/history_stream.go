@@ -16,11 +16,12 @@ import (
 // never change, and a new field or type may be added, so a reader ignores what it does not
 // know. Nothing but these lines is written to stdout.
 //
-// Order: start; discover; then, team by team in a fixed order, holdings, session_skipped
-// (already_done, failed_previously, already_held) and team_blocked as each team is
-// planned; one plan; then, team by team, each planned session's session_start and its
-// session_done, session_failed or session_skipped, with team_blocked when a team stops;
-// and summary. Skips and blocks before plan are not in its totals. Each session plan
+// Order: start; discover; then, team by team in a fixed order, holdings and team_blocked
+// as each team is planned; one plan; then, team by team, each planned session's
+// session_start and its session_done, session_failed or session_skipped, with
+// team_blocked when a team stops; and summary. Sessions planning leaves out (sent or
+// failed in an earlier run, or held by the server) are counted on plan, not reported one
+// by one, and blocks before plan are not in its totals. Each session plan
 // counts ends in exactly one session_done, session_failed or session_skipped line, or is
 // counted in a later team_blocked line's "skipped" (a session a team stopped on after its
 // session_start included). A dry run asks no server and sends nothing: start, discover,
@@ -42,10 +43,14 @@ import (
 //   - plan: holdings_checked (false in a dry run), sessions, resume_sessions, records
 //     (before content filtering in an upload), source_bytes (each session's own files on
 //     disk; a session split across two teams counts under each), estimated_bytes (request
-//     bytes, dry run only), teams: [{enrollment_id, team_id, team_label, sessions,
-//     resume_sessions, records, source_bytes, estimated_bytes}].
+//     bytes, dry run only), skipped_sessions ({skip reason: count} of the sessions
+//     planning left out: already_done, failed_previously, already_held), teams:
+//     [{enrollment_id, team_id, team_label, sessions, resume_sessions, records,
+//     source_bytes, estimated_bytes, skipped_sessions}]: a team with sessions to send or
+//     sessions planning left out, so its sessions may be 0; a team blocked while planning
+//     is in its team_blocked line instead.
 //   - session_start, session_done, session_failed, session_skipped: index and total
-//     (the session's place in the plan; absent before plan), enrollment_id, team_id,
+//     (the session's place in the plan), enrollment_id, team_id,
 //     team_label, source_system, session_id, source_bytes; session_done adds records and
 //     bytes (sent), session_failed reason (the server's words), session_skipped reason
 //     (one of the skip reasons the summary counts).
@@ -146,10 +151,9 @@ type historyStreamPlan struct {
 
 type historyStreamSession struct {
 	Type string `json:"type"`
-	// Index numbers the session within the plan, of Total; both are absent for a session
-	// skipped before the plan.
-	Index int `json:"index,omitempty"`
-	Total int `json:"total,omitempty"`
+	// Index numbers the session within the plan, of Total.
+	Index int `json:"index"`
+	Total int `json:"total"`
 	historyStreamTeam
 	SourceSystem string `json:"source_system"`
 	SessionID    string `json:"session_id"`

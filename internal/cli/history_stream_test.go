@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -263,18 +264,16 @@ func TestHistoryUploadJSONStreamUpload(t *testing.T) {
 		t.Fatalf("second upload: %v\n%s", err, out)
 	}
 	lines = streamLines(t, out)
-	if got := streamTypes(lines); got != "start discover session_skipped session_skipped plan summary" {
+	if got := streamTypes(lines); got != "start discover plan summary" {
 		t.Fatalf("second run lines = %s\n%s", got, out)
 	}
-	if lines[2]["reason"] != history.SkipAlreadyDone || lines[2]["index"] != nil {
-		t.Errorf("skipped = %v, want already_done, outside the plan", lines[2])
-	}
-	if plan := lineOf(t, lines, "plan"); plan["sessions"] != float64(0) {
-		t.Errorf("second plan = %v, want nothing left", plan)
+	if plan := lineOf(t, lines, "plan"); plan["sessions"] != float64(0) ||
+		plan["skipped_sessions"].(map[string]any)[history.SkipAlreadyDone] != float64(2) {
+		t.Errorf("second plan = %v, want nothing left and 2 already_done", plan)
 	}
 }
 
-// A session the server holds is skipped before the plan; one it rejects ends in
+// A session the server holds is counted on the plan; one it rejects ends in
 // session_failed; a team whose holdings check fails is blocked before the plan, and the run
 // ends on its summary with exit code 1.
 func TestHistoryUploadJSONStreamHeldFailedAndBlocked(t *testing.T) {
@@ -302,7 +301,7 @@ func TestHistoryUploadJSONStreamHeldFailedAndBlocked(t *testing.T) {
 		t.Errorf("session_failed = %v, want team-a's session 1 of 1 with the server's reason", f)
 	}
 
-	// The server now holds team-b's session: skipped as held, before an empty plan.
+	// The server now holds team-b's session: both are counted on an empty plan, per team.
 	fx.answer(func(f *historyFixture) {
 		f.holdingsStatus = nil
 		f.held = map[string][]map[string]any{"team-b": {{"source_system": "codex", "session_id": "22222222-2222-2222-2222-222222222222"}}}
@@ -312,15 +311,26 @@ func TestHistoryUploadJSONStreamHeldFailedAndBlocked(t *testing.T) {
 		t.Fatalf("second run: %v\n%s", err, out)
 	}
 	lines = streamLines(t, out)
-	const want2 = "start discover session_skipped holdings session_skipped plan summary"
+	const want2 = "start discover holdings plan summary"
 	if got := streamTypes(lines); got != want2 {
 		t.Fatalf("second run lines = %s\nwant              %s\n%s", got, want2, out)
 	}
-	if s := lines[2]; s["team_id"] != "team-a" || s["reason"] != history.SkipFailedPreviously {
-		t.Errorf("first skip = %v, want team-a's failed_previously", s)
+	var plan history.UploadPlan
+	raw, _ := json.Marshal(lineOf(t, lines, "plan"))
+	if err := json.Unmarshal(raw, &plan); err != nil {
+		t.Fatal(err)
 	}
-	if s := lines[4]; s["team_id"] != "team-b" || s["reason"] != history.SkipAlreadyHeld {
-		t.Errorf("second skip = %v, want team-b's already_held", s)
+	wantSkips := map[string]map[string]int{
+		"team-a": {history.SkipFailedPreviously: 1},
+		"team-b": {history.SkipAlreadyHeld: 1},
+	}
+	if plan.Sessions != 0 || len(plan.Teams) != 2 || plan.SkippedSessions[history.SkipFailedPreviously] != 1 || plan.SkippedSessions[history.SkipAlreadyHeld] != 1 {
+		t.Fatalf("plan = %+v, want nothing left, one failed_previously and one already_held", plan)
+	}
+	for _, team := range plan.Teams {
+		if !maps.Equal(team.SkippedSessions, wantSkips[team.TeamID]) {
+			t.Errorf("%s skipped = %v, want %v", team.TeamID, team.SkippedSessions, wantSkips[team.TeamID])
+		}
 	}
 }
 

@@ -65,8 +65,8 @@ type ProgressEvent struct {
 	// Index and Total number a session within its team's resumed or new sessions.
 	Index int
 	Total int
-	// Overall numbers a planned session across every team's plan, of OverallTotal; zero
-	// for a session that was never in the plan.
+	// Overall numbers a session across every team's plan, of OverallTotal. Every session
+	// event is for a planned session.
 	Overall      int
 	OverallTotal int
 	Records      int
@@ -92,8 +92,11 @@ type UploadPlan struct {
 	Records         int   `json:"records"`
 	SourceBytes     int64 `json:"source_bytes"`
 	// EstimatedBytes is measured in a dry run only.
-	EstimatedBytes int64      `json:"estimated_bytes,omitempty"`
-	Teams          []PlanTeam `json:"teams"`
+	EstimatedBytes int64 `json:"estimated_bytes,omitempty"`
+	// SkippedSessions counts the sessions planning left out (already_done,
+	// failed_previously, already_held), by skip reason; none of them is in Sessions.
+	SkippedSessions map[string]int `json:"skipped_sessions"`
+	Teams           []PlanTeam     `json:"teams"`
 }
 
 // PlanTeam is one team's share of an UploadPlan.
@@ -106,6 +109,8 @@ type PlanTeam struct {
 	Records        int    `json:"records"`
 	SourceBytes    int64  `json:"source_bytes"`
 	EstimatedBytes int64  `json:"estimated_bytes,omitempty"`
+	// SkippedSessions is this team's share of UploadPlan.SkippedSessions.
+	SkippedSessions map[string]int `json:"skipped_sessions"`
 }
 
 func sessionEvent(kind ProgressKind, b *routeBucket, sp *routeSessionPlan, skipReason string) ProgressEvent {

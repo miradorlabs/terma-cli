@@ -360,7 +360,7 @@ func filterHeldCandidates(
 	report func(ProgressEvent),
 	orgBlocked map[string]string,
 	sum *Summary,
-) ([]*routeSessionPlan, error) {
+) (upload []*routeSessionPlan, held int, err error) {
 	ids := make([]string, 0, len(candidateQueue))
 	for _, sp := range candidateQueue {
 		ids = append(ids, sp.file.SessionID)
@@ -368,21 +368,21 @@ func filterHeldCandidates(
 	report(ProgressEvent{Kind: ProgressHoldings, RouteLabel: b.label, EnrollmentID: b.team.EnrollmentID, TeamID: b.team.TeamID, Total: len(ids)})
 	if opts.Holdings == nil {
 		stopRouteWithIssue(b, len(candidateQueue), SkipHoldingsFailed, "holdings check is unavailable", report, sum)
-		return nil, nil
+		return nil, 0, nil
 	}
 	orgEpochs := orgEpochSnapshot(freshState.Teams, b.team.OrganizationID, b.team.AuthURL)
-	held, err := opts.Holdings.Check(ctx, b.team, ids)
+	heldSet, err := opts.Holdings.Check(ctx, b.team, ids)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			sum.Interrupted = true
-			return nil, err
+			return nil, 0, err
 		}
 		if errors.Is(err, auth.ErrSignInRetired) {
-			return nil, &SignInRetiredError{Detail: err.Error()}
+			return nil, 0, &SignInRetiredError{Detail: err.Error()}
 		}
 		if apiErr, ok := errors.AsType[*api.Error](err); ok {
 			if apiErr.SignInRetired() {
-				return nil, &SignInRetiredError{Detail: apiErr.Error()}
+				return nil, 0, &SignInRetiredError{Detail: apiErr.Error()}
 			}
 			if apiErr.OrgNotAccessible() {
 				orgBlocked[b.team.OrganizationID] = apiErr.Error()
@@ -391,21 +391,20 @@ func filterHeldCandidates(
 				}
 				// The team's resumed sessions would be refused too.
 				stopRouteWithIssue(b, resumed+len(candidateQueue), SkipOrgAccessLost, apiErr.Error(), report, sum)
-				return nil, nil
+				return nil, 0, nil
 			}
 		}
 		stopRouteWithIssue(b, len(candidateQueue), SkipHoldingsFailed, fmt.Sprintf("holdings check failed: %v", err), report, sum)
-		return nil, nil
+		return nil, 0, nil
 	}
 
-	var uploadQueue []*routeSessionPlan
 	for _, sp := range candidateQueue {
-		if held.Contains(sp.file.SourceSystem, sp.file.SessionID) {
+		if heldSet.Contains(sp.file.SourceSystem, sp.file.SessionID) {
 			sum.addSkippedSession(SkipAlreadyHeld, 1)
-			report(sessionEvent(ProgressSessionSkipped, b, sp, SkipAlreadyHeld))
+			held++
 			continue
 		}
-		uploadQueue = append(uploadQueue, sp)
+		upload = append(upload, sp)
 	}
-	return uploadQueue, nil
+	return upload, held, nil
 }

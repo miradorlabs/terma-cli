@@ -1,0 +1,196 @@
+package history
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/account/api"
+	"github.com/miradorlabs/terma-cli/internal/agents"
+	"github.com/miradorlabs/terma-cli/internal/config"
+	"github.com/miradorlabs/terma-cli/internal/relay"
+	"github.com/miradorlabs/terma-cli/internal/routing"
+)
+
+// checkPlanAccounting checks the promise the progress events make: one plan, before any
+// session starts, and every session it counts ends in exactly one done, failed or skipped
+// event of its own, or in a later team_blocked count.
+func checkPlanAccounting(t *testing.T, events []ProgressEvent) *UploadPlan {
+	t.Helper()
+	var plan *UploadPlan
+	ended := map[int]int{}
+	blockedAfter := 0
+	for _, ev := range events {
+		switch ev.Kind {
+		case ProgressPlan:
+			if plan != nil {
+				t.Fatal("two plan events")
+			}
+			plan = ev.Plan
+		case ProgressSessionStart, ProgressSessionDone, ProgressSessionFailed, ProgressSessionSkipped:
+			if plan == nil {
+				t.Fatalf("%s for %s before the plan", ev.Kind, ev.SessionID)
+			}
+			if ev.Overall < 1 || ev.Overall > plan.Sessions || ev.OverallTotal != plan.Sessions {
+				t.Errorf("%s for %s numbered %d of %d, plan has %d", ev.Kind, ev.SessionID, ev.Overall, ev.OverallTotal, plan.Sessions)
+			}
+			if ev.Kind != ProgressSessionStart {
+				ended[ev.Overall]++
+			}
+		case ProgressRouteBlocked:
+			if plan != nil {
+				blockedAfter += ev.Skipped
+			}
+		}
+	}
+	if plan == nil {
+		t.Fatal("no plan event")
+	}
+	for i, n := range ended {
+		if n != 1 {
+			t.Errorf("session %d ended %d times", i, n)
+		}
+	}
+	if got := len(ended) + blockedAfter; got != plan.Sessions {
+		t.Errorf("%d sessions ended and %d were blocked, plan counted %d", len(ended), blockedAfter, plan.Sessions)
+	}
+	return plan
+}
+
+// A team that cannot be sent to when it is planned stops whole, with its resumed sessions,
+// in one issue and before anything is sent; another team of an organization that refused
+// access stops when its turn comes, without its server being asked.
+func TestPlanStopsATeamWholeWhenItCannotBeSent(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	repoA := initTestGitRepo(t, "https://github.com/org-a/repo-a.git")
+	repoB := initTestGitRepo(t, "https://github.com/org-a/repo-b.git")
+	team := func(id, repo string) routing.Team {
+		return routing.Team{
+			EnrollmentID: "enr-" + id, TeamID: id, OrganizationID: "org-a", AuthURL: "https://auth.example.com",
+			Policy: config.Policy{
+				Mode: config.ModeRepo, Repositories: []string{repo}, IncludePrompts: true, IncludeToolContent: true,
+				OrganizationID: "org-a", TeamID: id, AuthURL: "https://auth.example.com", FetchedAt: now,
+			},
+		}
+	}
+	st := routing.State{Account: "acc1", Teams: []routing.Team{team("team-a", "github.com/org-a/repo-a"), team("team-b", "github.com/org-a/repo-b")}}
+	src := &stubHistorySource{
+		source: "claude",
+		files: []agents.HistoryFile{
+			{SourceSystem: "claude", SessionID: "s-resume", ModTime: now.Add(-5 * time.Hour)},
+			{SourceSystem: "claude", SessionID: "s-new-1", ModTime: now.Add(-4 * time.Hour)},
+			{SourceSystem: "claude", SessionID: "s-new-2", ModTime: now.Add(-3 * time.Hour)},
+			{SourceSystem: "claude", SessionID: "s-b", ModTime: now.Add(-3 * time.Hour)},
+		},
+		segments: map[string][]agents.HistorySegment{
+			"s-resume": {makeNativeSegment("claude", "s-resume", repoA, "r", now.Add(-5*time.Hour))},
+			"s-new-1":  {makeNativeSegment("claude", "s-new-1", repoA, "n1", now.Add(-4*time.Hour))},
+			"s-new-2":  {makeNativeSegment("claude", "s-new-2", repoA, "n2", now.Add(-3*time.Hour))},
+			"s-b":      {makeNativeSegment("claude", "s-b", repoB, "b", now.Add(-3*time.Hour))},
+		},
+	}
+	run := func(t *testing.T, holdings HoldingsChecker, reload func() (routing.State, error)) (Summary, []ProgressEvent, int64) {
+		t.Helper()
+		stateDir := t.TempDir()
+		rs := NewRouteState("acc1", "default", "enr-team-a", "team-a")
+		rs.MarkInProgress("claude", "s-resume", now.Add(-time.Hour), 1, 100, time.Time{})
+		if err := SaveState(stateDir, rs); err != nil {
+			t.Fatal(err)
+		}
+		var sends atomic.Int64
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			sends.Add(1)
+			w.WriteHeader(http.StatusOK)
+		}))
+		t.Cleanup(srv.Close)
+		var events []ProgressEvent
+		sum, err := Upload(context.Background(), Options{
+			StateDir: stateDir, Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
+			State: st, ReloadState: reload, Sources: []agents.HistorySource{src}, Filter: relay.NewContentFilter(nil), Holdings: holdings,
+			Transport:   &Transport{Version: "test", HTTP: srv.Client(), SignIn: &fakeSignIn{account: "acc1", tokens: []string{"t1"}}, BytesPerSec: 1 << 30},
+			EndpointFor: func(string) string { return srv.URL },
+			Now:         func() time.Time { return now },
+			Progress:    func(ev ProgressEvent) { events = append(events, ev) },
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return sum, events, sends.Load()
+	}
+
+	t.Run("recheck fails", func(t *testing.T) {
+		t.Parallel()
+		calls := 0
+		// The first reload is team-a's plan-time recheck; every later one succeeds.
+		reload := func() (routing.State, error) {
+			if calls++; calls == 1 {
+				return routing.State{}, errors.New("team selections changed")
+			}
+			return st, nil
+		}
+		sum, events, _ := run(t, stubHoldings{}, reload)
+		plan := checkPlanAccounting(t, events)
+		if len(sum.TeamIssues) != 1 || sum.TeamIssues[0].TeamID != "team-a" || sum.TeamIssues[0].Skipped != 3 || sum.SkippedSessions[SkipDeselected] != 3 {
+			t.Fatalf("issues = %+v skipped = %v, want one team-a issue of all 3 sessions", sum.TeamIssues, sum.SkippedSessions)
+		}
+		if plan.Sessions != 1 || sum.SentSessions != 1 {
+			t.Errorf("plan = %d sessions, sent %d; want team-b's one", plan.Sessions, sum.SentSessions)
+		}
+	})
+
+	t.Run("organization not accessible", func(t *testing.T) {
+		t.Parallel()
+		lost := &api.Error{StatusCode: http.StatusForbidden, Reason: api.ReasonOrgNotAccessible, Message: "organization is not accessible"}
+		var asked []string
+		holdings := checkerFunc(func(team routing.Team) error {
+			asked = append(asked, team.TeamID)
+			return lost
+		})
+		sum, events, sends := run(t, holdings, nil)
+		plan := checkPlanAccounting(t, events)
+		if len(asked) != 1 || asked[0] != "team-a" {
+			t.Errorf("holdings asked of %v, want team-a only", asked)
+		}
+		if sends != 0 || plan.Sessions != 0 {
+			t.Errorf("sent %d requests and planned %d sessions, want none", sends, plan.Sessions)
+		}
+		if len(sum.TeamIssues) != 2 || sum.TeamIssues[0].Skipped != 3 || sum.TeamIssues[1].TeamID != "team-b" || sum.SkippedSessions[SkipOrgAccessLost] != 4 {
+			t.Fatalf("issues = %+v skipped = %v, want team-a's 3 and team-b's 1 as org_access_lost", sum.TeamIssues, sum.SkippedSessions)
+		}
+	})
+
+	// team-b's holdings check finds the organization refusing access after team-a's passed:
+	// team-a, already in the plan, is blocked whole when its turn comes.
+	t.Run("organization refuses a later team", func(t *testing.T) {
+		t.Parallel()
+		lost := &api.Error{StatusCode: http.StatusForbidden, Reason: api.ReasonOrgNotAccessible, Message: "organization is not accessible"}
+		holdings := checkerFunc(func(team routing.Team) error {
+			if team.TeamID == "team-b" {
+				return lost
+			}
+			return nil
+		})
+		sum, events, sends := run(t, holdings, nil)
+		plan := checkPlanAccounting(t, events)
+		if plan.Sessions != 3 || sends != 0 {
+			t.Errorf("planned %d sessions and sent %d requests, want team-a's 3 planned and none sent", plan.Sessions, sends)
+		}
+		if sum.SkippedSessions[SkipOrgAccessLost] != 4 || sum.SentSessions != 0 {
+			t.Fatalf("skipped = %v sent = %d, want all 4 sessions org_access_lost", sum.SkippedSessions, sum.SentSessions)
+		}
+	})
+}
+
+type checkerFunc func(team routing.Team) error
+
+func (f checkerFunc) Check(_ context.Context, team routing.Team, _ []string) (HeldSet, error) {
+	if err := f(team); err != nil {
+		return HeldSet{}, err
+	}
+	return NewHeldSet(), nil
+}
