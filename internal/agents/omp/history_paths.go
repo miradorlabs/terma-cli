@@ -132,6 +132,27 @@ func isAbsToolPath(p string) bool {
 	return filepath.IsAbs(p) || (len(p) >= 3 && isWindowsDrivePath(p))
 }
 
+func translateWindowsDriveOnLinux(p string) (string, bool) {
+	if strings.HasPrefix(p, `\\`) {
+		return p, true
+	}
+	if !isWindowsDrivePath(p) {
+		return p, false
+	}
+	if os.Getenv("WSL_DISTRO_NAME") != "" || os.Getenv("WSL_INTEROP") != "" {
+		drive := strings.ToLower(p[:1])
+		mount := "/mnt/" + drive
+		if fi, err := os.Stat(mount); err == nil && fi.IsDir() {
+			rest := strings.TrimLeft(strings.ReplaceAll(p[2:], `\`, "/"), "/")
+			if rest == "" {
+				return mount, false
+			}
+			return mount + "/" + rest, false
+		}
+	}
+	return p, true
+}
+
 // resolveReachPath normalizes OMP path shorthands, decodes local file:// URLs, filters
 // internal URLs, translates or fails closed on Windows drive/UNC paths under Linux/WSL, and
 // expands a leading ~ / ~/ / ~\ to the user's home directory so reach classification never

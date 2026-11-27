@@ -65,6 +65,7 @@ type ompToolDetails struct {
 	DisplayTarget          string    `json:"displayTarget,omitempty"`
 	MediaPath              string    `json:"mediaPath,omitempty"`
 	ImagePaths             []string  `json:"imagePaths,omitempty"`
+	IsDirectory            bool      `json:"isDirectory,omitempty"`
 	DisplayReadTargets     []string  `json:"displayReadTargets,omitempty"`
 	DisplayReadTargetLinks []*string `json:"displayReadTargetLinks,omitempty"`
 	TouchesNoFiles         bool      `json:"touchesNoFiles,omitempty"`
@@ -142,9 +143,22 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 		}
 		return dirs
 	}
-	addDelimited := func(p string) {
+	addDelimited := func(p string, allowDirWalk bool) {
 		for _, seg := range splitOmpDelimitedPaths(p, cwd) {
-			addAlone(seg)
+			resolved, unknown := resolveReachPath(seg)
+			if unknown {
+				out = append(out, hookrun.UnknownReach+"\x00"+seg)
+				continue
+			}
+			if resolved == "" {
+				continue
+			}
+			resolved = peelSelectorIfMissing(resolved, cwd)
+			if allowDirWalk && isExistingDir(resolved, cwd) {
+				out = append(out, hookrun.SearchHistorical(resolved)...)
+			} else {
+				out = append(out, hookrun.Alone(resolved)...)
+			}
 		}
 	}
 	searchWithGlobs := func(rawGlobs ...string) {
@@ -179,9 +193,9 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 	}
 	switch toolName {
 	case "read":
-		addDelimited(in.Path)
+		addDelimited(in.Path, true)
 		for _, p := range in.Paths {
-			addDelimited(p)
+			addDelimited(p, true)
 		}
 	case "grep", "search", "ast_grep", "ast_edit":
 		searchWithGlobs(in.Glob, in.Include)
@@ -190,16 +204,17 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 	case "ls":
 		addAlone(in.Path)
 	case "lsp":
+		// Match live terma-omp.ts: classify explicit file args only; cross-repo LSP navigation is an accepted trade-off.
 		addAlone(in.File)
 		if in.Action == "rename_file" {
 			addAlone(in.NewName)
 		}
 	case "security_scan":
 		for _, p := range in.IncludePaths {
-			addDelimited(p)
+			addDelimited(p, false)
 		}
 		for _, p := range in.KnowledgeBasePaths {
-			addDelimited(p)
+			addDelimited(p, false)
 		}
 	case "generate_image":
 		if len(in.Input) > 0 && string(in.Input) != "null" {
@@ -303,25 +318,13 @@ func isRootSearchDir(p string) bool {
 	return c == "/" || (len(c) == 3 && isASCIILetter(c[0]) && c[1] == ':' && c[2] == '/')
 }
 
-func translateWindowsDriveOnLinux(p string) (string, bool) {
-	if strings.HasPrefix(p, `\\`) {
-		return p, true
+func isExistingDir(p, cwd string) bool {
+	cand := p
+	if !isAbsToolPath(cand) && cwd != "" {
+		cand = filepath.Join(cwd, cand)
 	}
-	if !isWindowsDrivePath(p) {
-		return p, false
-	}
-	if os.Getenv("WSL_DISTRO_NAME") != "" || os.Getenv("WSL_INTEROP") != "" {
-		drive := strings.ToLower(p[:1])
-		mount := "/mnt/" + drive
-		if fi, err := os.Stat(mount); err == nil && fi.IsDir() {
-			rest := strings.TrimLeft(strings.ReplaceAll(p[2:], `\`, "/"), "/")
-			if rest == "" {
-				return mount, false
-			}
-			return mount + "/" + rest, false
-		}
-	}
-	return p, true
+	fi, err := os.Stat(cand)
+	return err == nil && fi.IsDir()
 }
 
 // ompToolResultReachPaths extracts any resolved paths disclosed in a tool result's details.
@@ -330,25 +333,30 @@ func ompToolResultReachPaths(toolName string, d *ompToolDetails, cwd string) []s
 		return nil
 	}
 	var out []string
-	add := func(p string) {
+	add := func(p string, dirWalk bool) {
 		resolved, unknown := resolveReachPath(p)
 		if unknown {
 			out = append(out, hookrun.UnknownReach+"\x00"+p)
 		} else if resolved != "" {
-			out = append(out, hookrun.Alone(peelSelectorIfMissing(resolved, cwd))...)
+			resolved = peelSelectorIfMissing(resolved, cwd)
+			if dirWalk && (d.IsDirectory || isExistingDir(resolved, cwd)) {
+				out = append(out, hookrun.SearchHistorical(resolved)...)
+			} else {
+				out = append(out, hookrun.Alone(resolved)...)
+			}
 		}
 	}
 	switch toolName {
 	case "read":
-		add(d.ResolvedPath)
-		add(d.DisplayTarget)
-		add(d.MediaPath)
+		add(d.ResolvedPath, true)
+		add(d.DisplayTarget, true)
+		add(d.MediaPath, false)
 		for _, target := range d.DisplayReadTargets {
-			add(target)
+			add(target, true)
 		}
 		for _, link := range d.DisplayReadTargetLinks {
 			if link != nil {
-				add(*link)
+				add(*link, true)
 			}
 		}
 		if len(d.Meta) > 0 {
@@ -359,31 +367,31 @@ func ompToolResultReachPaths(toolName string, d *ompToolDetails, cwd string) []s
 				} `json:"source"`
 			}
 			if json.Unmarshal(d.Meta, &meta) == nil && meta.Source.Type == "path" {
-				add(meta.Source.Value)
+				add(meta.Source.Value, true)
 			}
 		}
 	case "write":
 		if !d.TouchesNoFiles {
-			add(d.ResolvedPath)
+			add(d.ResolvedPath, false)
 		}
 	case "edit", "apply_patch":
-		add(d.Path)
-		add(d.Move)
-		add(d.SourcePath)
+		add(d.Path, false)
+		add(d.Move, false)
+		add(d.SourcePath, false)
 		for _, r := range d.PerFileResults {
-			add(r.Path)
-			add(r.Move)
-			add(r.SourcePath)
+			add(r.Path, false)
+			add(r.Move, false)
+			add(r.SourcePath, false)
 		}
 	case "ast_edit", "ast_grep":
-		add(d.ScopePath)
-		add(d.Path)
+		add(d.ScopePath, false)
+		add(d.Path, false)
 	case "generate_image":
 		for _, p := range d.ImagePaths {
-			add(p)
+			add(p, false)
 		}
 	case "bash":
-		add(d.Cwd)
+		add(d.Cwd, false)
 	}
 	return out
 }

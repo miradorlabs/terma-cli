@@ -374,7 +374,7 @@ func (Agent) ReadHistory(ctx context.Context, file agents.HistoryFile, opts agen
 	pathToID := map[string]string{}
 
 	isSubagent := false
-	if file.ParentSessionID != "" {
+	if file.ParentSessionID != "" && !file.OneWayParent {
 		if hdr, err := peekOmpSessionHeader(file.Path); err == nil && hdr.Type == "session" &&
 			matchesParentSession(file.Path, filepath.Dir(file.Path)+".jsonl", file.ParentSessionID, hdr.ParentSession, runtime.GOOS == "windows") {
 			isSubagent = true

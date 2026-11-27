@@ -1501,6 +1501,16 @@ func TestUploadOmpEvalAndEmbeddedPathGlobs(t *testing.T) {
 		`{"type":"message","id":"bptr1","timestamp":"2026-11-23T01:30:03Z","message":{"role":"toolResult","toolCallId":"bp1","toolName":"glob","content":[{"type":"text","text":"LEAKED-BS-PATTERN"}],"isError":false,"timestamp":1795397403000}}`,
 	}, "\n")+"\n")
 
+	// 6. Round 9 fix: read on a directory (read .) in Personal wsRoot containing nested Org B checkout
+	// walks nested checkouts and withholds listing + subsequent replies.
+	writeAged("2026-11-23T01-00-00-000Z_s-read-dir.jsonl", strings.Join([]string{
+		`{"type":"session","version":3,"id":"s-read-dir","timestamp":"2026-11-23T01:00:00Z","cwd":` + mustJSONTest(wsRoot) + `}`,
+		`{"type":"message","id":"rdu1","timestamp":"2026-11-23T01:00:01Z","message":{"role":"user","content":"list dir","timestamp":1795395601000}}`,
+		`{"type":"message","id":"rda1","timestamp":"2026-11-23T01:00:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","duration":100,"timestamp":1795395601900,"usage":{"input":5,"output":5},"content":[{"type":"toolCall","id":"rd1","name":"read","arguments":{"path":"."}}]}}`,
+		`{"type":"message","id":"rdtr1","timestamp":"2026-11-23T01:00:03Z","message":{"role":"toolResult","toolCallId":"rd1","toolName":"read","content":[{"type":"text","text":"LEAKED-READ-DIR-LISTING"}],"details":{"resolvedPath":` + mustJSONTest(wsRoot) + `,"isDirectory":true},"isError":false,"timestamp":1795395603000}}`,
+		`{"type":"message","id":"rda2","timestamp":"2026-11-23T01:00:04Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","duration":100,"timestamp":1795395603900,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"LEAKED-READ-DIR-REPLY"}]}}`,
+	}, "\n")+"\n")
+
 	stA := singleTeamRoutingState(now, "acc1", "org-a", "team-a", "github.com/org-a/repo-a", true, true)
 	stB := singleTeamRoutingState(now, "acc1", "org-b", "team-b", "github.com/org-b/repo-b", true, true)
 	stP := singleTeamRoutingState(now, "acc1", "org-personal", "team-personal", "", true, true)

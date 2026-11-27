@@ -1034,6 +1034,66 @@ func TestOmpEvalFailClosedAndEmbeddedSearchGlobs(t *testing.T) {
 	if !matchesParentSession(filepath.Join(cwd, "p", "tan-1.jsonl"), filepath.Join(cwd, "p.jsonl"), "parent-123", "parent-123", false) {
 		t.Errorf("matchesParentSession should match bare parent session ID for /tan children")
 	}
+
+	// 5. Round 9 fixes: top-level /fork with bare parent ID stays non-subagent (emits title, no session.start),
+	// and read on a directory emits non-Alone directory reach so nested checkouts are walked.
+	agentDir := t.TempDir()
+	t.Setenv("PI_CODING_AGENT_DIR", agentDir)
+	projDir := filepath.Join(agentDir, "sessions", "--work-repo--")
+	if err := os.MkdirAll(projDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	forkFile := filepath.Join(projDir, "2026-11-23T11-00-00-000Z_fork-bare.jsonl")
+	forkData := strings.Join([]string{
+		`{"type":"session","version":3,"id":"fork-bare","timestamp":"2026-11-23T11:00:00Z","cwd":"/work/repo","parentSession":"parent-bare","title":"Forked Title"}`,
+		`{"type":"message","id":"u1","timestamp":"2026-11-23T11:00:01Z","message":{"role":"user","content":"hi","timestamp":1795431601000}}`,
+		`{"type":"message","id":"a1","timestamp":"2026-11-23T11:00:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","duration":100,"timestamp":1795431601900,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"hello"}]}}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(forkFile, []byte(forkData), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	disc, err := (Agent{}).DiscoverHistory(context.Background(), agents.HistoryDiscoverOptions{Now: time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var forkHF agents.HistoryFile
+	for _, f := range disc {
+		if f.SessionID == "fork-bare" {
+			forkHF = f
+		}
+	}
+	if !forkHF.OneWayParent || forkHF.ParentSessionID != "parent-bare" {
+		t.Fatalf("discovered fork = %+v, want OneWayParent=true ParentSessionID=parent-bare", forkHF)
+	}
+	var gotTitle, gotStart bool
+	if err := (Agent{}).ReadHistory(context.Background(), forkHF, agents.HistoryReadOptions{IncludeSupplemental: true}, func(seg agents.HistorySegment) error {
+		if seg.Subagent {
+			t.Errorf("top-level /fork emitted Subagent=true")
+		}
+		for _, lr := range collectLogRecords(seg.SupplementalLogs) {
+			if lr.GetEventName() == semconv.TermaSessionTitleEvent {
+				gotTitle = true
+			}
+			if lr.GetEventName() == semconv.TermaSessionStartEvent {
+				gotStart = true
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !gotTitle || gotStart {
+		t.Errorf("top-level /fork supplemental logs: gotTitle=%v gotStart=%v, want true/false", gotTitle, gotStart)
+	}
+
+	readDirCall := ompToolCallReachPaths("read", json.RawMessage(`{"path":"."}`), cwd)
+	if !slices.Contains(readDirCall, ".") {
+		t.Errorf("read on directory '.' should emit non-Alone directory reach '.', got %v", readDirCall)
+	}
+	readDirRes := ompToolResultReachPaths("read", &ompToolDetails{ResolvedPath: cwd, IsDirectory: true}, cwd)
+	if !slices.Contains(readDirRes, cwd) {
+		t.Errorf("read result with isDirectory=true should emit non-Alone reach %q, got %v", cwd, readDirRes)
+	}
 }
 
 func mustJSON(v any) string {
