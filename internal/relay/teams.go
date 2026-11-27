@@ -50,6 +50,9 @@ type (
 		Why     Why
 		Blocker string
 		MixedAt time.Time
+		// MixedRun is the run MixedAt cuts: only its queued entries (and those with no run)
+		// are swept. Empty sweeps every run of the session.
+		MixedRun string
 	}
 	// Rechecked is the verdict returned by a Rechecker for a pinned or queued entry.
 	Rechecked struct {
@@ -184,9 +187,9 @@ func (r *Relay) decideTeams(key string, p *part) verdict {
 			how = attribution{how: semconv.TermaRelayAttributionProcess, session: rec.Session}
 		}
 		held = whyUnclaimed
-		if raw, ok := r.lookup(rec.Session); ok {
+		if raw, ok, c, placed := r.lookupFor(rec.Session, p.pid, p.startAt); ok {
 			held = whyProcess
-			if c, ok := raw.At(p.pid, p.startAt); ok {
+			if placed {
 				if c.Kind == "" && c.ProjectID == "" {
 					return verdict{why: whyNotCollected, final: true}
 				}
@@ -205,11 +208,12 @@ func (r *Relay) decideTeams(key string, p *part) verdict {
 	}
 	routed := r.opts.Router.Route(rec)
 	v := verdict{
-		why:     routed.Why.reason(),
-		blocker: routed.Blocker,
-		mixedAt: routed.MixedAt,
-		session: rec.Session,
-		c:       rec.Placement,
+		why:      routed.Why.reason(),
+		blocker:  routed.Blocker,
+		mixedAt:  routed.MixedAt,
+		mixedRun: routed.MixedRun,
+		session:  rec.Session,
+		c:        rec.Placement,
 	}
 	q := routed.Queued
 	if q.Enrollment != "" {

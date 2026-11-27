@@ -526,7 +526,10 @@ its text. A prompt or a reply longer than 16 KiB is cut there and marked as cut.
 cut at 16 KiB and ends with how many characters were dropped. Arguments longer than 16 KiB
 keep their short values, such as a path or a command, and each long value is cut to 2 KiB
 and ends the same way. Thinking is not sent. A tool's result on a transcript line over 8 MiB
-is lost.
+is lost. The name `agy` gives a conversation, or the one you rename it to, goes as the
+session's title under the same rules as a prompt, since it restates the first one. terma
+reads it from the conversation's file in `agy`'s `annotations` folder when a turn starts
+and when it ends. A headless `agy -p` names none.
 
 Two rules limit what a session sends of another repository's content. They do not cover
 every tool. terma checks what a call names for `agy`'s own file and folder tools only. A
@@ -654,7 +657,9 @@ sessions that OpenCode process knows: a parent session in another OpenCode proce
 back. On OpenCode 2, every session of the background service runs in one process. Also on
 OpenCode 2, the first model call or tool call of a session can be recorded a few tens of
 milliseconds shorter than it was: OpenCode does not wait for terma's first check of the
-session, and nothing is recorded as starting before the prompt that asked for it.
+session, and nothing is recorded as starting before the prompt that asked for it. On OpenCode
+1, the first prompt an OpenCode process sends in a session waits for terma to claim that
+session: usually a fraction of a second, a few seconds at most.
 
 On OpenCode 2, some attached files stop a session from being recorded. terma checks that a
 file an agent reads belongs to a repository your team collects, and for these OpenCode 2

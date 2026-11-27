@@ -194,24 +194,27 @@ func indexBySession(files []agents.HistoryFile) map[string]agents.HistoryFile {
 func buildChildrenMap(files []agents.HistoryFile) map[string][]agents.HistoryFile {
 	out := map[string][]agents.HistoryFile{}
 	for _, f := range files {
-		if f.ParentSessionID != "" && f.ParentSessionID != f.SessionID {
+		if f.ParentSessionID != "" && f.ParentSessionID != f.SessionID && !f.OneWayParent {
 			out[f.ParentSessionID] = append(out[f.ParentSessionID], f)
 		}
 	}
 	return out
 }
 
-// collectFamily resolves the full connected spawn tree containing f (walking up
-// ParentSessionID to the root, then collecting root and all descendants except f itself).
-// If f's ancestor chain references a parent session whose transcript is absent from disk,
-// missingParent returns that parent session ID so the caller fails closed.
+// collectFamily resolves the spawn and ancestor tree relevant to f: walking up
+// ParentSessionID through every ancestor (both bidirectional subagents and one-way
+// forks/continuations), then collecting each ancestor and its bidirectional subagent tree
+// except f itself. One-way forks inherit their ancestors' cutoffs without propagating back
+// into the original parent. If f's ancestor chain references a parent session whose
+// transcript is absent from disk, missingParent returns that parent session ID so the caller
+// fails closed.
 func collectFamily(
 	f agents.HistoryFile,
 	bySession map[string]agents.HistoryFile,
 	childrenByParent map[string][]agents.HistoryFile,
 ) (companions []agents.HistoryFile, missingParent string) {
-	rootID := f.SessionID
-	seenUp := map[string]bool{rootID: true}
+	queue := []agents.HistoryFile{f}
+	seenUp := map[string]bool{f.SessionID: true}
 	for cur := f; cur.ParentSessionID != ""; {
 		pid := cur.ParentSessionID
 		if seenUp[pid] {
@@ -223,14 +226,10 @@ func collectFamily(
 			missingParent = pid
 			break
 		}
-		rootID = pid
+		queue = append(queue, parent)
 		cur = parent
 	}
 	visited := map[string]bool{}
-	var queue []agents.HistoryFile
-	if rootFile, ok := bySession[rootID]; ok {
-		queue = append(queue, rootFile)
-	}
 	for len(queue) > 0 {
 		cur := queue[0]
 		queue = queue[1:]
@@ -258,4 +257,52 @@ func familyReadError(f agents.HistoryFile, companions []agents.HistoryFile) stri
 		}
 	}
 	return ""
+}
+
+// ancestorCutoffs maps each companion session reached through one or more OneWayParent
+// edges from f to the earliest fork/continuation timestamp along that upward path, so
+// unrelated post-fork activity on an ancestor does not suppress an independent fork.
+func ancestorCutoffs(f agents.HistoryFile, companions []agents.HistoryFile) map[string]time.Time {
+	byID := make(map[string]agents.HistoryFile, len(companions)+1)
+	byID[f.SessionID] = f
+	bidirChildren := map[string][]string{}
+	for _, c := range companions {
+		byID[c.SessionID] = c
+		if c.ParentSessionID != "" && c.ParentSessionID != c.SessionID && !c.OneWayParent {
+			bidirChildren[c.ParentSessionID] = append(bidirChildren[c.ParentSessionID], c.SessionID)
+		}
+	}
+	cutoffs := map[string]time.Time{}
+	var running time.Time
+	seen := map[string]bool{f.SessionID: true}
+	for cur := f; cur.ParentSessionID != ""; {
+		if cur.OneWayParent && !cur.OneWayCutoff.IsZero() {
+			if running.IsZero() || cur.OneWayCutoff.Before(running) {
+				running = cur.OneWayCutoff
+			}
+		}
+		pid := cur.ParentSessionID
+		if seen[pid] {
+			break
+		}
+		seen[pid] = true
+		parent, ok := byID[pid]
+		if !ok {
+			break
+		}
+		if !running.IsZero() {
+			// Propagate the one-way cutoff to this ancestor and its bidirectional subagents.
+			q := []string{pid}
+			for len(q) > 0 {
+				id := q[0]
+				q = q[1:]
+				if prev, exists := cutoffs[id]; !exists || running.Before(prev) {
+					cutoffs[id] = running
+					q = append(q, bidirChildren[id]...)
+				}
+			}
+		}
+		cur = parent
+	}
+	return cutoffs
 }

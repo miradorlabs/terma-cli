@@ -464,6 +464,48 @@ func TestOpenCodeResume(t *testing.T) {
 	})
 }
 
+// A session paused by a shell call terma cannot place, then resumed in two more processes:
+// the prompt that resumes it and its reply arrive, and so does the next, while nothing of
+// the paused part does. The resuming process claims the session in a new, clean run.
+func TestOpenCodeResumeAfterPause(t *testing.T) {
+	forEachOpenCode(t, func(t *testing.T, b Binary, _ bool) {
+		sb := openCodeRelay(t, b, true, func(sb *Sandbox) []openCodeStep {
+			return []openCodeStep{
+				{text: "TERMA_FIRST_REPLY"},
+				{calls: []openCodeCall{openCodeCallFor(b, "call_cd", openCodeIntent{shell: `cd "$(cat where.txt)" && ls`, description: "a cd terma cannot place"})}},
+				{text: "TERMA_PAUSED_REPLY"},
+				{text: "TERMA_RESUMED_REPLY"},
+				{text: "TERMA_AGAIN_REPLY"},
+			}
+		})
+		sb.writeAbs(filepath.Join(sb.Repo, "where.txt"), sb.Repo+"\n")
+		sid := sb.OpenCodeRun(b, sb.Repo, "", "TERMA_FIRST_PROMPT")
+		sb.OpenCodeRun(b, sb.Repo, sid, "TERMA_PAUSING_PROMPT")
+		if !sb.paused(sid) {
+			t.Fatalf("the shell call did not pause session %s", sid)
+		}
+		sb.OpenCodeRun(b, sb.Repo, sid, "TERMA_RESUMED_PROMPT")
+		sb.OpenCodeRun(b, sb.Repo, sid, "TERMA_AGAIN_PROMPT")
+		var e telemetryEvidence
+		waitUntil(45*time.Second, func() bool {
+			e = sb.Receiver.evidence()
+			return len(leakedFieldsOf(e, "TERMA_AGAIN_REPLY")) > 0
+		})
+		// What would leak of the paused part arrives a little later, if at all: give it the time.
+		time.Sleep(5 * time.Second)
+		e = sb.Receiver.evidence()
+		for _, m := range []string{"TERMA_FIRST_PROMPT", "TERMA_RESUMED_PROMPT", "TERMA_RESUMED_REPLY", "TERMA_AGAIN_PROMPT", "TERMA_AGAIN_REPLY"} {
+			if len(leakedFieldsOf(e, m)) == 0 {
+				t.Errorf("%s did not arrive; relay %v", m, sb.RelayStats())
+			}
+		}
+		if leaked := leakedFieldsOf(e, "TERMA_PAUSED_REPLY"); len(leaked) > 0 {
+			t.Errorf("the paused part arrived: %v", leaked)
+		}
+		finishOpenCode(t, sb)
+	})
+}
+
 // A provider that numbers its call ids per response gives call_0 twice: the plugin
 // qualifies each by its assistant message, so two calls arrive as two.
 func TestOpenCodeRepeatedToolCallID(t *testing.T) {

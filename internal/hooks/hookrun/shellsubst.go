@@ -362,7 +362,14 @@ func (sc *scan) readSmallFile(path string) (string, error) {
 func (sc *scan) below(dir string, levels int) {
 	if c := (candidate{dir, strconv.Itoa(levels), walked}); func() bool { _, seen := sc.examined[c]; return seen }() || !sc.spend(1) {
 		return
-	} else if sc.examined[c] = (cached{}); sc.holdsNone(dir) || sc.unknown || func() bool { r, ok := sc.walkUpGit(dir, false); return ok && !sc.enclosingCheckout(r) }() || sc.unknown {
+	} else if sc.examined[c] = (cached{}); sc.holdsNone(dir) || sc.unknown {
+		return
+	} else if r, ok := sc.walkUpGit(dir, false); sc.unknown || ok && !sc.enclosingCheckout(r) {
+		// A search in a checkout stays in it for a hook, whose scan has no time to walk a
+		// repository. A past session's search also reaches the checkouts nested in it.
+		if ok && !sc.unknown && sc.historical {
+			sc.placeNestedBelow(r, dir)
+		}
 		return
 	}
 	for depth, level := 0, []string{dir}; len(level) > 0 && !sc.unknown && depth+1 < levels; depth++ {

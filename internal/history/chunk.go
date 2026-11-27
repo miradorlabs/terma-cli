@@ -8,6 +8,7 @@ import (
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
@@ -26,20 +27,32 @@ const MaxRequestBytes = 3584 << 10
 // MaxRequestBytes one needs about 1 Mbit/s. Only a chunk holding one larger record exceeds it.
 const TargetChunkBytes = 512 << 10
 
-// Chunk is one marshaled OTLP LogsData protobuf payload ready to send.
+// Chunk is one marshaled OTLP protobuf payload ready to send to Path (/v1/logs or /v1/traces).
 type Chunk struct {
+	Path    string
 	Body    []byte
 	Records int
 }
 
+// PreparedSegment holds the filtered and stamped OTLP log and trace batches for one segment.
+type PreparedSegment struct {
+	Logs   *logspb.LogsData
+	Traces *tracepb.TracesData
+}
+
+// Empty reports whether p contains neither log records nor trace spans.
+func (p PreparedSegment) Empty() bool {
+	return p.Logs == nil && p.Traces == nil
+}
+
 // PrepareSegment applies the destination team's content policy and resource stamps to one
-// transcript segment, preserving terma.session.historical=true on every resource and log
-// record. Native logs pass through the relay's ContentFilter; supplemental terma-scoped
-// records (such as assistant replies) are included only when the team policy allows prompts.
-func PrepareSegment(seg agents.HistorySegment, filter *relay.ContentFilter, pol config.Policy, stamp relay.StampOptions) (*logspb.LogsData, int) {
+// transcript segment, preserving terma.session.historical=true on every resource, log
+// record, and span. Native logs and traces pass through the relay's ContentFilter;
+// supplemental terma-scoped records are filtered per event kind according to the team policy.
+func PrepareSegment(seg agents.HistorySegment, filter *relay.ContentFilter, pol config.Policy, stamp relay.StampOptions) (PreparedSegment, int) {
 	prompts, toolContent := pol.Content()
 	stamp.IncludeToolContent = toolContent
-	out := &logspb.LogsData{}
+	var out PreparedSegment
 	total := 0
 
 	if seg.NativeLogs != nil {
@@ -51,32 +64,55 @@ func PrepareSegment(seg agents.HistorySegment, filter *relay.ContentFilter, pol 
 		relay.StampLogs(native, stamp)
 		ensureHistorical(native)
 		if n := countLogs(native); n > 0 {
-			out.ResourceLogs = append(out.ResourceLogs, native.ResourceLogs...)
+			if out.Logs == nil {
+				out.Logs = &logspb.LogsData{}
+			}
+			out.Logs.ResourceLogs = append(out.Logs.ResourceLogs, native.ResourceLogs...)
 			total += n
 		}
 	}
 
-	if seg.SupplementalLogs != nil && prompts {
+	if seg.NativeTraces != nil {
+		native := proto.CloneOf(seg.NativeTraces)
+		ensureHistoricalTraces(native)
+		if filter != nil {
+			filter.FilterTraces(native, prompts, toolContent)
+		}
+		relay.StampTraces(native, stamp)
+		ensureHistoricalTraces(native)
+		if n := countTraces(native); n > 0 {
+			out.Traces = native
+			total += n
+		}
+	}
+
+	if seg.SupplementalLogs != nil {
 		supp := proto.CloneOf(seg.SupplementalLogs)
+		filterSupplementalLogs(supp, prompts, toolContent)
 		ensureHistorical(supp)
 		stampSupplemental(supp, stamp)
 		ensureHistorical(supp)
 		if n := countLogs(supp); n > 0 {
-			out.ResourceLogs = append(out.ResourceLogs, supp.ResourceLogs...)
+			if out.Logs == nil {
+				out.Logs = &logspb.LogsData{}
+			}
+			out.Logs.ResourceLogs = append(out.Logs.ResourceLogs, supp.ResourceLogs...)
 			total += n
 		}
 	}
 
 	if total == 0 {
-		return nil, 0
+		return PreparedSegment{}, 0
 	}
 	return out, total
 }
 
 // stampSupplemental applies terma resource metadata and checkout stamps to supplemental
-// terma-scoped log batches, stripping local checkout paths when toolContent is withheld.
+// terma-scoped log batches, normalizing file-touch records to the checkout and stripping
+// local checkout paths when toolContent is withheld.
 func stampSupplemental(msg *logspb.LogsData, opts relay.StampOptions) {
 	relay.StampLogs(msg, opts)
+	var keptRL []*logspb.ResourceLogs
 	for _, rl := range msg.GetResourceLogs() {
 		if rl.Resource == nil {
 			rl.Resource = &resourcepb.Resource{}
@@ -85,20 +121,36 @@ func stampSupplemental(msg *logspb.LogsData, opts relay.StampOptions) {
 			setAttr(rl.Resource, semconv.ServiceVersionKey, opts.Version)
 		}
 		setAttr(rl.Resource, semconv.TermaSchemaVersionKey, semconv.SchemaVersion)
+		var keptSL []*logspb.ScopeLogs
 		for _, sl := range rl.GetScopeLogs() {
 			if sl.Scope != nil && opts.Version != "" {
 				sl.Scope.Version = opts.Version
 			}
-			if !opts.IncludeToolContent {
-				for _, lr := range sl.GetLogRecords() {
+			var keptLR []*logspb.LogRecord
+			for _, lr := range sl.GetLogRecords() {
+				if lr.GetEventName() == semconv.TermaFilesTouchedEvent {
+					keptLR = append(keptLR, normalizeFilesTouched(lr, opts.Checkout)...)
+					continue
+				}
+				if !opts.IncludeToolContent {
 					lr.Attributes = slices.DeleteFunc(lr.Attributes, func(kv *commonpb.KeyValue) bool {
 						return kv.GetKey() == semconv.TermaRepositoryRootKey ||
 							kv.GetKey() == semconv.TermaWorkingDirectoryKey
 					})
 				}
+				keptLR = append(keptLR, lr)
+			}
+			if len(keptLR) > 0 {
+				sl.LogRecords = keptLR
+				keptSL = append(keptSL, sl)
 			}
 		}
+		if len(keptSL) > 0 {
+			rl.ScopeLogs = keptSL
+			keptRL = append(keptRL, rl)
+		}
 	}
+	msg.ResourceLogs = keptRL
 }
 
 func setAttr(res *resourcepb.Resource, key, val string) {
@@ -112,25 +164,26 @@ func setAttr(res *resourcepb.Resource, key, val string) {
 	res.Attributes = append(res.Attributes, &commonpb.KeyValue{Key: key, Value: v})
 }
 
-func ensureHistorical(msg *logspb.LogsData) {
+func setHistoricalAttr(attrs []*commonpb.KeyValue) []*commonpb.KeyValue {
 	boolTrue := &commonpb.AnyValue{Value: &commonpb.AnyValue_BoolValue{BoolValue: true}}
-	setBool := func(attrs []*commonpb.KeyValue) []*commonpb.KeyValue {
-		for _, kv := range attrs {
-			if kv.GetKey() == semconv.TermaSessionHistoricalKey {
-				kv.Value = proto.CloneOf(boolTrue)
-				return attrs
-			}
+	for _, kv := range attrs {
+		if kv.GetKey() == semconv.TermaSessionHistoricalKey {
+			kv.Value = boolTrue
+			return attrs
 		}
-		return append(attrs, &commonpb.KeyValue{Key: semconv.TermaSessionHistoricalKey, Value: proto.CloneOf(boolTrue)})
 	}
+	return append(attrs, &commonpb.KeyValue{Key: semconv.TermaSessionHistoricalKey, Value: boolTrue})
+}
+
+func ensureHistorical(msg *logspb.LogsData) {
 	for _, rl := range msg.GetResourceLogs() {
 		if rl.Resource == nil {
 			rl.Resource = &resourcepb.Resource{}
 		}
-		rl.Resource.Attributes = setBool(rl.Resource.Attributes)
+		rl.Resource.Attributes = setHistoricalAttr(rl.Resource.Attributes)
 		for _, sl := range rl.GetScopeLogs() {
 			for _, lr := range sl.GetLogRecords() {
-				lr.Attributes = setBool(lr.Attributes)
+				lr.Attributes = setHistoricalAttr(lr.Attributes)
 			}
 		}
 	}
@@ -161,7 +214,29 @@ func FilterMixedLogs(msg *logspb.LogsData, snap runs.Snapshot, lookup func(id st
 		t := logRecordTime(lr)
 		return !maxRecordTime.IsZero() && !t.IsZero() && t.After(maxRecordTime)
 	}
+	farPast := time.Unix(1, 0).UTC()
+	farFuture := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
 	isMixed := func(lr *logspb.LogRecord) bool {
+		// An undated title (TimeUnixNano == 0, ObservedTimeUnixNano carrying fallback time)
+		// cannot be ordered against a Mixed cutoff, so drop it whenever any cutoff exists.
+		if lr.GetTimeUnixNano() == 0 && lr.GetEventName() == semconv.TermaSessionTitleEvent {
+			if hasReachMixed {
+				return true
+			}
+			if _, mixed := snap.MixedInterval(farPast, farFuture); mixed {
+				return true
+			}
+			if lookup != nil {
+				for _, attrKey := range []string{"agent_id", semconv.SessionIDKey} {
+					if id := logRecordAttrString(lr, attrKey); id != "" {
+						if _, mixed := lookup(id).MixedInterval(farPast, farFuture); mixed {
+							return true
+						}
+					}
+				}
+			}
+			return false
+		}
 		t := logRecordTime(lr)
 		if hasReachMixed && (reachMixedAt.IsZero() || t.IsZero() || !t.Before(reachMixedAt)) {
 			return true
@@ -170,10 +245,12 @@ func FilterMixedLogs(msg *logspb.LogsData, snap runs.Snapshot, lookup func(id st
 			return true
 		}
 		if lookup != nil {
-			if agentID := logRecordAttrString(lr, "agent_id"); agentID != "" {
-				sub := lookup(agentID)
-				if mixedAt, mixed := sub.MixedAt(t); mixed && (mixedAt.IsZero() || t.IsZero() || !t.Before(mixedAt)) {
-					return true
+			for _, attrKey := range []string{"agent_id", semconv.SessionIDKey} {
+				if id := logRecordAttrString(lr, attrKey); id != "" {
+					sub := lookup(id)
+					if mixedAt, mixed := sub.MixedAt(t); mixed && (mixedAt.IsZero() || t.IsZero() || !t.Before(mixedAt)) {
+						return true
+					}
 				}
 			}
 		}
@@ -228,9 +305,10 @@ func logRecordAttrString(lr *logspb.LogRecord, key string) string {
 	return ""
 }
 
-// ChunkWriter streams prepared OTLP log batches into bounded protobuf chunks (<= maxBytes),
-// emitting each completed chunk via onChunk so peak memory stays bounded to one chunk at a time.
-// A chunk with more than one record also stays at or under target.
+// ChunkWriter streams prepared OTLP log and trace batches into bounded protobuf chunks
+// (<= maxBytes), emitting each completed chunk via onChunk so peak memory stays bounded to
+// one chunk per signal at a time. A chunk with more than one record also stays at or under
+// target.
 type ChunkWriter struct {
 	maxBytes   int
 	target     int
@@ -238,6 +316,7 @@ type ChunkWriter struct {
 	cur        *logspb.LogsData
 	curRecords int
 	estBytes   int
+	traces     *traceChunker
 }
 
 // NewChunkWriter constructs a streaming OTLP chunk writer bounded by maxBytes.
@@ -245,11 +324,13 @@ func NewChunkWriter(maxBytes int, onChunk func(Chunk) error) *ChunkWriter {
 	if maxBytes <= 0 {
 		maxBytes = MaxRequestBytes
 	}
+	target := min(TargetChunkBytes, maxBytes)
 	return &ChunkWriter{
 		maxBytes: maxBytes,
-		target:   min(TargetChunkBytes, maxBytes),
+		target:   target,
 		onChunk:  onChunk,
 		cur:      &logspb.LogsData{},
+		traces:   newTraceChunker(maxBytes, target, onChunk),
 	}
 }
 
@@ -282,7 +363,7 @@ func (w *ChunkWriter) Add(batch *logspb.LogsData) error {
 				}
 				// The soft target is judged on the estimate; maxBytes, below, on the exact size.
 				if w.target < w.maxBytes && w.curRecords > 0 && w.estBytes+grow > w.target {
-					if err := w.Flush(); err != nil {
+					if err := w.flushLogs(); err != nil {
 						return err
 					}
 					activeSL = nil
@@ -313,7 +394,7 @@ func (w *ChunkWriter) Add(batch *logspb.LogsData) error {
 						Reason: fmt.Sprintf("single log record exceeds %d-byte request limit", w.maxBytes),
 					}
 				}
-				if err := w.Flush(); err != nil {
+				if err := w.flushLogs(); err != nil {
 					return err
 				}
 				openScope()
@@ -331,8 +412,17 @@ func (w *ChunkWriter) Add(batch *logspb.LogsData) error {
 	return nil
 }
 
-// Flush marshals and emits any remaining buffered records.
+// Flush marshals and emits any remaining buffered trace spans and log records.
 func (w *ChunkWriter) Flush() error {
+	if w.traces != nil {
+		if err := w.traces.flush(); err != nil {
+			return err
+		}
+	}
+	return w.flushLogs()
+}
+
+func (w *ChunkWriter) flushLogs() error {
 	if w.curRecords == 0 {
 		return nil
 	}
@@ -343,7 +433,7 @@ func (w *ChunkWriter) Flush() error {
 	if len(wire) > w.maxBytes {
 		return &PermanentError{Reason: fmt.Sprintf("marshaled batch (%d bytes) exceeds %d-byte limit", len(wire), w.maxBytes)}
 	}
-	ch := Chunk{Body: wire, Records: w.curRecords}
+	ch := Chunk{Path: otlpLogsPath, Body: wire, Records: w.curRecords}
 	w.cur = &logspb.LogsData{}
 	w.curRecords = 0
 	w.estBytes = 0

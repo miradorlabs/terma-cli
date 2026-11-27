@@ -5,6 +5,7 @@ import (
 	"time"
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 // HistoryFile describes one discovered local session transcript on disk.
@@ -14,8 +15,17 @@ type HistoryFile struct {
 	// SessionID is the agent's native session identifier.
 	SessionID string
 	// ParentSessionID is the optional parent session identifier for spawned subagent
-	// transcripts stored as separate files (so cross-org reach in a child taints its parent).
+	// transcripts stored as separate files (so cross-org reach in a child taints its parent),
+	// or a fork/continuation ancestor when OneWayParent is true.
 	ParentSessionID string
+	// OneWayParent reports that ParentSessionID is a one-directional lineage ancestor (such
+	// as a forked or continued transcript) whose history flowed into this session, rather
+	// than a bidirectional subagent whose activity flows back into the parent.
+	OneWayParent bool
+	// OneWayCutoff optionally bounds inherited ancestor activity to events strictly before
+	// this timestamp (such as a fork's creation time) when OneWayParent is true, so later
+	// unrelated activity on the original parent does not suppress the independent fork.
+	OneWayCutoff time.Time
 	// Path is the main transcript file path on disk.
 	Path string
 	// ExtraPaths lists companion transcript files belonging to the same session, such as
@@ -24,6 +34,10 @@ type HistoryFile struct {
 	// WatchDirs lists optional companion directories whose regular .jsonl files are checked
 	// when re-verifying that the session has not resumed before upload.
 	WatchDirs []string
+	// SeenWatchFiles lists regular .jsonl files already present inside WatchDirs at discovery
+	// time that were intentionally not included in ExtraPaths (for example, stale copied
+	// subagent transcripts inside a fork's directory), so re-verification only flags new files.
+	SeenWatchFiles []string
 	// ModTime is the latest modification time across Path and ExtraPaths.
 	ModTime time.Time
 	// Active reports whether the transcript was modified within the active-session window
@@ -85,8 +99,13 @@ type HistorySegment struct {
 	// NativeLogs holds the agent's native OTLP log records, filtered by the relay content
 	// filter before upload.
 	NativeLogs *logspb.LogsData
-	// SupplementalLogs holds optional terma-scoped log records (such as replies not present
-	// in the native stream), filtered by the destination team's prompt policy before upload.
+	// NativeTraces holds the agent's native OTLP trace spans (for agents whose platform
+	// adapter maps /v1/traces rather than /v1/logs), filtered by the relay content filter
+	// before upload.
+	NativeTraces *tracepb.TracesData
+	// SupplementalLogs holds optional terma-scoped log records (such as replies, session
+	// titles, subagent parent starts, or file-touch metadata not present in the native
+	// stream), filtered by the destination team's content policy before upload.
 	SupplementalLogs *logspb.LogsData
 	// ToolReaches holds paths reached by tool calls in this segment (with their timestamps)
 	// so historical upload enforces the same cross-organization Mixed cutoff as live hooks.
@@ -95,7 +114,8 @@ type HistorySegment struct {
 	// sharing the parent session's run (so a subagent crossing into another organization
 	// taints the parent session's run at that timestamp).
 	Subagent bool
-	// RecordCount is the total number of log records across NativeLogs and SupplementalLogs.
+	// RecordCount is the total number of log records and spans across NativeLogs,
+	// NativeTraces, and SupplementalLogs.
 	RecordCount int
 }
 
