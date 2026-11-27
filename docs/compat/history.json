@@ -13724,7 +13724,7 @@
     "platform": "darwin/arm64",
     "capability": "relay.telemetry",
     "result": "pass",
-    "last_run": "2026-11-27T08:22:30.493794Z",
+    "last_run": "2026-11-27T14:28:50.787073Z",
     "first_passed": "2026-11-26T19:44:01.713076Z",
     "terma": "terma version dev",
     "test": "TestRelayT3/v0.1.13"
