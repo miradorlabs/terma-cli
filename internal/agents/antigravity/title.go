@@ -78,7 +78,7 @@ var annotationsTitle = sync.OnceValues(func() (protoreflect.MessageDescriptor, e
 // found is false before agy has named it. A file that is not a regular one, too long or not
 // in the text format is an error.
 func readAntigravityTitle(path string) (title string, found bool, err error) {
-	f, err := os.Open(path)
+	f, err := os.OpenFile(path, os.O_RDONLY|hookrun.EvidenceOpenFlags, 0)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			err = nil
@@ -113,15 +113,13 @@ func readAntigravityTitle(path string) (title string, found bool, err error) {
 }
 
 // spoolTitle spools the conversation's name when it is new or changed, while the hook holds
-// the conversation and may send its prompts.
+// the conversation, which it does only with a transcript of agy's shape, and may send its
+// prompts.
 func (c *antigravityConversation) spoolTitle() {
 	if !c.held || !c.contentFor().prompts {
 		return
 	}
 	path := antigravityAnnotations(c.in)
-	if path == "" {
-		return
-	}
 	attrs := map[string]any{semconv.GenAIMainAgentNameKey: antigravityTool, semconv.TermaEvidenceSourceKey: sourceAntigravityAnnotations}
 	hookrun.SpoolTitle(c.at(c.e), c.r, antigravityTitleDir, c.in.id(), attrs, func() (string, bool, error) {
 		return readAntigravityTitle(path)

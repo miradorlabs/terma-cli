@@ -529,7 +529,7 @@ and ends the same way. Thinking is not sent. A tool's result on a transcript lin
 is lost. The name `agy` gives a conversation, or the one you rename it to, goes as the
 session's title under the same rules as a prompt, since it restates the first one. terma
 reads it from the conversation's file in `agy`'s `annotations` folder when a turn starts
-and when it ends.
+and when it ends. A headless `agy -p` names none.
 
 Two rules limit what a session sends of another repository's content. They do not cover
 every tool. terma checks what a call names for `agy`'s own file and folder tools only. A
