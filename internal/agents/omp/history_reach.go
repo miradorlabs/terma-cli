@@ -1,15 +1,11 @@
 package omp
 
 import (
-	"bytes"
 	"cmp"
 	"encoding/json"
-	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"slices"
 	"strings"
 	"unicode"
@@ -40,21 +36,22 @@ func unwrapHashlinePath(p string) string {
 }
 
 type ompToolInput struct {
-	Path               string   `json:"path,omitempty"`
-	Paths              []string `json:"paths,omitempty"`
-	Move               string   `json:"move,omitempty"`
-	Glob               string   `json:"glob,omitempty"`
-	Include            string   `json:"include,omitempty"`
-	Pattern            string   `json:"pattern,omitempty"`
-	Command            string   `json:"command,omitempty"`
-	Cwd                string   `json:"cwd,omitempty"`
-	Input              string   `json:"input,omitempty"`
-	Diff               string   `json:"diff,omitempty"`
-	Action             string   `json:"action,omitempty"`
-	File               string   `json:"file,omitempty"`
-	NewName            string   `json:"new_name,omitempty"`
-	IncludePaths       []string `json:"include_paths,omitempty"`
-	KnowledgeBasePaths []string `json:"knowledge_base_paths,omitempty"`
+	Path               string          `json:"path,omitempty"`
+	Paths              []string        `json:"paths,omitempty"`
+	Move               string          `json:"move,omitempty"`
+	Glob               string          `json:"glob,omitempty"`
+	Include            string          `json:"include,omitempty"`
+	Pattern            string          `json:"pattern,omitempty"`
+	Command            string          `json:"command,omitempty"`
+	Cwd                string          `json:"cwd,omitempty"`
+	Input              json.RawMessage `json:"input,omitempty"`
+	Diff               string          `json:"diff,omitempty"`
+	Action             string          `json:"action,omitempty"`
+	File               string          `json:"file,omitempty"`
+	NewName            string          `json:"new_name,omitempty"`
+	OutputPath         string          `json:"output_path,omitempty"`
+	IncludePaths       []string        `json:"include_paths,omitempty"`
+	KnowledgeBasePaths []string        `json:"knowledge_base_paths,omitempty"`
 }
 
 type ompToolDetails struct {
@@ -67,6 +64,7 @@ type ompToolDetails struct {
 	ScopePath              string    `json:"scopePath,omitempty"`
 	DisplayTarget          string    `json:"displayTarget,omitempty"`
 	MediaPath              string    `json:"mediaPath,omitempty"`
+	ImagePaths             []string  `json:"imagePaths,omitempty"`
 	DisplayReadTargets     []string  `json:"displayReadTargets,omitempty"`
 	DisplayReadTargetLinks []*string `json:"displayReadTargetLinks,omitempty"`
 	TouchesNoFiles         bool      `json:"touchesNoFiles,omitempty"`
@@ -82,7 +80,8 @@ type ompToolDetails struct {
 // ompToolCallReachPaths extracts filesystem paths reached by a tool call's arguments
 // without consulting the uploader's live shell environment, matching terma-omp.ts.
 func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string) []string {
-	if toolName == "eval" || toolName == "debug" {
+	switch toolName {
+	case "eval", "debug", "browser", "computer", "run_code", "python":
 		return []string{hookrun.UnknownReach + "\x00" + toolName}
 	}
 	if len(rawArgs) == 0 {
@@ -91,7 +90,7 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 	var in ompToolInput
 	if json.Unmarshal(rawArgs, &in) != nil {
 		switch toolName {
-		case "read", "grep", "search", "ast_grep", "ast_edit", "find", "glob", "ls", "lsp", "security_scan", "bash", "write", "edit", "apply_patch":
+		case "read", "grep", "search", "ast_grep", "ast_edit", "find", "glob", "ls", "lsp", "security_scan", "generate_image", "tts", "bash", "write", "edit", "apply_patch":
 			return []string{hookrun.UnknownReach + "\x00" + toolName}
 		}
 		return nil
@@ -113,6 +112,11 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 			p, unknown := resolveReachPath(p)
 			if unknown {
 				out = append(out, hookrun.UnknownReach+"\x00"+p)
+				return
+			}
+			// Leading '!' entries are OMP exclusion filters (e.g. "!vendor"), not search roots;
+			// skip them unless a literal entry of that name exists on disk so cwd is still scanned.
+			if strings.HasPrefix(p, "!") && !statReachExists(p, cwd) {
 				return
 			}
 			if p != "" {
@@ -143,16 +147,18 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 			addAlone(seg)
 		}
 	}
-	searchWithGlobs := func(rawGlob string) {
+	searchWithGlobs := func(rawGlobs ...string) {
 		var globs []string
-		for _, part := range splitTopLevel(strings.TrimSpace(normalizeUnicodeSpaces(rawGlob)), false, false) {
-			resolved, unknown := resolveReachPath(part)
-			if unknown {
-				out = append(out, hookrun.UnknownReach+"\x00"+part)
-				continue
-			}
-			if resolved != "" {
-				globs = append(globs, resolved)
+		for _, rawGlob := range rawGlobs {
+			for _, part := range splitTopLevel(strings.TrimSpace(normalizeUnicodeSpaces(rawGlob)), false, false) {
+				resolved, unknown := resolveReachPath(part)
+				if unknown {
+					out = append(out, hookrun.UnknownReach+"\x00"+part)
+					continue
+				}
+				if resolved != "" {
+					globs = append(globs, strings.ReplaceAll(resolved, `\`, "/"))
+				}
 			}
 		}
 		for _, d := range searchDirs() {
@@ -178,9 +184,9 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 			addDelimited(p)
 		}
 	case "grep", "search", "ast_grep", "ast_edit":
-		searchWithGlobs(cmp.Or(in.Glob, in.Include))
+		searchWithGlobs(in.Glob, in.Include)
 	case "find", "glob":
-		searchWithGlobs(cmp.Or(in.Pattern, in.Glob))
+		searchWithGlobs(in.Pattern, in.Glob)
 	case "ls":
 		addAlone(in.Path)
 	case "lsp":
@@ -195,6 +201,21 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 		for _, p := range in.KnowledgeBasePaths {
 			addDelimited(p)
 		}
+	case "generate_image":
+		if len(in.Input) > 0 && string(in.Input) != "null" {
+			var imgs []struct {
+				Path string `json:"path,omitempty"`
+			}
+			if json.Unmarshal(in.Input, &imgs) != nil {
+				out = append(out, hookrun.UnknownReach+"\x00generate_image")
+			} else {
+				for _, img := range imgs {
+					addAlone(img.Path)
+				}
+			}
+		}
+	case "tts":
+		addAlone(in.OutputPath)
 	case "bash":
 		dir := cwd
 		if raw := strings.TrimSpace(in.Cwd); raw != "" {
@@ -221,7 +242,11 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 		for _, p := range in.Paths {
 			addAlone(p)
 		}
-		for _, patch := range []string{in.Input, in.Diff} {
+		var inputStr string
+		if len(in.Input) > 0 {
+			_ = json.Unmarshal(in.Input, &inputStr)
+		}
+		for _, patch := range []string{inputStr, in.Diff} {
 			if patch == "" {
 				continue
 			}
@@ -299,45 +324,6 @@ func translateWindowsDriveOnLinux(p string) (string, bool) {
 	return p, true
 }
 
-// isOmpChangesJournal reports whether path is OMP's non-session commit/selective change
-// journal (<session-stem>/changes.jsonl). It requires the exact lowercase filename on
-// case-sensitive OSes and checks the leading 512 bytes so a task subagent named Changes
-// (or any session transcript) is never exempted while oversized journal lines still match.
-func isOmpChangesJournal(path, name string) bool {
-	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
-		if !strings.EqualFold(name, "changes.jsonl") {
-			return false
-		}
-	} else if name != "changes.jsonl" {
-		return false
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		return false
-	}
-	defer func() { _ = f.Close() }()
-	var buf [512]byte
-	n, err := f.Read(buf[:])
-	if err != nil && !errors.Is(err, io.EOF) {
-		return false
-	}
-	head := bytes.TrimSpace(buf[:n])
-	if len(head) == 0 {
-		return true
-	}
-	if nl := bytes.IndexByte(head, '\n'); nl >= 0 {
-		head = bytes.TrimSpace(head[:nl])
-	}
-	var kind struct {
-		Type string `json:"type"`
-	}
-	if json.Unmarshal(head, &kind) == nil && kind.Type != "" {
-		return kind.Type == "change" || kind.Type == "commit"
-	}
-	return bytes.Contains(head, []byte(`"type":"change"`)) || bytes.Contains(head, []byte(`"type": "change"`)) ||
-		bytes.Contains(head, []byte(`"type":"commit"`)) || bytes.Contains(head, []byte(`"type": "commit"`))
-}
-
 // ompToolResultReachPaths extracts any resolved paths disclosed in a tool result's details.
 func ompToolResultReachPaths(toolName string, d *ompToolDetails, cwd string) []string {
 	if d == nil {
@@ -392,6 +378,10 @@ func ompToolResultReachPaths(toolName string, d *ompToolDetails, cwd string) []s
 	case "ast_edit", "ast_grep":
 		add(d.ScopePath)
 		add(d.Path)
+	case "generate_image":
+		for _, p := range d.ImagePaths {
+			add(p)
+		}
 	case "bash":
 		add(d.Cwd)
 	}

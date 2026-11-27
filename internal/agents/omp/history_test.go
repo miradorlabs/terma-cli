@@ -1001,6 +1001,39 @@ func TestOmpEvalFailClosedAndEmbeddedSearchGlobs(t *testing.T) {
 	if isOmpChangesJournal(sessionNamedChanges, "changes.jsonl") {
 		t.Errorf("session transcript starting with type=session must never be treated as changes.jsonl journal")
 	}
+	emptyChanges := filepath.Join(cwd, "empty-dir", "changes.jsonl")
+	if err := os.MkdirAll(filepath.Dir(emptyChanges), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(emptyChanges, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if isOmpChangesJournal(emptyChanges, "changes.jsonl") {
+		t.Errorf("empty 0-byte changes.jsonl must not be exempted")
+	}
+
+	// 4. Round 8 fixes: !negation path fallback to cwd, generate_image input[].path,
+	// backslash normalization in glob.pattern, browser/computer/tts, and /tan bare parentSession ID.
+	if got := ompToolCallReachPaths("grep", json.RawMessage(`{"pattern":"secret","path":"!vendor"}`), cwd); !slices.Contains(got, cwd) {
+		t.Errorf("grep path=!vendor = %v, want fallback to cwd %q", got, cwd)
+	}
+	if got := ompToolCallReachPaths("glob", json.RawMessage(`{"pattern":"..\\org-b\\*.txt"}`), cwd); !slices.Contains(got, wantRelB) {
+		t.Errorf("glob pattern=..\\org-b\\*.txt = %v, want %q", got, wantRelB)
+	}
+	if got := ompToolCallReachPaths("generate_image", json.RawMessage(`{"subject":"edit","input":[{"path":"/work/org-b/ref.png"}]}`), cwd); !slices.ContainsFunc(got, func(s string) bool { return strings.HasSuffix(s, "/work/org-b/ref.png") }) {
+		t.Errorf("generate_image input[].path = %v, want /work/org-b/ref.png", got)
+	}
+	if got := ompToolCallReachPaths("tts", json.RawMessage(`{"output_path":"/work/org-b/out.mp3"}`), cwd); !slices.ContainsFunc(got, func(s string) bool { return strings.HasSuffix(s, "/work/org-b/out.mp3") }) {
+		t.Errorf("tts output_path = %v, want /work/org-b/out.mp3", got)
+	}
+	for _, tool := range []string{"browser", "computer", "run_code", "python"} {
+		if got := ompToolCallReachPaths(tool, json.RawMessage(`{}`), cwd); !hasUnknown(got) {
+			t.Errorf("%s should fail closed with UnknownReach, got %v", tool, got)
+		}
+	}
+	if !matchesParentSession(filepath.Join(cwd, "p", "tan-1.jsonl"), filepath.Join(cwd, "p.jsonl"), "parent-123", "parent-123", false) {
+		t.Errorf("matchesParentSession should match bare parent session ID for /tan children")
+	}
 }
 
 func mustJSON(v any) string {

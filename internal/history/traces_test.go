@@ -1462,6 +1462,45 @@ func TestUploadOmpEvalAndEmbeddedPathGlobs(t *testing.T) {
 		}
 	}
 
+	// 5. Round 8 blockers end-to-end: /tan child storing bare parent session ID in header.parentSession,
+	// grep path="!vendor" searching wsRoot (catching nested Org B), generate_image input[].path,
+	// and glob pattern with backslash traversal on Linux/WSL.
+	writeAged("2026-11-23T03-00-00-000Z_s-tan-parent.jsonl", strings.Join([]string{
+		`{"type":"session","version":3,"id":"s-tan-parent","timestamp":"2026-11-23T03:00:00Z","cwd":` + mustJSONTest(repoA) + `}`,
+		`{"type":"message","id":"tu1","timestamp":"2026-11-23T03:00:01Z","message":{"role":"user","content":"run /tan","timestamp":1795402801000}}`,
+		`{"type":"message","id":"ta1","timestamp":"2026-11-23T03:00:05Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","duration":100,"timestamp":1795402804900,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"LEAKED-TAN-PARENT-REPLY"}]}}`,
+	}, "\n")+"\n")
+	tanSubDir := filepath.Join(projDir, "2026-11-23T03-00-00-000Z_s-tan-parent")
+	if err := os.MkdirAll(tanSubDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	tanChild := filepath.Join(tanSubDir, "tan-1.jsonl")
+	if err := os.WriteFile(tanChild, []byte(strings.Join([]string{
+		`{"type":"session","version":3,"id":"s-tan-child","timestamp":"2026-11-23T03:00:02Z","cwd":` + mustJSONTest(repoA) + `,"parentSession":"s-tan-parent"}`,
+		`{"type":"message","id":"tca1","timestamp":"2026-11-23T03:00:03Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","duration":100,"timestamp":1795402802900,"usage":{"input":5,"output":5},"content":[{"type":"toolCall","id":"tcr1","name":"read","arguments":{"path":` + mustJSONTest(filepath.Join(repoB, "secret.txt")) + `}}]}}`,
+	}, "\n")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(tanChild, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
+
+	writeAged("2026-11-23T02-30-00-000Z_s-neg-grep.jsonl", makeGrep("s-neg-grep", wsRoot, "!vendor", "LEAKED-NEG-GREP"))
+
+	writeAged("2026-11-23T02-00-00-000Z_s-gen-img.jsonl", strings.Join([]string{
+		`{"type":"session","version":3,"id":"s-gen-img","timestamp":"2026-11-23T02:00:00Z","cwd":` + mustJSONTest(repoA) + `}`,
+		`{"type":"message","id":"giu1","timestamp":"2026-11-23T02:00:01Z","message":{"role":"user","content":"edit img","timestamp":1795399201000}}`,
+		`{"type":"message","id":"gia1","timestamp":"2026-11-23T02:00:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","duration":100,"timestamp":1795399201900,"usage":{"input":5,"output":5},"content":[{"type":"toolCall","id":"gi1","name":"generate_image","arguments":{"subject":"edit","input":[{"path":` + mustJSONTest(filepath.Join(repoB, "secret.txt")) + `}]}}]}}`,
+		`{"type":"message","id":"gitr1","timestamp":"2026-11-23T02:00:03Z","message":{"role":"toolResult","toolCallId":"gi1","toolName":"generate_image","content":[{"type":"text","text":"LEAKED-GEN-IMAGE"}],"isError":false,"timestamp":1795399203000}}`,
+	}, "\n")+"\n")
+
+	writeAged("2026-11-23T01-30-00-000Z_s-bs-pattern.jsonl", strings.Join([]string{
+		`{"type":"session","version":3,"id":"s-bs-pattern","timestamp":"2026-11-23T01:30:00Z","cwd":` + mustJSONTest(repoA) + `}`,
+		`{"type":"message","id":"bpu1","timestamp":"2026-11-23T01:30:01Z","message":{"role":"user","content":"glob bs","timestamp":1795397401000}}`,
+		`{"type":"message","id":"bpa1","timestamp":"2026-11-23T01:30:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","duration":100,"timestamp":1795397401900,"usage":{"input":5,"output":5},"content":[{"type":"toolCall","id":"bp1","name":"glob","arguments":{"pattern":"..\\org-b\\*.txt"}}]}}`,
+		`{"type":"message","id":"bptr1","timestamp":"2026-11-23T01:30:03Z","message":{"role":"toolResult","toolCallId":"bp1","toolName":"glob","content":[{"type":"text","text":"LEAKED-BS-PATTERN"}],"isError":false,"timestamp":1795397403000}}`,
+	}, "\n")+"\n")
+
 	stA := singleTeamRoutingState(now, "acc1", "org-a", "team-a", "github.com/org-a/repo-a", true, true)
 	stB := singleTeamRoutingState(now, "acc1", "org-b", "team-b", "github.com/org-b/repo-b", true, true)
 	stP := singleTeamRoutingState(now, "acc1", "org-personal", "team-personal", "", true, true)

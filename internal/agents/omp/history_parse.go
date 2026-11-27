@@ -184,7 +184,7 @@ func (p *ompHistoryParser) handleSessionHeader(rec *ompLine, ts time.Time) error
 	if !ts.IsZero() {
 		p.headerTime = ts
 	}
-	if !p.subagent && (strings.TrimSpace(rec.ParentSession) != "" || strings.TrimSpace(rec.ContinuationOf) != "") {
+	if strings.TrimSpace(rec.ParentSession) != "" || strings.TrimSpace(rec.ContinuationOf) != "" {
 		p.copiedFromParent = true
 	}
 	if t := strings.TrimSpace(rec.Title); t != "" {

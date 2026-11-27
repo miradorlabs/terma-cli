@@ -113,20 +113,10 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 				stem := strings.TrimSuffix(ent.Name(), ".jsonl")
 				topStems[stem] = true
 				modTime := info.ModTime()
-				subDir := filepath.Join(projPath, stem)
-				extras, watchDirs, seenWatch, extraMod, subErr := findOmpSubagents(ctx, mainPath, subDir)
-				if extraMod.After(modTime) {
-					modTime = extraMod
-				}
-				active := now.Sub(modTime) < activeWindow
-				outside := !opts.Since.IsZero() && modTime.Before(opts.Since)
 				sid := ompSessionIDFromFilename(ent.Name())
 				var parentID string
 				var oneWayCutoff time.Time
 				hdr, peekErr := peekOmpSessionHeader(mainPath)
-				if peekErr != nil && !errors.Is(peekErr, fs.ErrNotExist) && subErr == "" {
-					subErr = mainPath
-				}
 				if hdr.Type == "session" {
 					if !session.ValidID(sid) && session.ValidID(hdr.ID) {
 						sid = hdr.ID
@@ -139,6 +129,16 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 				if !session.ValidID(sid) {
 					continue
 				}
+				subDir := filepath.Join(projPath, stem)
+				extras, watchDirs, seenWatch, extraMod, subErr := findOmpSubagents(ctx, mainPath, sid, subDir)
+				if peekErr != nil && !errors.Is(peekErr, fs.ErrNotExist) && subErr == "" {
+					subErr = mainPath
+				}
+				if extraMod.After(modTime) {
+					modTime = extraMod
+				}
+				active := now.Sub(modTime) < activeWindow
+				outside := !opts.Since.IsZero() && modTime.Before(opts.Since)
 				addFile(agents.HistoryFile{
 					SourceSystem:       ompSourceSystem,
 					SessionID:          sid,
@@ -203,10 +203,10 @@ type ompSessionHeader struct {
 // whose header's parentSession points to parentPath, returning them sorted parent-before-child,
 // every watched directory, any non-matching .jsonl files already present in those directories,
 // the latest modification time, and the first unreadable path if any.
-func findOmpSubagents(ctx context.Context, parentPath, stemDir string) (paths, watchDirs, seenWatch []string, latest time.Time, readErr string) {
+func findOmpSubagents(ctx context.Context, parentPath, parentID, stemDir string) (paths, watchDirs, seenWatch []string, latest time.Time, readErr string) {
 	watchDirs = []string{stemDir}
-	var walk func(curParent, curDir string, depth int)
-	walk = func(curParent, curDir string, depth int) {
+	var walk func(curParent, curParentID, curDir string, depth int)
+	walk = func(curParent, curParentID, curDir string, depth int) {
 		if depth > 8 || ctx.Err() != nil {
 			return
 		}
@@ -253,7 +253,7 @@ func findOmpSubagents(ctx context.Context, parentPath, stemDir string) (paths, w
 				// treats a freshly-started subagent transcript as active.
 				continue
 			}
-			if !sameParentSessionPath(subPath, curParent, hdr.ParentSession, runtime.GOOS == "windows") {
+			if !matchesParentSession(subPath, curParent, curParentID, hdr.ParentSession, runtime.GOOS == "windows") {
 				seenWatch = append(seenWatch, subPath)
 				continue
 			}
@@ -264,7 +264,7 @@ func findOmpSubagents(ctx context.Context, parentPath, stemDir string) (paths, w
 			nestedDir := strings.TrimSuffix(subPath, ".jsonl")
 			watchDirs = append(watchDirs, nestedDir)
 			if depth < 8 {
-				walk(subPath, nestedDir, depth+1)
+				walk(subPath, hdr.ID, nestedDir, depth+1)
 			} else if info, err := os.Stat(nestedDir); (err == nil && info.IsDir() && dirHasJSONLOrErr(ctx, nestedDir, 0)) || (err != nil && !errors.Is(err, fs.ErrNotExist)) {
 				if readErr == "" {
 					readErr = nestedDir
@@ -286,7 +286,7 @@ func findOmpSubagents(ctx context.Context, parentPath, stemDir string) (paths, w
 			}
 		}
 	}
-	walk(parentPath, stemDir, 0)
+	walk(parentPath, parentID, stemDir, 0)
 	sortPathsParentFirst(paths)
 	slices.Sort(watchDirs)
 	watchDirs = slices.Compact(watchDirs)
@@ -317,7 +317,7 @@ func findOrphanOmpSubagents(ctx context.Context, expectedParent, dir, missingPar
 		if err != nil || hdr.Type != "session" || !session.ValidID(hdr.ID) {
 			continue
 		}
-		if !sameParentSessionPath(subPath, expectedParent, hdr.ParentSession, runtime.GOOS == "windows") {
+		if !matchesParentSession(subPath, expectedParent, missingParentID, hdr.ParentSession, runtime.GOOS == "windows") {
 			continue
 		}
 		modTime := info.ModTime()
@@ -376,7 +376,7 @@ func (Agent) ReadHistory(ctx context.Context, file agents.HistoryFile, opts agen
 	isSubagent := false
 	if file.ParentSessionID != "" {
 		if hdr, err := peekOmpSessionHeader(file.Path); err == nil && hdr.Type == "session" &&
-			sameParentSessionPath(file.Path, filepath.Dir(file.Path)+".jsonl", hdr.ParentSession, runtime.GOOS == "windows") {
+			matchesParentSession(file.Path, filepath.Dir(file.Path)+".jsonl", file.ParentSessionID, hdr.ParentSession, runtime.GOOS == "windows") {
 			isSubagent = true
 		}
 	}
