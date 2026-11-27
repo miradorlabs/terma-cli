@@ -56,6 +56,7 @@ type pkg struct {
 	Dir                       string
 	GoFiles, TestGoFiles      []string
 	XTestGoFiles              []string
+	IgnoredGoFiles            []string
 	Imports, Deps             []string
 	TestImports, XTestImports []string
 }

@@ -239,3 +239,6 @@ combined outbox/spool losses.
   out): like a hook entry it only calls terma, and holds no endpoint or token. What a developer collects is decided
   by `routing.Router.Route` over the profile's `routing.State` and each selected team's collection policy.
 - Help text never mentions the hidden `dev` and `local` environments.
+- `TERMA_POLICY_STUB`, the offline policy tests and the hook bench use, is read only by a
+  build without the `release` build tag; goreleaser builds every release with it, which
+  `internal/boundary` checks.
