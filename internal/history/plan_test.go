@@ -448,7 +448,7 @@ func TestUploadTeamBlockedAtDiscoveryEmitsRouteBlocked(t *testing.T) {
 		blocked[0].Skipped != 2 || blocked[0].SkipReason != SkipTeamBlockedPrefix+string(routing.Suspended) {
 		t.Fatalf("blocked events = %+v, want one team-a event with 2 skipped", blocked)
 	}
-	if !(discoverIdx < blockedIdx && blockedIdx < planIdx) {
+	if discoverIdx >= blockedIdx || blockedIdx >= planIdx {
 		t.Fatalf("order discover=%d blocked=%d plan=%d, want discover < blocked < plan", discoverIdx, blockedIdx, planIdx)
 	}
 	if len(sum.TeamIssues) != 0 {
@@ -526,4 +526,3 @@ func TestUploadSignInLostPaths(t *testing.T) {
 		}
 	})
 }
-

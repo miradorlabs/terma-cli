@@ -833,4 +833,3 @@ func TestHistoryUploadJSONStreamSplitTranscript(t *testing.T) {
 		t.Errorf("summary = %+v, want 2 sent_sessions and %v sent_bytes", sum, sentBytes)
 	}
 }
-
