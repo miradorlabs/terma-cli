@@ -1047,6 +1047,40 @@ func TestOmpCouncilR4FileURLSelectorsMissingIntermediateAndPostForkParent(t *tes
 		`{"type":"message","id":"sa2","timestamp":"2026-11-23T04:00:04Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"stop","timestamp":1795406404000,"usage":{"input":5,"output":5},"content":[{"type":"text","text":"CLEAN-SPACED-FILE-IN-REPO-A"}]}}`,
 	}, "\n")+"\n")
 
+	// 8. Round 6 blockers end-to-end: ast_edit preview on repoB, semicolon-split glob.pattern,
+	// Windows drive path on Linux, and @../ relative traversal all trigger Mixed cutoff.
+	writeSess("2026-11-23T03-00-00-000Z_s-ast-edit.jsonl", strings.Join([]string{
+		`{"type":"session","version":3,"id":"s-ast-edit","timestamp":"2026-11-23T03:00:00Z","cwd":` + mustJSONTest(repoA) + `}`,
+		`{"type":"message","id":"aeu1","timestamp":"2026-11-23T03:00:01Z","message":{"role":"user","content":"ast edit","timestamp":1795402801000}}`,
+		`{"type":"message","id":"aea1","timestamp":"2026-11-23T03:00:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","duration":100,"timestamp":1795402801900,"usage":{"input":5,"output":5},"content":[{"type":"toolCall","id":"ae1","name":"ast_edit","arguments":{"ops":[{"pat":"x","out":"y"}],"paths":[` + mustJSONTest(filepath.Join(repoB, "b.txt")) + `]}}]}}`,
+		`{"type":"message","id":"aetr1","timestamp":"2026-11-23T03:00:03Z","message":{"role":"toolResult","toolCallId":"ae1","toolName":"ast_edit","content":[{"type":"text","text":"LEAKED-AST-EDIT-DIFF"}],"isError":false,"timestamp":1795402803000}}`,
+	}, "\n")+"\n")
+
+	writeSess("2026-11-23T02-00-00-000Z_s-glob-semi.jsonl", strings.Join([]string{
+		`{"type":"session","version":3,"id":"s-glob-semi","timestamp":"2026-11-23T02:00:00Z","cwd":` + mustJSONTest(repoA) + `}`,
+		`{"type":"message","id":"gsu1","timestamp":"2026-11-23T02:00:01Z","message":{"role":"user","content":"glob semi","timestamp":1795399201000}}`,
+		`{"type":"message","id":"gsa1","timestamp":"2026-11-23T02:00:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","duration":100,"timestamp":1795399201900,"usage":{"input":5,"output":5},"content":[{"type":"toolCall","id":"gs1","name":"glob","arguments":{"pattern":` + mustJSONTest("*.go;"+filepath.Join(repoB, "*.txt")) + `}}]}}`,
+		`{"type":"message","id":"gstr1","timestamp":"2026-11-23T02:00:03Z","message":{"role":"toolResult","toolCallId":"gs1","toolName":"glob","content":[{"type":"text","text":"LEAKED-GLOB-SEMI"}],"isError":false,"timestamp":1795399203000}}`,
+	}, "\n")+"\n")
+
+	writeSess("2026-11-23T01-00-00-000Z_s-win-drive.jsonl", strings.Join([]string{
+		`{"type":"session","version":3,"id":"s-win-drive","timestamp":"2026-11-23T01:00:00Z","cwd":` + mustJSONTest(repoA) + `}`,
+		`{"type":"message","id":"wdu1","timestamp":"2026-11-23T01:00:01Z","message":{"role":"user","content":"win drive","timestamp":1795395601000}}`,
+		`{"type":"message","id":"wda1","timestamp":"2026-11-23T01:00:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","duration":100,"timestamp":1795395601900,"usage":{"input":5,"output":5},"content":[{"type":"toolCall","id":"wd1","name":"grep","arguments":{"pattern":"x","path":"C:/work/org-b/file.ts"}}]}}`,
+		`{"type":"message","id":"wdtr1","timestamp":"2026-11-23T01:00:03Z","message":{"role":"toolResult","toolCallId":"wd1","toolName":"grep","content":[{"type":"text","text":"LEAKED-WIN-DRIVE"}],"isError":false,"timestamp":1795395603000}}`,
+	}, "\n")+"\n")
+
+	relToB, relErr := filepath.Rel(repoA, filepath.Join(repoB, "b.txt"))
+	if relErr != nil {
+		t.Fatal(relErr)
+	}
+	writeSess("2026-11-23T00-30-00-000Z_s-at-rel.jsonl", strings.Join([]string{
+		`{"type":"session","version":3,"id":"s-at-rel","timestamp":"2026-11-23T00:30:00Z","cwd":` + mustJSONTest(repoA) + `}`,
+		`{"type":"message","id":"aru1","timestamp":"2026-11-23T00:30:01Z","message":{"role":"user","content":"at rel","timestamp":1795393801000}}`,
+		`{"type":"message","id":"ara1","timestamp":"2026-11-23T00:30:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","duration":100,"timestamp":1795393801900,"usage":{"input":5,"output":5},"content":[{"type":"toolCall","id":"ar1","name":"grep","arguments":{"pattern":"x","path":` + mustJSONTest("@"+filepath.ToSlash(relToB)) + `}}]}}`,
+		`{"type":"message","id":"artr1","timestamp":"2026-11-23T00:30:03Z","message":{"role":"toolResult","toolCallId":"ar1","toolName":"grep","content":[{"type":"text","text":"LEAKED-AT-REL"}],"isError":false,"timestamp":1795393803000}}`,
+	}, "\n")+"\n")
+
 	stA := singleTeamRoutingState(now, "acc1", "org-a", "team-a", "github.com/org-a/repo-a", true, true)
 	stB := singleTeamRoutingState(now, "acc1", "org-b", "team-b", "github.com/org-b/repo-b", true, true)
 	st := stA

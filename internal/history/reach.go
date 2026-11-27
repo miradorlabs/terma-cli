@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -304,6 +305,9 @@ func reachCrosses(tr agents.HistoryToolReach, baseRoot, goneRoot string, bases [
 		return true
 	}
 	for _, p := range expanded {
+		if runtime.GOOS != "windows" && isForeignWindowsPath(p) {
+			return true
+		}
 		if !filepath.IsAbs(p) && tr.Cwd != "" {
 			p = filepath.Join(tr.Cwd, p)
 		}
@@ -333,6 +337,15 @@ func reachCrosses(tr agents.HistoryToolReach, baseRoot, goneRoot string, bases [
 		}
 	}
 	return false
+}
+
+// isForeignWindowsPath reports whether p is a Windows drive or UNC path on a non-Windows
+// host so reachCrosses fails closed instead of joining C:/... under a POSIX cwd.
+func isForeignWindowsPath(p string) bool {
+	if strings.HasPrefix(p, `\\`) {
+		return true
+	}
+	return len(p) >= 2 && ((p[0] >= 'A' && p[0] <= 'Z') || (p[0] >= 'a' && p[0] <= 'z')) && p[1] == ':' && (len(p) == 2 || p[2] == '/' || p[2] == '\\')
 }
 
 // pathUnder reports whether path is root or lies below it, by name alone.

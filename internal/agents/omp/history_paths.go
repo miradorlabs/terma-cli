@@ -12,16 +12,22 @@ import (
 	"runtime"
 	"slices"
 	"strings"
-	"unicode"
 
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
 var (
-	ompInternalURLRe = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*://`)
-	ompStrayColonRe  = regexp.MustCompile(`^:(?:[/\\~]|\.\.?[/\\]|[A-Za-z]:)`)
-	ompLineRangeRe   = regexp.MustCompile(`(?i)(?::(?:(?:\d+(?:(?:-|\+)\d+)?|-\d+)(?:,(?:\d+(?:(?:-|\+)\d+)?|-\d+))*|raw|conflicts|img)|#L?\d+(?:-L?\d+)?)$`)
+	ompInternalURLRe      = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*://`)
+	ompStrayColonTargetRe = regexp.MustCompile(`^(?:[/\\~]|\.\.?[/\\]|[A-Za-z]:)`)
+	ompLineRangeRe        = regexp.MustCompile(`(?i)(?::(?:(?:\d+(?:(?:-|\+)\d+)?|-\d+)(?:,(?:\d+(?:(?:-|\+)\d+)?|-\d+))*|raw|conflicts|img)|#L?\d+(?:-L?\d+)?)$`)
 )
+
+func stripOuterDoubleQuotes(p string) string {
+	if len(p) >= 2 && p[0] == '"' && p[len(p)-1] == '"' {
+		return strings.TrimSpace(p[1 : len(p)-1])
+	}
+	return p
+}
 
 func normalizeUnicodeSpaces(s string) string {
 	return strings.Map(func(r rune) rune {
@@ -46,23 +52,24 @@ func stripWindowsExtendedPrefix(p string) string {
 
 // normalizeOmpPath mirrors OMP's expandPath / normalizeAtPrefix / stripOuterDoubleQuotes
 // before URL decoding and tilde expansion: Unicode spaces, outer double quotes, stray leading
-// ':' before a path root, leading '@' shorthands (@/..., @~/..., @C:\..., @\\..., @scheme://...),
-// and Windows extended-length prefixes (\\?\).
+// ':' before a path root, leading '@' shorthands (@/..., @~/..., @../..., @./..., @C:\...,
+// @\\..., @scheme://...), and Windows extended-length prefixes (\\?\).
 func normalizeOmpPath(raw string) string {
-	p := strings.TrimSpace(normalizeUnicodeSpaces(raw))
-	if len(p) >= 2 && p[0] == '"' && p[len(p)-1] == '"' {
-		p = strings.TrimSpace(p[1 : len(p)-1])
-	}
+	p := stripOuterDoubleQuotes(strings.TrimSpace(normalizeUnicodeSpaces(raw)))
 	if p == "" {
 		return ""
 	}
-	if ompStrayColonRe.MatchString(p) {
-		p = p[1:]
+	if strings.HasPrefix(p, ":") {
+		if rest := stripOuterDoubleQuotes(p[1:]); ompStrayColonTargetRe.MatchString(rest) {
+			p = rest
+		}
 	}
 	if strings.HasPrefix(p, "@") {
-		rest := p[1:]
+		rest := stripOuterDoubleQuotes(p[1:])
 		if strings.HasPrefix(rest, "/") || strings.HasPrefix(rest, `\`) ||
 			rest == "~" || strings.HasPrefix(rest, "~/") || strings.HasPrefix(rest, `~\`) ||
+			rest == ".." || strings.HasPrefix(rest, "../") || strings.HasPrefix(rest, `..\`) ||
+			strings.HasPrefix(rest, "./") || strings.HasPrefix(rest, `.\`) ||
 			isAbsToolPath(rest) || ompInternalURLRe.MatchString(rest) {
 			p = rest
 		}
@@ -119,37 +126,48 @@ func stripPathSelector(p string) string {
 	return p[:loc[0]]
 }
 
-// unwrapHashlinePath strips an optional [PATH] or [PATH#ABCD] hashline header wrapper,
-// matching adapter/omp/tool_trace.go's unwrapHashlinePath.
-func unwrapHashlinePath(p string) string {
-	inner, opened := strings.CutPrefix(strings.TrimRightFunc(p, unicode.IsSpace), "[")
-	inner, closed := strings.CutSuffix(inner, "]")
-	if !opened || !closed {
-		return p
-	}
-	if loc := ompHashlineTagRe.FindStringIndex(inner); loc != nil {
-		inner = inner[:loc[0]]
-	} else if strings.Contains(inner, "#") {
-		return p
-	}
-	return cmp.Or(inner, p)
+func isWindowsDrivePath(p string) bool {
+	return len(p) >= 2 && isASCIILetter(p[0]) && p[1] == ':' && (len(p) == 2 || p[2] == '\\' || p[2] == '/')
 }
 
 func isAbsToolPath(p string) bool {
-	if filepath.IsAbs(p) {
-		return true
+	return filepath.IsAbs(p) || (len(p) >= 3 && isWindowsDrivePath(p))
+}
+
+func translateWindowsDriveOnLinux(p string) (string, bool) {
+	if strings.HasPrefix(p, `\\`) {
+		return p, true
 	}
-	return len(p) >= 3 && isASCIILetter(p[0]) && p[1] == ':' && (p[2] == '\\' || p[2] == '/')
+	if !isWindowsDrivePath(p) {
+		return p, false
+	}
+	if os.Getenv("WSL_DISTRO_NAME") != "" || os.Getenv("WSL_INTEROP") != "" {
+		drive := strings.ToLower(p[:1])
+		mount := "/mnt/" + drive
+		if fi, err := os.Stat(mount); err == nil && fi.IsDir() {
+			rest := strings.TrimLeft(strings.ReplaceAll(p[2:], `\`, "/"), "/")
+			if rest == "" {
+				return mount, false
+			}
+			return mount + "/" + rest, false
+		}
+	}
+	return p, true
 }
 
 // resolveReachPath normalizes OMP path shorthands, decodes local file:// URLs, filters
-// internal URLs, and expands a leading ~ / ~/ / ~\ to the user's home directory so reach
-// classification never joins ~/... under the session cwd. An unexpandable ~ path or a
-// remote/malformed file:// URL returns unknown=true to fail closed.
+// internal URLs, translates or fails closed on Windows drive/UNC paths under Linux/WSL, and
+// expands a leading ~ / ~/ / ~\ to the user's home directory so reach classification never
+// joins ~/... under the session cwd.
 func resolveReachPath(raw string) (string, bool) {
 	p, unknown := decodeReachPath(raw)
 	if unknown || p == "" {
 		return p, unknown
+	}
+	if runtime.GOOS != "windows" {
+		if translated, unk := translateWindowsDriveOnLinux(p); unk || translated != p {
+			return translated, unk
+		}
 	}
 	if !strings.HasPrefix(p, "~") {
 		return p, false
@@ -170,9 +188,9 @@ func resolveReachPath(raw string) (string, bool) {
 // splitOmpDelimitedPaths mirrors OMP's splitDelimitedPathEntry while remaining fail-closed
 // after referenced files have been deleted: an existing literal path stays intact, otherwise
 // entries split on top-level ';' or ',' outside '{...}' braces. When a segment does not exist
-// on disk and has top-level whitespace, any live whitespace-split part confirms the split;
-// when disk state cannot disambiguate (all targets deleted), both the unsplit segment and its
-// whitespace-split parts are returned so no cross-org target is missed.
+// on disk and has top-level whitespace, live whitespace parts suppress the unsplit segment;
+// when none are live, a deleted path inside an existing spaced enclosing directory stays whole
+// unless a trailing token looks like an independent path root, otherwise both forms are kept.
 func splitOmpDelimitedPaths(entry, cwd string) []string {
 	entry = strings.TrimSpace(normalizeUnicodeSpaces(entry))
 	if entry == "" {
@@ -181,7 +199,7 @@ func splitOmpDelimitedPaths(entry, cwd string) []string {
 	if statReachExists(entry, cwd) {
 		return []string{entry}
 	}
-	primary := splitTopLevel(entry, false)
+	primary := splitTopLevel(entry, false, true)
 	if len(primary) == 0 {
 		return nil
 	}
@@ -196,13 +214,17 @@ func splitOmpDelimitedPaths(entry, cwd string) []string {
 			add(seg)
 			continue
 		}
-		if ws := splitTopLevel(seg, true); len(ws) >= 2 {
+		if ws := splitTopLevel(seg, true, true); len(ws) >= 2 {
 			anyLive := false
 			for _, w := range ws {
 				if statReachExists(w, cwd) {
 					anyLive = true
 					break
 				}
+			}
+			if !anyLive && spacedEnclosingDirExists(seg, ws[1:], cwd) {
+				add(seg)
+				continue
 			}
 			if !anyLive {
 				add(seg)
@@ -217,7 +239,33 @@ func splitOmpDelimitedPaths(entry, cwd string) []string {
 	return out
 }
 
-func splitTopLevel(s string, whitespace bool) []string {
+func spacedEnclosingDirExists(seg string, tailTokens []string, cwd string) bool {
+	for _, tok := range tailTokens {
+		p := normalizeOmpPath(tok)
+		if p == "~" || p == ".." || strings.HasPrefix(p, "/") || strings.HasPrefix(p, `\`) ||
+			strings.HasPrefix(p, "~/") || strings.HasPrefix(p, `~\`) ||
+			strings.HasPrefix(p, "../") || strings.HasPrefix(p, `..\`) ||
+			isWindowsDrivePath(p) || ompInternalURLRe.MatchString(p) {
+			return false
+		}
+	}
+	p, unknown := resolveReachPath(seg)
+	if unknown || p == "" {
+		return false
+	}
+	cand := stripPathSelector(p)
+	if !isAbsToolPath(cand) && cwd != "" {
+		cand = filepath.Join(cwd, cand)
+	}
+	dir := filepath.Dir(cand)
+	if !strings.ContainsAny(dir, " \t") {
+		return false
+	}
+	fi, err := os.Stat(dir)
+	return err == nil && fi.IsDir()
+}
+
+func splitTopLevel(s string, whitespace, comma bool) []string {
 	var parts []string
 	depth, start := 0, 0
 	for i := 0; i < len(s); i++ {
@@ -237,7 +285,7 @@ func splitTopLevel(s string, whitespace bool) []string {
 		if depth != 0 {
 			continue
 		}
-		sep := ch == ';' || ch == ',' || (whitespace && (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'))
+		sep := ch == ';' || (comma && ch == ',') || (whitespace && (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'))
 		if sep {
 			if seg := strings.TrimSpace(s[start:i]); seg != "" {
 				parts = append(parts, seg)

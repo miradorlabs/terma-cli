@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/miradorlabs/terma-cli/internal/agents/internal/applypatch"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
@@ -17,17 +18,39 @@ var (
 	ompHashlineTagRe = regexp.MustCompile(`#[0-9A-Fa-f]{4}$`)
 )
 
+// unwrapHashlinePath strips an optional [PATH] or [PATH#ABCD] hashline header wrapper,
+// matching adapter/omp/tool_trace.go's unwrapHashlinePath.
+func unwrapHashlinePath(p string) string {
+	inner, opened := strings.CutPrefix(strings.TrimRightFunc(p, unicode.IsSpace), "[")
+	inner, closed := strings.CutSuffix(inner, "]")
+	if !opened || !closed {
+		return p
+	}
+	if loc := ompHashlineTagRe.FindStringIndex(inner); loc != nil {
+		inner = inner[:loc[0]]
+	} else if strings.Contains(inner, "#") {
+		return p
+	}
+	return cmp.Or(inner, p)
+}
+
 type ompToolInput struct {
-	Path    string   `json:"path,omitempty"`
-	Paths   []string `json:"paths,omitempty"`
-	Move    string   `json:"move,omitempty"`
-	Glob    string   `json:"glob,omitempty"`
-	Include string   `json:"include,omitempty"`
-	Pattern string   `json:"pattern,omitempty"`
-	Command string   `json:"command,omitempty"`
-	Cwd     string   `json:"cwd,omitempty"`
-	Input   string   `json:"input,omitempty"`
-	Diff    string   `json:"diff,omitempty"`
+	Path               string   `json:"path,omitempty"`
+	Paths              []string `json:"paths,omitempty"`
+	Move               string   `json:"move,omitempty"`
+	Glob               string   `json:"glob,omitempty"`
+	Include            string   `json:"include,omitempty"`
+	Pattern            string   `json:"pattern,omitempty"`
+	Command            string   `json:"command,omitempty"`
+	Cwd                string   `json:"cwd,omitempty"`
+	Input              string   `json:"input,omitempty"`
+	Diff               string   `json:"diff,omitempty"`
+	Action             string   `json:"action,omitempty"`
+	File               string   `json:"file,omitempty"`
+	NewName            string   `json:"new_name,omitempty"`
+	Filename           string   `json:"filename,omitempty"`
+	IncludePaths       []string `json:"include_paths,omitempty"`
+	KnowledgeBasePaths []string `json:"knowledge_base_paths,omitempty"`
 }
 
 type ompToolDetails struct {
@@ -37,6 +60,7 @@ type ompToolDetails struct {
 	Move                   string    `json:"move,omitempty"`
 	SourcePath             string    `json:"sourcePath,omitempty"`
 	ResolvedPath           string    `json:"resolvedPath,omitempty"`
+	ScopePath              string    `json:"scopePath,omitempty"`
 	DisplayTarget          string    `json:"displayTarget,omitempty"`
 	MediaPath              string    `json:"mediaPath,omitempty"`
 	DisplayReadTargets     []string  `json:"displayReadTargets,omitempty"`
@@ -108,24 +132,56 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 			addAlone(seg)
 		}
 	}
+	searchWithGlobs := func(rawGlob string) {
+		var globs []string
+		for _, part := range splitTopLevel(strings.TrimSpace(normalizeUnicodeSpaces(rawGlob)), false, false) {
+			resolved, unknown := resolveReachPath(part)
+			if unknown {
+				out = append(out, hookrun.UnknownReach+"\x00"+part)
+				continue
+			}
+			if resolved != "" {
+				globs = append(globs, resolved)
+			}
+		}
+		for _, d := range searchDirs() {
+			out = append(out, hookrun.SearchHistorical(d, globs...)...)
+		}
+	}
 	switch toolName {
 	case "read":
 		addDelimited(in.Path)
 		for _, p := range in.Paths {
 			addDelimited(p)
 		}
-	case "grep", "ast_grep":
-		glob := cmp.Or(in.Glob, in.Include)
+	case "grep", "search", "ast_grep":
+		searchWithGlobs(cmp.Or(in.Glob, in.Include))
+	case "ast_edit":
 		for _, d := range searchDirs() {
-			out = append(out, hookrun.SearchHistorical(d, glob)...)
+			out = append(out, hookrun.SearchHistorical(d)...)
+			if strings.ContainsAny(d, "*?[{") && cwd != "" {
+				out = append(out, hookrun.SearchHistorical(cwd, d)...)
+			}
 		}
 	case "find", "glob":
-		glob := cmp.Or(in.Pattern, in.Glob)
-		for _, d := range searchDirs() {
-			out = append(out, hookrun.SearchHistorical(d, glob)...)
-		}
+		searchWithGlobs(cmp.Or(in.Pattern, in.Glob))
 	case "ls":
 		addAlone(in.Path)
+	case "lsp":
+		addAlone(in.File)
+		if in.Action == "rename_file" {
+			addAlone(in.NewName)
+		}
+	case "security_scan":
+		for _, p := range in.IncludePaths {
+			addDelimited(p)
+		}
+		for _, p := range in.KnowledgeBasePaths {
+			addDelimited(p)
+		}
+	case "eval":
+		addAlone(in.Filename)
+		addAlone(in.Cwd)
 	case "bash":
 		dir := cwd
 		if raw := strings.TrimSpace(in.Cwd); raw != "" {
@@ -147,8 +203,8 @@ func ompToolCallReachPaths(toolName string, rawArgs json.RawMessage, cwd string)
 	case "write":
 		addAlone(unwrapHashlinePath(in.Path))
 	case "edit", "apply_patch":
-		addAlone(in.Path)
-		addAlone(in.Move)
+		addAlone(unwrapHashlinePath(in.Path))
+		addAlone(unwrapHashlinePath(in.Move))
 		for _, p := range in.Paths {
 			addAlone(p)
 		}
@@ -218,6 +274,9 @@ func ompToolResultReachPaths(toolName string, d *ompToolDetails, cwd string) []s
 			add(r.Move)
 			add(r.SourcePath)
 		}
+	case "ast_edit", "ast_grep":
+		add(d.ScopePath)
+		add(d.Path)
 	case "bash":
 		add(d.Cwd)
 	}
@@ -247,7 +306,7 @@ func ompEditedFiles(toolName string, rawArgs json.RawMessage, d *ompToolDetails,
 		}
 		var in ompToolInput
 		if json.Unmarshal(rawArgs, &in) == nil {
-			add(nonURLPath(unwrapHashlinePath(in.Path)))
+			add(unwrapHashlinePath(in.Path))
 		}
 	case "edit", "apply_patch":
 		if d == nil {

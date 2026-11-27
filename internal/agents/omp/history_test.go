@@ -679,6 +679,136 @@ func TestOmpCouncilRegressionCases(t *testing.T) {
 	}
 }
 
+func TestOmpRound6SecurityRegressions(t *testing.T) {
+	dir := t.TempDir()
+
+	// 1. ast_edit, lsp, security_scan, eval tool reach extraction + semicolon-split glob.pattern.
+	astEditPaths := ompToolCallReachPaths("ast_edit", json.RawMessage(`{"ops":[{"pat":"a","out":"b"}],"paths":["/work/org-b/repo/a.ts","../../org-c/**/*.ts"]}`), "/work/org-a/repo")
+	if !slices.Contains(astEditPaths, "/work/org-b/repo/a.ts") {
+		t.Errorf("ast_edit missing /work/org-b/repo/a.ts: %v", astEditPaths)
+	}
+	if !slices.Contains(astEditPaths, "/work/org-c") {
+		t.Errorf("ast_edit glob path missing /work/org-c: %v", astEditPaths)
+	}
+	globPaths := ompToolCallReachPaths("glob", json.RawMessage(`{"pattern":"*.go;/work/org-b/*.ts"}`), "/work/org-a/repo")
+	if !slices.Contains(globPaths, "/work/org-b") {
+		t.Errorf("glob semicolon pattern missing /work/org-b: %v", globPaths)
+	}
+	lspPaths := ompToolCallReachPaths("lsp", json.RawMessage(`{"action":"rename_file","file":"/work/org-a/a.go","new_name":"/work/org-b/b.go"}`), "/work/org-a/repo")
+	if !slices.ContainsFunc(lspPaths, func(s string) bool { return strings.HasSuffix(s, "/work/org-b/b.go") }) {
+		t.Errorf("lsp rename_file missing destination reach: %v", lspPaths)
+	}
+	scanPaths := ompToolCallReachPaths("security_scan", json.RawMessage(`{"include_paths":["/work/org-b/src"]}`), "/work/org-a/repo")
+	if !slices.ContainsFunc(scanPaths, func(s string) bool { return strings.HasSuffix(s, "/work/org-b/src") }) {
+		t.Errorf("security_scan missing include_paths reach: %v", scanPaths)
+	}
+	evalPaths := ompToolCallReachPaths("eval", json.RawMessage(`{"filename":"/work/org-b/script.py"}`), "/work/org-a/repo")
+	if !slices.ContainsFunc(evalPaths, func(s string) bool { return strings.HasSuffix(s, "/work/org-b/script.py") }) {
+		t.Errorf("eval missing filename reach: %v", evalPaths)
+	}
+
+	// 2. @../, @./, @.., and quotes after @ / :.
+	for _, tc := range []struct{ in, want string }{
+		{"@../org-b/secret.txt", "../org-b/secret.txt"},
+		{"@./../org-b/secret.txt", "./../org-b/secret.txt"},
+		{"@..", ".."},
+		{`@"/work/org-b/secret.txt"`, "/work/org-b/secret.txt"},
+		{`:"/work/org-b/secret.txt"`, "/work/org-b/secret.txt"},
+		{"@scope/pkg", "@scope/pkg"},
+	} {
+		if got, unk := resolveReachPath(tc.in); unk || got != tc.want {
+			t.Errorf("resolveReachPath(%q) = (%q, %v), want (%q, false)", tc.in, got, unk, tc.want)
+		}
+	}
+
+	// 3. Windows drive / UNC paths fail closed on non-Windows hosts instead of joining under cwd.
+	if runtime.GOOS != "windows" {
+		t.Setenv("WSL_DISTRO_NAME", "")
+		t.Setenv("WSL_INTEROP", "")
+		for _, winPath := range []string{`C:/work/org-b/file.ts`, `C:\work\org-b\file.ts`, `\\server\share\file.ts`} {
+			if _, unk := resolveReachPath(winPath); !unk {
+				t.Errorf("resolveReachPath(%q) on %s should fail closed with unknown=true", winPath, runtime.GOOS)
+			}
+		}
+	}
+
+	// 4. Spaced enclosing directory keeps deleted absolute path whole while still splitting multi-target calls.
+	spacedRepo := filepath.Join(dir, "My Projects", "repo-a")
+	if err := os.MkdirAll(spacedRepo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	deletedInSpaced := filepath.Join(spacedRepo, "deleted.go")
+	if got := splitOmpDelimitedPaths(deletedInSpaced, spacedRepo); !slices.Equal(got, []string{deletedInSpaced}) {
+		t.Errorf("splitOmpDelimitedPaths(deleted in spaced dir) = %v, want [%q]", got, deletedInSpaced)
+	}
+	if got := splitOmpDelimitedPaths(deletedInSpaced+" /work/org-b/b.go", spacedRepo); !slices.Contains(got, "/work/org-b/b.go") {
+		t.Errorf("splitOmpDelimitedPaths(spaced + orgB) = %v, want /work/org-b/b.go", got)
+	}
+	if got := splitOmpDelimitedPaths("local.txt ~", spacedRepo); !slices.Contains(got, "~") {
+		t.Errorf("splitOmpDelimitedPaths(local.txt ~) = %v, want ~", got)
+	}
+
+	// 5. Oversized (> 1 MiB) session header returns an error from peekOmpSessionHeader and fails closed in DiscoverHistory.
+	agentDir := t.TempDir()
+	t.Setenv("PI_CODING_AGENT_DIR", agentDir)
+	projDir := filepath.Join(agentDir, "sessions", "--work-repo--")
+	if err := os.MkdirAll(projDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	bigPath := filepath.Join(projDir, "2026-11-23T10-00-00-000Z_s-big-hdr.jsonl")
+	bigHeader := `{"type":"session","version":3,"id":"s-big-hdr","timestamp":"2026-11-23T10:00:00Z","cwd":"/work/repo","parentSession":"parent-x","pad":"` + strings.Repeat("A", (1<<20)+64) + `"}` + "\n"
+	if err := os.WriteFile(bigPath, []byte(bigHeader), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := peekOmpSessionHeader(bigPath); err == nil {
+		t.Errorf("peekOmpSessionHeader should return error when 1 MiB cap is exhausted without session header")
+	}
+
+	// 6. Subagent recursion past depth 8 fails closed with CompanionReadError when a depth-9 .jsonl exists,
+	// while a depth-8 leaf without deeper transcripts stays clean.
+	writeChain := func(rootName, rootID string, totalDepth int) {
+		parentPath := filepath.Join(projDir, rootName+".jsonl")
+		if err := os.WriteFile(parentPath, []byte(`{"type":"session","version":3,"id":"`+rootID+`","timestamp":"2026-11-23T10:00:00Z","cwd":"/work/repo"}`+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		curDir := filepath.Join(projDir, rootName)
+		curParent := parentPath
+		for d := 0; d < totalDepth; d++ {
+			if err := os.MkdirAll(curDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			subStem := "0-sub"
+			subPath := filepath.Join(curDir, subStem+".jsonl")
+			hdr := `{"type":"session","version":3,"id":"` + rootID + `-d` + string(rune('0'+d)) + `","timestamp":"2026-11-23T10:00:01Z","cwd":"/work/repo","parentSession":` + mustJSON(curParent) + `}` + "\n"
+			if err := os.WriteFile(subPath, []byte(hdr), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			curParent = subPath
+			curDir = filepath.Join(curDir, subStem)
+		}
+	}
+	writeChain("2026-11-23T10-00-00-000Z_s-depth8", "s-depth8", 9)  // depth 0..8 leaves (clean)
+	writeChain("2026-11-23T10-00-00-000Z_s-depth9", "s-depth9", 10) // has depth 9 beyond cap (fail closed)
+
+	files, err := (Agent{}).DiscoverHistory(context.Background(), agents.HistoryDiscoverOptions{Now: time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	byID := map[string]agents.HistoryFile{}
+	for _, f := range files {
+		byID[f.SessionID] = f
+	}
+	if byID["s-big-hdr"].CompanionReadError == "" {
+		t.Errorf("oversized header session should set CompanionReadError")
+	}
+	if byID["s-depth8"].CompanionReadError != "" {
+		t.Errorf("depth-8 leaf session should not set CompanionReadError, got %q", byID["s-depth8"].CompanionReadError)
+	}
+	if byID["s-depth9"].CompanionReadError == "" {
+		t.Errorf("session with subagent past depth 8 should set CompanionReadError")
+	}
+}
+
 func mustJSON(v any) string {
 	b, _ := json.Marshal(v)
 	return string(b)

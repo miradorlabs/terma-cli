@@ -257,10 +257,14 @@ func findOmpSubagents(ctx context.Context, parentPath, stemDir string) (paths, w
 			if info.ModTime().After(latest) {
 				latest = info.ModTime()
 			}
+			nestedDir := strings.TrimSuffix(subPath, ".jsonl")
+			watchDirs = append(watchDirs, nestedDir)
 			if depth < 8 {
-				nestedDir := strings.TrimSuffix(subPath, ".jsonl")
-				watchDirs = append(watchDirs, nestedDir)
 				walk(subPath, nestedDir, depth+1)
+			} else if info, err := os.Stat(nestedDir); (err == nil && info.IsDir() && dirHasJSONLOrErr(ctx, nestedDir, 0)) || (err != nil && !errors.Is(err, fs.ErrNotExist)) {
+				if readErr == "" {
+					readErr = nestedDir
+				}
 			}
 		}
 		// If an intermediate subagent transcript was deleted while a nested subdirectory
@@ -334,7 +338,8 @@ func peekOmpSessionHeader(path string) (ompSessionHeader, error) {
 		return ompSessionHeader{}, err
 	}
 	defer func() { _ = f.Close() }()
-	br := bufio.NewReader(io.LimitReader(f, 1<<20))
+	lr := &io.LimitedReader{R: f, N: 1 << 20}
+	br := bufio.NewReader(lr)
 	for range 8 {
 		line, rerr := br.ReadBytes('\n')
 		trimmed := bytes.TrimSpace(line)
@@ -350,6 +355,9 @@ func peekOmpSessionHeader(path string) (ompSessionHeader, error) {
 			}
 			return ompSessionHeader{}, rerr
 		}
+	}
+	if lr.N == 0 {
+		return ompSessionHeader{}, errors.New("omp session header exceeds 1 MiB")
 	}
 	return ompSessionHeader{}, nil
 }
