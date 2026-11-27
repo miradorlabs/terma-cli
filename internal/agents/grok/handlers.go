@@ -91,7 +91,7 @@ func sessionEnd(ctx context.Context, env hookrun.Env) error {
 	if !ok {
 		return nil
 	}
-	captureTitle(ctx, env, in)
+	captureTitle(env, r, in)
 	env.EndSession(r, in.SessionID, name)
 	return nil
 }
@@ -104,7 +104,12 @@ func stop(ctx context.Context, env hookrun.Env) error {
 		env.Logf("%v", err)
 		return nil
 	}
-	captureTitle(ctx, env, in)
+	if !titled(in) {
+		return nil
+	}
+	if r, ok := env.Open(ctx, in.SessionID, in.Cwd); ok {
+		captureTitle(env, r, in)
+	}
 	return nil
 }
 

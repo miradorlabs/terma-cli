@@ -1,11 +1,8 @@
 package grok
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
-	"io"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -24,24 +21,19 @@ import (
 // sourceGrokSummary is where a session's name comes from: grok's summary.json.
 const sourceGrokSummary = "grok_summary"
 
-// summaryMaxBytes bounds the read of summary.json, which holds a few summaries beside the name.
-const summaryMaxBytes = 1 << 20
-
 var titleDir = hookrun.AgentStateDir(name, "titles")
 
-// captureTitle spools the session's name when it is new or changed.
-func captureTitle(ctx context.Context, env hookrun.Env, in *grokHookInput) {
-	path := summaryPath(in)
-	if path == "" || in.child() {
-		return
-	}
-	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
-	if !ok || !(Agent{}).ContentConsented(env.Consent(r)) {
+// titled reports whether the hook's session can be titled: its own, with a summary to read.
+func titled(in *grokHookInput) bool { return !in.child() && summaryPath(in) != "" }
+
+// captureTitle spools the session's name, in its checkout r, when it is new or changed.
+func captureTitle(env hookrun.Env, r *hookrun.Repo, in *grokHookInput) {
+	if !titled(in) || !(Agent{}).ContentConsented(env.Consent(r)) {
 		return
 	}
 	attrs := map[string]any{semconv.GenAIMainAgentNameKey: name, semconv.TermaEvidenceSourceKey: sourceGrokSummary}
 	hookrun.SpoolTitle(env, r, titleDir, in.SessionID, attrs, func() (string, bool, error) {
-		return readTitle(path)
+		return readTitle(summaryPath(in))
 	})
 }
 
@@ -60,36 +52,21 @@ func summaryPath(in *grokHookInput) string {
 }
 
 // readTitle is the name summary.json at path holds, trimmed; found is false before grok has
-// named the session.
+// written the file or named the session.
 func readTitle(path string) (title string, found bool, err error) {
-	f, err := os.OpenFile(path, os.O_RDONLY|hookrun.EvidenceOpenFlags, 0)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			err = nil
+	doc, status := hookrun.ReadEvidenceJSON(path)
+	switch status {
+	case "present":
+	case "missing":
+		return "", false, nil
+	default:
+		return "", false, errors.New("summary.json is " + status)
+	}
+	if raw, ok := doc["generated_title"]; ok {
+		if err := json.Unmarshal(raw, &title); err != nil {
+			return "", false, err
 		}
-		return "", false, err
 	}
-	defer func() { _ = f.Close() }()
-	info, err := f.Stat()
-	if err != nil {
-		return "", false, err
-	}
-	if !info.Mode().IsRegular() {
-		return "", false, errors.New("summary.json is not a regular file")
-	}
-	b, err := io.ReadAll(io.LimitReader(f, summaryMaxBytes+1))
-	if err != nil {
-		return "", false, err
-	}
-	if len(b) > summaryMaxBytes {
-		return "", false, errors.New("summary.json is too long")
-	}
-	var summary struct {
-		GeneratedTitle string `json:"generated_title"`
-	}
-	if err := json.Unmarshal(b, &summary); err != nil {
-		return "", false, err
-	}
-	title = strings.TrimSpace(summary.GeneratedTitle)
+	title = strings.TrimSpace(title)
 	return title, title != "", nil
 }
