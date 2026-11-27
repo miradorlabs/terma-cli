@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/api"
-	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 )
@@ -66,7 +65,10 @@ func uploadOneSession(
 	}
 
 	// Recheck live routing state and team policy before reading and preparing segments.
-	freshState, freshTeam, skipReason, reasonDetail, ok := recheckRouteTeam(opts, b.team.EnrollmentID, now)
+	freshState, freshTeam, skipReason, reasonDetail, ok, fatalErr := recheckRouteTeam(opts, b.team.EnrollmentID, now)
+	if fatalErr != nil {
+		return true, fatalErr
+	}
 	if !ok {
 		return stopRouteWithIssue(b, remaining, skipReason, reasonDetail, report, sum), nil
 	}
@@ -121,7 +123,10 @@ func uploadOneSession(
 		if snap != preSnap || changedWithin(curNow, snap.modTime, activeWindow) {
 			return &preAttemptStopError{skipReason: SkipActive, reason: "session transcript modified during upload", active: true}
 		}
-		checkState, checkTeam, checkSkip, checkReason, ok := recheckRouteTeam(opts, b.team.EnrollmentID, curNow)
+		checkState, checkTeam, checkSkip, checkReason, ok, fatalErr := recheckRouteTeam(opts, b.team.EnrollmentID, curNow)
+		if fatalErr != nil {
+			return fatalErr
+		}
 		if !ok {
 			return &preAttemptStopError{skipReason: checkSkip, reason: checkReason}
 		}
@@ -205,6 +210,9 @@ func uploadOneSession(
 		}
 		if retired, ok := errors.AsType[*SignInRetiredError](streamErr); ok {
 			return true, retired
+		}
+		if lost, ok := errors.AsType[*SignInLostError](streamErr); ok {
+			return true, lost
 		}
 		if lost, ok := errors.AsType[*OrgAccessLostError](streamErr); ok {
 			orgBlocked[b.team.OrganizationID] = lost.Error()
@@ -384,8 +392,8 @@ func filterHeldCandidates(
 			sum.Interrupted = true
 			return nil, 0, err
 		}
-		if errors.Is(err, auth.ErrSignInRetired) {
-			return nil, 0, &SignInRetiredError{Detail: err.Error()}
+		if fatal := signInGoneError(err); fatal != nil {
+			return nil, 0, fatal
 		}
 		if apiErr, ok := errors.AsType[*api.Error](err); ok {
 			if apiErr.SignInRetired() {

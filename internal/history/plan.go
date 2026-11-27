@@ -122,7 +122,10 @@ func planRoute(
 	}
 	// A team that cannot be sent to now stops whole, its resumed sessions with it, as the
 	// first resumed session's own recheck would stop it.
-	freshState, _, checkSkip, checkReason, routeOK := recheckRouteTeam(opts, eid, nowFn())
+	freshState, _, checkSkip, checkReason, routeOK, fatalErr := recheckRouteTeam(opts, eid, nowFn())
+	if fatalErr != nil {
+		return nil, fatalErr
+	}
 	if !routeOK {
 		stopRouteWithIssue(b, len(w.resume)+len(candidateQueue), checkSkip, checkReason, report, sum)
 		w.resume = nil

@@ -151,41 +151,44 @@ func routingPoliciesMatch(a, b routing.State, now time.Time) bool {
 	return true
 }
 
-func recheckRouteTeam(opts Options, enrollmentID string, now time.Time) (routing.State, routing.Team, string, string, bool) {
+func recheckRouteTeam(opts Options, enrollmentID string, now time.Time) (routing.State, routing.Team, string, string, bool, error) {
 	st := opts.State
 	if opts.ReloadState != nil {
 		fresh, err := opts.ReloadState()
 		if err != nil {
-			return routing.State{}, routing.Team{}, SkipDeselected, err.Error(), false
+			if fatal := signInGoneError(err); fatal != nil {
+				return routing.State{}, routing.Team{}, "", "", false, fatal
+			}
+			return routing.State{}, routing.Team{}, SkipDeselected, err.Error(), false, nil
 		}
 		st = fresh
 	}
 	if st.Account != opts.Account {
-		return routing.State{}, routing.Team{}, SkipDeselected, "active sign-in account changed during upload", false
+		return routing.State{}, routing.Team{}, SkipDeselected, "active sign-in account changed during upload", false, nil
 	}
 	team, ok := st.Team(enrollmentID)
 	if !ok {
-		return routing.State{}, routing.Team{}, SkipDeselected, "team is no longer selected", false
+		return routing.State{}, routing.Team{}, SkipDeselected, "team is no longer selected", false, nil
 	}
 	if state := team.StateAt(now); state != routing.Active {
 		reason := string(state)
-		return routing.State{}, routing.Team{}, SkipTeamBlockedPrefix + reason, "team is currently blocked (" + reason + ")", false
+		return routing.State{}, routing.Team{}, SkipTeamBlockedPrefix + reason, "team is currently blocked (" + reason + ")", false, nil
 	}
 	if team.Policy.CollectsNothing || team.Policy.Unset {
-		return routing.State{}, routing.Team{}, SkipNotCollected, "team policy no longer collects telemetry", false
+		return routing.State{}, routing.Team{}, SkipNotCollected, "team policy no longer collects telemetry", false, nil
 	}
 	if opts.AuthURL != "" && team.AuthURL != "" && !sameHost(team.AuthURL, opts.AuthURL) {
-		return routing.State{}, routing.Team{}, SkipWrongEnvironment, "team belongs to another environment", false
+		return routing.State{}, routing.Team{}, SkipWrongEnvironment, "team belongs to another environment", false, nil
 	}
 	if opts.ServerKey {
 		if opts.AuthURL != "" && !sameHost(opts.ServerKeyAuthURL, opts.AuthURL) {
-			return routing.State{}, routing.Team{}, SkipWrongEnvironment, "server key belongs to another environment", false
+			return routing.State{}, routing.Team{}, SkipWrongEnvironment, "server key belongs to another environment", false, nil
 		}
 		if opts.ServerKeyTeam == "" || team.TeamID != opts.ServerKeyTeam {
-			return routing.State{}, routing.Team{}, SkipNotCollected, "team does not match configured server-key team", false
+			return routing.State{}, routing.Team{}, SkipNotCollected, "team does not match configured server-key team", false, nil
 		}
 	}
-	return st, team, "", "", true
+	return st, team, "", "", true, nil
 }
 
 func orgEpochSnapshot(teams []routing.Team, orgID, authURL string) map[string]int64 {

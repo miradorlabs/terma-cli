@@ -265,6 +265,9 @@ func (app *App) runHistoryUpload(cmd *cobra.Command, sinceSpec, activeWindowSpec
 		if _, ok := errors.AsType[*history.SignInRetiredError](uploadErr); ok {
 			return &historyError{code: historyErrSignedOut, exit: ExitSignedOut, err: auth.ErrSignInRetired}
 		}
+		if lost, ok := errors.AsType[*history.SignInLostError](uploadErr); ok {
+			return &historyError{code: historyErrSignedOut, exit: ExitSignedOut, err: lost}
+		}
 		if errors.Is(uploadErr, history.ErrUploadRunning) {
 			return &historyError{code: historyErrUploadRunning, exit: ExitUploadRunning, err: uploadErr}
 		}
@@ -289,14 +292,24 @@ func (app *App) reloadHistoryState(profile, lane string, laneGen uint64) (routin
 	if freshCfg.ProfileName != profile {
 		return routing.State{}, errors.New("active profile changed during upload")
 	}
-	if app.profileLane(freshCfg) != lane {
+	freshLane := app.profileLane(freshCfg)
+	if freshLane != lane {
+		if freshLane == "" {
+			return routing.State{}, fmt.Errorf("%w: signed out during upload", auth.ErrNotLoggedIn)
+		}
 		return routing.State{}, errors.New("active sign-in account changed during upload")
+	}
+	if !freshCfg.ServerKeySignIn && auth.Retired(freshCfg.Dir, freshCfg.ProfileName) {
+		return routing.State{}, auth.ErrSignInRetired
 	}
 	if _, gen := app.signInSource(freshCfg).Lane(); gen != laneGen {
 		return routing.State{}, errors.New("active sign-in changed during upload")
 	}
 	fresh, found, loadErr := routing.Load(app.stateDir, freshCfg.ProfileName)
 	if reason, detail := routingStateProblem(fresh, found, loadErr, lane); reason != "" {
+		if reason == "signed_out" {
+			return routing.State{}, fmt.Errorf("%w: %s", auth.ErrNotLoggedIn, detail)
+		}
 		return routing.State{}, errors.New(detail)
 	}
 	return fresh, nil

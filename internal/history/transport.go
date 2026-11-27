@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
@@ -63,6 +64,32 @@ func (e *SignInRetiredError) Error() string {
 		return "sign-in is retired (SIGN_IN_RETIRED); run `terma setup`"
 	}
 	return e.Detail
+}
+
+// SignInLostError reports that the profile's sign-in is gone (signed out, expired, or
+// unrenewable) and cannot continue the upload.
+type SignInLostError struct {
+	Err error
+}
+
+func (e *SignInLostError) Error() string {
+	if e.Err == nil {
+		return auth.ErrNotLoggedIn.Error()
+	}
+	return e.Err.Error()
+}
+
+// Unwrap returns the underlying sign-in error.
+func (e *SignInLostError) Unwrap() error { return e.Err }
+
+func signInGoneError(err error) error {
+	if errors.Is(err, auth.ErrSignInRetired) {
+		return &SignInRetiredError{Detail: err.Error()}
+	}
+	if errors.Is(err, auth.ErrNotLoggedIn) {
+		return &SignInLostError{Err: err}
+	}
+	return nil
 }
 
 // RouteError reports an authentication, authorization, or endpoint configuration failure
@@ -321,14 +348,17 @@ func (t *Transport) credential(ctx context.Context, req SendRequest) (bearer str
 		return req.ServerKey, false, nil
 	}
 	if t.SignIn == nil || req.Account == "" {
-		return "", false, &TransientError{Err: errors.New("no sign-in available for this account")}
+		return "", false, &SignInLostError{Err: fmt.Errorf("%w: no sign-in available for this account", auth.ErrNotLoggedIn)}
 	}
 	tok, err := t.SignIn.Token(ctx, req.Account)
 	if err != nil {
+		if fatal := signInGoneError(err); fatal != nil {
+			return "", false, fatal
+		}
 		return "", false, &TransientError{Err: fmt.Errorf("read sign-in token: %w", err)}
 	}
 	if tok == "" {
-		return "", false, &TransientError{Err: errors.New("no active sign-in token for this account")}
+		return "", false, &SignInLostError{Err: fmt.Errorf("%w: no active sign-in token for this account", auth.ErrNotLoggedIn)}
 	}
 	return tok, true, nil
 }
