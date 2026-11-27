@@ -25,26 +25,42 @@ const ledgerTTL = time.Second
 // maxLedgers bounds the ledgers Route caches in memory.
 const maxLedgers = 4096
 
-// mixedInterval reports whether session's run covering [start, end] was Mixed and from when.
-// An unreadable ledger fails closed (Mixed from Unix(0, 1)).
-func (t *Teams) mixedInterval(session string, start, end time.Time) (time.Time, bool) {
+// mixedInterval reports whether session's run covering [start, end] was Mixed, which run,
+// and from when. An unreadable ledger fails closed (Mixed from Unix(0, 1), no run). run is
+// the record's placement's run, if any.
+//
+// A drop is final, and a cached read may predate a resumed process's session-start: it
+// would judge that process's records by the paused run before it. So a read that does not
+// hold the record's run is not used, and a record placed in no run yet (the relay's claim
+// cache can predate the resume too) that a cached read finds Mixed is judged on a fresh one.
+func (t *Teams) mixedInterval(session, run string, start, end time.Time) (string, time.Time, bool) {
 	if session == "" {
-		return time.Time{}, false
+		return "", time.Time{}, false
 	}
-	return mixedIntervalFrom(t.ledger(session), start, end)
+	l, cached := t.ledger(session, run, false)
+	mixedRun, from, mixed := mixedIntervalFrom(l, start, end)
+	if mixed && cached && run == "" {
+		l, _ = t.ledger(session, "", true)
+		mixedRun, from, mixed = mixedIntervalFrom(l, start, end)
+	}
+	return mixedRun, from, mixed
 }
 
-func (t *Teams) ledger(session string) runs.Snapshot {
+// ledger is session's run ledger, from a read at most ledgerTTL old that holds run unless
+// fresh is set, and whether it came from that earlier read.
+func (t *Teams) ledger(session, run string, fresh bool) (runs.Snapshot, bool) {
 	now := t.deps.Now()
-	t.ledgerMu.Lock()
-	e, ok := t.ledgers[session]
-	t.ledgerMu.Unlock()
-	if ok && now.Sub(e.read) < t.ledgerTTL {
-		return e.l
+	if !fresh {
+		t.ledgerMu.Lock()
+		e, ok := t.ledgers[session]
+		t.ledgerMu.Unlock()
+		if ok && now.Sub(e.read) < t.ledgerTTL && (run == "" || e.l.HasRun(run)) {
+			return e.l, true
+		}
 	}
 	l := t.readLedger(t.cfg.StateDir, session)
 	t.remember(session, cachedLedger{l: l, read: now})
-	return l
+	return l, false
 }
 
 func (t *Teams) remember(session string, e cachedLedger) {
@@ -77,18 +93,19 @@ func (p *recheck) mixedInterval(session string, start, end time.Time) (time.Time
 		l = runs.Read(p.stateDir, session)
 		p.runs[session] = l
 	}
-	return mixedIntervalFrom(l, start, end)
+	_, from, mixed := mixedIntervalFrom(l, start, end)
+	return from, mixed
 }
 
-func mixedIntervalFrom(l runs.Snapshot, start, end time.Time) (time.Time, bool) {
-	from, mixed := l.MixedInterval(start, end)
+func mixedIntervalFrom(l runs.Snapshot, start, end time.Time) (string, time.Time, bool) {
+	run, from, mixed := l.MixedIn(start, end)
 	if !mixed {
-		return time.Time{}, false
+		return "", time.Time{}, false
 	}
 	if from.IsZero() {
 		from = time.Unix(0, 1)
 	}
-	return from, true
+	return run, from, true
 }
 
 func mixedBlocker(session string) string {
