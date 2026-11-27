@@ -7,14 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
+	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/history"
 )
@@ -96,6 +93,7 @@ type historyStreamAgent struct {
 
 type historyStreamStart struct {
 	Type                string               `json:"type"`
+	StreamVersion       int                  `json:"stream_version"`
 	DryRun              bool                 `json:"dry_run"`
 	Since               string               `json:"since"`
 	ActiveWindowSeconds int64                `json:"active_window_seconds"`
@@ -142,6 +140,7 @@ type historyStreamSession struct {
 type historyStreamTeamBlocked struct {
 	Type string `json:"type"`
 	historyStreamTeam
+	Phase      string `json:"phase"`
 	ReasonCode string `json:"reason_code"`
 	Reason     string `json:"reason"`
 	Skipped    int    `json:"skipped"`
@@ -162,64 +161,88 @@ type historyStreamError struct {
 	Error historyStreamFailure `json:"error"`
 }
 
-type writeDeadlineSetter interface {
-	SetWriteDeadline(time.Time) error
-}
-
 type streamWriteReq struct {
 	data []byte
 	done chan error
 }
 
-// finalWriteTimeout bounds how long a cancelled run waits to flush its final summary or
-// error line when stdout is backed up by a reader that stopped draining the pipe.
-const finalWriteTimeout = 250 * time.Millisecond
+const (
+	// historyStreamVersion is incremented only for breaking schema changes to --json-stream.
+	historyStreamVersion = 1
+	// cancelGracePeriod is how long a cancelled run keeps writing queued lines and the
+	// final summary or error line before giving up on a stalled stdout pipe.
+	cancelGracePeriod = 250 * time.Millisecond
+)
 
-// historyStream writes the --json-stream lines through a dedicated writer goroutine so
-// cancelling the run context interrupts a blocked stdout pipe rather than holding the
-// upload lock forever. A write that fails is kept and reported once the run ends.
+// historyStream writes --json-stream lines through one dedicated writer goroutine. Before
+// ctx is cancelled, writes block normally; once ctx is cancelled, queued lines and the
+// final line share one cancelGracePeriod measured from the cancel before giving up so a
+// stalled pipe cannot keep upload.lock held.
 type historyStream struct {
-	ctx        context.Context
-	w          io.Writer
-	reqs       chan streamWriteReq
-	writerDone chan struct{}
-	started    bool
-	aborted    bool
-	closed     bool
-	err        error
+	ctx          context.Context
+	w            io.Writer
+	reqs         chan streamWriteReq
+	writerDone   chan struct{}
+	graceExpired chan struct{}
+	stopGrace    chan struct{}
+	started      bool
+	finalWritten bool
+	gaveUp       bool
+	closed       bool
+	err          error
 }
 
 func newHistoryStream(ctx context.Context, w io.Writer) *historyStream {
+	return newHistoryStreamWithGrace(ctx, w, cancelGracePeriod)
+}
+
+func newHistoryStreamWithGrace(ctx context.Context, w io.Writer, grace time.Duration) *historyStream {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	s := &historyStream{
-		ctx:        ctx,
-		w:          w,
-		reqs:       make(chan streamWriteReq),
-		writerDone: make(chan struct{}),
+		ctx:          ctx,
+		w:            w,
+		reqs:         make(chan streamWriteReq),
+		writerDone:   make(chan struct{}),
+		graceExpired: make(chan struct{}),
+		stopGrace:    make(chan struct{}),
 	}
 	go s.runWriter()
+	if ctx.Done() != nil {
+		go func() {
+			select {
+			case <-ctx.Done():
+				t := time.NewTimer(grace)
+				defer t.Stop()
+				select {
+				case <-t.C:
+					close(s.graceExpired)
+				case <-s.stopGrace:
+				}
+			case <-s.stopGrace:
+			}
+		}()
+	}
 	return s
 }
 
 func (s *historyStream) runWriter() {
 	defer close(s.writerDone)
 	for req := range s.reqs {
-		_, err := s.w.Write(req.data)
+		n, err := s.w.Write(req.data)
+		if err == nil && n != len(req.data) {
+			err = io.ErrShortWrite
+		}
 		req.done <- err
 	}
 }
 
-func (s *historyStream) cancelWrite() {
-	if d, ok := s.w.(writeDeadlineSetter); ok {
-		_ = d.SetWriteDeadline(time.Now())
+func (s *historyStream) giveUp() {
+	s.gaveUp = true
+	if s.err == nil {
+		s.err = fmt.Errorf("stdout write timed out after cancel: %w", s.ctx.Err())
 	}
-}
-
-func (s *historyStream) abort() {
-	s.aborted = true
-	s.cancelWrite()
 }
 
 func (s *historyStream) close() {
@@ -227,19 +250,12 @@ func (s *historyStream) close() {
 		return
 	}
 	s.closed = true
-	if !s.aborted {
-		close(s.reqs)
-		<-s.writerDone
+	close(s.stopGrace)
+	close(s.reqs)
+	if s.gaveUp {
 		return
 	}
-	s.cancelWrite()
-	close(s.reqs)
-	timer := time.NewTimer(50 * time.Millisecond)
-	defer timer.Stop()
-	select {
-	case <-s.writerDone:
-	case <-timer.C:
-	}
+	<-s.writerDone
 }
 
 func encodeStreamLine(v any) ([]byte, error) {
@@ -250,81 +266,47 @@ func encodeStreamLine(v any) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (s *historyStream) write(v any) {
-	if s.aborted || s.closed || s.ctx.Err() != nil {
-		return
+func (s *historyStream) write(v any) bool {
+	if s.gaveUp || s.closed || s.err != nil {
+		return false
+	}
+	select {
+	case <-s.graceExpired:
+		s.giveUp()
+		return false
+	default:
 	}
 	data, err := encodeStreamLine(v)
 	if err != nil {
-		if s.err == nil {
-			s.err = err
-		}
-		return
+		s.err = err
+		return false
 	}
 	req := streamWriteReq{data: data, done: make(chan error, 1)}
 	select {
 	case s.reqs <- req:
-	case <-s.ctx.Done():
-		s.abort()
-		return
+	case <-s.graceExpired:
+		s.giveUp()
+		return false
 	}
 	select {
 	case err := <-req.done:
-		if err != nil && s.err == nil {
+		if err != nil {
 			s.err = err
+			return false
 		}
-	case <-s.ctx.Done():
-		s.abort()
-	}
-}
-
-// writeFinal delivers the terminal summary or error line even after ctx is cancelled (for
-// example on Ctrl-C), while bounding the wait so a stalled reader cannot block exit.
-func (s *historyStream) writeFinal(v any) {
-	if s.aborted || s.closed {
-		return
-	}
-	if s.ctx.Err() == nil {
-		s.write(v)
-		return
-	}
-	data, err := encodeStreamLine(v)
-	if err != nil {
-		if s.err == nil {
-			s.err = err
-		}
-		return
-	}
-	if d, ok := s.w.(writeDeadlineSetter); ok {
-		_ = d.SetWriteDeadline(time.Now().Add(finalWriteTimeout))
-	}
-	req := streamWriteReq{data: data, done: make(chan error, 1)}
-	timer := time.NewTimer(finalWriteTimeout)
-	defer timer.Stop()
-	select {
-	case s.reqs <- req:
-	case <-timer.C:
-		s.abort()
-		return
-	}
-	select {
-	case err := <-req.done:
-		if err != nil && s.err == nil {
-			s.err = err
-		}
-	case <-timer.C:
-		s.abort()
+		return true
+	case <-s.graceExpired:
+		s.giveUp()
+		return false
 	}
 }
 
 func (s *historyStream) start(dryRun bool, since time.Time, activeWindow time.Duration, reg *agents.Registry) {
-	if s.aborted || s.ctx.Err() != nil {
-		return
-	}
 	line := historyStreamStart{
 		Type:                historyLineStart,
+		StreamVersion:       historyStreamVersion,
 		DryRun:              dryRun,
-		Since:               since.UTC().Format(time.RFC3339),
+		Since:               since.UTC().Format(time.RFC3339Nano),
 		ActiveWindowSeconds: int64(activeWindow / time.Second),
 		Agents:              []historyStreamAgent{},
 	}
@@ -332,8 +314,7 @@ func (s *historyStream) start(dryRun bool, since time.Time, activeWindow time.Du
 		_, reads := a.(agents.HistorySource)
 		line.Agents = append(line.Agents, historyStreamAgent{Name: a.Name(), DisplayName: a.DisplayName(), History: reads})
 	}
-	s.write(line)
-	if !s.aborted {
+	if s.write(line) {
 		s.started = true
 	}
 }
@@ -379,12 +360,12 @@ func (s *historyStream) progress(ev history.ProgressEvent) {
 		line.Reason = ev.SkipReason
 		s.write(line)
 	case history.ProgressRouteBlocked:
-		s.write(historyStreamTeamBlocked{Type: historyLineTeamBlocked, historyStreamTeam: team, ReasonCode: ev.SkipReason, Reason: ev.Reason, Skipped: ev.Skipped})
+		s.write(historyStreamTeamBlocked{Type: historyLineTeamBlocked, historyStreamTeam: team, Phase: ev.Phase, ReasonCode: ev.SkipReason, Reason: ev.Reason, Skipped: ev.Skipped})
 	}
 }
 
 func (s *historyStream) summary(sum history.Summary) {
-	s.writeFinal(historyStreamSummary{Type: historyLineSummary, Summary: sum})
+	s.finalWritten = s.write(historyStreamSummary{Type: historyLineSummary, Summary: sum})
 }
 
 // fail writes err as the run's last line, its message on stderr too, and ends with err's
@@ -392,52 +373,49 @@ func (s *historyStream) summary(sum history.Summary) {
 func (s *historyStream) fail(stderr io.Writer, err error) error {
 	code, exit := historyErrorOf(err)
 	fmt.Fprintf(stderr, "terma history upload: %s: %v\n", code, err)
-	s.writeFinal(historyStreamError{Type: historyLineError, Error: historyStreamFailure{Code: code, Message: err.Error()}})
+	s.finalWritten = s.write(historyStreamError{Type: historyLineError, Error: historyStreamFailure{Code: code, Message: err.Error()}})
 	return exitWith(exit)
 }
 
-// historyUsageError reports arguments `history upload` does not take. A --json-stream run
-// ends with an error line, as every other failure of one does. Flags are read up to the
-// one refused, so --json-stream after it is looked for in the process's arguments.
-func historyUsageError(cmd *cobra.Command, jsonStream bool, err error) error {
-	if !jsonStream && !argsAskForJSONStream(cmd.Flags(), os.Args[1:]) {
-		return err
+func checkStreamSignIn(dir, profile string) error {
+	ident, err := auth.LoadIdentity(dir, profile)
+	if errors.Is(err, auth.ErrNotLoggedIn) {
+		return &historyError{code: historyErrSignedOut, exit: ExitSignedOut, err: auth.ErrNotLoggedIn}
 	}
-	s := newHistoryStream(cmd.Context(), cmd.OutOrStdout())
-	defer s.close()
-	return s.fail(cmd.ErrOrStderr(), err)
+	if err == nil && !ident.RetiredAt.IsZero() {
+		return &historyError{code: historyErrSignedOut, exit: ExitSignedOut, err: auth.ErrSignInRetired}
+	}
+	return nil
 }
 
-// argsAskForJSONStream reports whether args set --json-stream as a flag: not as the value of
-// another of flags' flags that takes one, and not set to false.
-func argsAskForJSONStream(flags *pflag.FlagSet, args []string) bool {
-	// takesValue reports whether the flag a names reads the next argument as its value.
-	takesValue := func(a string) bool {
-		var f *pflag.Flag
-		switch {
-		case strings.Contains(a, "="):
-			return false
-		case strings.HasPrefix(a, "--"):
-			f = flags.Lookup(a[2:])
-		case len(a) == 2 && a[0] == '-':
-			f = flags.ShorthandLookup(a[1:])
+func classifyHistoryNoToken(signIn *signInSource) func(context.Context, string) error {
+	return func(context.Context, string) error {
+		err := signIn.LastLoss()
+		if errors.Is(err, auth.ErrSignInRetired) {
+			return &history.SignInRetiredError{Detail: err.Error()}
 		}
-		return f != nil && f.NoOptDefVal == ""
+		if errors.Is(err, auth.ErrNotLoggedIn) {
+			return &history.SignInLostError{Err: err}
+		}
+		return nil
 	}
-	asked := false
-	for i := 0; i < len(args); i++ {
-		a := args[i]
-		switch {
-		case a == "--":
-			return asked
-		case a == "--json-stream":
-			asked = true
-		case strings.HasPrefix(a, "--json-stream="):
-			v, err := strconv.ParseBool(strings.TrimPrefix(a, "--json-stream="))
-			asked = err == nil && v
-		case takesValue(a):
-			i++
+}
+
+func (app *App) runHistoryUploadStream(cmd *cobra.Command, sinceSpec, activeWindowSpec string, dryRun, retryFailed bool) error {
+	stream := newHistoryStream(cmd.Context(), cmd.OutOrStdout())
+	defer stream.close()
+	err := app.runHistoryUpload(cmd, sinceSpec, activeWindowSpec, dryRun, retryFailed, stream)
+	if _, coded := exitCodeOf(err); err != nil && !coded && !errors.Is(err, context.Canceled) {
+		err = stream.fail(cmd.ErrOrStderr(), err)
+	}
+	stream.close()
+	if err == nil {
+		if stream.err != nil {
+			return stream.err
+		}
+		if !stream.finalWritten {
+			return errors.New("failed to write final stream line")
 		}
 	}
-	return asked
+	return err
 }

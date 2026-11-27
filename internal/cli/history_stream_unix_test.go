@@ -15,9 +15,53 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/history"
 )
+
+// readOneLine reads bytes from f until '\n' without buffering ahead, so unread bytes remain
+// in the OS pipe for pipe-full tests.
+func readOneLine(f *os.File) (string, error) {
+	var buf bytes.Buffer
+	var b [1]byte
+	for {
+		n, err := f.Read(b[:])
+		if n > 0 {
+			buf.WriteByte(b[0])
+			if b[0] == '\n' {
+				return buf.String(), nil
+			}
+		}
+		if err != nil {
+			return buf.String(), err
+		}
+	}
+}
+
+// pipeWritable reports whether the write end of an OS pipe currently has buffer space
+// (POLLOUT set), without writing any bytes or changing non-blocking state.
+func pipeWritable(f *os.File) (bool, error) {
+	rc, err := f.SyscallConn()
+	if err != nil {
+		return false, err
+	}
+	var writable bool
+	var pollErr error
+	if err := rc.Control(func(fd uintptr) {
+		fds := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLOUT}}
+		n, e := unix.Poll(fds, 0)
+		for errors.Is(e, unix.EINTR) {
+			n, e = unix.Poll(fds, 0)
+		}
+		pollErr = e
+		writable = n > 0 && fds[0].Revents&unix.POLLOUT != 0
+	}); err != nil {
+		return false, err
+	}
+	return writable, pollErr
+}
 
 // saveFileBackedSignIn writes the fixture's sign-in into user-credentials.json so a child
 // terma binary reads it without touching the host system keychain.
@@ -100,18 +144,19 @@ func TestHistoryUploadJSONStreamInterruptExit130(t *testing.T) {
 	}
 }
 
-// A reader that never drains stdout must not keep upload.lock held after an interrupt:
-// once signalled, the process gives up on blocked stdout writes, releases the lock, and exits.
+// A reader that stops draining stdout must not keep upload.lock held after an interrupt:
+// once signalled, the process gives up on blocked stdout writes after its grace period,
+// releases the lock, and exits 130.
 func TestHistoryUploadJSONStreamBlockedStdoutReleasesLock(t *testing.T) {
 	bin := termaBinary(t)
 	fx := newHistoryFixture(t)
 	saveFileBackedSignIn(t, fx)
 
-	// Create enough sessions so the stream lines (plan + session events) overflow the OS
-	// pipe buffer (~64 KiB) and block stdout writes while upload.lock is held.
+	// Create enough sessions so stream lines overflow any OS pipe buffer (~16 KiB on macOS,
+	// ~64 KiB on Linux) and block stdout writes while upload.lock is held.
 	oldTime := time.Now().UTC().Add(-4 * time.Hour)
 	projectDir := filepath.Dir(fx.ccPath)
-	for i := range 250 {
+	for i := range 350 {
 		sid := fmt.Sprintf("33333333-3333-3333-3333-%012d", i)
 		p := filepath.Join(projectDir, sid+".jsonl")
 		content := strings.Join([]string{
@@ -124,14 +169,14 @@ func TestHistoryUploadJSONStreamBlockedStdoutReleasesLock(t *testing.T) {
 		_ = os.Chtimes(p, oldTime, oldTime)
 	}
 
-	// Open an OS pipe whose read end is never read.
 	pr, pw, err := os.Pipe()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer pr.Close()
+	defer pw.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, bin, "history", "upload", "--json-stream")
 	cmd.Env = append(os.Environ(),
@@ -142,58 +187,82 @@ func TestHistoryUploadJSONStreamBlockedStdoutReleasesLock(t *testing.T) {
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Start(); err != nil {
-		_ = pw.Close()
 		t.Fatal(err)
 	}
-	// Close the parent's copy of the write end so only the child holds it.
-	_ = pw.Close()
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
 
-	// Wait until the child holds upload.lock and stalls on the full stdout pipe (uploads
-	// stop advancing before all 250 sessions complete).
-	deadline := time.Now().Add(10 * time.Second)
-	stalled := false
-	prevSent := -1
-	stableTicks := 0
-	for time.Now().Before(deadline) {
-		unlock, lockErr := history.LockUpload(fx.stateDir, fx.account, config.DefaultProfile)
-		if errors.Is(lockErr, history.ErrUploadRunning) {
-			sent := fx.receivedBy("team-a")
-			if sent > 0 && sent < 250 {
-				if sent == prevSent {
-					stableTicks++
-					if stableTicks >= 4 {
-						stalled = true
-						break
-					}
-				} else {
-					prevSent = sent
-					stableTicks = 0
-				}
-			}
-		} else if lockErr == nil {
-			unlock()
+	// Wait for the child's "start" line (emitted only after upload.lock is acquired), without
+	// ever touching upload.lock from the parent.
+	type lineRes struct {
+		line string
+		err  error
+	}
+	startCh := make(chan lineRes, 1)
+	go func() {
+		l, err := readOneLine(pr)
+		startCh <- lineRes{line: l, err: err}
+	}()
+	select {
+	case r := <-startCh:
+		if r.err != nil {
+			_ = cmd.Process.Kill()
+			<-done
+			t.Fatalf("read start line: %v (stderr=%q)", r.err, stderr.String())
 		}
-		time.Sleep(25 * time.Millisecond)
-	}
-	if !stalled {
+		var obj map[string]any
+		if err := json.Unmarshal([]byte(r.line), &obj); err != nil || obj["type"] != "start" {
+			_ = cmd.Process.Kill()
+			<-done
+			t.Fatalf("first line = %q (%v), want start", r.line, err)
+		}
+	case err := <-done:
+		t.Fatalf("child exited before emitting start: %v (stderr=%q)", err, stderr.String())
+	case <-time.After(30 * time.Second):
 		_ = cmd.Process.Kill()
-		_ = cmd.Wait()
-		t.Fatalf("child did not stall on unread stdout pipe (sent=%d); stderr=%q", fx.receivedBy("team-a"), stderr.String())
+		<-done
+		t.Fatalf("timed out waiting for start line (stderr=%q)", stderr.String())
 	}
+
+	// Stop reading pr and wait deterministically until the OS pipe buffer is full (POLLOUT clears).
+	fillDeadline := time.NewTimer(30 * time.Second)
+	defer fillDeadline.Stop()
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		writable, pollErr := pipeWritable(pw)
+		if pollErr != nil {
+			_ = cmd.Process.Kill()
+			<-done
+			t.Fatalf("poll pipe: %v", pollErr)
+		}
+		if !writable {
+			break
+		}
+		select {
+		case err := <-done:
+			t.Fatalf("child exited before filling stdout pipe: %v (sent=%d, stderr=%q)", err, fx.receivedBy("team-a"), stderr.String())
+		case <-fillDeadline.C:
+			_ = cmd.Process.Kill()
+			<-done
+			t.Fatalf("timed out waiting for stdout pipe to fill (sent=%d, stderr=%q)", fx.receivedBy("team-a"), stderr.String())
+		case <-ticker.C:
+		}
+	}
+	// Close parent's write end before signalling so only the child owns it.
+	_ = pw.Close()
 
 	if err := cmd.Process.Signal(os.Interrupt); err != nil {
 		t.Fatalf("signal interrupt: %v", err)
 	}
 
-	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
 	select {
 	case waitErr := <-done:
 		var exitErr *exec.ExitError
 		if !errors.As(waitErr, &exitErr) || exitErr.ExitCode() != 130 {
 			t.Fatalf("exit = %v, want 130; stderr=%q", waitErr, stderr.String())
 		}
-	case <-time.After(5 * time.Second):
+	case <-time.After(10 * time.Second):
 		_ = cmd.Process.Kill()
 		<-done
 		t.Fatalf("process hung on unread stdout pipe after SIGINT; stderr=%q", stderr.String())
@@ -205,4 +274,62 @@ func TestHistoryUploadJSONStreamBlockedStdoutReleasesLock(t *testing.T) {
 		t.Fatalf("upload.lock still held after interrupted exit: %v", err)
 	}
 	unlock()
+}
+
+// D4: When HOME and config/state directory variables are unset, `terma history upload --json-stream`
+// still emits a JSON error line on stdout and exits 1; text mode prints Error: to stderr and exits 1.
+func TestHistoryUploadJSONStreamHomeUnsetSubprocess(t *testing.T) {
+	bin := termaBinary(t)
+	var cleanEnv []string
+	for _, kv := range os.Environ() {
+		name, _, _ := strings.Cut(kv, "=")
+		switch name {
+		case "HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "TERMA_CONFIG_DIR", "TERMA_STATE_DIR":
+			continue
+		}
+		cleanEnv = append(cleanEnv, kv)
+	}
+
+	t.Run("json-stream emits error line and exits 1", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, bin, "history", "upload", "--json-stream")
+		cmd.Env = cleanEnv
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		err := cmd.Run()
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) || exitErr.ExitCode() != 1 {
+			t.Fatalf("exit = %v, want 1\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+		}
+		lines := streamLines(t, stdout.String())
+		if got := streamTypes(lines); got != "error" {
+			t.Fatalf("lines = %q, want %q\nstdout:\n%s", got, "error", stdout.String())
+		}
+		if code, msg := lastError(t, stdout.String()); code != "failed" || msg == "" {
+			t.Errorf("error = (%q, %q), want failed with non-empty message", code, msg)
+		}
+	})
+
+	t.Run("text mode prints Error on stderr and exits 1", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, bin, "history", "upload")
+		cmd.Env = cleanEnv
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		err := cmd.Run()
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) || exitErr.ExitCode() != 1 {
+			t.Fatalf("exit = %v, want 1\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+		}
+		if stdout.Len() != 0 {
+			t.Errorf("text stdout = %q, want empty", stdout.String())
+		}
+		if !strings.Contains(stderr.String(), "Error:") {
+			t.Errorf("text stderr = %q, want Error: ...", stderr.String())
+		}
+	})
 }

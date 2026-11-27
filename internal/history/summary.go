@@ -57,6 +57,14 @@ const (
 	ProgressRouteBlocked ProgressKind = "route_blocked"
 )
 
+// Phases in which ProgressRouteBlocked can be emitted. Only plan and upload blocks are
+// counted in Summary.TeamIssues; discovery blocks are counted in Summary.SkippedSegments.
+const (
+	BlockPhaseDiscovery = "discovery"
+	BlockPhasePlan      = "plan"
+	BlockPhaseUpload    = "upload"
+)
+
 // ProgressEvent reports live upload progress to the CLI.
 type ProgressEvent struct {
 	Kind         ProgressKind
@@ -79,6 +87,8 @@ type ProgressEvent struct {
 	Reason      string
 	// SkipReason is one of the Skip* reasons, for a skipped session or a blocked team.
 	SkipReason string
+	// Phase is BlockPhaseDiscovery, BlockPhasePlan, or BlockPhaseUpload on ProgressRouteBlocked.
+	Phase string
 	// Skipped is how many sessions a blocked team left out.
 	Skipped int
 	// Skips counts the sessions discovery left out, by skip reason.

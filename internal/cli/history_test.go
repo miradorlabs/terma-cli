@@ -513,11 +513,11 @@ func TestReloadHistoryStateFailsWhenProfileChanges(t *testing.T) {
 	}
 	lane := testApp.profileLane(cfg)
 	_, gen := testApp.signInSource(cfg).Lane()
-	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen); err == nil || strings.Contains(err.Error(), "profile changed") {
+	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen, false); err == nil || strings.Contains(err.Error(), "profile changed") {
 		t.Fatalf("same profile, no routing state: %v, want a routing-state error", err)
 	}
 	t.Setenv("TERMA_PROFILE", "other")
-	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen); err == nil || !strings.Contains(err.Error(), "active profile changed") {
+	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen, false); err == nil || !strings.Contains(err.Error(), "active profile changed") {
 		t.Fatalf("after a profile switch: %v, want active profile changed", err)
 	}
 }
@@ -543,7 +543,7 @@ func TestReloadHistoryStateFailsWhenTheSignInChangedAndCameBack(t *testing.T) {
 	if _, err := routing.Replace(testApp.stateDir, cfg.ProfileName, nil, lane, func(*routing.State) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen); err != nil {
+	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen, false); err != nil {
 		t.Fatalf("nothing changed: %v, want the routing state", err)
 	}
 	if err := saveSignIn(testApp.dir, storedSessionOf(f, "u-2")); err != nil {
@@ -558,7 +558,7 @@ func TestReloadHistoryStateFailsWhenTheSignInChangedAndCameBack(t *testing.T) {
 	if got := testApp.profileLane(cfg); got != lane {
 		t.Fatalf("after a switch and back, lane = %q, want %q", got, lane)
 	}
-	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen); err == nil || err.Error() != "active sign-in changed during upload" {
+	if _, err := testApp.reloadHistoryState(cfg.ProfileName, lane, gen, false); err == nil || err.Error() != "active sign-in changed during upload" {
 		t.Fatalf("after a switch and back: %v, want active sign-in changed during upload", err)
 	}
 }

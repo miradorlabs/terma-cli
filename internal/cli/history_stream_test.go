@@ -276,8 +276,11 @@ func TestHistoryUploadJSONStreamDryRun(t *testing.T) {
 	}
 
 	start := lineOf(t, lines, "start")
-	if start["dry_run"] != true || start["active_window_seconds"] != float64(3600) {
-		t.Errorf("start = %v, want a dry run with a one-hour window", start)
+	if start["stream_version"] != float64(1) || start["dry_run"] != true || start["active_window_seconds"] != float64(3600) {
+		t.Errorf("start = %v, want stream_version 1, dry_run true, and a one-hour window", start)
+	}
+	if _, err := time.Parse(time.RFC3339Nano, start["since"].(string)); err != nil {
+		t.Errorf("start.since = %q: %v", start["since"], err)
 	}
 	withHistory := map[string]bool{}
 	for _, a := range start["agents"].([]any) {
@@ -356,7 +359,7 @@ func TestHistoryUploadJSONStreamUpload(t *testing.T) {
 		t.Fatalf("second run lines = %s\n%s", got, out)
 	}
 	if plan := lineOf(t, lines, "plan"); plan["sessions"] != float64(0) ||
-		plan["skipped_sessions"].(map[string]any)[history.SkipAlreadyDone] != float64(2) {
+		plan["skipped_sessions"].(map[string]any)["already_done"] != float64(2) {
 		t.Errorf("second plan = %v, want nothing left and 2 already_done", plan)
 	}
 }
@@ -379,8 +382,8 @@ func TestHistoryUploadJSONStreamHeldFailedAndBlocked(t *testing.T) {
 	if got := streamTypes(lines); got != want {
 		t.Fatalf("lines = %s\nwant    %s\n%s", got, want, out)
 	}
-	if b := lines[4]; b["team_id"] != "team-b" || b["reason_code"] != history.SkipHoldingsFailed || b["skipped"] != float64(1) {
-		t.Errorf("team_blocked = %v, want team-b's one session, holdings_check_failed", b)
+	if b := lines[4]; b["team_id"] != "team-b" || b["phase"] != "plan" || b["reason_code"] != "holdings_check_failed" || b["skipped"] != float64(1) {
+		t.Errorf("team_blocked = %v, want team-b's one session, plan phase, holdings_check_failed", b)
 	}
 	if p := lines[5]; p["sessions"] != float64(1) {
 		t.Errorf("plan = %v, want team-a's one session", p)
@@ -409,10 +412,10 @@ func TestHistoryUploadJSONStreamHeldFailedAndBlocked(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantSkips := map[string]map[string]int{
-		"team-a": {history.SkipFailedPreviously: 1},
-		"team-b": {history.SkipAlreadyHeld: 1},
+		"team-a": {"failed_previously": 1},
+		"team-b": {"already_held": 1},
 	}
-	if plan.Sessions != 0 || len(plan.Teams) != 2 || plan.SkippedSessions[history.SkipFailedPreviously] != 1 || plan.SkippedSessions[history.SkipAlreadyHeld] != 1 {
+	if plan.Sessions != 0 || len(plan.Teams) != 2 || plan.SkippedSessions["failed_previously"] != 1 || plan.SkippedSessions["already_held"] != 1 {
 		t.Fatalf("plan = %+v, want nothing left, one failed_previously and one already_held", plan)
 	}
 	for _, team := range plan.Teams {
@@ -578,8 +581,8 @@ func TestHistoryUploadActiveWindow(t *testing.T) {
 		{[]string{"--active-window", "5h"}, 2, 0},
 	} {
 		sum := dryRun(c.args...)
-		if sum.SkippedSessions[history.SkipActive] != c.active || len(sum.Planned) != c.plans {
-			t.Errorf("%v: active=%d planned=%d, want %d and %d", c.args, sum.SkippedSessions[history.SkipActive], len(sum.Planned), c.active, c.plans)
+		if sum.SkippedSessions["active"] != c.active || len(sum.Planned) != c.plans {
+			t.Errorf("%v: active=%d planned=%d, want %d and %d", c.args, sum.SkippedSessions["active"], len(sum.Planned), c.active, c.plans)
 		}
 	}
 
@@ -625,7 +628,7 @@ func TestParseHistoryActiveWindow(t *testing.T) {
 }
 
 // Every path where sign-in is lost mid-run ends with summary followed by an error line
-// carrying code "signed_out" and exit code 6, while text mode keeps its non-coded error.
+// carrying code "signed_out" and exit code 6 in --json-stream, while text mode keeps main's behaviour.
 func TestHistoryUploadJSONStreamSignInLostMidRun(t *testing.T) {
 	t.Run("refresh refused during holdings", func(t *testing.T) {
 		fx := newHistoryFixture(t)
@@ -651,7 +654,7 @@ func TestHistoryUploadJSONStreamSignInLostMidRun(t *testing.T) {
 		}
 	})
 
-	t.Run("refresh refused in text mode keeps non-coded error", func(t *testing.T) {
+	t.Run("refresh refused in text mode matches main holdings team issues", func(t *testing.T) {
 		fx := newHistoryFixture(t)
 		cred := storedSession(&fakeAuth{srv: fx.srv})
 		cred.ExpiresAt = time.Now().Add(-time.Hour)
@@ -662,12 +665,14 @@ func TestHistoryUploadJSONStreamSignInLostMidRun(t *testing.T) {
 			f.refreshStatus = http.StatusUnauthorized
 			f.refreshBody = `{"error":{"code":"UNAUTHENTICATED","message":"refresh token expired"}}`
 		})
-		_, _, err := termaRun{}.exec(t, "history", "upload")
-		if err == nil {
-			t.Fatal("text mode did not fail")
+		out, stderr, err := termaRun{}.exec(t, "history", "upload")
+		if code, ok := exitCodeOf(err); !ok || code != 1 {
+			t.Fatalf("text mode exit = %v, want exitWith(1)\nstdout:\n%s\nstderr:\n%s", err, out, stderr)
 		}
-		if _, coded := exitCodeOf(err); coded {
-			t.Errorf("text mode ended with coded exit error: %v", err)
+		if !strings.Contains(out, "Skipped sessions: deselected=1, holdings_check_failed=1\n") ||
+			!strings.Contains(out, "  - team-a (1 skipped): holdings check failed:") ||
+			!strings.Contains(out, "  - team-b (1 skipped): active sign-in account changed during upload\n") {
+			t.Errorf("text mode stdout did not match main:\n%s", out)
 		}
 	})
 
@@ -713,45 +718,47 @@ func TestHistoryUploadJSONStreamSignInLostMidRun(t *testing.T) {
 	})
 }
 
-// A team already blocked in routing state at discovery emits team_blocked once before plan
-// even when all sessions belong to it and plan is empty.
+// Teams already blocked in routing state at discovery emit team_blocked once per team
+// (phase "discovery", sorted by enrollment_id) before plan, even when plan is empty.
 func TestHistoryUploadJSONStreamDiscoveryBlocked(t *testing.T) {
 	fx := newHistoryFixture(t)
 	if _, err := routing.Update(fx.stateDir, config.DefaultProfile, routing.Expect{Account: fx.account}, func(s *routing.State) error {
 		for i := range s.Teams {
-			if s.Teams[i].TeamID == "team-a" {
-				s.Teams[i].Refusals = 1
-			}
+			s.Teams[i].Refusals = 1
 		}
+		// Reverse order in state so output order must come from sorting by enrollment_id.
+		s.Teams[0], s.Teams[1] = s.Teams[1], s.Teams[0]
 		return nil
 	}); err != nil {
 		t.Fatal(err)
 	}
-	// Remove team-b's session so every discovered session belongs to the blocked team.
-	if err := os.Remove(fx.cxPath); err != nil {
-		t.Fatal(err)
-	}
-	out, _, err := termaRun{}.exec(t, "history", "upload", "--json-stream")
-	if err != nil {
-		t.Fatalf("upload: %v\n%s", err, out)
-	}
-	lines := streamLines(t, out)
-	const want = "start discover team_blocked plan summary"
-	if got := streamTypes(lines); got != want {
-		t.Fatalf("lines = %q, want %q\n%s", got, want, out)
-	}
-	b := lines[2]
-	if b["team_id"] != "team-a" || b["enrollment_id"] != "enr-a" ||
-		b["reason_code"] != "team_blocked:suspended" || b["skipped"] != float64(1) {
-		t.Errorf("team_blocked = %v", b)
-	}
-	if p := lines[3]; p["sessions"] != float64(0) || p["source_bytes"] != float64(0) {
-		t.Errorf("plan = %v, want empty plan", p)
+	for range 6 {
+		out, _, err := termaRun{}.exec(t, "history", "upload", "--json-stream")
+		if err != nil {
+			t.Fatalf("upload: %v\n%s", err, out)
+		}
+		lines := streamLines(t, out)
+		const want = "start discover team_blocked team_blocked plan summary"
+		if got := streamTypes(lines); got != want {
+			t.Fatalf("lines = %q, want %q\n%s", got, want, out)
+		}
+		for i, wantTeam := range []struct{ eid, tid string }{{"enr-a", "team-a"}, {"enr-b", "team-b"}} {
+			b := lines[2+i]
+			if b["team_id"] != wantTeam.tid || b["enrollment_id"] != wantTeam.eid || b["team_label"] != wantTeam.tid ||
+				b["phase"] != "discovery" || b["reason_code"] != "team_blocked:suspended" ||
+				b["reason"] == "" || b["skipped"] != float64(1) {
+				t.Errorf("team_blocked[%d] = %v, want %s discovery team_blocked:suspended skipped=1", i, b, wantTeam.eid)
+			}
+		}
+		if p := lines[4]; p["sessions"] != float64(0) || p["source_bytes"] != float64(0) {
+			t.Errorf("plan = %v, want empty plan", p)
+		}
 	}
 }
 
 // When team A passes holdings and team B in the same organization gets ORG_NOT_ACCESSIBLE,
-// both teams are blocked before plan is emitted, so plan counts 0 sessions and 0 source bytes.
+// both teams are blocked before plan is emitted (phase "plan"), so plan counts 0 sessions
+// and 0 source bytes. When organization access returns, a subsequent run uploads both.
 func TestHistoryUploadJSONStreamOrgBlockedPlan(t *testing.T) {
 	fx := newHistoryFixture(t)
 	if _, err := routing.Update(fx.stateDir, config.DefaultProfile, routing.Expect{Account: fx.account}, func(s *routing.State) error {
@@ -776,12 +783,41 @@ func TestHistoryUploadJSONStreamOrgBlockedPlan(t *testing.T) {
 	if got := streamTypes(lines); got != want {
 		t.Fatalf("lines = %q, want %q\n%s", got, want, out)
 	}
+	for _, idx := range []int{4, 5} {
+		b := lines[idx]
+		if b["phase"] != "plan" || b["reason_code"] != "org_access_lost" || b["skipped"] != float64(1) {
+			t.Errorf("team_blocked[%d] = %v, want plan phase org_access_lost skipped=1", idx, b)
+		}
+	}
 	plan := lineOf(t, lines, "plan")
 	if plan["sessions"] != float64(0) || plan["source_bytes"] != float64(0) {
 		t.Errorf("plan = %v, want 0 sessions and 0 source_bytes", plan)
 	}
 	if fx.receivedBy("team-a") != 0 || fx.receivedBy("team-b") != 0 {
 		t.Errorf("sent requests for blocked org: team-a=%d team-b=%d", fx.receivedBy("team-a"), fx.receivedBy("team-b"))
+	}
+
+	// Once organization access is restored, the second run uploads both teams' sessions.
+	if _, err := routing.Update(fx.stateDir, config.DefaultProfile, routing.Expect{Account: fx.account}, func(s *routing.State) error {
+		for i := range s.Teams {
+			s.Teams[i].Refusals = 0
+			s.Teams[i].RefusedAt = time.Time{}
+			s.Teams[i].LastError = ""
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	fx.answer(func(f *historyFixture) {
+		f.holdingsStatus = nil
+		f.holdingsBody = nil
+	})
+	out2, _, err := termaRun{}.exec(t, "history", "upload", "--json-stream")
+	if err != nil {
+		t.Fatalf("recovery upload: %v\n%s", err, out2)
+	}
+	if fx.receivedBy("team-a") != 1 || fx.receivedBy("team-b") != 1 {
+		t.Errorf("recovery run received team-a=%d team-b=%d, want 1 each", fx.receivedBy("team-a"), fx.receivedBy("team-b"))
 	}
 }
 

@@ -27,7 +27,8 @@ type signInSource struct {
 	client *api.Client
 	// sent are the access tokens Token handed out lately, each with its session: a refusal
 	// that arrives after the session rotated its token still names that session.
-	sent []sentToken
+	sent     []sentToken
+	lastLoss error
 	// accountMu guards the account cache alone, apart from mu, which a client's creation
 	// holds across a keychain read: an export must never wait on a keychain prompt.
 	accountMu sync.Mutex
@@ -166,37 +167,64 @@ func unchanged(was, now os.FileInfo) bool {
 	return os.SameFile(was, now) && was.ModTime().Equal(now.ModTime()) && was.Size() == now.Size()
 }
 
+func (s *signInSource) setLastLoss(err error) {
+	s.mu.Lock()
+	s.lastLoss = err
+	s.mu.Unlock()
+}
+
+// LastLoss returns the sign-in loss error (auth.ErrNotLoggedIn or auth.ErrSignInRetired)
+// observed by the most recent Token call, or nil when Token succeeded, hit a transient
+// error, or found another account or environment.
+func (s *signInSource) LastLoss() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lastLoss
+}
+
 // Token is a fresh access token of the sign-in whose account key is account: "" with no
 // error when that sign-in cannot send at all now (signed out, another person's, or
 // retired), so what waits for it is held; an error for what a retry may fix (a locked
 // keychain, an auth host out of reach), which the relay also waits out as keyless.
 func (s *signInSource) Token(ctx context.Context, account string) (string, error) {
+	s.setLastLoss(nil)
 	ident, err := auth.LoadIdentity(s.cfg.Dir, s.cfg.ProfileName)
 	switch {
 	case errors.Is(err, auth.ErrNotLoggedIn):
+		s.setLastLoss(auth.ErrNotLoggedIn)
 		return "", nil
 	case err != nil:
 		return "", err
-	case account == "" || auth.AccountKey(ident.AuthURL, ident.UserID) != account || ident.CheckEnvironment(s.cfg.AuthURL) != nil:
+	case account == "":
+		s.setLastLoss(auth.ErrNotLoggedIn)
+		return "", nil
+	case auth.AccountKey(ident.AuthURL, ident.UserID) != account || ident.CheckEnvironment(s.cfg.AuthURL) != nil:
 		return "", nil
 	case !ident.RetiredAt.IsZero():
+		s.setLastLoss(auth.ErrSignInRetired)
 		return "", nil
 	}
 	client, err := s.clientFor(ident.SessionID)
 	if errors.Is(err, auth.ErrNotLoggedIn) {
+		s.setLastLoss(auth.ErrNotLoggedIn)
 		return "", nil
 	}
 	if err != nil {
 		return "", err
 	}
 	if err := client.Refresh(ctx); errors.Is(err, auth.ErrNotLoggedIn) || errors.Is(err, auth.ErrSignInRetired) {
+		s.setLastLoss(err)
 		return "", nil
 	} else if err != nil {
 		return "", err
 	}
 	// The pair the client holds is the session account names, never one stored since.
 	held := client.Credential()
-	if held.SessionID != ident.SessionID || auth.AccountKey(held.AuthURL, held.UserID) != account || !held.RetiredAt.IsZero() {
+	if !held.RetiredAt.IsZero() {
+		s.setLastLoss(auth.ErrSignInRetired)
+		return "", nil
+	}
+	if held.SessionID != ident.SessionID || auth.AccountKey(held.AuthURL, held.UserID) != account {
 		return "", nil
 	}
 	s.handedOut(held.AccessToken, held.SessionID)

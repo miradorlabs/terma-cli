@@ -159,7 +159,7 @@ func recheckRouteTeam(opts Options, enrollmentID string, now time.Time) (routing
 	if opts.ReloadState != nil {
 		fresh, err := opts.ReloadState()
 		if err != nil {
-			if fatal := signInGoneError(err); fatal != nil {
+			if fatal := signInGoneError(err); opts.FailOnSignInLost && fatal != nil {
 				return routing.State{}, routing.Team{}, "", "", false, fatal
 			}
 			return routing.State{}, routing.Team{}, SkipDeselected, err.Error(), false, nil

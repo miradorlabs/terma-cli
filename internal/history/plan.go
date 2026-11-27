@@ -105,13 +105,13 @@ func planRoute(
 	// An organization that refused access for an earlier team refuses this one too: it
 	// stops whole, and its server is not asked.
 	if reason, blocked := orgBlocked[b.team.OrganizationID]; blocked {
-		stopRouteWithIssue(b, len(w.resume)+len(candidateQueue), SkipOrgAccessLost, reason, report, sum)
+		stopRouteWithIssue(b, len(w.resume)+len(candidateQueue), SkipOrgAccessLost, reason, BlockPhasePlan, report, sum)
 		w.resume = nil
 		return w, nil
 	}
 	// A server-key profile without this team's key can neither ask nor send: the team
 	// stops whole, before its server is asked.
-	key, keyOK := resolveRouteServerKey(opts, b, len(w.resume)+len(candidateQueue), report, sum)
+	key, keyOK := resolveRouteServerKey(opts, b, len(w.resume)+len(candidateQueue), BlockPhasePlan, report, sum)
 	if !keyOK {
 		w.resume = nil
 		return w, nil
@@ -127,19 +127,19 @@ func planRoute(
 		return nil, fatalErr
 	}
 	if !routeOK {
-		stopRouteWithIssue(b, len(w.resume)+len(candidateQueue), checkSkip, checkReason, report, sum)
+		stopRouteWithIssue(b, len(w.resume)+len(candidateQueue), checkSkip, checkReason, BlockPhasePlan, report, sum)
 		w.resume = nil
 		return w, nil
 	}
-	upload, held, err := filterHeldCandidates(ctx, opts, freshState, b, candidateQueue, len(w.resume), nowFn, report, orgBlocked, sum)
+	upload, held, blocked, err := filterHeldCandidates(ctx, opts, freshState, b, candidateQueue, len(w.resume), nowFn, report, orgBlocked, sum)
 	if err != nil {
 		return nil, err
 	}
 	if held > 0 {
 		w.skipped[SkipAlreadyHeld] += held
 	}
-	if _, blocked := orgBlocked[b.team.OrganizationID]; blocked {
-		w.resume = nil // counted in the team's org_access_lost issue
+	if blocked {
+		w.resume = nil // counted in the team's plan-time issue
 	}
 	w.upload = upload
 	return w, nil
@@ -161,7 +161,7 @@ func applyOrgBlocksToPlanned(works []*routeWork, orgBlocked map[string]string, r
 		if !blocked {
 			continue
 		}
-		stopRouteWithIssue(w.b, total, SkipOrgAccessLost, reason, report, sum)
+		stopRouteWithIssue(w.b, total, SkipOrgAccessLost, reason, BlockPhasePlan, report, sum)
 		w.resume = nil
 		w.upload = nil
 	}
@@ -231,7 +231,7 @@ func uploadRoute(
 		return nil
 	}
 	if reason, blocked := orgBlocked[b.team.OrganizationID]; blocked {
-		stopRouteWithIssue(b, total, SkipOrgAccessLost, reason, report, sum)
+		stopRouteWithIssue(b, total, SkipOrgAccessLost, reason, BlockPhaseUpload, report, sum)
 		return nil
 	}
 

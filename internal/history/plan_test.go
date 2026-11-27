@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -445,14 +446,179 @@ func TestUploadTeamBlockedAtDiscoveryEmitsRouteBlocked(t *testing.T) {
 		}
 	}
 	if len(blocked) != 1 || blocked[0].TeamID != "team-a" || blocked[0].EnrollmentID != "enr-team-a" ||
-		blocked[0].Skipped != 2 || blocked[0].SkipReason != SkipTeamBlockedPrefix+string(routing.Suspended) {
-		t.Fatalf("blocked events = %+v, want one team-a event with 2 skipped", blocked)
+		blocked[0].Phase != BlockPhaseDiscovery ||
+		blocked[0].Skipped != 2 || blocked[0].SkipReason != "team_blocked:suspended" {
+		t.Fatalf("blocked events = %+v, want one discovery team-a event with 2 skipped", blocked)
 	}
 	if discoverIdx >= blockedIdx || blockedIdx >= planIdx {
 		t.Fatalf("order discover=%d blocked=%d plan=%d, want discover < blocked < plan", discoverIdx, blockedIdx, planIdx)
 	}
 	if len(sum.TeamIssues) != 0 {
 		t.Errorf("sum.TeamIssues = %+v, want empty to preserve -o json compatibility", sum.TeamIssues)
+	}
+}
+
+func TestUploadDiscoveryBlockedTwoTeamsSorted(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	repoA := initTestGitRepo(t, "https://github.com/org-a/repo-a.git")
+	repoB := initTestGitRepo(t, "https://github.com/org-b/repo-b.git")
+	stA := singleTeamRoutingState(now, "acc1", "org-a", "team-a", "github.com/org-a/repo-a", true, true)
+	stB := singleTeamRoutingState(now, "acc1", "org-b", "team-b", "github.com/org-b/repo-b", true, true)
+	stA.Teams[0].Refusals = 1
+	stB.Teams[0].Refusals = 1
+	// Place team-b before team-a in state and discovery so emission order must come from sorting.
+	st := routing.State{Account: "acc1", Teams: []routing.Team{stB.Teams[0], stA.Teams[0]}}
+	src := &stubHistorySource{
+		source: "claude",
+		files: []agents.HistoryFile{
+			{SourceSystem: "claude", SessionID: "sb1", ModTime: now.Add(-5 * time.Hour)},
+			{SourceSystem: "claude", SessionID: "sa1", ModTime: now.Add(-4 * time.Hour)},
+			{SourceSystem: "claude", SessionID: "sa2", ModTime: now.Add(-3 * time.Hour)},
+		},
+		segments: map[string][]agents.HistorySegment{
+			"sb1": {makeNativeSegment("claude", "sb1", repoB, "b1", now.Add(-5*time.Hour))},
+			"sa1": {makeNativeSegment("claude", "sa1", repoA, "a1", now.Add(-4*time.Hour))},
+			"sa2": {makeNativeSegment("claude", "sa2", repoA, "a2", now.Add(-3*time.Hour))},
+		},
+	}
+	for range 8 {
+		var blocked []ProgressEvent
+		_, err := Upload(context.Background(), Options{
+			StateDir: t.TempDir(), Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
+			State: st, Sources: []agents.HistorySource{src}, Filter: relay.NewContentFilter(nil), Holdings: stubHoldings{},
+			Transport: &Transport{Version: "test", HTTP: http.DefaultClient, BytesPerSec: 1 << 30},
+			Now:       func() time.Time { return now },
+			Progress: func(ev ProgressEvent) {
+				if ev.Kind == ProgressRouteBlocked {
+					blocked = append(blocked, ev)
+				}
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(blocked) != 2 ||
+			blocked[0].EnrollmentID != "enr-team-a" || blocked[0].Skipped != 2 || blocked[0].Phase != BlockPhaseDiscovery ||
+			blocked[1].EnrollmentID != "enr-team-b" || blocked[1].Skipped != 1 || blocked[1].Phase != BlockPhaseDiscovery {
+			t.Fatalf("blocked = %+v, want [enr-team-a(2), enr-team-b(1)] in sorted enrollment_id order", blocked)
+		}
+	}
+}
+
+func TestUploadDiscoveryBlockedResumableOutsideSince(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	stateDir := t.TempDir()
+	repoA := initTestGitRepo(t, "https://github.com/org-a/repo-a.git")
+	st := singleTeamRoutingState(now, "acc1", "org-a", "team-a", "github.com/org-a/repo-a", true, true)
+	st.Teams[0].Refusals = 1
+
+	// Seed an unfinished (in_progress) session whose file is older than --since.
+	rs := NewRouteState("acc1", "default", "enr-team-a", "team-a")
+	rs.MarkInProgress("claude", "s-old-resume", now.Add(-48*time.Hour), 1, 100, time.Time{})
+	if err := SaveState(stateDir, rs); err != nil {
+		t.Fatal(err)
+	}
+	src := &stubHistorySource{
+		source: "claude",
+		files: []agents.HistoryFile{
+			{SourceSystem: "claude", SessionID: "s-old-resume", ModTime: now.Add(-100 * 24 * time.Hour), OutsideSince: true},
+		},
+		segments: map[string][]agents.HistorySegment{
+			"s-old-resume": {makeNativeSegment("claude", "s-old-resume", repoA, "old unfinished", now.Add(-100*24*time.Hour))},
+		},
+	}
+
+	var blocked []ProgressEvent
+	sum, err := Upload(context.Background(), Options{
+		StateDir: stateDir, Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
+		State: st, Sources: []agents.HistorySource{src}, Filter: relay.NewContentFilter(nil), Holdings: stubHoldings{},
+		Transport: &Transport{Version: "test", HTTP: http.DefaultClient, BytesPerSec: 1 << 30},
+		Now:       func() time.Time { return now },
+		Progress: func(ev ProgressEvent) {
+			if ev.Kind == ProgressRouteBlocked {
+				blocked = append(blocked, ev)
+			}
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(blocked) != 1 || blocked[0].EnrollmentID != "enr-team-a" || blocked[0].Phase != BlockPhaseDiscovery ||
+		blocked[0].SkipReason != "team_blocked:suspended" || blocked[0].Skipped != 1 {
+		t.Fatalf("blocked = %+v, want one discovery team_blocked:suspended event skipping 1", blocked)
+	}
+	if sum.SkippedSegments["team_blocked:suspended"] != 1 {
+		t.Errorf("SkippedSegments = %v, want team_blocked:suspended=1", sum.SkippedSegments)
+	}
+	if len(sum.TeamIssues) != 0 {
+		t.Errorf("TeamIssues = %+v, want empty for discovery-phase hold", sum.TeamIssues)
+	}
+	after, found, err := LoadState(stateDir, "acc1", "default", "enr-team-a", "team-a")
+	if err != nil || !found || !after.IsInProgress(SessionKey("claude", "s-old-resume")) {
+		t.Fatalf("resume state not preserved while blocked: found=%v err=%v", found, err)
+	}
+
+	// Once the team is unblocked, a second run resumes and uploads the older session.
+	st.Teams[0].Refusals = 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+	defer srv.Close()
+	sum2, err := Upload(context.Background(), Options{
+		StateDir: stateDir, Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
+		State: st, Sources: []agents.HistorySource{src}, Filter: relay.NewContentFilter(nil), Holdings: stubHoldings{},
+		Transport:   &Transport{Version: "test", HTTP: srv.Client(), SignIn: &fakeSignIn{tokens: []string{"tok"}, account: "acc1"}, BytesPerSec: 1 << 30},
+		EndpointFor: func(string) string { return srv.URL },
+		Now:         func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum2.SentSessions != 1 {
+		t.Errorf("second run SentSessions = %d, want 1", sum2.SentSessions)
+	}
+}
+
+func TestUploadResumedPlusHoldingsFailSingleTeamIssue(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
+	stateDir := t.TempDir()
+	repoA := initTestGitRepo(t, "https://github.com/org-a/repo-a.git")
+	st := singleTeamRoutingState(now, "acc1", "org-a", "team-a", "github.com/org-a/repo-a", true, true)
+	rs := NewRouteState("acc1", "default", "enr-team-a", "team-a")
+	rs.MarkInProgress("claude", "s-resume", now.Add(-time.Hour), 1, 100, time.Time{})
+	if err := SaveState(stateDir, rs); err != nil {
+		t.Fatal(err)
+	}
+	src := &stubHistorySource{
+		source: "claude",
+		files: []agents.HistoryFile{
+			{SourceSystem: "claude", SessionID: "s-resume", ModTime: now.Add(-5 * time.Hour)},
+			{SourceSystem: "claude", SessionID: "s-new", ModTime: now.Add(-4 * time.Hour)},
+		},
+		segments: map[string][]agents.HistorySegment{
+			"s-resume": {makeNativeSegment("claude", "s-resume", repoA, "r", now.Add(-5*time.Hour))},
+			"s-new":    {makeNativeSegment("claude", "s-new", repoA, "n", now.Add(-4*time.Hour))},
+		},
+	}
+	var events []ProgressEvent
+	sum, err := Upload(context.Background(), Options{
+		StateDir: stateDir, Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
+		State: st, Sources: []agents.HistorySource{src}, Filter: relay.NewContentFilter(nil),
+		Holdings:  checkerFunc(func(routing.Team) error { return errors.New("backend 503") }),
+		Transport: &Transport{Version: "test", HTTP: http.DefaultClient, BytesPerSec: 1 << 30},
+		Now:       func() time.Time { return now },
+		Progress:  func(ev ProgressEvent) { events = append(events, ev) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sum.TeamIssues) != 1 || sum.TeamIssues[0].Skipped != 2 || sum.SkippedSessions[SkipHoldingsFailed] != 2 {
+		t.Fatalf("issues = %+v skipped = %v, want 1 TeamIssue skipping both sessions", sum.TeamIssues, sum.SkippedSessions)
+	}
+	plan := checkPlanAccounting(t, events)
+	if plan.Sessions != 0 {
+		t.Errorf("plan.Sessions = %d, want 0", plan.Sessions)
 	}
 }
 
@@ -471,21 +637,39 @@ func TestUploadSignInLostPaths(t *testing.T) {
 		}
 	}
 
-	t.Run("holdings returns ErrNotLoggedIn", func(t *testing.T) {
+	t.Run("holdings returns ErrNotLoggedIn in stream mode", func(t *testing.T) {
 		t.Parallel()
 		_, err := Upload(context.Background(), Options{
 			StateDir: t.TempDir(), Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
 			State: st, Sources: []agents.HistorySource{makeSrc()}, Filter: relay.NewContentFilter(nil),
-			Holdings:  checkerFunc(func(routing.Team) error { return auth.ErrNotLoggedIn }),
-			Transport: &Transport{Version: "test", HTTP: http.DefaultClient, BytesPerSec: 1 << 30},
-			Now:       func() time.Time { return now },
+			Holdings:         checkerFunc(func(routing.Team) error { return auth.ErrNotLoggedIn }),
+			Transport:        &Transport{Version: "test", HTTP: http.DefaultClient, BytesPerSec: 1 << 30, FailOnSignInLost: true},
+			FailOnSignInLost: true,
+			Now:              func() time.Time { return now },
 		})
 		if _, ok := errors.AsType[*SignInLostError](err); !ok {
 			t.Fatalf("err = %v, want *SignInLostError", err)
 		}
 	})
 
-	t.Run("recheck returns ErrNotLoggedIn", func(t *testing.T) {
+	t.Run("holdings returns ErrNotLoggedIn in non-stream mode keeps main TeamIssue", func(t *testing.T) {
+		t.Parallel()
+		sum, err := Upload(context.Background(), Options{
+			StateDir: t.TempDir(), Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
+			State: st, Sources: []agents.HistorySource{makeSrc()}, Filter: relay.NewContentFilter(nil),
+			Holdings:  checkerFunc(func(routing.Team) error { return auth.ErrNotLoggedIn }),
+			Transport: &Transport{Version: "test", HTTP: http.DefaultClient, BytesPerSec: 1 << 30},
+			Now:       func() time.Time { return now },
+		})
+		if err != nil {
+			t.Fatalf("err = %v, want nil with TeamIssue", err)
+		}
+		if len(sum.TeamIssues) != 1 || !strings.Contains(sum.TeamIssues[0].Reason, "holdings check failed") || sum.SkippedSessions[SkipHoldingsFailed] != 1 {
+			t.Fatalf("issues = %+v skipped = %v, want holdings check failed issue", sum.TeamIssues, sum.SkippedSessions)
+		}
+	})
+
+	t.Run("recheck returns ErrNotLoggedIn in stream mode", func(t *testing.T) {
 		t.Parallel()
 		calls := 0
 		_, err := Upload(context.Background(), Options{
@@ -499,15 +683,41 @@ func TestUploadSignInLostPaths(t *testing.T) {
 				}
 				return routing.State{}, auth.ErrNotLoggedIn
 			},
-			Transport: &Transport{Version: "test", HTTP: http.DefaultClient, BytesPerSec: 1 << 30},
-			Now:       func() time.Time { return now },
+			Transport:        &Transport{Version: "test", HTTP: http.DefaultClient, BytesPerSec: 1 << 30, FailOnSignInLost: true},
+			FailOnSignInLost: true,
+			Now:              func() time.Time { return now },
 		})
 		if _, ok := errors.AsType[*SignInLostError](err); !ok {
 			t.Fatalf("err = %v, want *SignInLostError", err)
 		}
 	})
 
-	t.Run("send has missing token", func(t *testing.T) {
+	t.Run("recheck returns ErrNotLoggedIn in non-stream mode keeps deselected TeamIssue", func(t *testing.T) {
+		t.Parallel()
+		calls := 0
+		sum, err := Upload(context.Background(), Options{
+			StateDir: t.TempDir(), Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
+			State: st, Sources: []agents.HistorySource{makeSrc()}, Filter: relay.NewContentFilter(nil),
+			Holdings: stubHoldings{},
+			ReloadState: func() (routing.State, error) {
+				calls++
+				if calls == 1 {
+					return st, nil
+				}
+				return routing.State{}, auth.ErrNotLoggedIn
+			},
+			Transport: &Transport{Version: "test", HTTP: http.DefaultClient, BytesPerSec: 1 << 30},
+			Now:       func() time.Time { return now },
+		})
+		if err != nil {
+			t.Fatalf("err = %v, want nil with deselected TeamIssue", err)
+		}
+		if len(sum.TeamIssues) != 1 || sum.SkippedSessions[SkipDeselected] != 1 {
+			t.Fatalf("issues = %+v skipped = %v, want 1 deselected TeamIssue", sum.TeamIssues, sum.SkippedSessions)
+		}
+	})
+
+	t.Run("send has missing token in stream mode with sign-in lost", func(t *testing.T) {
 		t.Parallel()
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -516,13 +726,53 @@ func TestUploadSignInLostPaths(t *testing.T) {
 		_, err := Upload(context.Background(), Options{
 			StateDir: t.TempDir(), Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
 			State: st, Sources: []agents.HistorySource{makeSrc()}, Filter: relay.NewContentFilter(nil),
-			Holdings:    stubHoldings{},
-			Transport:   &Transport{Version: "test", HTTP: srv.Client(), SignIn: &fakeSignIn{account: "acc1"}, BytesPerSec: 1 << 30},
-			EndpointFor: func(string) string { return srv.URL },
-			Now:         func() time.Time { return now },
+			Holdings: stubHoldings{},
+			Transport: &Transport{
+				Version:          "test",
+				HTTP:             srv.Client(),
+				SignIn:           &fakeSignIn{account: "acc1"},
+				BytesPerSec:      1 << 30,
+				FailOnSignInLost: true,
+				ClassifyNoToken:  func(context.Context, string) error { return &SignInLostError{Err: auth.ErrNotLoggedIn} },
+			},
+			FailOnSignInLost: true,
+			EndpointFor:      func(string) string { return srv.URL },
+			Now:              func() time.Time { return now },
 		})
 		if _, ok := errors.AsType[*SignInLostError](err); !ok {
 			t.Fatalf("err = %v, want *SignInLostError", err)
+		}
+	})
+
+	t.Run("send has missing token without sign-in loss is not mapped to SignInLostError", func(t *testing.T) {
+		t.Parallel()
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer srv.Close()
+		sum, err := Upload(context.Background(), Options{
+			StateDir: t.TempDir(), Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
+			State: st, Sources: []agents.HistorySource{makeSrc()}, Filter: relay.NewContentFilter(nil),
+			Holdings: stubHoldings{},
+			Transport: &Transport{
+				Version:          "test",
+				HTTP:             srv.Client(),
+				SignIn:           &fakeSignIn{account: "acc1"},
+				BytesPerSec:      1 << 30,
+				InitialBackoff:   time.Millisecond,
+				MaxRetries:       1,
+				FailOnSignInLost: true,
+				ClassifyNoToken:  func(context.Context, string) error { return nil },
+			},
+			FailOnSignInLost: true,
+			EndpointFor:      func(string) string { return srv.URL },
+			Now:              func() time.Time { return now },
+		})
+		if err != nil {
+			t.Fatalf("err = %v, want nil (send_failed TeamIssue, not SignInLostError)", err)
+		}
+		if len(sum.TeamIssues) != 1 || sum.SkippedSessions[SkipSendFailed] != 1 {
+			t.Fatalf("issues = %+v skipped = %v, want 1 send_failed TeamIssue", sum.TeamIssues, sum.SkippedSessions)
 		}
 	})
 }

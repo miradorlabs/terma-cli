@@ -3,9 +3,13 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // maxActiveWindowDays bounds --active-window in days, well inside time.Duration's ~292 years.
@@ -65,4 +69,50 @@ func parseHistoryActiveWindow(spec string) (time.Duration, error) {
 		return 0, fmt.Errorf("invalid --active-window %q: must be whole seconds (e.g. 1h, 30m, 30s, or 0)", spec)
 	}
 	return d, nil
+}
+
+// historyUsageError reports arguments `history upload` does not take. A --json-stream run
+// ends with an error line, as every other failure of one does. Flags are read up to the
+// one refused, so --json-stream after it is looked for in the process's arguments.
+func historyUsageError(cmd *cobra.Command, jsonStream bool, err error) error {
+	if !jsonStream && !argsAskForJSONStream(cmd.Flags(), os.Args[1:]) {
+		return err
+	}
+	s := newHistoryStream(cmd.Context(), cmd.OutOrStdout())
+	defer s.close()
+	return s.fail(cmd.ErrOrStderr(), err)
+}
+
+// argsAskForJSONStream reports whether args set --json-stream as a flag: not as the value of
+// another of flags' flags that takes one, and not set to false.
+func argsAskForJSONStream(flags *pflag.FlagSet, args []string) bool {
+	// takesValue reports whether the flag a names reads the next argument as its value.
+	takesValue := func(a string) bool {
+		var f *pflag.Flag
+		switch {
+		case strings.Contains(a, "="):
+			return false
+		case strings.HasPrefix(a, "--"):
+			f = flags.Lookup(a[2:])
+		case len(a) == 2 && a[0] == '-':
+			f = flags.ShorthandLookup(a[1:])
+		}
+		return f != nil && f.NoOptDefVal == ""
+	}
+	asked := false
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--":
+			return asked
+		case a == "--json-stream":
+			asked = true
+		case strings.HasPrefix(a, "--json-stream="):
+			v, err := strconv.ParseBool(strings.TrimPrefix(a, "--json-stream="))
+			asked = err == nil && v
+		case takesValue(a):
+			i++
+		}
+	}
+	return asked
 }

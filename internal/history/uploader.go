@@ -39,12 +39,13 @@ type Options struct {
 	Since            time.Time
 	// ActiveWindow is how recently a session's files may have changed for it to be left
 	// out as still in progress; nil means DefaultActiveWindow, and zero leaves none out.
-	ActiveWindow *time.Duration
-	MaxReqBytes  int
-	DryRun       bool
-	RetryFailed  bool // re-send sessions a team rejected before, with the in-progress ones
-	Now          func() time.Time
-	Progress     func(ProgressEvent)
+	ActiveWindow     *time.Duration
+	MaxReqBytes      int
+	DryRun           bool
+	RetryFailed      bool // re-send sessions a team rejected before, with the in-progress ones
+	FailOnSignInLost bool // abort with SignInLostError on lost sign-in (--json-stream only)
+	Now              func() time.Time
+	Progress         func(ProgressEvent)
 }
 
 type routeSessionPlan struct {
@@ -235,6 +236,7 @@ func emitDiscoveryBlocked(held map[string]*heldRoute, report func(ProgressEvent)
 			EnrollmentID: hr.team.EnrollmentID,
 			TeamID:       hr.team.TeamID,
 			SkipReason:   hr.skipReason,
+			Phase:        BlockPhaseDiscovery,
 			Reason:       "team is currently blocked (" + state + ")",
 			Skipped:      len(hr.sessions),
 		})
@@ -344,9 +346,11 @@ func discoverAndPlan(
 			anyRouted := false
 			for _, rs := range segSums {
 				if !rs.ok {
-					if !f.OutsideSince {
+					eid := rs.target.Team.EnrollmentID
+					teamBlocked := eid != "" && strings.HasPrefix(rs.skipReason, SkipTeamBlockedPrefix)
+					if !f.OutsideSince || (teamBlocked && resumableByRoute[eid][key]) {
 						sum.addSkippedSegment(rs.skipReason, 1)
-						if eid := rs.target.Team.EnrollmentID; eid != "" && strings.HasPrefix(rs.skipReason, SkipTeamBlockedPrefix) {
+						if teamBlocked {
 							hr := held[eid]
 							if hr == nil {
 								hr = &heldRoute{

@@ -135,16 +135,18 @@ func (r SendRequest) signalPath() string {
 // touching the shared live relay outbox. One pacer instance per route enforces serial
 // delivery at 2 MiB/s.
 type Transport struct {
-	Version        string
-	HTTP           *http.Client
-	SignIn         sendas.SignIn
-	BytesPerSec    int64
-	MaxRetries     int
-	InitialBackoff time.Duration
-	MaxBackoff     time.Duration
-	MaxRetryAfter  time.Duration
-	Now            func() time.Time
-	Sleep          func(context.Context, time.Duration) error
+	Version          string
+	HTTP             *http.Client
+	SignIn           sendas.SignIn
+	FailOnSignInLost bool
+	ClassifyNoToken  func(ctx context.Context, account string) error
+	BytesPerSec      int64
+	MaxRetries       int
+	InitialBackoff   time.Duration
+	MaxBackoff       time.Duration
+	MaxRetryAfter    time.Duration
+	Now              func() time.Time
+	Sleep            func(context.Context, time.Duration) error
 }
 
 // NewHTTPClient returns an isolated HTTP client that refuses redirects so bearer tokens
@@ -358,17 +360,31 @@ func (t *Transport) credential(ctx context.Context, req SendRequest) (bearer str
 		return req.ServerKey, false, nil
 	}
 	if t.SignIn == nil || req.Account == "" {
-		return "", false, &SignInLostError{Err: fmt.Errorf("%w: no sign-in available for this account", auth.ErrNotLoggedIn)}
+		if t.FailOnSignInLost {
+			return "", false, &SignInLostError{Err: fmt.Errorf("%w: no sign-in available for this account", auth.ErrNotLoggedIn)}
+		}
+		return "", false, &TransientError{Err: errors.New("no sign-in available for this account")}
 	}
 	tok, err := t.SignIn.Token(ctx, req.Account)
 	if err != nil {
-		if fatal := signInGoneError(err); fatal != nil {
-			return "", false, fatal
+		if t.FailOnSignInLost {
+			if fatal := signInGoneError(err); fatal != nil {
+				return "", false, fatal
+			}
 		}
 		return "", false, &TransientError{Err: fmt.Errorf("read sign-in token: %w", err)}
 	}
 	if tok == "" {
-		return "", false, &SignInLostError{Err: fmt.Errorf("%w: no active sign-in token for this account", auth.ErrNotLoggedIn)}
+		if t.FailOnSignInLost {
+			if t.ClassifyNoToken != nil {
+				if fatal := t.ClassifyNoToken(ctx, req.Account); fatal != nil {
+					return "", false, fatal
+				}
+			} else {
+				return "", false, &SignInLostError{Err: fmt.Errorf("%w: no active sign-in token for this account", auth.ErrNotLoggedIn)}
+			}
+		}
+		return "", false, &TransientError{Err: errors.New("no active sign-in token for this account")}
 	}
 	return tok, true, nil
 }
