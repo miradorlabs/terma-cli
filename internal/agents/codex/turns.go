@@ -4,11 +4,12 @@ package codex
 // thread resumed in a collected repository still holds earlier turns that must stay home
 // or route to their own destination rather than the session's current run.
 
-// turnFields are the payload fields that say where a thread runs.
+// turnFields are the payload fields that say where a thread runs, and on which model provider.
 type turnFields struct {
 	Cwd            string `json:"cwd"`
 	ThreadSettings struct {
-		Cwd string `json:"cwd"`
+		Cwd             string `json:"cwd"`
+		ModelProviderID string `json:"model_provider_id"`
 	} `json:"thread_settings"`
 }
 

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
@@ -25,6 +26,8 @@ type quotaCursor struct {
 	Anchor    string `json:"anchor"`
 	TurnID    string `json:"turn_id,omitempty"`
 	Skipping  bool   `json:"skipping,omitempty"`
+	// Provider is the thread's model provider id, which stays on this machine.
+	Provider string `json:"provider,omitempty"`
 	turnState
 }
 
@@ -67,12 +70,21 @@ func readFunding(ctx context.Context, sessionID, transcript string, cursor quota
 	if cursor.Identity == "" || reset {
 		cursor = quotaCursor{Identity: identity, Stream: fundingHash(identity + old.Stream + fmt.Sprint(old.Offset))}
 	}
+	// A cursor written before the provider was tracked takes the session's first one, which a
+	// resume may since have moved.
+	if cursor.Provider == "" {
+		cursor.Provider = codexSessionProvider(first)
+	}
+	providers := sync.OnceValue(readCodexProviders)
 	send := func(e hookrun.FundingEvidence, offset int64) error {
 		if e.Attrs == nil {
 			e.Attrs = map[string]any{}
 		}
 		e.Attrs[semconv.TermaObservationStreamKey] = cursor.Stream
 		e.Attrs[semconv.TermaObservationIDKey] = fundingHash(sessionID + cursor.Stream + fmt.Sprint(offset) + e.Status)
+		if b := codexServingBackend(cursor.Provider, providers()); b != "" {
+			e.Attrs[semconv.TermaServingBackendKey] = b
+		}
 		// A gap in a withheld turn leaves, but not which turn it was, nor where it ran.
 		if cursor.TurnID != "" && cursor.Admitted {
 			e.Attrs[semconv.TermaTurnIDKey] = cursor.TurnID
@@ -150,6 +162,10 @@ func readFunding(ctx context.Context, sessionID, transcript string, cursor quota
 				cursor.TurnID = ""
 			} else {
 				cursor.track(admits, rec.Type, rec.Payload.Type, rec.Payload.turnFields)
+				// A resume can move the thread to another provider.
+				if rec.Type == "event_msg" && rec.Payload.Type == "thread_settings_applied" && rec.Payload.ThreadSettings.ModelProviderID != "" {
+					cursor.Provider = rec.Payload.ThreadSettings.ModelProviderID
+				}
 				switch {
 				case rec.Type == "turn_context" || (rec.Type == "event_msg" && (rec.Payload.Type == "task_started" || rec.Payload.Type == "turn_started")):
 					cursor.TurnID = ""

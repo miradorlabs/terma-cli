@@ -15,6 +15,7 @@ import (
 // newRepo is a repository with private terma and Claude Code config directories.
 func newRepo(t *testing.T) string {
 	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
+	t.Setenv("ANTHROPIC_BASE_URL", "")
 	return hookruntest.InitRepo(t)
 }
 
@@ -26,6 +27,7 @@ func newFundingEnv(t *testing.T) hookrun.Env {
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	t.Setenv("ANTHROPIC_AUTH_TOKEN", "")
 	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "")
+	t.Setenv("ANTHROPIC_BASE_URL", "")
 	root, stateDir, sp := hookruntest.Project(t)
 	return hookrun.Env{StateDir: stateDir, Now: time.Now(), Cwd: root, Spool: sp, Version: "test", Policy: hookruntest.Admitting(root), Team: hookruntest.Team}
 }

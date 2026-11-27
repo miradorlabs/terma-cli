@@ -84,9 +84,14 @@ func captureCodexFunding(ctx context.Context, e hookrun.Env, r *hookrun.Repo, in
 	// Capture progress separately: backlog is not a new unavailable quota.
 	if status != "caught_up" && status != "append_failed" {
 		name := semconv.TermaSessionCaptureEvent
+		attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 		if status == "not_ready" {
 			name = semconv.TermaSessionQuotaEvent
+			// The platform takes a session's backend from its latest quota record, this one included.
+			if b := codexServingBackend(next.Provider, readCodexProviders()); b != "" {
+				attrs[semconv.TermaServingBackendKey] = b
+			}
 		}
-		e.CaptureFunding(r, in.SessionID, codexTool, name, hookrun.FundingEvidence{Source: sourceCodexRollout, Status: status, Attrs: hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)})
+		e.CaptureFunding(r, in.SessionID, codexTool, name, hookrun.FundingEvidence{Source: sourceCodexRollout, Status: status, Attrs: attrs})
 	}
 }
