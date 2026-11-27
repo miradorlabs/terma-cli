@@ -17,7 +17,8 @@
 //     path a call names; no other tool's arguments are judged.
 //   - What is sent (call.go, content.go): a model call, a prompt, a reply and a tool's result,
 //     cut to size. transcript.go's send picks them for a line; PostToolUse sends the tool
-//     call with its arguments.
+//     call with its arguments; a turn's start and its Stop send the name agy gave the
+//     conversation (title.go).
 package antigravity
 
 import (
@@ -110,7 +111,7 @@ func (Agent) PayloadSession(payload []byte) (hookrun.PayloadSession, bool) {
 // Coverage is how completely terma supports the agent.
 func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 	return agents.CapabilitySupport{Level: agents.SupportPartial, Note: "files its file tools write; a file a shell command writes is not recorded"},
-		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "hooks and its transcript, no OTLP export: each model call's tokens (thinking not counted apart), every turn and tool step; under the team's content policy, each prompt, reply, tool call's arguments and tool's result, cut at 16 KiB; no thinking; plan, quota and account from the status line, interactive agy sessions only, so none from T3 Code threads; the version of the running agy or of T3 Code's own copy, none when terma cannot tell or on Windows; no cost or tool durations"}
+		agents.CapabilitySupport{Level: agents.SupportPartial, Note: "hooks and its transcript, no OTLP export: each model call's tokens (thinking not counted apart), every turn and tool step; under the team's content policy, each prompt, reply, tool call's arguments and tool's result, cut at 16 KiB, and the session's title; no thinking; plan, quota and account from the status line, interactive agy sessions only, so none from T3 Code threads; the version of the running agy or of T3 Code's own copy, none when terma cannot tell or on Windows; no cost or tool durations"}
 }
 
 // ContentConsented is the consent prompts, replies, tool arguments and results travel under.
@@ -134,5 +135,5 @@ var (
 
 // StateDirs are the directories its hooks keep state in.
 func (Agent) StateDirs() []string {
-	return []string{antigravityObservationDir, antigravityTurnDir, antigravityCallDir, antigravityStatusLineDir, antigravityVersionDir}
+	return []string{antigravityObservationDir, antigravityTurnDir, antigravityCallDir, antigravityStatusLineDir, antigravityVersionDir, antigravityTitleDir}
 }

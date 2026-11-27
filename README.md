@@ -526,7 +526,10 @@ its text. A prompt or a reply longer than 16 KiB is cut there and marked as cut.
 cut at 16 KiB and ends with how many characters were dropped. Arguments longer than 16 KiB
 keep their short values, such as a path or a command, and each long value is cut to 2 KiB
 and ends the same way. Thinking is not sent. A tool's result on a transcript line over 8 MiB
-is lost.
+is lost. The name `agy` gives a conversation, or the one you rename it to, goes as the
+session's title under the same rules as a prompt, since it restates the first one. terma
+reads it from the conversation's file in `agy`'s `annotations` folder when a turn starts
+and when it ends. A headless `agy -p` names none.
 
 Two rules limit what a session sends of another repository's content. They do not cover
 every tool. terma checks what a call names for `agy`'s own file and folder tools only. A
