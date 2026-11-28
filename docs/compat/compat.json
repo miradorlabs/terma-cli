@@ -73,7 +73,7 @@
       "label": "The machine's heartbeat reaches the project's ingest"
     }
   ],
-  "generated_at": "2026-11-27T23:29:43Z",
+  "generated_at": "2026-11-28T01:48:20Z",
   "harnesses": [
     {
       "ID": "claude",
@@ -11742,7 +11742,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.content_allowed",
       "result": "pass",
-      "last_run": "2026-11-27T19:30:04.954307Z",
+      "last_run": "2026-11-28T01:46:29.195679Z",
       "first_passed": "2026-11-27T13:19:29.610029Z",
       "terma": "terma version dev",
       "test": "TestRelayCopilot/v1.0.117/content"
@@ -11753,7 +11753,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.content_withheld",
       "result": "pass",
-      "last_run": "2026-11-27T19:30:33.732961Z",
+      "last_run": "2026-11-28T01:46:55.111851Z",
       "first_passed": "2026-11-27T13:19:54.925422Z",
       "terma": "terma version dev",
       "test": "TestRelayCopilot/v1.0.117/withheld"
@@ -11764,7 +11764,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.only_opted_in",
       "result": "pass",
-      "last_run": "2026-11-27T19:30:51.484716Z",
+      "last_run": "2026-11-28T01:47:10.606756Z",
       "first_passed": "2026-11-27T13:20:11.015102Z",
       "terma": "terma version dev",
       "test": "TestRelayCopilotOutsideARepository/v1.0.117"
@@ -11775,7 +11775,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.telemetry",
       "result": "pass",
-      "last_run": "2026-11-27T19:30:33.733055Z",
+      "last_run": "2026-11-28T01:46:55.11265Z",
       "first_passed": "2026-11-27T13:19:54.925491Z",
       "terma": "terma version dev",
       "test": "TestRelayCopilot/v1.0.117"
@@ -11786,7 +11786,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.tools_no_token",
       "result": "pass",
-      "last_run": "2026-11-27T19:31:05.43873Z",
+      "last_run": "2026-11-28T01:47:22.93378Z",
       "first_passed": "2026-11-27T13:20:23.37636Z",
       "terma": "terma version dev",
       "test": "TestRelayCopilotToolsGetNoExporter/v1.0.117"
