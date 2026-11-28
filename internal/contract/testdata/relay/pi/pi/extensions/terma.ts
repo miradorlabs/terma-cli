@@ -112,10 +112,7 @@ function schedule() {
   if (!timer) timer = setTimeout(() => void flush(), 1000)
 }
 
-const tainted = new Set<string>()
-
 function span(session: string, name: string, start: number, end: number, a: Record<string, unknown>, error = false) {
-  if (session && tainted.has(session)) return
   spans.push({
     traceId: traceId(session),
     spanId: hex(8),
@@ -130,7 +127,6 @@ function span(session: string, name: string, start: number, end: number, a: Reco
 }
 
 function record(session: string, event: string, body: string, a: Record<string, unknown>) {
-  if (session && tainted.has(session)) return
   const t = nanos(Date.now())
   logs.push({
     timeUnixNano: t,
@@ -147,9 +143,9 @@ function record(session: string, event: string, body: string, a: Record<string, 
 // --- terma hook ----------------------------------------------------------------------
 
 // termaHook hands an event to `terma hook pi-*` in FIFO order so session-start always
-// finishes before tool-reach (preventing a late StartRun from clearing an earlier Mixed
-// mark) and reach completes before the session exits. A timed-out child is terminated and
-// the FIFO queue only advances once child exit is confirmed.
+// finishes before the session's prompts and file edits, and they finish before the session
+// ends. A timed-out child is terminated and the FIFO queue only advances once child exit is
+// confirmed.
 const HOOK_TIMEOUT_MS = 2000, HOOK_KILL_GRACE_MS = 250, MAX_HOOK_QUEUE = 64
 let hookQueue: Promise<void> = Promise.resolve()
 let hookPending = 0
@@ -200,67 +196,20 @@ function termaHook(event: string, payload: Record<string, unknown>): Promise<boo
 
 let session = ""
 let turnStart = Date.now()
-const toolCalls = new Map<string, { start: number; reach: Promise<boolean> | null }>()
+const toolCalls = new Map<string, number>()
 
 function sessionOf(ctx: any): string {
   const own = ctx && ctx.sessionManager && typeof ctx.sessionManager.getSessionId === "function" ? ctx.sessionManager.getSessionId() : ""
   return own ? String(own) : session
 }
 
-// toolReach describes what a read, search, glob, list or shell tool call can reach.
-function toolReach(event: any): Record<string, unknown> | null {
-  const name = String(event?.toolName ?? "")
-  const input = event?.input ?? {}
-  const out: Record<string, unknown> = {}
-  const path = typeof input.path === "string" && input.path ? input.path : ""
-  switch (name) {
-    case "read":
-      if (path) out.paths = [path]
-      break
-    case "grep":
-      out.paths = [path || "."]
-      if (typeof input.glob === "string" && input.glob) out.globs = [input.glob]
-      break
-    case "find":
-    case "glob": {
-      out.paths = [path || "."]
-      const g = typeof input.pattern === "string" ? input.pattern : typeof input.glob === "string" ? input.glob : ""
-      if (g) out.globs = [g]
-      break
-    }
-    case "ls":
-      if (path) out.lists = [path]
-      break
-    case "bash":
-      if (typeof input.command === "string" && input.command) out.command = input.command
-      if (typeof input.cwd === "string" && input.cwd) out.dir = input.cwd
-      break
-    default:
-      return null
-  }
-  return Object.keys(out).length > 0 ? out : null
-}
-
 export default function (pi: any) {
   if (!CONFIG) return
-
-  const emitReach = (event: any, ctx: any): Promise<boolean> | null => {
-    const reach = toolReach(event)
-    if (!reach) return null
-    const s = sessionOf(ctx)
-    if (!s) return null
-    return termaHook(AGENT + "-tool-reach", { session_id: s, cwd: ctx?.cwd, tool: String(event?.toolName ?? ""), ...reach }).then((ok) => {
-      if (!ok) tainted.add(s)
-      return ok
-    })
-  }
 
   pi.on("session_start", (event: any, ctx: any) => {
     const s = sessionOf(ctx)
     session = s
-    return termaHook(AGENT + "-session-start", { session_id: s, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason }).then((ok) => {
-      if (ok && s) tainted.delete(s)
-    })
+    return termaHook(AGENT + "-session-start", { session_id: s, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason })
   })
 
   pi.on("session_shutdown", async (_event: any, ctx: any) => {
@@ -304,26 +253,17 @@ export default function (pi: any) {
     turnStart = end
   })
 
-  pi.on("tool_call", async (event: any, ctx: any) => {
-    const reach = emitReach(event, ctx)
+  pi.on("tool_call", (event: any) => {
     if (event?.toolCallId) {
-      toolCalls.set(event.toolCallId, { start: Date.now(), reach })
+      toolCalls.set(event.toolCallId, Date.now())
       if (toolCalls.size > 1024) toolCalls.delete(toolCalls.keys().next().value!)
     }
-    if (reach) await reach
   })
 
-  pi.on("tool_result", async (event: any, ctx: any) => {
+  pi.on("tool_result", (event: any, ctx: any) => {
     const s = sessionOf(ctx)
-    const call = event?.toolCallId ? toolCalls.get(event.toolCallId) : undefined
+    const start = (event?.toolCallId ? toolCalls.get(event.toolCallId) : undefined) ?? Date.now()
     if (event?.toolCallId) toolCalls.delete(event.toolCallId)
-    const start = call?.start ?? Date.now()
-    const reachDone = call?.reach ?? emitReach(event, ctx)
-    if (reachDone && !(await reachDone)) {
-      if (s) tainted.add(s)
-      return
-    }
-    if (s && tainted.has(s)) return
     const end = Date.now()
     const name = String(event?.toolName ?? "")
     span(s, "execute_tool " + name, start, end, {

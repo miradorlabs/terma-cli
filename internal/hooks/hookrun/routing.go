@@ -2,24 +2,16 @@ package hookrun
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
-	"slices"
-	"sync"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
-
-// ErrFailClosed signals that a reach hook could not verify or persist routing state,
-// instructing dispatch.Run to exit non-zero so extension plugins fail closed.
-var ErrFailClosed = errors.New("reach classification failed closed")
 
 // Routing holds a profile's routing state and compiled Router for one hook process.
 // When Env.Routing is non-nil it replaces Policy and Team; nil keeps the pre-cutover fallback.
@@ -28,20 +20,11 @@ type Routing struct {
 	WithholdPlacements bool // Council 7: true while a live !RunInfo.Routing relay holds the lock.
 	state              *routing.State
 	router             *routing.Router
-	mu                 sync.Mutex
-	runs               map[string]*ledgerRun
-	writeErr           error
-}
-type ledgerRun struct {
-	id              string
-	locations       []string
-	active, mixedAt time.Time
-	aside           bool
 }
 
 // NewRouting builds a Routing for profile from st; nil fails closed (Usable() == false).
 func NewRouting(profile string, st *routing.State) *Routing {
-	rt := &Routing{Profile: profile, runs: map[string]*ledgerRun{}}
+	rt := &Routing{Profile: profile}
 	if st != nil {
 		s := *st
 		rt.state, rt.router = &s, routing.NewRouter(s)
@@ -74,15 +57,13 @@ func (rt *Routing) route(loc routing.Location, now time.Time) *dest {
 	}
 	return &dest{loc: loc, d: rt.router.Route(loc, now)}
 }
-func (e Env) resolveRouted(ctx context.Context, r *Repo) (*Repo, error) {
+func (e Env) resolveRouted(ctx context.Context) (*Repo, error) {
 	if !e.Routing.Usable() {
 		return nil, ErrNotAdmitted
 	}
-	if r == nil {
-		var err error
-		if r, err = e.routeHere(ctx); err != nil {
-			return nil, err
-		}
+	r, err := e.routeHere(ctx)
+	if err != nil {
+		return nil, err
 	}
 	if !r.dest.collected() {
 		return nil, ErrNotAdmitted
@@ -191,14 +172,14 @@ func (e Env) RoutesWith(r *Repo, gitDir, origin string) bool {
 	return d.collected() && d.d.EnrollmentID == r.dest.d.EnrollmentID
 }
 
-// Routed stamps ev with r's routed destination and the session's current run when routed.
+// Routed stamps ev with r's routed destination when routed.
 func (e Env) Routed(r *Repo, ev spool.Event) spool.Event {
 	if e.Routing == nil || r == nil || r.dest == nil {
 		return ev
 	}
-	return e.destine(ev, r.dest, false, e.runOf(ev.SessionID))
+	return e.destine(ev, r.dest)
 }
-func (e Env) destine(ev spool.Event, d *dest, own bool, run string) spool.Event {
+func (e Env) destine(ev spool.Event, d *dest) spool.Event {
 	if ev.Account == "" && !ev.NoPerson {
 		l := e.lane()
 		ev.Account, ev.NoPerson = l.Account, l.NoPerson
@@ -207,52 +188,9 @@ func (e Env) destine(ev spool.Event, d *dest, own bool, run string) spool.Event 
 	if d.loc.Kind == routing.Repository {
 		ev.Repository.Origin = d.loc.Repository
 	}
-	ev.Run, ev.OwnLocation, ev.Global = run, own, false
+	ev.Global = false
 	delete(ev.Attrs, AttrProjectID)
 	return ev
-}
-func (e Env) runOf(sessionID string) string { return e.currentRun(sessionID).id }
-func (e Env) currentRun(sessionID string) ledgerRun {
-	rt := e.Routing
-	if rt == nil || sessionID == "" {
-		return ledgerRun{}
-	}
-	rt.mu.Lock()
-	defer rt.mu.Unlock()
-	cur, ok := rt.runs[sessionID]
-	if !ok {
-		p, _ := runs.Locate(e.StateDir, sessionID)
-		cur = &ledgerRun{id: p.Run, locations: p.Locations, active: p.Active, mixedAt: p.MixedAt, aside: p.Aside}
-		rt.runs[sessionID] = cur
-	}
-	out := *cur
-	out.locations = slices.Clip(out.locations)
-	return out
-}
-func (rt *Routing) setRun(sessionID, run string, at time.Time) {
-	rt.mu.Lock()
-	defer rt.mu.Unlock()
-	rt.runs[sessionID] = &ledgerRun{id: run, active: at}
-}
-func (e Env) keepRun(sessionID string, now time.Time) {
-	due := false
-	e.Routing.updateRun(sessionID, func(cur *ledgerRun) {
-		if cur.id != "" && now.Sub(cur.active) > runs.RefreshEvery {
-			cur.active, due = now, true
-		}
-	})
-	if due {
-		if err := runs.Refresh(e.StateDir, sessionID, now); err != nil {
-			e.Logf("renew the run ledger: %v", err)
-		}
-	}
-}
-func (rt *Routing) updateRun(sessionID string, fn func(*ledgerRun)) {
-	rt.mu.Lock()
-	defer rt.mu.Unlock()
-	if cur, ok := rt.runs[sessionID]; ok {
-		fn(cur)
-	}
 }
 
 // Turns judges and routes per-turn agent records by each turn's working directory.
@@ -302,12 +240,12 @@ func (t *Turns) Exclusive(r *Repo, cwd string) bool {
 	return r != nil && r.dest != nil && t.RouteKey(cwd) == r.RouteKey()
 }
 
-// Routed stamps ev using cwd's routed destination (OwnLocation: true) while keeping the session run.
+// Routed stamps ev using cwd's routed destination.
 func (t *Turns) Routed(r *Repo, cwd string, ev spool.Event) spool.Event {
 	if t.env.Routing == nil || cwd == "" {
 		return t.env.Routed(r, ev)
 	}
-	return t.env.destine(ev, t.dest(cwd), true, t.env.runOf(ev.SessionID))
+	return t.env.destine(ev, t.dest(cwd))
 }
 func (t *Turns) dest(cwd string) *dest {
 	if d, ok := t.dests[cwd]; ok {
@@ -323,34 +261,4 @@ func (t *Turns) dest(cwd string) *dest {
 	}
 	t.dests[cwd] = d
 	return d
-}
-func (rt *Routing) dropRunCache(ids ...string) {
-	rt.mu.Lock()
-	defer rt.mu.Unlock()
-	for _, id := range ids {
-		delete(rt.runs, id)
-	}
-}
-
-func (rt *Routing) noteWriteErr(err error) {
-	if rt == nil || err == nil {
-		return
-	}
-	rt.mu.Lock()
-	if rt.writeErr == nil {
-		rt.writeErr = err
-	}
-	rt.mu.Unlock()
-}
-
-// TakeWriteErr returns and clears the first persistence error recorded on rt.
-func (rt *Routing) TakeWriteErr() error {
-	if rt == nil {
-		return nil
-	}
-	rt.mu.Lock()
-	err := rt.writeErr
-	rt.writeErr = nil
-	rt.mu.Unlock()
-	return err
 }

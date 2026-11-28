@@ -71,9 +71,7 @@ bench() {
   median=$(echo "$times" | tr ' ' '\n' | grep -v '^$' | sort -n | sed -n 4p)
   echo "prepare-commit-msg, $2: median ${median}ms over 7 runs (${times# }) — budget ${BUDGET_MS}ms"
   [ "$median" -le "$BUDGET_MS" ] || { echo "$2: over budget" >&2; exit 1; }
-  tool_hook pre-tool-use "Read, $2" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"%s/NOTES.md"},"cwd":"%s"}' "$sid" "$3" "$1")"
-  tool_hook pre-tool-use "Bash, $2" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"cd %s && cat NOTES.md src/a.go | grep -c bench > /dev/null; ls -la %s/src"},"cwd":"%s"}' "$sid" "$3" "$1" "$1")"
-  tool_hook pre-tool-use "Grep, $2" "$(printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"Grep","tool_input":{"pattern":"TODO","path":"%s"},"cwd":"%s"}' "$sid" "$1" "$1")"
+  tool_hook post-tool-use "Edit, $2" "$(printf '{"session_id":"%s","hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":"%s/src/a.go"},"cwd":"%s"}' "$sid" "$1" "$1")"
 }
 
 bench "$repo" checkout "$tmp/wt"

@@ -1,13 +1,10 @@
 package cli
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"os"
-	"slices"
 	"strings"
 	"time"
 
@@ -21,7 +18,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -94,8 +90,7 @@ The exit status distinguishes the outcomes a script needs apart:
      or given up on for age, disk pressure, no destination, or being unreadable
 
 Events dropped by policy are reported but are not a failure: those a team's
-policy withholds or no longer collects, and those of a session that crossed
-organizations.`,
+policy withholds or no longer collects.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			res, err := app.flushSpool(cmd.Context(), force, minInterval)
 			if quiet {
@@ -181,38 +176,7 @@ func describeFlush(res delivery.Result, signInFix string) (delivered string, und
 	if res.Discarded > 0 {
 		undelivered = append(undelivered, fmt.Sprintf("dropped %d their team no longer collects", res.Discarded))
 	}
-	if res.Mixed > 0 {
-		s := fmt.Sprintf("dropped %d because their session's run is Mixed", res.Mixed)
-		if len(res.MixedBy) > 0 {
-			s += " (" + mixedReasonCounts(res.MixedBy) + ")"
-		}
-		undelivered = append(undelivered, s)
-	}
 	return delivered, undelivered
-}
-
-func mixedReasonCounts(by map[runs.Reason]int) string {
-	reasons := slices.Collect(maps.Keys(by))
-	slices.SortFunc(reasons, func(a, b runs.Reason) int { return cmp.Or(by[b]-by[a], strings.Compare(string(a), string(b))) })
-	parts := make([]string, 0, len(reasons))
-	for _, r := range reasons {
-		parts = append(parts, fmt.Sprintf("%d %s", by[r], mixedReasonWords(r)))
-	}
-	return strings.Join(parts, ", ")
-}
-
-func mixedReasonWords(r runs.Reason) string {
-	switch r {
-	case runs.Crossed:
-		return "crossed organizations"
-	case runs.UnknownReach:
-		return "ran a shell command whose reach is not known"
-	case runs.LocationBound:
-		return "touched more places than the run ledger keeps"
-	case runs.Aside:
-		return "crossed while the run ledger was busy"
-	}
-	return "with a run ledger that cannot be read"
 }
 
 func plural(n int) string {

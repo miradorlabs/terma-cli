@@ -16,7 +16,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/delivery"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -31,8 +30,6 @@ func TestDescribeFlushRoutedClauses(t *testing.T) {
 		Unrouted:   1,
 		Unroutable: 3,
 		Discarded:  4,
-		Mixed:      5,
-		MixedBy:    map[runs.Reason]int{runs.Crossed: 3, runs.UnknownReach: 2},
 	}, "terma setup")
 	if delivered != "2 events" {
 		t.Fatalf("delivered = %q", delivered)
@@ -43,7 +40,6 @@ func TestDescribeFlushRoutedClauses(t *testing.T) {
 		"holding 1 until this machine's routing state can be read (run `terma doctor`)",
 		"dropped 3 with no destination",
 		"dropped 4 their team no longer collects",
-		"dropped 5 because their session's run is Mixed (3 crossed organizations, 2 ran a shell command whose reach is not known)",
 	}
 	if strings.Join(undelivered, "|") != strings.Join(want, "|") {
 		t.Fatalf("undelivered =\n  %q\nwant\n  %q", undelivered, want)
@@ -264,18 +260,11 @@ func TestCLISpoolFlushRoutedPolicyDropsSucceed(t *testing.T) {
 	}
 
 	now := time.Now()
-	if _, err := runs.Start(testApp.stateDir, "sess-mixed", now.Add(-time.Minute)); err != nil {
-		t.Fatal(err)
-	}
-	if err := runs.MarkMixed(testApp.stateDir, "sess-mixed", now.Add(-30*time.Second), runs.Why{Reason: runs.Crossed}); err != nil {
-		t.Fatal(err)
-	}
-
 	s := spoolForTest(t)
 	s.Bind(account)
 	if err := s.Append(
 		spool.Event{
-			Time: now, Name: semconv.TermaToolCallEvent, SessionID: "sess-mixed",
+			Time: now, Name: semconv.TermaToolCallEvent, SessionID: "sess-1",
 			Repository: config.Repository{Origin: "github.com/acme/app"},
 			Profile:    config.DefaultProfile, Enrollment: enrID,
 		},
@@ -290,9 +279,9 @@ func TestCLISpoolFlushRoutedPolicyDropsSucceed(t *testing.T) {
 
 	out, err := runTerma(t, "spool", "flush")
 	if err != nil {
-		t.Fatalf("policy/Mixed drops must not fail flush: %v\n%s", err, out)
+		t.Fatalf("policy drops must not fail flush: %v\n%s", err, out)
 	}
-	for _, want := range []string{"dropped 1 their team no longer collects", "dropped 1 because their session's run is Mixed (1 crossed organizations)"} {
+	for _, want := range []string{"1 event", "dropped 1 their team no longer collects"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("output missing %q:\n%s", want, out)
 		}

@@ -173,13 +173,6 @@ func (r *Relay) sweep() {
 		// A part that must wait holds up nothing: order matters only among parts that leave.
 		for _, h := range r.expandHeldPieces(key, parts) {
 			v := r.judge(key, h.p)
-			if before, after := r.splitMixed(h.p, v); before != nil {
-				if after != nil {
-					r.dropStats(after.signal, v.why, v.blocker, after.records)
-				}
-				h.p, h.size = before, proto.Size(before.msg)
-				v = r.judge(key, h.p)
-			}
 			why, ok := v.why, v.ok
 			switch {
 			case why != whyNoKey:
@@ -312,16 +305,6 @@ func (r *Relay) sweepPinned(keys []string, now time.Time, lost *int) {
 			}
 			res, waits := rcs[rk].TeamWaits()
 			if !waits {
-				res = rcs[rk].Entry(pn.q)
-			}
-			if before, after := r.splitMixed(h.p, verdict{why: string(res.Why), mixedAt: res.MixedAt}); res.Verdict == Discard && before != nil {
-				if after != nil {
-					r.dropStats(after.signal, res.Why.reason(), res.Blocker, after.records)
-				}
-				h.p = before
-				h.size = proto.Size(before.msg)
-				pn.q.At = before.startAt
-				pn.q.EndAt = before.endAt
 				res = rcs[rk].Entry(pn.q)
 			}
 			switch res.Verdict {

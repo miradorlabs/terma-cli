@@ -15,9 +15,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookmgr"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
-	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -73,113 +71,38 @@ func makeRoutedClaudeEnv(t *testing.T, stateDir, cwd string) (hookrun.Env, *hook
 	}, rt
 }
 
-func TestClaudePreToolUseAndStartRunCrossOrgMixed(t *testing.T) {
-	stateDir := t.TempDir()
-	repoA := initOriginRepo(t, "alpha", "git@github.com:orgA/alpha.git")
-	repoB := initOriginRepo(t, "beta", "git@github.com:orgB/beta.git")
-	fileB := filepath.Join(repoB, "secret.go")
-	if err := os.WriteFile(fileB, []byte("package b\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	env, _ := makeRoutedClaudeEnv(t, stateDir, repoA)
-	ctx := context.Background()
-	sid := "018f3a2c-cl01-7000-8000-000000000001"
-
-	// SessionStart starts a run.
-	startJSON, _ := json.Marshal(map[string]any{"session_id": sid, "cwd": repoA, "source": "startup"})
-	env.Stdin = bytes.NewReader(startJSON)
-	if err := sessionStart(ctx, env); err != nil {
-		t.Fatal(err)
-	}
-	p1, _ := runs.Locate(stateDir, sid)
-	if p1.Run == "" {
-		t.Fatal("SessionStart did not start a run")
-	}
-
-	// Compaction SessionStart must NOT reset the run.
-	compactJSON, _ := json.Marshal(map[string]any{"session_id": sid, "cwd": repoA, "source": "compact"})
-	env.Stdin = bytes.NewReader(compactJSON)
-	if err := sessionStart(ctx, env); err != nil {
-		t.Fatal(err)
-	}
-	if p2, _ := runs.Locate(stateDir, sid); p2.Run != p1.Run {
-		t.Fatalf("compact SessionStart changed run from %q to %q", p1.Run, p2.Run)
-	}
-
-	// PreToolUse Read into orgB marks the run Mixed and writes NOTHING to stdout.
-	var stdout bytes.Buffer
-	preJSON, _ := json.Marshal(map[string]any{
-		"session_id": sid, "cwd": repoA, "tool_name": "Read",
-		"tool_input": map[string]any{"file_path": fileB},
-	})
-	env.Stdin = bytes.NewReader(preJSON)
-	env.Stdout = &stdout
-	if err := preToolUse(ctx, env); err != nil {
-		t.Fatal(err)
-	}
-	if stdout.Len() != 0 {
-		t.Fatalf("PreToolUse wrote stdout %q; must print nothing", stdout.String())
-	}
-	c, ok := claim.Read(stateDir, sid, env.Time())
-	if !ok || c.Kind != claim.KindMixed {
-		t.Fatalf("claim after cross-org Read = %+v (ok=%v); want KindMixed", c, ok)
-	}
-
-	// Bash reach in a fresh session also marks Mixed.
-	sid2 := "018f3a2c-cl01-7000-8000-000000000002"
-	startJSON2, _ := json.Marshal(map[string]any{"session_id": sid2, "cwd": repoA, "source": "startup"})
-	env.Stdin = bytes.NewReader(startJSON2)
-	_ = sessionStart(ctx, env)
-	bashJSON, _ := json.Marshal(map[string]any{
-		"session_id": sid2, "cwd": repoA, "tool_name": "Bash",
-		"tool_input": map[string]any{"command": "cat " + fileB},
-	})
-	env.Stdin = bytes.NewReader(bashJSON)
-	if err := preToolUse(ctx, env); err != nil {
-		t.Fatal(err)
-	}
-	c2, ok := claim.Read(stateDir, sid2, env.Time())
-	if !ok || c2.Kind != claim.KindMixed {
-		t.Fatalf("claim after cross-org Bash = %+v (ok=%v); want KindMixed", c2, ok)
-	}
-}
-
-func TestClaudePreToolUseRegisteredAndRefreshedInUserHooks(t *testing.T) {
+// An earlier build registered a PreToolUse hook: refreshing settings.json takes it out, and
+// until then the hook it still runs is a silent no-op.
+func TestClaudeRefreshDropsTheLegacyPreToolUseHook(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "settings.json")
-	// Unhooked settings file: refreshUserHooks does nothing.
-	if err := os.WriteFile(path, []byte(`{"env":{}}`), 0o600); err != nil {
-		t.Fatal(err)
+	cmd := hookmgr.UserHookCommand("/usr/local/bin/terma")
+	group := func(event string) []any {
+		return []any{map[string]any{"hooks": []any{map[string]any{"type": "command", "command": cmd(event), "timeout": 10}}}}
 	}
-	if changed, err := refreshUserHooks(path); err != nil || changed {
-		t.Fatalf("refreshUserHooks(unhooked) = (%v, %v); want (false, nil)", changed, err)
-	}
-	// Pre-PR8 settings file with only SessionStart: refreshUserHooks adds PreToolUse.
-	oldCmd := hookmgr.UserHookCommand("/usr/local/bin/terma")("session-start")
-	oldDoc := map[string]any{
-		"hooks": map[string]any{
-			"SessionStart": []any{map[string]any{"hooks": []any{
-				map[string]any{"type": "command", "command": oldCmd, "timeout": 10},
-			}}},
-		},
-	}
-	raw, err := json.Marshal(oldDoc)
+	raw, err := json.Marshal(map[string]any{"hooks": map[string]any{
+		"SessionStart": group("session-start"),
+		"PreToolUse":   []any{map[string]any{"matcher": "Read|Grep|Glob|NotebookRead|LS|Bash", "hooks": group("pre-tool-use")[0].(map[string]any)["hooks"]}},
+	}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	changed, err := refreshUserHooks(path)
-	if err != nil || !changed {
-		t.Fatalf("refreshUserHooks(upgrade) = (%v, %v); want (true, nil)", changed, err)
+	if changed, err := refreshUserHooks(path); err != nil || !changed {
+		t.Fatalf("refreshUserHooks(legacy) = (%v, %v); want (true, nil)", changed, err)
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(b), "PreToolUse") || !strings.Contains(string(b), "pre-tool-use") {
-		t.Fatalf("refreshed settings.json missing PreToolUse hook:\n%s", b)
+	if strings.Contains(string(b), "PreToolUse") || strings.Contains(string(b), "pre-tool-use") {
+		t.Fatalf("refreshed settings.json still runs the PreToolUse hook:\n%s", b)
+	}
+	env := hookrun.Env{StateDir: t.TempDir(), Cwd: dir, Stdin: strings.NewReader(`{"session_id":"018f3a2c-cl04-7000-8000-000000000001","tool_name":"Read","tool_input":{"file_path":"/elsewhere/a.go"}}`)}
+	if err := (Agent{}).Events()["pre-tool-use"](context.Background(), env); err != nil {
+		t.Fatalf("legacy pre-tool-use hook = %v; want nil", err)
 	}
 }
 

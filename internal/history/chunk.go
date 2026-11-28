@@ -14,7 +14,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/relay"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
@@ -199,74 +198,47 @@ func countLogs(msg *logspb.LogsData) int {
 	return n
 }
 
-// FilterMixedLogs removes any log record whose timestamp falls at or after a Mixed cutoff
-// recorded in snap or derived from transcript tool reach (reachMixedAt when hasReachMixed),
-// drops records newer than maxRecordTime when resuming a transcript modified after an
-// interrupted upload, or drops every record when the ledger is unreadable (failing closed).
-// dropped counts the Mixed drops only. A record past maxRecordTime is a turn added after the
-// interrupted upload began, which live collection already holds: it is not a Mixed drop and
-// is not counted.
-func FilterMixedLogs(msg *logspb.LogsData, snap runs.Snapshot, lookup func(id string) runs.Snapshot, reachMixedAt time.Time, hasReachMixed bool, maxRecordTime time.Time) (kept, dropped int) {
+func prepareSegmentForUpload(seg agents.HistorySegment, filter *relay.ContentFilter, pol config.Policy, stamp relay.StampOptions, maxRecordTime time.Time) (PreparedSegment, int) {
+	prepared, n := PrepareSegment(seg, filter, pol, stamp)
+	if n == 0 || prepared.Empty() || maxRecordTime.IsZero() {
+		return prepared, n
+	}
+	total := 0
+	if prepared.Logs != nil {
+		kept := TrimLogsAfter(prepared.Logs, maxRecordTime)
+		if kept == 0 {
+			prepared.Logs = nil
+		}
+		total += kept
+	}
+	if prepared.Traces != nil {
+		kept := TrimTracesAfter(prepared.Traces, maxRecordTime)
+		if kept == 0 {
+			prepared.Traces = nil
+		}
+		total += kept
+	}
+	return prepared, total
+}
+
+// TrimLogsAfter drops log records newer than maxRecordTime when resuming a transcript
+// modified after an interrupted upload (turns added later are already handled by live
+// collection) and returns the number of records kept.
+func TrimLogsAfter(msg *logspb.LogsData, maxRecordTime time.Time) int {
 	if msg == nil {
-		return 0, 0
+		return 0
 	}
-	later := func(lr *logspb.LogRecord) bool {
-		t := logRecordTime(lr)
-		return !maxRecordTime.IsZero() && !t.IsZero() && t.After(maxRecordTime)
+	if maxRecordTime.IsZero() {
+		return countLogs(msg)
 	}
-	farPast := time.Unix(1, 0).UTC()
-	farFuture := time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
-	isMixed := func(lr *logspb.LogRecord) bool {
-		// An undated title (TimeUnixNano == 0, ObservedTimeUnixNano carrying fallback time)
-		// cannot be ordered against a Mixed cutoff, so drop it whenever any cutoff exists.
-		if lr.GetTimeUnixNano() == 0 && lr.GetEventName() == semconv.TermaSessionTitleEvent {
-			if hasReachMixed {
-				return true
-			}
-			if _, mixed := snap.MixedInterval(farPast, farFuture); mixed {
-				return true
-			}
-			if lookup != nil {
-				for _, attrKey := range []string{"agent_id", semconv.SessionIDKey} {
-					if id := logRecordAttrString(lr, attrKey); id != "" {
-						if _, mixed := lookup(id).MixedInterval(farPast, farFuture); mixed {
-							return true
-						}
-					}
-				}
-			}
-			return false
-		}
-		t := logRecordTime(lr)
-		if hasReachMixed && (reachMixedAt.IsZero() || t.IsZero() || !t.Before(reachMixedAt)) {
-			return true
-		}
-		if mixedAt, mixed := snap.MixedAt(t); mixed && (mixedAt.IsZero() || t.IsZero() || !t.Before(mixedAt)) {
-			return true
-		}
-		if lookup != nil {
-			for _, attrKey := range []string{"agent_id", semconv.SessionIDKey} {
-				if id := logRecordAttrString(lr, attrKey); id != "" {
-					sub := lookup(id)
-					if mixedAt, mixed := sub.MixedAt(t); mixed && (mixedAt.IsZero() || t.IsZero() || !t.Before(mixedAt)) {
-						return true
-					}
-				}
-			}
-		}
-		return false
-	}
+	kept := 0
 	var keptRL []*logspb.ResourceLogs
 	for _, rl := range msg.GetResourceLogs() {
 		var keptSL []*logspb.ScopeLogs
 		for _, sl := range rl.GetScopeLogs() {
 			var keptLR []*logspb.LogRecord
 			for _, lr := range sl.GetLogRecords() {
-				if later(lr) {
-					continue
-				}
-				if isMixed(lr) {
-					dropped++
+				if t := logRecordTime(lr); !t.IsZero() && t.After(maxRecordTime) {
 					continue
 				}
 				keptLR = append(keptLR, lr)
@@ -283,7 +255,7 @@ func FilterMixedLogs(msg *logspb.LogsData, snap runs.Snapshot, lookup func(id st
 		}
 	}
 	msg.ResourceLogs = keptRL
-	return kept, dropped
+	return kept
 }
 
 func logRecordTime(lr *logspb.LogRecord) time.Time {
@@ -294,15 +266,6 @@ func logRecordTime(lr *logspb.LogRecord) time.Time {
 		return time.Unix(0, int64(ns)).UTC()
 	}
 	return time.Time{}
-}
-
-func logRecordAttrString(lr *logspb.LogRecord, key string) string {
-	for _, kv := range lr.GetAttributes() {
-		if kv.GetKey() == key {
-			return kv.GetValue().GetStringValue()
-		}
-	}
-	return ""
 }
 
 // ChunkWriter streams prepared OTLP log and trace batches into bounded protobuf chunks

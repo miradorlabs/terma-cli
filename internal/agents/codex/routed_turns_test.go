@@ -15,7 +15,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
-	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -75,40 +74,19 @@ func makeRoutedCodexEnv(t *testing.T, stateDir, configDir, cwd string) (hookrun.
 	}, enrollments
 }
 
-func TestCodexReachCrossOrgMixedAndPerTurnRouting(t *testing.T) {
+// A rollout whose turns ran in two collected repositories and one uncollected one routes
+// each turn's reply to its own repository's enrollment, and the uncollected one to none.
+func TestCodexPerTurnRouting(t *testing.T) {
 	t.Setenv("CODEX_HOME", t.TempDir())
 	stateDir, configDir := t.TempDir(), t.TempDir()
 	repoA := initCodexOriginRepo(t, "alpha", "git@github.com:orgA/alpha.git")
 	repoB := initCodexOriginRepo(t, "beta", "git@github.com:orgB/beta.git")
 	repoUn := initCodexOriginRepo(t, "uncollected", "git@github.com:other/uncollected.git")
-	fileB := filepath.Join(repoB, "b.go")
-	if err := os.WriteFile(fileB, []byte("package b\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
 
 	env, enrollments := makeRoutedCodexEnv(t, stateDir, configDir, repoA)
 	ctx := context.Background()
 
-	// 1. Cross-org shell reach in PreToolUse marks session Mixed.
-	sid := "018f3a2c-cx01-7000-8000-000000000001"
-	startJSON, _ := json.Marshal(map[string]any{"session_id": sid, "cwd": repoA})
-	env.Stdin = bytes.NewReader(startJSON)
-	if err := sessionStart(ctx, env); err != nil {
-		t.Fatal(err)
-	}
-	preJSON, _ := json.Marshal(map[string]any{
-		"session_id": sid, "cwd": repoA, "tool_name": codexShellTool,
-		"tool_input": map[string]any{"command": "cat " + fileB},
-	})
-	env.Stdin = bytes.NewReader(preJSON)
-	if err := preToolUse(ctx, env); err != nil {
-		t.Fatal(err)
-	}
-	if c, ok := claim.Read(stateDir, sid, env.Time()); !ok || c.Kind != claim.KindMixed {
-		t.Fatalf("claim after cross-org Bash = %+v (ok=%v); want KindMixed", c, ok)
-	}
-
-	// 2. Per-turn routing: rollout with turns in repoA, repoUn (withheld), and repoB routes each reply to its own enrollment.
+	// The rollout has turns in repoA, repoUn (withheld), and repoB routes each reply to its own enrollment.
 	sid2 := "018f3a2c-cx02-7000-8000-000000000002"
 	turnA, turnU, turnB := "01a0bae4-aaaa-7910-9022-15897b3021a1", "01a0bae4-uuuu-7910-9022-15897b3021a2", "01a0bae4-bbbb-7910-9022-15897b3021a3"
 	rollout := filepath.Join(os.Getenv("CODEX_HOME"), "sessions", "2026", "09", "19", "rollout-2026-09-19T12-18-12-"+sid2+".jsonl")
@@ -144,11 +122,11 @@ func TestCodexReachCrossOrgMixedAndPerTurnRouting(t *testing.T) {
 	if len(byText) != 2 {
 		t.Fatalf("spooled replies = %v; want exactly 2 (repoA and repoB, not uncollected)", byText)
 	}
-	if byText["reply in A"].Enrollment != enrollments["orgA"] || !byText["reply in A"].OwnLocation {
-		t.Fatalf("turn A event = %+v; want enrollment %q with OwnLocation=true", byText["reply in A"], enrollments["orgA"])
+	if byText["reply in A"].Enrollment != enrollments["orgA"] {
+		t.Fatalf("turn A event = %+v; want enrollment %q", byText["reply in A"], enrollments["orgA"])
 	}
-	if byText["reply in B"].Enrollment != enrollments["orgB"] || !byText["reply in B"].OwnLocation {
-		t.Fatalf("turn B event = %+v; want enrollment %q with OwnLocation=true", byText["reply in B"], enrollments["orgB"])
+	if byText["reply in B"].Enrollment != enrollments["orgB"] {
+		t.Fatalf("turn B event = %+v; want enrollment %q", byText["reply in B"], enrollments["orgB"])
 	}
 }
 

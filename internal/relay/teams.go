@@ -11,7 +11,7 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
-// Router places records on a routed machine using routing.State and the run ledger.
+// Router places records on a routed machine using routing.State.
 type Router interface {
 	Active() bool
 	UnknownToPersonal() bool
@@ -49,17 +49,12 @@ type (
 		Queued  Queued
 		Why     Why
 		Blocker string
-		MixedAt time.Time
-		// MixedRun is the run MixedAt cuts: only its queued entries (and those with no run)
-		// are swept. Empty sweeps every run of the session.
-		MixedRun string
 	}
 	// Rechecked is the verdict returned by a Rechecker for a pinned or queued entry.
 	Rechecked struct {
 		Verdict Verdict
 		Why     Why
 		Blocker string
-		MixedAt time.Time
 	}
 	// Queued is a routed record's pinned destination in pinnedHold and .teams/ outbox headers.
 	Queued struct {
@@ -71,7 +66,6 @@ type (
 		Repository string    `json:"repository,omitempty"`
 		Narrow     bool      `json:"narrow,omitempty"`
 		Session    string    `json:"session,omitempty"`
-		Run        string    `json:"run,omitempty"`
 		At         time.Time `json:"at,omitzero"`
 		EndAt      time.Time `json:"end_at,omitzero"`
 	}
@@ -80,7 +74,6 @@ type (
 		teamSenders     map[teamRoute]*sender
 		teamRecovered   map[teamRoute]bool
 		teamDiscoverErr bool
-		mixedSeen       map[string]time.Time
 		nudging         map[string]bool
 	}
 )
@@ -90,7 +83,6 @@ func newTeamState() teamState {
 		pinnedHold:    map[string][]heldPart{},
 		teamSenders:   map[teamRoute]*sender{},
 		teamRecovered: map[teamRoute]bool{},
-		mixedSeen:     map[string]time.Time{},
 		nudging:       map[string]bool{},
 	}
 }
@@ -145,7 +137,7 @@ func (r *Relay) sessionOf(key string, pid int) (session, held string) {
 	return session, cmp.Or(held, whyNoTrace)
 }
 func placementKey(pl claim.Claim) string {
-	return strings.Join([]string{string(pl.Kind), pl.ProjectID, pl.Run, pl.Profile, pl.Account, pl.Repository.Origin, pl.Root, pl.Cwd, pl.Tool}, "\x00")
+	return strings.Join([]string{string(pl.Kind), pl.ProjectID, pl.Profile, pl.Account, pl.Repository.Origin, pl.Root, pl.Cwd, pl.Tool}, "\x00")
 }
 func crossedPlacement(raw claim.Claim, pid int, c claim.Claim, start, end time.Time) string {
 	if end.IsZero() || end.Equal(start) {
@@ -194,11 +186,7 @@ func (r *Relay) decideTeams(key string, p *part) verdict {
 					return verdict{why: whyNotCollected, final: true}
 				}
 				if why := crossedPlacement(raw, p.pid, c, p.startAt, p.endAt); why != "" {
-					v := verdict{why: why, final: true}
-					if why == string(WhyMixed) {
-						v.blocker = "mixed:" + rec.Session
-					}
-					return v
+					return verdict{why: why, final: true}
 				}
 				rec.Placement = c
 				rec.Placed = true
@@ -208,18 +196,15 @@ func (r *Relay) decideTeams(key string, p *part) verdict {
 	}
 	routed := r.opts.Router.Route(rec)
 	v := verdict{
-		why:      routed.Why.reason(),
-		blocker:  routed.Blocker,
-		mixedAt:  routed.MixedAt,
-		mixedRun: routed.MixedRun,
-		session:  rec.Session,
-		c:        rec.Placement,
+		why:     routed.Why.reason(),
+		blocker: routed.Blocker,
+		session: rec.Session,
+		c:       rec.Placement,
 	}
 	q := routed.Queued
 	if q.Enrollment != "" {
 		q.Account = cmp.Or(q.Account, p.account)
 		q.Session = cmp.Or(q.Session, rec.Session)
-		q.Run = cmp.Or(q.Run, rec.Placement.Run)
 		q.At = nonZeroTime(q.At, p.startAt)
 		q.EndAt = nonZeroTime(q.EndAt, p.endAt)
 	}

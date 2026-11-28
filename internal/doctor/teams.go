@@ -2,16 +2,12 @@ package doctor
 
 import (
 	"cmp"
-	"fmt"
-	"maps"
-	"slices"
 	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
@@ -36,10 +32,6 @@ type Routing struct {
 	SingleTeamLabel string
 	// Teams and Orgs name teams and organizations by ID.
 	Teams, Orgs map[string]string
-	// Mixed are sessions whose current run is Mixed (runs.Mixed); MixedDropped counts
-	// records the relay dropped from Mixed runs.
-	Mixed        []runs.MixedRun
-	MixedDropped int
 	// Blocked counts records the relay held and dropped by blocker ("team:<enrollment>",
 	// "overflow").
 	Blocked map[string]int
@@ -130,71 +122,13 @@ func TeamsCheck(r Routing, now time.Time) Check {
 		}
 	}
 	fix := cmp.Or(signInFix, failFix, warnFix)
-	mixed := ""
-	if len(r.Mixed) > 0 || r.MixedDropped > 0 {
-		mixed = MixedSummary(r)
-	}
-	withMixed := func(s string) string {
-		if mixed == "" {
-			return s
-		}
-		return s + "; " + mixed
-	}
 	switch {
 	case len(failing) > 0:
-		return Check{Status: Fail, Detail: withMixed(strings.Join(append(failing, warning...), "; ")), Fix: fix}
+		return Check{Status: Fail, Detail: strings.Join(append(failing, warning...), "; "), Fix: fix}
 	case len(warning) > 0:
-		return Check{Status: Warn, Detail: withMixed(strings.Join(warning, "; ")), Fix: fix}
+		return Check{Status: Warn, Detail: strings.Join(warning, "; "), Fix: fix}
 	}
-	return Check{Status: Pass, Detail: withMixed(strings.Join(parts, ", "))}
-}
-
-// MixedSummary says how many session runs are Mixed, by why, and what the relay dropped
-// from them.
-func MixedSummary(r Routing) string {
-	by, older := map[runs.Reason]int{}, 0
-	for _, m := range r.Mixed {
-		by[m.Why.Reason]++
-		if !m.Recent {
-			older++
-		}
-	}
-	s := fmt.Sprintf("%d session run(s) Mixed, sending no telemetry until they resume", len(r.Mixed))
-	if len(r.Mixed) > 0 {
-		s += ": " + ReasonCounts(by)
-	}
-	if older > 0 {
-		s += fmt.Sprintf(" (%d idle for over a day)", older)
-	}
-	if r.MixedDropped > 0 {
-		s += fmt.Sprintf("; the relay dropped %d record(s) from such runs", r.MixedDropped)
-	}
-	return s
-}
-
-// ReasonCounts says how many runs each reason turned Mixed, most frequent first.
-func ReasonCounts(by map[runs.Reason]int) string {
-	reasons := slices.Collect(maps.Keys(by))
-	slices.SortFunc(reasons, func(a, b runs.Reason) int { return cmp.Or(by[b]-by[a], strings.Compare(string(a), string(b))) })
-	parts := make([]string, 0, len(reasons))
-	for _, r := range reasons {
-		parts = append(parts, fmt.Sprintf("%d %s", by[r], reasonWords(r)))
-	}
-	return strings.Join(parts, ", ")
-}
-
-func reasonWords(r runs.Reason) string {
-	switch r {
-	case runs.Crossed:
-		return "crossed organizations"
-	case runs.UnknownReach:
-		return "ran a shell command whose reach is not known"
-	case runs.LocationBound:
-		return "touched more places than the run ledger keeps"
-	case runs.Aside:
-		return "crossed while the run ledger was busy"
-	}
-	return "with a run ledger that cannot be read"
+	return Check{Status: Pass, Detail: strings.Join(parts, ", ")}
 }
 
 func words(s string) string { return strings.ReplaceAll(s, "_", " ") }

@@ -33,12 +33,11 @@ internal/agents/        one package per coding agent; builtin/ is the only list 
 internal/hooks/         `terma hook <event>`: dispatch, runtime (hookrun), hook-file writers (hookmgr)
 internal/relay/         the local relay daemon
 internal/routing/       multi-org routing table (`routing.State` CAS, `routing.Router`)
-internal/runs/          per-session run ledger and cross-org Mixed cutoff
 internal/spool/         the local queue hooks append to
 internal/delivery/      sends the spool to each project, from a detached flush
 internal/history/       `terma history upload`: discovery, routing, holdings skip check, paced upload and resume state
 internal/session/       session manifests and commit attribution
-internal/doctor/        `terma doctor` checks (teams, routing state, Mixed runs, outbox/spool losses)
+internal/doctor/        `terma doctor` checks (teams, routing state, outbox/spool losses)
 internal/setup/         `terma setup`; internal/globalmode/ writes the machine-wide hooks
 internal/repohooks/     the commit hooks a claimed session installs in a repository's own
                         .git/hooks, chained to whatever was there
@@ -70,16 +69,13 @@ organization teams' policies are tried newest first (`Policy.UpdatedAt`), a Refu
 passed over, the first that lists the repository collects it, and personal comes last. Missing, unreadable, or
 wrong-account routing state fails closed (zero fallback to `Profile.Team`). Unmatched
 locations write no manifest, spool line, trailer, or team claim — only a not-collected
-placement (`claim.Mark`). Read/shell reach hooks (and Extension agents' `<prefix>-tool-reach`)
-call `runs.MarkMixed` when a session crosses organizations; from `MixedAt` onward all
-conversation and telemetry content is dropped, while metadata-only `runs.Locational` events
-(commits, pushes, file touches) still route by their own checkout. A folder outside git that
-is no one's workspace crosses into no organization, Personal included: the filesystem's
-root, a device or kernel filesystem (`2>/dev/null`), the operating system's own folders and
-the machine's scratch space (`/tmp`, `$TMPDIR`), unless it is in the developer's home
-(`nobodys` in `internal/hooks/hookrun/reach.go`). A reach hook that fails never blocks or
-fails the agent's tool: an Extension agent's plugin taints the session, hands nothing more
-of it over and asks terma to mark its run Mixed. A harness may run the entries in another
+placement (`claim.Mark`). Each record routes by the placement in force at its time: a
+session that resumes in another repository is claimed there, and its later records go to
+that repository's team. An edit of a folder outside git that is no one's workspace reports
+no file touch, to Personal or anyone: the filesystem's root, a device or kernel filesystem
+(`2>/dev/null`), the operating system's own folders and the machine's scratch space (`/tmp`,
+`$TMPDIR`), unless it is in the developer's home (`nobodys` in
+`internal/hooks/hookrun/lifecycle.go`). A harness may run the entries in another
 agent's hooks file (the grok agent's grok runs Claude Code's and Cursor's), so an agent
 marks the hook processes it starts (`agents.HookStarter`), and `terma hook` stands down in
 a process a harness other than the event's owner started: no claim, no spool line, no reply.
@@ -114,8 +110,7 @@ policies, updated via account- and generation-checked CAS
 `routing.Update`/`routing.Replace`; only `terma setup` writes a profile's first one, but
 for a server-key profile an earlier terma set up, whose stored team, key and policy the
 refresh after an update, or a relay of this build as it starts, turns into its one-team
-`no_person` state, once: `internal/cli/serverkey_migrate.go`), `runs/` (per-session run
-ledgers and Mixed cutoffs),
+`no_person` state, once: `internal/cli/serverkey_migrate.go`),
 `relay/` (including `outbox-v2/.teams/@<account>/<enrollment>/<tool>/`), `spool/`,
 `policies/`, `agents/<agent>/` (each agent's hook state), `funding/`,
 `workspaces/` (session stores for work begun outside git) and `update/`; a repository's
@@ -144,14 +139,15 @@ subagent (`terma.subagent.call`) and, when the parent waits on or kills a backgr
 how it ended (`terma.subagent.end`). The relay forwards only claimed sessions from claimed
 PIDs, pinned once routed: unclaimed records wait briefly in `unknownHold`, while
 blocked records stay destination-pinned in `pinnedHold` (re-checked only, never
-re-routed), and spans/logs/metrics straddling `MixedAt` drop. It sends each team's backlog
+re-routed), and a span or delta metric whose interval straddles two placements drops. It
+sends each team's backlog
 with the person's single user token and `X-Mirador-Project: <team_id>` (a server-key profile
 uses its `keys.json` server key under `Account: "no_person"` with no `X-Mirador-Project`),
 applying that team's `config.Policy.Content`. On ingest `403 ORG_NOT_ACCESSIBLE`, the relay
 triggers a coalesced refresh nudge and refuses all enrollments of that org via epoch-fenced
 CAS (`routing.ApplyOrgAccessLost`) without retiring the user token, leaving other
 organizations and Personal uninterrupted. Spool delivery applies the same lane,
-`routing.State`, Mixed, and content rules. Antigravity has no export, so its hooks send its
+`routing.State` and content rules. Antigravity has no export, so its hooks send its
 content too: the prompt and the reply from the transcript, a tool call's arguments from
 `PostToolUse` and each tool's result as `terma.tool.result`
 (`internal/agents/antigravity/content_paths.go` and `turn.go`), under the content switches
@@ -165,8 +161,8 @@ entry and OpenCode 2's `setup` feeding one emitter) is its exporter, under scope
 it. Use `terma teams` to manage ticked teams, `terma route explain` to trace
 `routing.Router.Route` for a path, and
 `terma doctor` to inspect routing state, per-enrollment health (including `OrgAccessLost`,
-policy conflicts, and single `terma setup` remediation for `SignInNeeded`), Mixed runs, and
-combined outbox/spool losses.
+policy conflicts, and single `terma setup` remediation for `SignInNeeded`) and combined
+outbox/spool losses.
 
 ### Lanes, ownership, and loss accounting
 

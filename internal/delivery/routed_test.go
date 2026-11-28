@@ -21,7 +21,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -151,8 +150,7 @@ func routedEvent(account, profile, enrollment, repo, name string) spool.Event {
 	return e
 }
 
-// Invariant 1: Wrong-lane events are gated BEFORE reading routing.State, run ledger, or
-// policy; they stay held untouched (even when routing.State is corrupt or Enrollment == "")
+// Invariant 1: Wrong-lane events are gated BEFORE reading routing.State or policy; they stay held untouched (even when routing.State is corrupt or Enrollment == "")
 // and age out after spool.MaxAge (14 days).
 func TestRoutedLaneGateRunsBeforeRoutingStateAndPolicy(t *testing.T) {
 	t.Parallel()
@@ -170,15 +168,11 @@ func TestRoutedLaneGateRunsBeforeRoutingStateAndPolicy(t *testing.T) {
 	}
 
 	srv, sent := recordingIngest(t, http.StatusOK)
-	var stateReads, ledgerReads atomic.Int32
+	var stateReads atomic.Int32
 	r := m.router(&fakeSignIn{account: aliceLane, token: "tok-alice"})
 	r.loadState = func(dir, profile string) (routing.State, bool, error) {
 		stateReads.Add(1)
 		return routing.Load(dir, profile)
-	}
-	r.readLedger = func(dir, id string) runs.Snapshot {
-		ledgerReads.Add(1)
-		return runs.Read(dir, id)
 	}
 
 	// Queue Bob's event (with enrollment), Bob's destination-less event, a server-key event,
@@ -195,8 +189,8 @@ func TestRoutedLaneGateRunsBeforeRoutingStateAndPolicy(t *testing.T) {
 	if !res.Routed || res.Sent != 0 || res.Held != 3 || res.Expired != 1 || res.Unrouted != 0 || res.Unroutable != 0 || res.Discarded != 0 || res.Err != nil {
 		t.Fatalf("Flush = %+v", res)
 	}
-	if stateReads.Load() != 0 || ledgerReads.Load() != 0 || len(sent()) != 0 {
-		t.Fatalf("wrong-lane events touched state=%d ledger=%d sent=%d", stateReads.Load(), ledgerReads.Load(), len(sent()))
+	if stateReads.Load() != 0 || len(sent()) != 0 {
+		t.Fatalf("wrong-lane events touched state=%d sent=%d", stateReads.Load(), len(sent()))
 	}
 	// No losses recorded for Bob's destination-less event while Alice is active.
 	losses, err := spool.ReadLosses(filepath.Join(m.state, spool.Dir), time.Now())
@@ -450,96 +444,6 @@ func TestRoutedRecheckNeverReroutes(t *testing.T) {
 	lastBody := sent()[len(sent())-1].body
 	if strings.Contains(lastBody, "secret-args") || strings.Contains(lastBody, "alice@example.com") {
 		t.Fatalf("withheld attributes leaked: %s", lastBody)
-	}
-}
-
-// Invariant 4b (§6 item 9): Content/conversation events drop from MixedAt onward (even with
-// OwnLocation: true), whereas non-content locational events (OwnLocation: true &&
-// runs.Locational(name)) still leave to their own repo's team after the run turns Mixed.
-func TestRoutedMixedDropsContentButKeepsOwnLocationLocational(t *testing.T) {
-	t.Parallel()
-	m := newRoutedMachine(t)
-	enr := m.createState(config.DefaultProfile, aliceLane, []routing.Team{
-		orgTeam("org-a", "team-a", "github.com/acme/app"),
-		orgTeam("org-b", "team-b", "github.com/beta/lib"),
-	}, nil)
-
-	t0 := time.Now().Add(-10 * time.Minute)
-	mixedAt := t0.Add(2 * time.Minute)
-	newRunAt := t0.Add(6 * time.Minute)
-
-	if _, err := runs.Start(m.state, "sess-1", t0); err != nil {
-		t.Fatal(err)
-	}
-	if err := runs.MarkMixed(m.state, "sess-1", mixedAt, runs.Why{Reason: runs.Crossed, Where: "github.com/beta/lib"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := runs.Alias(m.state, "sess-1", "subagent-1"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := runs.Start(m.state, "sess-1", newRunAt); err != nil {
-		t.Fatal(err)
-	}
-
-	evAt := func(sess, enrollment, repo, name string, at time.Time, ownLoc bool) spool.Event {
-		e := routedEvent(aliceLane, config.DefaultProfile, enrollment, repo, name)
-		e.SessionID, e.Time, e.OwnLocation = sess, at, ownLoc
-		return e
-	}
-
-	// 1. Before MixedAt -> leaves.
-	before := evAt("sess-1", enr["team-a"], "github.com/acme/app", semconv.TermaToolCallEvent, mixedAt.Add(-time.Second), false)
-	// 2. At MixedAt -> drops.
-	atMixed := evAt("sess-1", enr["team-a"], "github.com/acme/app", semconv.TermaToolCallEvent, mixedAt, false)
-	// 3. Content event after MixedAt even with OwnLocation=true -> drops!
-	replyAfter := evAt("sess-1", enr["team-b"], "github.com/beta/lib", semconv.TermaAssistantMessageEvent, mixedAt.Add(time.Minute), true)
-	// 4. Subagent alias after MixedAt -> drops!
-	subAfter := evAt("subagent-1", enr["team-a"], "github.com/acme/app", semconv.TermaToolCallEvent, mixedAt.Add(time.Minute), false)
-	// 5. Locational event WITHOUT OwnLocation after MixedAt -> drops!
-	commitNotOwn := evAt("sess-1", enr["team-a"], "github.com/acme/app", semconv.TermaCommitEvent, mixedAt.Add(time.Minute), false)
-	// 6. Locational events WITH OwnLocation=true after MixedAt -> STILL LEAVE to their own repo's team!
-	commitOwn := evAt("sess-1", enr["team-b"], "github.com/beta/lib", semconv.TermaCommitEvent, mixedAt.Add(time.Minute), true)
-	pushOwn := evAt("sess-1", enr["team-b"], "github.com/beta/lib", semconv.TermaPushEvent, mixedAt.Add(time.Minute), true)
-	touchOwn := evAt("sess-1", enr["team-a"], "github.com/acme/app", semconv.TermaFilesTouchedEvent, mixedAt.Add(time.Minute), true)
-	// 7. New clean run started at newRunAt -> leaves!
-	cleanRun := evAt("sess-1", enr["team-a"], "github.com/acme/app", semconv.TermaToolCallEvent, newRunAt.Add(time.Second), false)
-
-	m.queueRaw(before, atMixed, replyAfter, subAfter, commitNotOwn, commitOwn, pushOwn, touchOwn, cleanRun)
-
-	srv, sent := recordingIngest(t, http.StatusOK)
-	r := m.router(&fakeSignIn{account: aliceLane, token: "tok-alice"})
-	r.Consent = func(string, hookrun.Consent) bool { return true }
-
-	res := r.Flush(t.Context(), m.spool, &config.Config{OTLPURL: srv.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth}, true, 0)
-	if res.Sent != 5 || res.Mixed != 4 || res.MixedBy[runs.Crossed] != 4 || res.Lost() {
-		t.Fatalf("Mixed flush = %+v", res)
-	}
-	var bodies []string
-	for _, req := range sent() {
-		bodies = append(bodies, req.project+":"+req.body)
-	}
-	joined := strings.Join(bodies, "\n")
-	for _, want := range []string{semconv.TermaCommitEvent, semconv.TermaPushEvent, semconv.TermaFilesTouchedEvent} {
-		if !strings.Contains(joined, want) {
-			t.Errorf("expected locational event %s to leave after Mixed", want)
-		}
-	}
-	if strings.Contains(joined, semconv.TermaAssistantMessageEvent) || strings.Contains(joined, "subagent-1") {
-		t.Fatalf("Mixed content leaked: %s", joined)
-	}
-
-	// Unreadable ledger fails closed for content events (MixedBy[""]++) while keeping OwnLocation locational.
-	badLedgerPath := filepath.Join(m.state, runs.Dir, "sess-corrupt.json")
-	if err := os.WriteFile(badLedgerPath, []byte("{corrupt"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	m.queueRaw(
-		evAt("sess-corrupt", enr["team-a"], "github.com/acme/app", semconv.TermaToolCallEvent, time.Now(), false),
-		evAt("sess-corrupt", enr["team-a"], "github.com/acme/app", semconv.TermaCommitEvent, time.Now(), true),
-	)
-	res2 := r.Flush(t.Context(), m.spool, &config.Config{OTLPURL: srv.URL, ProfileName: config.DefaultProfile, AuthURL: routedAuth}, true, 0)
-	if res2.Sent != 1 || res2.Mixed != 1 || res2.MixedBy[""] != 1 {
-		t.Fatalf("unreadable ledger = %+v", res2)
 	}
 }
 

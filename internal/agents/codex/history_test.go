@@ -4,11 +4,9 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -319,87 +317,23 @@ func TestCodexCrossCwdToolArgsDroppedAndResumedStartUsesSegmentTimestamp(t *test
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if len(segs) != 2 || segs[0].Cwd != workPath("repo-a") || segs[0].RecordCount != 0 || segs[1].Cwd != workPath("repo-b") {
-		t.Fatalf("got %d segments %+v, want reach-only %s then %s", len(segs), segs, workPath("repo-a"), workPath("repo-b"))
+	// repo-a's turn produced no record of its own, so it is no segment.
+	if len(segs) != 1 || segs[0].Cwd != workPath("repo-b") {
+		t.Fatalf("got %d segments %+v, want one in %s", len(segs), segs, workPath("repo-b"))
 	}
-	if len(segs[0].ToolReaches) == 0 {
-		t.Fatalf("expected repo-a reach-only segment to preserve pre-switch ToolReaches")
-	}
-	wire, _ := proto.Marshal(segs[1].NativeLogs)
+	wire, _ := proto.Marshal(segs[0].NativeLogs)
 	if strings.Contains(string(wire), "SECRET_ORG_A") {
 		t.Fatalf("org A tool arguments or delayed output leaked into org B segment")
 	}
 	wantStart := time.Date(2026, 10, 3, 11, 0, 2, 0, time.UTC).UnixNano()
-	for _, lr := range segs[1].NativeLogs.ResourceLogs[0].ScopeLogs[0].LogRecords {
+	for _, lr := range segs[0].NativeLogs.ResourceLogs[0].ScopeLogs[0].LogRecords {
 		if cxStr(lr.Attributes, "event.name") == "codex.conversation_starts" && int64(lr.TimeUnixNano) != wantStart {
 			t.Errorf("resumed conversation_starts TimeUnixNano = %d, want %d (segment time, not repo-a metaTime)", lr.TimeUnixNano, wantStart)
 		}
 	}
-	// Verify CommandExecution.cwd (file:// URI) and FileChange paths were captured in ToolReaches,
-	// while repo-a reach stayed isolated in segs[0] and did not contaminate segs[1].
-	var sawC, sawD bool
-	for _, r := range segs[1].ToolReaches {
-		if r.Cwd == workPath("repo-c") {
-			sawC = true
-		}
-		for _, p := range r.Paths {
-			p = filepath.ToSlash(p)
-			if strings.Contains(p, "work/repo-c") {
-				sawC = true
-			}
-			if strings.Contains(p, "work/repo-d/patched.go") {
-				sawD = true
-			}
-			if strings.Contains(p, "work/repo-a") {
-				t.Errorf("stale repo-a reach survived into repo-b segment: %+v", r)
-			}
-		}
-	}
-	if !sawC || !sawD {
-		t.Errorf("missing expected reaches: sawC=%v sawD=%v reaches=%+v", sawC, sawD, segs[1].ToolReaches)
-	}
 }
 
-func TestCodexBoundedSingleCwdFlushEmitsOneConversationStart(t *testing.T) {
-	t.Parallel()
-	var lines []string
-	lines = append(lines, `{"timestamp":"2026-10-03T10:00:00Z","type":"session_meta","payload":{"id":"sess-big","cwd":"/work/repo-a"}}`)
-	t0 := time.Date(2026, 10, 3, 10, 0, 1, 0, time.UTC)
-	for i := range 270 {
-		ts := t0.Add(time.Duration(i) * time.Second).Format(time.RFC3339)
-		lines = append(lines, fmt.Sprintf(`{"timestamp":%q,"type":"event_msg","payload":{"type":"user_message","message":"msg-%d"}}`, ts, i))
-	}
-	path := filepath.Join(t.TempDir(), "rollout-2026-10-03T10-00-00-sess-big.jsonl")
-	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	var segs []agents.HistorySegment
-	if err := (Agent{}).ReadHistory(context.Background(), agents.HistoryFile{
-		SourceSystem: "codex", SessionID: "sess-big", Path: path,
-	}, agents.HistoryReadOptions{}, func(seg agents.HistorySegment) error {
-		segs = append(segs, seg)
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if len(segs) < 2 {
-		t.Fatalf("expected >= 2 bounded segments for 270 prompts, got %d", len(segs))
-	}
-	starts, total := 0, 0
-	for _, s := range segs {
-		total += s.RecordCount
-		for _, lr := range s.NativeLogs.ResourceLogs[0].ScopeLogs[0].LogRecords {
-			if cxStr(lr.Attributes, "event.name") == "codex.conversation_starts" {
-				starts++
-			}
-		}
-	}
-	if starts != 1 || total != 271 {
-		t.Fatalf("starts=%d total=%d, want 1 conversation_starts and 271 records", starts, total)
-	}
-}
-
-func TestCodexLegacyShellArgvPatchWrapperSubagentParentAndBareReach(t *testing.T) {
+func TestCodexDiscoverHistoryNamesASubagentsParent(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("CODEX_HOME", home)
 	t.Setenv("WORKSPACE", workPath("repo-a"))
@@ -446,75 +380,14 @@ func TestCodexLegacyShellArgvPatchWrapperSubagentParentAndBareReach(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	var gotParent, gotChild agents.HistoryFile
+	var gotChild agents.HistoryFile
 	for _, f := range files {
-		if f.SessionID == parentID {
-			gotParent = f
-		}
 		if f.SessionID == childID {
 			gotChild = f
 		}
 	}
 	if gotChild.ParentSessionID != parentID {
 		t.Fatalf("child ParentSessionID = %q, want %q", gotChild.ParentSessionID, parentID)
-	}
-
-	var segs []agents.HistorySegment
-	if err := (Agent{}).ReadHistory(context.Background(), gotParent, agents.HistoryReadOptions{}, func(seg agents.HistorySegment) error {
-		segs = append(segs, seg)
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if len(segs) != 1 || segs[0].RecordCount != 0 {
-		t.Fatalf("expected 1 reach-only segment (RecordCount=0), got %d segments (first RecordCount=%d)", len(segs), func() int {
-			if len(segs) == 0 {
-				return -1
-			}
-			return segs[0].RecordCount
-		}())
-	}
-	var sawB, sawC, sawD, sawUnknown bool
-	for _, r := range segs[0].ToolReaches {
-		for _, p := range r.Paths {
-			p = filepath.ToSlash(p)
-			if strings.Contains(p, "work/repo-b") {
-				sawB = true
-			}
-			if strings.Contains(p, "work/repo-c/patch.go") {
-				sawC = true
-			}
-			if strings.Contains(p, "work/repo-d/bare.go") {
-				sawD = true
-			}
-			if strings.Contains(p, "\x00unknown") {
-				sawUnknown = true
-			}
-		}
-	}
-	if !sawB || !sawC || !sawD || !sawUnknown {
-		t.Errorf("missing expected reaches: sawB=%v sawC=%v sawD=%v sawUnknown=%v reaches=%+v", sawB, sawC, sawD, sawUnknown, segs[0].ToolReaches)
-	}
-
-	// Non-shell argv with -c (head -c 80 <workDir>/B/notes) must keep all args; direct argv
-	// containing literal $foo must stay shell-quoted and NOT trigger UnknownReach.
-	workDir := t.TempDir()
-	notesB := filepath.Join(workDir, "B", "notes")
-	headReach := codexCommandReachPaths([]string{"head", "-c", "80", notesB}, workPath("repo-a"), workPath("repo-a"))
-	sawHeadB := false
-	for _, p := range headReach {
-		if strings.Contains(p, notesB) {
-			sawHeadB = true
-		}
-	}
-	if !sawHeadB {
-		t.Errorf("head -c 80 %s lost target argument: %+v", notesB, headReach)
-	}
-	rgReach := codexCommandReachPaths([]string{"rg", "$foo", "main.go"}, workPath("repo-a"), workPath("repo-a"))
-	for _, p := range rgReach {
-		if strings.Contains(p, "\x00unknown") {
-			t.Errorf("direct argv rg $foo falsely triggered UnknownReach: %+v", rgReach)
-		}
 	}
 }
 
@@ -597,67 +470,12 @@ func TestFileURLPath(t *testing.T) {
 	}
 }
 
-func hasUnknownReach(paths []string) bool {
-	return slices.ContainsFunc(paths, func(p string) bool { return strings.Contains(p, "\x00unknown") })
-}
-
-func TestCodexArgvRendersAsShellCommandAndRelativeCwdJoins(t *testing.T) {
-	dir := t.TempDir()
-	other := t.TempDir()
-	for _, argv := range [][]string{
-		{"bash", "-l", "-c", "ls sub"},
-		{"env", "FOO=1", "go", "version"},
-		{"echo", "$foo"},
-	} {
-		if got := codexCommandReachPaths(argv, dir, dir); hasUnknownReach(got) {
-			t.Errorf("%q: unexpected unknown reach: %q", argv, got)
-		}
-	}
-	target := filepath.Join(other, "notes.txt")
-	if err := os.WriteFile(target, []byte("x"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	// The scan reports an existing file by its folder.
-	if got := codexCommandReachPaths([]string{"head", "-c", "80", target}, dir, dir); !slices.ContainsFunc(got, func(p string) bool { return strings.HasSuffix(p, other) || strings.HasSuffix(p, target) }) {
-		t.Errorf("head -c 80 %s: target not reached: %q", target, got)
-	}
-	if got := codexCommandReachPaths([]string{"grep", "-r", "x", other}, dir, dir); !slices.ContainsFunc(got, func(p string) bool { return strings.HasSuffix(p, other) }) {
-		t.Errorf("grep -r x %s: directory not reached: %q", other, got)
-	}
-	if got := shellArgvCommand([]string{"FOO=1", "if", "a b", "it's", ""}); got != `'FOO=1' if 'a b' 'it'\''s' ''` {
-		t.Errorf("shellArgvCommand = %s", got)
-	}
+func TestCodexNormalizeCwdJoinsARelativeCwd(t *testing.T) {
 	if got := codexNormalizeCwd("sub", "/work/a"); got != filepath.Join("/work/a", "sub") {
 		t.Errorf("codexNormalizeCwd(sub, /work/a) = %q", got)
 	}
 	if got := codexNormalizeCwd("sub", ""); got != "sub" {
 		t.Errorf("codexNormalizeCwd(sub, \"\") = %q", got)
-	}
-}
-
-// A code-mode script's image read appears only as an ImageView item, so its path is a reach.
-func TestCodexImageViewIsAReach(t *testing.T) {
-	var reached []string
-	p := newCodexHistoryParser("019d2b54-7a10-7000-8000-000000000301", false, func(seg agents.HistorySegment) error {
-		for _, tr := range seg.ToolReaches {
-			reached = append(reached, tr.Paths...)
-		}
-		return nil
-	})
-	for _, line := range []string{
-		`{"timestamp":"2026-10-03T10:00:00Z","type":"session_meta","payload":{"id":"019d2b54-7a10-7000-8000-000000000301","cwd":` + jsonText(workPath("repo-a")) + `}}`,
-		`{"timestamp":"2026-10-03T10:00:02Z","type":"event_msg","payload":{"type":"item_completed","item":{"type":"ImageView","id":"iv-1","path":` + jsonText(fileURL(workPath("repo-b/design.png"))) + `}}}`,
-	} {
-		if err := p.handleLine([]byte(line), 0); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := p.finish(); err != nil {
-		t.Fatal(err)
-	}
-	// The whole path, so one joined onto the session's working directory does not pass.
-	if !slices.Contains(reached, "\x00alone\x00"+workPath("repo-b/design.png")) {
-		t.Errorf("ImageView path not recorded as a reach: %q", reached)
 	}
 }
 
@@ -688,8 +506,7 @@ func TestCodexUntimedPromptStaysUntimed(t *testing.T) {
 						continue
 					}
 					found = true
-					// A made-up time would read as a dated record from before the read, so it
-					// would survive a Mixed cutoff; a zero time is dropped under any cutoff.
+					// An untimed prompt stays untimed rather than taking a made-up time.
 					if lr.TimeUnixNano != 0 || lr.ObservedTimeUnixNano != 0 {
 						t.Errorf("untimed prompt got time %d/%d, want 0", lr.TimeUnixNano, lr.ObservedTimeUnixNano)
 					}

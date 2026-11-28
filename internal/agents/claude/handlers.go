@@ -31,10 +31,6 @@ type claudeHookInput struct {
 	ToolInput           struct {
 		FilePath     string `json:"file_path"`
 		NotebookPath string `json:"notebook_path"`
-		Path         string `json:"path"`
-		Pattern      string `json:"pattern"`
-		Glob         string `json:"glob"`
-		Command      string `json:"command"`
 		Edits        []struct {
 			FilePath string `json:"file_path"`
 		} `json:"edits"`
@@ -64,9 +60,6 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 	if err != nil {
 		env.Logf("%v", err)
 		return nil
-	}
-	if in.Source != "compact" {
-		env.StartRun(in.SessionID)
 	}
 	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
 	if !ok {
@@ -118,23 +111,8 @@ func stop(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// preToolUse classifies what a read, search or shell call is about to reach before it runs.
-// Prints nothing: Claude Code reads PreToolUse stdout as a decision on the call.
-func preToolUse(ctx context.Context, env hookrun.Env) error {
-	if env.Routing == nil {
-		return nil
-	}
-	in, err := readClaudeInput(env.Stdin)
-	if err != nil {
-		env.Logf("%v", err)
-		return nil
-	}
-	if session.ValidID(in.SessionID) && claudeReadTools[in.ToolName] {
-		env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-		env.Classify(ctx, nil, session.Session{ID: in.SessionID, Tool: claudeTool, Model: in.Model}, reachedPaths(in, env.Cwd), hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType))
-	}
-	return nil
-}
+// preToolUse is kept as a silent no-op for older settings.json entries until refreshed.
+func preToolUse(context.Context, hookrun.Env) error { return nil }
 
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	in, err := readClaudeInput(env.Stdin)
@@ -151,7 +129,6 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 	r, err := env.Repo(ctx)
 	if err != nil {
-		env.Classify(ctx, nil, sess, reachedPaths(in, env.Cwd), attrs)
 		return nil
 	}
 	if isClaudeAgentTool(in.ToolName) {
@@ -171,18 +148,4 @@ func editedPaths(in *claudeHookInput) []string {
 		out = append(out, e.FilePath)
 	}
 	return out
-}
-
-func reachedPaths(in *claudeHookInput, cwd string) []string {
-	switch in.ToolName {
-	case "Bash":
-		return hookrun.Alone(hookrun.ShellPaths(in.ToolInput.Command, cwd)...)
-	case "Grep":
-		return hookrun.Search(cmp.Or(in.ToolInput.Path, cwd), in.ToolInput.Glob)
-	case "Glob":
-		return hookrun.Search(cmp.Or(in.ToolInput.Path, cwd), in.ToolInput.Pattern)
-	case "LS":
-		return hookrun.Alone(in.ToolInput.Path)
-	}
-	return append(editedPaths(in), in.ToolInput.Path)
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +12,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 // readCodexLines writes lines as a rollout and returns its segments and their native wire.
@@ -81,26 +79,5 @@ func TestCodexOutputAfterBoundedFlushIsKept(t *testing.T) {
 	}
 	if !strings.Contains(wire, "KEPT_LONG_OUTPUT") {
 		t.Errorf("an output after the bounded flush was dropped")
-	}
-}
-
-// A relative file_path is resolved against the call's own workdir, not the session's cwd.
-func TestCodexRelativeFilePathUsesCallWorkdir(t *testing.T) {
-	t.Parallel()
-	args := jsonText(map[string]string{"workdir": workPath("orgA"), "file_path": "../orgB/x.go"})
-	segs, _ := readCodexLines(t, []string{
-		`{"timestamp":"2026-10-03T10:00:00Z","type":"session_meta","payload":{"id":"sess-orphan","cwd":` + jsonText(workPath("orgA/sub/deep")) + `}}`,
-		`{"timestamp":"2026-10-03T10:00:01Z","type":"response_item","payload":{"type":"function_call","call_id":"call-1","name":"read_file","arguments":` + jsonText(args) + `}}`,
-		`{"timestamp":"2026-10-03T10:00:02Z","type":"event_msg","payload":{"type":"user_message","message":"hi"}}`,
-	})
-	want := hookrun.Alone(workPath("orgB/x.go"))[0]
-	var got []string
-	for _, s := range segs {
-		for _, r := range s.ToolReaches {
-			got = append(got, r.Paths...)
-		}
-	}
-	if !slices.Contains(got, want) {
-		t.Errorf("reaches = %q, want %q", got, want)
 	}
 }

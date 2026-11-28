@@ -7,7 +7,8 @@ import (
 )
 
 // EventHook is one entry terma owns in an agent's hooks file: the event it is filed
-// under, and the entry as that agent spells it.
+// under, and the entry as that agent spells it. A nil Entry retires the event: terma's
+// entries under it are taken out and none is installed.
 type EventHook struct {
 	Event string
 	Entry json.RawMessage
@@ -56,7 +57,7 @@ func MergeEventHooks(root string, file HooksFile, own []EventHook, install bool)
 		var kept []json.RawMessage
 		present := false
 		for _, entry := range entries {
-			if install && !present && SameJSON(entry, h.Entry) {
+			if install && !present && h.Entry != nil && SameJSON(entry, h.Entry) {
 				kept = append(kept, entry)
 				present = true
 				continue
@@ -70,7 +71,7 @@ func MergeEventHooks(root string, file HooksFile, own []EventHook, install bool)
 				kept = append(kept, remaining)
 			}
 		}
-		if install && !present {
+		if install && !present && h.Entry != nil {
 			kept = append(kept, h.Entry)
 			changed = true
 		}

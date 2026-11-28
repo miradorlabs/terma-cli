@@ -105,6 +105,35 @@ func TestPruneKeepsAHeldLock(t *testing.T) {
 	}
 }
 
+// An earlier build kept a <claim>.mixed folder beside a claim: Prune empties and removes
+// one whose files are past TTL, and leaves a newer file, and its folder, alone.
+func TestPruneRemovesLegacyMixedFolders(t *testing.T) {
+	t.Parallel()
+	dir := enable(t)
+	now := time.Now()
+	claims := filepath.Join(dir, DirName, claimsDir)
+	old, fresh := filepath.Join(claims, "old.json.mixed"), filepath.Join(claims, "fresh.json.mixed")
+	for _, d := range []string{old, fresh} {
+		if err := os.MkdirAll(d, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(d, "a.json"), []byte("{}"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	stale := now.Add(-TTL - time.Minute)
+	if err := os.Chtimes(filepath.Join(old, "a.json"), stale, stale); err != nil {
+		t.Fatal(err)
+	}
+	Prune(dir, now)
+	if _, err := os.Stat(old); !os.IsNotExist(err) {
+		t.Fatalf("prune kept a stale legacy .mixed folder: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(fresh, "a.json")); err != nil {
+		t.Fatalf("prune removed a fresh file in a legacy .mixed folder: %v", err)
+	}
+}
+
 // Each hook adds its processes; one whose processes are already named, inside Refresh, writes nothing.
 func TestClaimMergesProcesses(t *testing.T) {
 	t.Parallel()
@@ -515,35 +544,5 @@ func TestClaimKeepsItsParent(t *testing.T) {
 	}
 	if at, ok := c.At(8, now.Add(2*time.Second)); !ok || at.Parent != "parent" {
 		t.Fatalf("the placement lost the parent: %+v, %v", at, ok)
-	}
-}
-
-// When a parent-bearing sessionStart claim loses the race to KindMixed for the same run,
-// staysMixed refuses the downgrade while still preserving the session-global Parent for
-// subsequent runs.
-func TestMixedRejectionRetainsParent(t *testing.T) {
-	t.Parallel()
-	dir := enable(t)
-	now := time.Now()
-	if !Write(dir, "child-race", Claim{Kind: KindMixed, Run: "r1", Account: testAccount, Tool: "omp", PIDs: []int{7}}, now) {
-		t.Fatal("initial Mixed claim not written")
-	}
-	if Write(dir, "child-race", Claim{ProjectID: "p1", Run: "r1", Account: testAccount, Tool: "omp", PIDs: []int{7}, Parent: "parent-sess"}, now.Add(time.Second)) {
-		t.Fatal("staysMixed allowed non-Mixed downgrade")
-	}
-	c, ok := Read(dir, "child-race", now.Add(time.Second))
-	if !ok || c.Kind != KindMixed || c.Parent != "parent-sess" {
-		t.Fatalf("after rejected downgrade: claim = %+v, %v; want KindMixed with Parent=parent-sess", c, ok)
-	}
-	// A later clean run without Parent inherits the preserved session-global Parent.
-	if !Write(dir, "child-race", Claim{ProjectID: "p1", Run: "r2", Account: testAccount, Tool: "omp", PIDs: []int{8}}, now.Add(2*time.Second)) {
-		t.Fatal("next clean run not written")
-	}
-	c, ok = Read(dir, "child-race", now.Add(2*time.Second))
-	if !ok || c.Kind != "" || c.ProjectID != "p1" || c.Parent != "parent-sess" {
-		t.Fatalf("after next clean run: claim = %+v, %v; want Parent=parent-sess", c, ok)
-	}
-	if at, ok := c.At(8, now.Add(3*time.Second)); !ok || at.Parent != "parent-sess" {
-		t.Fatalf("next run placement lost Parent: %+v, %v", at, ok)
 	}
 }

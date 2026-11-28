@@ -117,8 +117,8 @@ flowchart LR
 Each selected team's collection policy, set in the Terma web app, lists the repositories it
 collects. Using your one sign-in, hooks route each session to the matching team and the
 relay forwards only claimed sessions — filtered by that team's policy — never mixing
-organizations. If a session crosses into another organization's repository, collection stops
-at the crossing (Mixed). Everything else — uncollected repositories and folders outside git —
+organizations. A session that moves to another repository is claimed there, and what it does
+from then on goes to that repository's team. Everything else — uncollected repositories and folders outside git —
 never leaves your machine unless you also enabled Personal. When a team's policy asks for
 commit stamping, a commit of files an agent session edited gets an `Agent-Session-Id` trailer.
 
@@ -129,7 +129,7 @@ Every command is safe to run again:
 ```bash
 terma setup          # sign in once, choose agents and teams, write machine-wide hooks
 terma teams          # pick which teams collect across organizations
-terma doctor         # check routing state, per-team health, Mixed runs, losses, and delivery
+terma doctor         # check routing state, per-team health, losses, and delivery
 terma update         # install the latest release, or refresh what terma installed
 terma teardown       # undo setup on this machine (--sign-out also signs out)
 ```
@@ -146,8 +146,6 @@ routes to and why using the exact same router hooks and the relay use.
 - **Where your data goes**: your teams in the order they are tried, each with its state.
   Under each team are the repositories it collects. A repository two teams list shows once,
   under the team whose newer policy wins.
-- **Paused sessions**: sessions that may have touched another organization's work. They
-  send nothing until they resume.
 - **This repository**: which team collects it, and the agent work not yet committed.
 - **Checks**: sign-in, hooks, agent export, the event queue, and delivery.
 
@@ -398,9 +396,8 @@ sessions using your single user sign-in and `X-Mirador-Project` (or the stored s
 a `TERMA_API_KEY` profile). Everything else — uncollected repositories and folders outside
 git — never leaves your machine unless Personal is enabled. A session in an uncollected
 location is dropped as soon as its first hook runs; anything else unclaimed waits briefly in
-memory, never on disk, then is dropped; a relay restart drops it too. If a session crosses
-into another organization's repository, its run becomes Mixed and conversation/telemetry
-records from the crossing onward are dropped so organizations never mix. Run
+memory, never on disk, then is dropped; a relay restart drops it too. Each record goes to
+the team of the repository its session was in when it was made. Run
 `terma route explain [path]` to see how any directory or repository routes and why.
 
 What content leaves is the routed team's collection policy, set in the Terma web app, and
@@ -639,9 +636,8 @@ or `$XDG_CONFIG_HOME/opencode/plugins`), and that one file serves OpenCode 1 and
 The plugin sends each model call with its tokens and the cost OpenCode reports, each reply,
 each tool call and MCP call, each subagent with the session that opened it, each prompt and
 each session title to the relay, which forwards what your team's policy collects. It also runs
-terma's hooks: they claim each session for its repository, check what a read, search or shell
-tool reaches, and record the files OpenCode's edit tools change, with their repository, so
-those edits are stamped on your commits.
+terma's hooks: they claim each session for its repository and record the files OpenCode's
+edit tools change, with their repository, so those edits are stamped on your commits.
 
 terma needs OpenCode 1.16.0 or later on OpenCode 1, and 2.0.0 or later on OpenCode 2: setup
 refuses an earlier one and doctor fails it. OpenCode loads its plugins when it starts, so
@@ -652,31 +648,18 @@ no plugins and is not recorded.
 OpenCode's known limits: on OpenCode 1, the call that writes a session's title has no tokens
 or cost. On OpenCode 2.0.0, MCP calls made in code mode are recorded only as the code-mode
 call that made them. Reasoning text is never collected, and a file one of OpenCode's shell
-commands writes is not attributed to its session. When a reach is checked only after its call
-ran, what the session and the sessions above it send waits for the check, but only for the
-sessions that OpenCode process knows: a parent session in another OpenCode process is not held
-back. On OpenCode 2, every session of the background service runs in one process. Also on
-OpenCode 2, the first model call or tool call of a session can be recorded a few tens of
+commands writes is not attributed to its session. On OpenCode 2, the first model call or
+tool call of a session can be recorded a few tens of
 milliseconds shorter than it was: OpenCode does not wait for terma's first check of the
 session, and nothing is recorded as starting before the prompt that asked for it. On OpenCode
 1, the first prompt an OpenCode process sends in a session waits for terma to claim that
 session: usually a fraction of a second, a few seconds at most.
 
-On OpenCode 2, some attached files stop a session from being recorded. terma checks that a
-file an agent reads belongs to a repository your team collects, and for these OpenCode 2
-gives the plugin the file's content but not where the file is, so it cannot be checked:
-
-- a file attached with `opencode run -f`;
-- on OpenCode 2.0.0, an image or PDF attached by its path.
-
-From such a prompt on, nothing of the session is recorded until the session is next resumed,
-and `terma doctor` lists it under "Paused sessions", as for any reach terma cannot place. A file
-attached with `@file` is checked and recorded as usual, and so is an image or PDF attached
-by its path on OpenCode 2.4.1. An image pasted from the clipboard has no file behind it: it
-is treated as your own input, like pasted text, and nothing of the image is sent. Text that
-OpenCode puts into the prompt itself, with nothing to say it came from a file, cannot be told
-from what you typed or pasted, and is recorded as your prompt: OpenCode 2.4.1's own code
-does this with an SVG dragged into the prompt (read in its code, not seen in a run).
+An image pasted from the clipboard has no file behind it: it is treated as your own input,
+like pasted text, and nothing of the image is sent. Text that OpenCode puts into the prompt
+itself, with nothing to say it came from a file, cannot be told from what you typed or pasted,
+and is recorded as your prompt: OpenCode 2.4.1's own code does this with an SVG dragged into
+the prompt (read in its code, not seen in a run).
 
 A session you move to another repository on OpenCode 2 is recorded under that repository's
 rules from the move on. What was said before the move stays as it was recorded, but the
@@ -725,7 +708,7 @@ one-time code in a form POST so it need not appear in a URL, or, with
 only to the auth host it was set up against. Your user sign-in (and any `TERMA_API_KEY`
 server key) stays in the system keychain, indexed from your configuration directory
 (`~/.config/terma`, or `%APPDATA%\terma` on Windows) with restrictive file permissions. What
-terma writes as it runs — routing state (`routing/<profile>.json`), run ledgers, the event
+terma writes as it runs — routing state (`routing/<profile>.json`), the event
 queue, the relay and its local token, the hooks' state, and the record of repositories its
 commit hooks are installed in — stays in its state directory (`~/.local/state/terma`, or
 `%LOCALAPPDATA%\terma` on Windows), with the same restrictive permissions. The only thing
@@ -740,7 +723,7 @@ terma is one binary with three roles:
 
 - the **command line** (`internal/cli`), which `cmd/terma` starts;
 - the **hooks** that coding agents and git run machine-wide (`terma hook <event>`,
-  `internal/hooks`), routed via `internal/routing` and guarded by `internal/runs`;
+  `internal/hooks`), routed via `internal/routing`;
 - a **local relay daemon** (`terma relay run`, `internal/relay`). It forwards an
   agent's own telemetry only for sessions a hook claimed for a routed team.
 

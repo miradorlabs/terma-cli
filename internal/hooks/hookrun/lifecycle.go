@@ -5,15 +5,17 @@ import (
 	"encoding/hex"
 	"errors"
 	"maps"
+	"os"
 	"path/filepath"
 	"slices"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/gitx"
 	"github.com/miradorlabs/terma-cli/internal/project"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/session"
@@ -170,9 +172,6 @@ func (e Env) record(r *Repo, sess session.Session, paths []string, mirror bool) 
 
 func (e Env) report(r *Repo, sess session.Session, toolName string, paths []string, extra map[string]any, confirmed bool) {
 	checkouts := e.checkouts(r, paths)
-	if e.Routing != nil {
-		e.classifyTouches(r, sess, extra, e.reached(r, paths), runs.Why{})
-	}
 	for _, c := range checkouts {
 		if e.Routing != nil && !c.repo.Collected() {
 			continue
@@ -190,28 +189,11 @@ func (e Env) report(r *Repo, sess session.Session, toolName string, paths []stri
 		}
 		ev := spool.Event{Name: semconv.TermaFilesTouchedEvent, SessionID: sess.ID, Attrs: attrs}
 		if c.repo == r {
-			e.emitFor(r, ev, true, true, true)
+			e.EmitFor(r, ev)
 		} else {
-			e.emit(e.stampFor(c.repo, ev, true, true))
+			e.emit(e.stampFor(c.repo, ev))
 		}
 	}
-}
-
-func (e Env) classifyTouches(r *Repo, sess session.Session, extra map[string]any, touched []touched, unknown runs.Why) {
-	if e.Routing == nil || r.dest == nil {
-		return
-	}
-	var locs []routing.Location
-	for _, t := range touched {
-		if t.repo != r && t.repo.dest != nil {
-			locs = append(locs, t.repo.dest.loc)
-		}
-	}
-	if len(locs) == 0 && unknown.Reason == "" {
-		return
-	}
-	agent, _ := extra[semconv.TermaAgentIDKey].(string)
-	e.judge(sess.ID, agent, e.repoClaim(r, sess.Tool), append([]routing.Location{r.dest.loc}, locs...), true, unknown)
 }
 
 // touched is the files of one checkout, repo-relative, as a set.
@@ -264,10 +246,9 @@ func (e Env) checkouts(r *Repo, paths []string) []touched {
 // checkoutOf is the checkout holding dir, judged from the filesystem alone: r when dir is in
 // r or no checkout can be read there (an inherited GIT_DIR names r's), another one only if
 // the team policy admits it, else nil. When Routing is active every other checkout is
-// returned with its routing destination so touches of uncollected repos are classified too,
-// and so is a folder outside git, as the place personal may collect, unless it is no one's
-// workspace (nobodys): a device or scratch space is reached and edited by every team's
-// sessions, so it places nothing, crosses into no organization and reports no touch.
+// returned with its routing destination, and so is a folder outside git, as the place
+// personal may collect, unless it is no one's workspace (nobodys): a device or scratch space
+// is edited by every team's sessions, so it reports no touch.
 func (e Env) checkoutOf(r *Repo, dir string) *Repo {
 	root, gitDir, ok := gitx.LocateFS(dir)
 	if !ok {
@@ -319,4 +300,53 @@ func resolved(p string) string {
 		return r
 	}
 	return p
+}
+
+// deviceRoots are the device and kernel filesystems, which are no one's workspace.
+var deviceRoots = []string{"/dev", "/proc", "/sys"}
+
+// machineRoots are the folders that are the machine's own, each as named and as its links
+// resolve: the operating system's configuration and programs, and the scratch space
+// (/tmp is /private/tmp on macOS, and $TMPDIR a folder of /var/folders there).
+var machineRoots = sync.OnceValue(func() (roots []string) {
+	for _, root := range []string{"/etc", "/bin", "/sbin", "/usr", "/lib", "/lib64", "/System", "/Library", "/tmp", "/var/tmp", os.TempDir()} {
+		if root = filepath.Clean(root); filepath.IsAbs(root) && root != filepath.Dir(root) {
+			roots = appendUnique(roots, root, resolved(root))
+		}
+	}
+	return roots
+})
+
+// nobodys reports whether dir, a folder in no git checkout, is no one's workspace, so that
+// touching it reports no file-edit to Personal (checkoutOf): the filesystem's root folder
+// itself, a device or kernel filesystem (2>/dev/null, /proc/cpuinfo), the operating system's
+// own folders (/etc/hosts, /usr/bin), or the machine's scratch space (/tmp, mktemp files).
+// Any other folder outside git may hold the developer's own work, and stays theirs: so does
+// a folder of their home wherever the home is, and a git checkout kept in scratch space is
+// still its origin's, never asked about here.
+func nobodys(dir string) bool {
+	if dir == filepath.Dir(dir) || slices.ContainsFunc(deviceRoots, func(root string) bool { return under(dir, root) }) {
+		return true
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != filepath.Dir(home) && (under(dir, home) || under(dir, resolved(home))) {
+		return false
+	}
+	return slices.ContainsFunc(machineRoots(), func(root string) bool { return under(dir, root) })
+}
+
+// under reports whether dir is root or a folder below it.
+func under(dir, root string) bool {
+	if root == "" || len(dir) < len(root) || dir[:len(root)] != root && (filepath.Separator != '\\' || !strings.EqualFold(dir[:len(root)], root)) {
+		return false
+	}
+	return len(dir) == len(root) || os.IsPathSeparator(dir[len(root)])
+}
+
+func appendUnique(dst []string, items ...string) []string {
+	for _, s := range items {
+		if s != "" && !slices.Contains(dst, s) {
+			dst = append(dst, s)
+		}
+	}
+	return dst
 }

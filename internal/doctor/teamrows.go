@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 )
 
 // OrderChanges says why the routing order is not fixed.
@@ -62,7 +61,7 @@ func TeamRows(r Routing, now time.Time) []Row {
 }
 
 // teamSections are doctor's view of a routed profile: each ticked team in the order routing
-// tries them, with its state and what it collects beneath it, then the paused sessions.
+// tries them, with its state and what it collects beneath it.
 func (r Routing) teamSections(now time.Time) []Section {
 	teams := Section{Title: "Where your data goes"}
 	if r.unusable() || len(r.State.Teams) == 0 {
@@ -86,11 +85,7 @@ func (r Routing) teamSections(now time.Time) []Section {
 	if orgs := len(order) - pick(len(order) > 0 && order[len(order)-1].Personal, 1, 0); orgs > 1 {
 		teams.Footnote = orderNote
 	}
-	out := []Section{teams}
-	if s, ok := r.pausedSection(now); ok {
-		out = append(out, s)
-	}
-	return out
+	return []Section{teams}
 }
 
 // teamLine is t's line: its state as the mark, and why it cannot send when it cannot,
@@ -169,67 +164,6 @@ func capEntries(lines []Line, n int) []Line {
 		more.Mark = MarkWarn
 	}
 	return append(lines[:n:n], more)
-}
-
-// pausedSection is the sessions the relay stopped sending, when there are any: each with
-// when it paused and why, and what the developer can do.
-func (r Routing) pausedSection(now time.Time) (Section, bool) {
-	if len(r.Mixed) == 0 && r.MixedDropped == 0 {
-		return Section{}, false
-	}
-	s := Section{Title: "Paused sessions", Footnote: pausedNote}
-	if n := len(r.Mixed); n > 0 {
-		s.Lines = append(s.Lines, Line{Mark: MarkWarn, Text: fmt.Sprintf("%d %s", n, pick(n == 1, "session is paused", "sessions are paused"))})
-		mixed := slices.Clone(r.Mixed)
-		slices.SortStableFunc(mixed, func(a, b runs.MixedRun) int { return b.At.Compare(a.At) })
-		var lines []Line
-		for _, m := range mixed[:min(len(mixed), maxListed)] {
-			l := Line{Depth: 1, Text: pausedWords(m.Why.Reason)}
-			if !m.At.IsZero() {
-				l.Note = pausedAt(m.At, now)
-			}
-			lines = append(lines, l)
-			if m.Why.Reason == runs.UnknownReach {
-				lines = append(lines, Line{Depth: 2, Text: "e.g. a command reading files outside the repository", Quiet: true})
-			}
-		}
-		if more := n - maxListed; more > 0 {
-			lines = append(lines, Line{Depth: 1, Text: fmt.Sprintf("+ %d more", more), Quiet: true})
-		}
-		s.Lines = append(s.Lines, lines...)
-	}
-	if d := r.MixedDropped; d > 0 {
-		s.Lines = append(s.Lines, Line{Mark: MarkWarn, Text: fmt.Sprintf("%d %s from paused sessions dropped", d, pick(d == 1, "record", "records"))})
-	}
-	return s, true
-}
-
-// pausedNote says why sessions pause and how to send again: only a new run ends a pause.
-const pausedNote = "Terma pauses a session that touches another organization's work, so nothing leaks between them.\n" +
-	"To send again, start a new session or resume this one. Keep each session to one organization's repositories."
-
-// pausedAt is when a session paused, as a reader says it.
-func pausedAt(at, now time.Time) string {
-	at = at.Local()
-	if y1, m1, d1 := at.Date(); y1 == now.Local().Year() && m1 == now.Local().Month() && d1 == now.Local().Day() {
-		return "paused " + at.Format("15:04")
-	}
-	return "paused " + at.Format("2 Jan 15:04")
-}
-
-// pausedWords says, for a reader, why a session paused.
-func pausedWords(r runs.Reason) string {
-	switch r {
-	case runs.Crossed:
-		return "worked in another organization's repository"
-	case runs.UnknownReach:
-		return "ran a command terma could not trace"
-	case runs.LocationBound:
-		return "touched more folders than terma tracks"
-	case runs.Aside:
-		return "changed organization while terma was busy"
-	}
-	return "with a record terma cannot read"
 }
 
 // blockedLines are what the relay held and then dropped, by blocker.

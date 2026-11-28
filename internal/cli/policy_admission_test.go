@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	"google.golang.org/protobuf/proto"

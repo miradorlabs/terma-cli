@@ -21,18 +21,16 @@ import (
 const maxParcelConcurrency = 4
 
 // routed sends a batch once multi-org routing is active. Each event is gated on its lane
-// first (Account / NoPerson) before touching any routing state or run ledger: another
+// first (Account / NoPerson) before touching any routing state: another
 // lane's events wait untouched until they age out. In-lane events with no destination
 // enrollment are dropped and counted (no_destination / Unroutable), never sent to
 // Profile.Team or re-routed. Every other event goes only to the enrollment routing pinned
 // when it was spooled, rechecked against its profile's routing state (whose Account must
-// match the active lane) and the session's run ledger:
+// match the active lane):
 //
 //   - profile routing state missing, unreadable, or paired to another account: held
 //     (fail closed, never falling back to Profile.Team);
 //   - enrollment ended, Refused, or no longer covers the location: dropped (Discarded);
-//   - session run became Mixed at or before the event's time: dropped (Mixed), unless it
-//     carries no content and routes by its own checkout location (OwnLocation && runs.Locational);
 //   - team expired, signing in, or suspended: held (Blocked);
 //   - team Active and still covering it: sent per enrollment with SignIn.Token +
 //     X-Mirador-Project (user token) or keys.json with no X-Mirador-Project (server key),
@@ -53,7 +51,7 @@ func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event,
 
 	for _, e := range events {
 		// 1. Lane gate FIRST: wrong-lane events stay held untouched without reading
-		// routing.State, run ledgers, or policies.
+		// routing.State or policies.
 		if !p.inLane(e) {
 			held = append(held, e)
 			continue
@@ -64,8 +62,8 @@ func (p *pass) routed(ctx context.Context, events []spool.Event) ([]spool.Event,
 			noDest = append(noDest, e)
 			continue
 		}
-		// 3. Load routing.State, verify State.Account == lane, recheck pinned enrollment
-		// + run-ledger Mixed state, and filter through current policy.
+		// 3. Load routing.State, verify State.Account == lane, recheck pinned enrollment,
+		// and filter through current policy.
 		pr := b.profile(e.Profile)
 		team, out, action := p.admit(e, pr, lane, now)
 		switch action {

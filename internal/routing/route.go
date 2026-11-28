@@ -19,8 +19,6 @@ const (
 	OutsideGit LocationKind = "outside_git"
 	// Repository: the record ran in the checkout whose origin Repository names.
 	Repository LocationKind = "repository"
-	// Mixed: the record's run touched repositories of two organizations.
-	Mixed LocationKind = "mixed"
 )
 
 // Location is where a record ran.
@@ -60,7 +58,6 @@ const (
 	// ReasonBlocked: the team that would collect it cannot send now (Decision.Blocked).
 	ReasonBlocked Reason = "blocked"
 	ReasonUnknown Reason = "unknown"
-	ReasonMixed   Reason = "mixed"
 	ReasonNoMatch Reason = "no_match"
 )
 
@@ -135,8 +132,6 @@ func (r *Router) match(i int, repo string) (Entry, bool) {
 // last list matches instead of passing it on.
 func (r *Router) Route(loc Location, now time.Time) Decision {
 	switch loc.Kind {
-	case Mixed:
-		return Decision{Outcome: Drop, Reason: ReasonMixed}
 	case OutsideGit:
 		return r.personal("", now)
 	case Repository:
@@ -224,17 +219,4 @@ func (s State) unknownToPersonalEligible() bool {
 // unknownToPersonal: personal is the only team, is Active and collects everything.
 func (s State) unknownToPersonal(now time.Time) bool {
 	return s.unknownToPersonalEligible() && s.Teams[0].StateAt(now) == Active
-}
-
-// OrganizationOf is the organization a location belongs to, for telling when a run
-// crosses organizations: the one of the team Route sends or holds it for, personal
-// included. False when nothing collects it, and for a repository that names no
-// repository, as Route holds it.
-func (r *Router) OrganizationOf(loc Location, now time.Time) (string, bool) {
-	loc.Narrow = true
-	d := r.Route(loc, now)
-	if d.Outcome == Drop || d.EnrollmentID == "" {
-		return "", false
-	}
-	return r.s.team(d.EnrollmentID).OrganizationID, true
 }

@@ -61,9 +61,6 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 		env.Logf("%v", err)
 		return nil
 	}
-	if !in.child() && in.Source != "compact" {
-		env.StartRun(in.SessionID)
-	}
 	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
 	if !ok {
 		return nil

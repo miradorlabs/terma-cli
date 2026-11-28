@@ -14,7 +14,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/session"
@@ -71,74 +70,9 @@ func gitRun(t *testing.T, dir string, args ...string) {
 	}
 }
 
-func TestRoutedCrossHookAndCrossToolMixedAndStartRun(t *testing.T) {
-	stateDir := t.TempDir()
-	repoA := namedRepo(t, "alpha", "git@github.com:orgA/alpha.git")
-	repoB := namedRepo(t, "beta", "git@github.com:orgB/beta.git")
-	if err := os.WriteFile(filepath.Join(repoA, "a.go"), []byte("package a\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(repoB, "b.go"), []byte("package b\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	rt := routedState(t, stateDir, testAccountA, []routing.Team{
-		makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true),
-		makeTeam("orgB", "team-b", []string{"github.com/orgB/beta"}, true),
-	})
-	env, _, _ := routedEnv(t, stateDir, repoA, testAccountA, rt)
-	ctx := context.Background()
-
-	sid := "018f3a2c-0001-7000-8000-000000000001"
-	sub := "018f3a2c-0001-7000-8000-000000000002"
-	env.StartRun(sid)
-	run1 := env.runOf(sid)
-	if run1 == "" {
-		t.Fatal("StartRun did not record a run id")
-	}
-
-	r, err := env.Repo(ctx)
-	if err != nil {
-		t.Fatalf("Repo(repoA): %v", err)
-	}
-	sess := session.Session{ID: sid, Tool: "claude_code"}
-	env.Touch(r, sess, "Edit", []string{filepath.Join(repoA, "a.go")}, map[string]any{semconv.TermaAgentIDKey: sub})
-
-	c, ok := claim.Read(stateDir, sid, env.Time())
-	if !ok || c.Kind != claim.KindRepository || c.ProjectID != "" || c.Run != run1 {
-		t.Fatalf("claim after repoA touch = %+v (ok=%v); want KindRepository, empty ProjectID, run %q", c, ok, run1)
-	}
-	if subClaim, ok := claim.Read(stateDir, sub, env.Time()); !ok || subClaim.Kind != claim.KindRepository {
-		t.Fatalf("subagent claim = %+v (ok=%v); want KindRepository", subClaim, ok)
-	}
-
-	// Hook 2: read into orgB repo via Classify -> marks run and subagent alias Mixed!
-	env.Classify(ctx, r, sess, []string{filepath.Join(repoB, "b.go")}, nil)
-	c, ok = claim.Read(stateDir, sid, env.Time())
-	if !ok || c.Kind != claim.KindMixed {
-		t.Fatalf("claim after cross-org Classify = %+v (ok=%v); want KindMixed", c, ok)
-	}
-	if subClaim, ok := claim.Read(stateDir, sub, env.Time()); !ok || subClaim.Kind != claim.KindMixed {
-		t.Fatalf("subagent claim after cross-org Classify = %+v (ok=%v); want KindMixed", subClaim, ok)
-	}
-	if p, _ := runs.Locate(stateDir, sid); p.MixedAt.IsZero() {
-		t.Fatalf("run ledger not marked mixed: %+v", p)
-	}
-
-	// Fresh StartRun starts a clean run.
-	env.StartRun(sid)
-	run2 := env.runOf(sid)
-	if run2 == "" || run2 == run1 {
-		t.Fatalf("second StartRun = %q; want new id != %q", run2, run1)
-	}
-	env.Touch(r, sess, "Edit", []string{filepath.Join(repoA, "a.go")}, nil)
-	c, ok = claim.Read(stateDir, sid, env.Time())
-	if !ok || c.Kind != claim.KindRepository || c.Run != run2 {
-		t.Fatalf("claim after fresh StartRun = %+v (ok=%v); want KindRepository with run %q", c, ok, run2)
-	}
-}
-
-func TestRoutedUnknownReachAndWithholdPlacementsAndKeepRun(t *testing.T) {
+// While a relay that does not route holds the lock (WithholdPlacements), a routed hook
+// writes no claim; once it lets go, the same edit claims the session.
+func TestRoutedWithholdPlacements(t *testing.T) {
 	stateDir := t.TempDir()
 	repoA := namedRepo(t, "alpha", "git@github.com:orgA/alpha.git")
 	rt := routedState(t, stateDir, testAccountA, []routing.Team{
@@ -149,30 +83,18 @@ func TestRoutedUnknownReachAndWithholdPlacementsAndKeepRun(t *testing.T) {
 	ctx := context.Background()
 
 	sid := "018f3a2c-0002-7000-8000-000000000001"
-	env.StartRun(sid)
 	r, err := env.Repo(ctx)
 	if err != nil {
 		t.Fatalf("Repo: %v", err)
 	}
-	// UnknownReach marks ledger Mixed, but WithholdPlacements writes no claim file.
-	env.Classify(ctx, r, session.Session{ID: sid, Tool: "claude_code"}, []string{UnknownReach + "eval\x00eval"}, nil)
-	if p, _ := runs.Locate(stateDir, sid); p.MixedAt.IsZero() {
-		t.Fatalf("UnknownReach did not mark ledger mixed: %+v", p)
-	}
+	env.Touch(r, session.Session{ID: sid, Tool: "claude_code"}, "Edit", []string{filepath.Join(repoA, "x.go")}, nil)
 	if _, ok := claim.Read(stateDir, sid, env.Time()); ok {
 		t.Fatal("WithholdPlacements still wrote a claim file")
 	}
-
-	// keepRun refreshes Active after runs.RefreshEvery.
 	rt.WithholdPlacements = false
-	sid2 := "018f3a2c-0002-7000-8000-000000000002"
-	env.StartRun(sid2)
-	before, _ := runs.Locate(stateDir, sid2)
-	env.Now = env.Now.Add(runs.RefreshEvery + time.Minute)
-	env.Touch(r, session.Session{ID: sid2, Tool: "claude_code"}, "Edit", []string{filepath.Join(repoA, "x.go")}, nil)
-	after, _ := runs.Locate(stateDir, sid2)
-	if !after.Active.After(before.Active) {
-		t.Fatalf("keepRun did not advance Active: before=%v after=%v", before.Active, after.Active)
+	env.Touch(r, session.Session{ID: sid, Tool: "claude_code"}, "Edit", []string{filepath.Join(repoA, "x.go")}, nil)
+	if c, ok := claim.Read(stateDir, sid, env.Time()); !ok || c.Repository.Origin != "github.com/orgA/alpha" {
+		t.Fatalf("claim after WithholdPlacements cleared = %+v (ok=%v); want repoA", c, ok)
 	}
 }
 
@@ -305,7 +227,7 @@ func TestRoutedTurns(t *testing.T) {
 	rA, _ := env.Repo(ctx)
 	evA := turns.Routed(rA, repoA, spool.Event{SessionID: "sess-t", Attrs: map[string]any{AttrProjectID: "old"}})
 	evB := turns.Routed(rA, repoB, spool.Event{SessionID: "sess-t", Attrs: map[string]any{AttrProjectID: "old"}})
-	if evA.Enrollment == "" || evB.Enrollment == "" || evA.Enrollment == evB.Enrollment || !evB.OwnLocation {
+	if evA.Enrollment == "" || evB.Enrollment == "" || evA.Enrollment == evB.Enrollment {
 		t.Fatalf("per-turn routing failed: evA=%+v evB=%+v", evA, evB)
 	}
 	if _, hasProj := evB.Attrs[AttrProjectID]; hasProj {
@@ -326,7 +248,6 @@ func TestRoutedHookLatencyBudget(t *testing.T) {
 	env, _, _ := routedEnv(t, stateDir, repoA, testAccountA, rt)
 	ctx := context.Background()
 	sid := "018f3a2c-0005-7000-8000-000000000001"
-	env.StartRun(sid)
 	r, err := env.Repo(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -351,11 +272,8 @@ func TestRoutedHookLatencyBudget(t *testing.T) {
 		}
 	}
 
-	measure("Read Classify", func() {
-		env.Classify(ctx, nil, sess, []string{fileA}, nil)
-	})
-	measure("Bash Classify", func() {
-		env.Classify(ctx, nil, sess, Alone(ShellPaths("cat a.go | grep package", repoA)...), nil)
+	measure("Edit Touch", func() {
+		env.Touch(r, sess, "Edit", []string{fileA}, nil)
 	})
 	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
 	measure("PrepareCommitMsg", func() {
@@ -370,60 +288,9 @@ func TestRoutedHookLatencyBudget(t *testing.T) {
 	})
 }
 
-func TestRoutedOutsideGitPersonalAndSymlinkEditMixed(t *testing.T) {
-	stateDir := t.TempDir()
-	repoA := namedRepo(t, "alpha", "git@github.com:orgA/alpha.git")
-	repoB := namedRepo(t, "beta", "git@github.com:orgB/beta.git")
-	// A folder of the developer's home: a temp folder that is not is no one's (nobodys).
-	outsideDir := t.TempDir()
-	t.Setenv("HOME", outsideDir)
-	t.Setenv("USERPROFILE", outsideDir)
-	personalFile := filepath.Join(outsideDir, "diary.txt")
-	if err := os.WriteFile(personalFile, []byte("private\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	targetB := filepath.Join(repoB, "secret.go")
-	if err := os.WriteFile(targetB, []byte("package b\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	linkInA := filepath.Join(repoA, "link.go")
-	if err := os.Symlink(targetB, linkInA); err != nil {
-		t.Fatal(err)
-	}
-
-	personal := makeTeam("orgPersonal", "team-personal", nil, false)
-	personal.Personal = true
-	personal.Policy.Mode = config.ModeGlobal
-	rt := routedState(t, stateDir, testAccountA, []routing.Team{
-		makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true),
-		makeTeam("orgB", "team-b", []string{"github.com/orgB/beta"}, true),
-		personal,
-	})
-	env, _, _ := routedEnv(t, stateDir, repoA, testAccountA, rt)
-	ctx := context.Background()
-	rA, err := env.Repo(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// 1. Reading a file outside git while personal team is selected marks orgA session Mixed.
-	sid1 := "018f3a2c-0006-7000-8000-000000000001"
-	env.StartRun(sid1)
-	env.Classify(ctx, rA, session.Session{ID: sid1, Tool: "claude_code"}, []string{personalFile}, nil)
-	if c, ok := claim.Read(stateDir, sid1, env.Time()); !ok || c.Kind != claim.KindMixed {
-		t.Fatalf("claim after reading outside-git file with personal team = %+v (ok=%v); want KindMixed", c, ok)
-	}
-
-	// 2. Editing a symlink in orgA pointing into orgB marks orgA session Mixed.
-	sid2 := "018f3a2c-0006-7000-8000-000000000002"
-	env.StartRun(sid2)
-	env.Touch(rA, session.Session{ID: sid2, Tool: "claude_code"}, "Edit", []string{linkInA}, nil)
-	if c, ok := claim.Read(stateDir, sid2, env.Time()); !ok || c.Kind != claim.KindMixed {
-		t.Fatalf("claim after editing symlink into orgB = %+v (ok=%v); want KindMixed", c, ok)
-	}
-}
-
-func TestRoutedGitCommitDoesNotTaintActiveRunInOtherOrg(t *testing.T) {
+// A commit in one organization's checkout, stamped with a session that has since resumed in
+// another's, leaves the session's claim where it is now.
+func TestRoutedGitCommitKeepsTheActiveClaimInAnotherOrg(t *testing.T) {
 	stateDir := t.TempDir()
 	repoA := namedRepo(t, "alpha", "git@github.com:orgA/alpha.git")
 	repoB := namedRepo(t, "beta", "git@github.com:orgB/beta.git")
@@ -440,7 +307,6 @@ func TestRoutedGitCommitDoesNotTaintActiveRunInOtherOrg(t *testing.T) {
 
 	// Run 1: touch file in repoA and stage it.
 	envA, _, _ := routedEnv(t, stateDir, repoA, testAccountA, rt)
-	envA.StartRun(sid)
 	rA, err := envA.Repo(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -450,7 +316,6 @@ func TestRoutedGitCommitDoesNotTaintActiveRunInOtherOrg(t *testing.T) {
 
 	// Run 2 (fresh hook process): session resumes cleanly in repoB (orgB).
 	envB, _, _ := routedEnv(t, stateDir, repoB, testAccountA, LoadRouting(stateDir, "default"))
-	envB.StartRun(sid)
 	rB, err := envB.Repo(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -461,7 +326,7 @@ func TestRoutedGitCommitDoesNotTaintActiveRunInOtherOrg(t *testing.T) {
 		t.Fatalf("claim before commit in A = %+v (ok=%v); want repoB", before, ok)
 	}
 
-	// Git commit hooks run in repoA stamping sid: must NOT place or mark repoB's active run Mixed.
+	// Git commit hooks run in repoA stamping sid: they must not move repoB's claim.
 	msgPath := filepath.Join(t.TempDir(), "COMMIT_EDITMSG")
 	if err := os.WriteFile(msgPath, []byte("feat: commit A\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -477,8 +342,8 @@ func TestRoutedGitCommitDoesNotTaintActiveRunInOtherOrg(t *testing.T) {
 		t.Fatal(err)
 	}
 	after, ok := claim.Read(stateDir, sid, postEnv.Time())
-	if !ok || after.Kind != claim.KindRepository || after.Repository.Origin != "github.com/orgB/beta" || after.Run != before.Run {
-		t.Fatalf("git hooks in repoA tainted repoB run: after=%+v (ok=%v), want repoB run %q", after, ok, before.Run)
+	if !ok || after.Kind != claim.KindRepository || after.Repository.Origin != "github.com/orgB/beta" || len(after.Placements) != len(before.Placements) {
+		t.Fatalf("git hooks in repoA moved repoB's claim: after=%+v (ok=%v), before=%+v", after, ok, before)
 	}
 }
 
@@ -510,7 +375,7 @@ func TestSpoolTitleWithholdsAfterRouteChange(t *testing.T) {
 	}
 }
 
-func TestUnparkMixedEventsAndPushesPreserveIdempotency(t *testing.T) {
+func TestUnparkEventsAndPushesPreserveIdempotency(t *testing.T) {
 	stateDir := t.TempDir()
 	repoA := namedRepo(t, "alpha", "git@github.com:orgA/alpha.git")
 	teamA := makeTeam("orgA", "team-a", []string{"github.com/orgA/alpha"}, true)
@@ -521,7 +386,7 @@ func TestUnparkMixedEventsAndPushesPreserveIdempotency(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Mixed parked events: block spool/losses so CountLost fails after AppendAsCollected commits.
+	// Parked events: block spool/losses so CountLost fails after AppendAsCollected commits.
 	lossesDir := filepath.Join(stateDir, spool.Dir, "losses")
 	if err := os.WriteFile(lossesDir, []byte("block"), 0o600); err != nil {
 		t.Fatal(err)
@@ -534,7 +399,7 @@ func TestUnparkMixedEventsAndPushesPreserveIdempotency(t *testing.T) {
 	}
 	env.unpark(r)
 	if got := hookruntest.Named(hookruntest.Spooled(t, env.Spool), "terma.git.commit"); len(got) != 1 {
-		t.Fatalf("spooled commits after mixed unpark retry = %d, want 1 (no duplicate replay)", len(got))
+		t.Fatalf("spooled commits after unpark retry = %d, want 1 (no duplicate replay)", len(got))
 	}
 	readNoDest := func() int {
 		l, err := spool.ReadLosses(filepath.Join(stateDir, spool.Dir), env.Time())
@@ -547,7 +412,7 @@ func TestUnparkMixedEventsAndPushesPreserveIdempotency(t *testing.T) {
 		t.Fatalf("no_destination lost after parked-loss import = %d, want 1", lost)
 	}
 
-	// Mixed parked pushes: block pushes dir so WriteJSON fails; CountLost must NOT run until writes commit.
+	// Parked pushes: block pushes dir so WriteJSON fails; CountLost must NOT run until writes commit.
 	pushesPath := filepath.Join(stateDir, PushesDir)
 	if err := os.WriteFile(pushesPath, []byte("block"), 0o600); err != nil {
 		t.Fatal(err)

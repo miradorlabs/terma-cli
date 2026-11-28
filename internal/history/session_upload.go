@@ -40,7 +40,6 @@ func uploadOneSession(
 	report func(ProgressEvent),
 	sum *Summary,
 	orgBlocked map[string]string,
-	reachCache map[string]familyVerdict,
 ) (stopRoute bool, fatalErr error) {
 	if err := ctx.Err(); err != nil {
 		sum.Interrupted = true
@@ -79,34 +78,6 @@ func uploadOneSession(
 		Total:        total,
 	})
 
-	runSnap, lookupSnap := newRunSnapLookup(opts.StateDir, sp.file.SessionID)
-
-	// Pass 1 reads the spawn family's routing and tool reach, without keeping log records.
-	reachMixedAt, hasReachMixed, readErr := familyCutoff(ctx, opts, sp.source, sessionResolver, sp.file, sp.companions, sp.missingParent, preSnap, reachCache)
-	if readErr != nil {
-		if errors.Is(readErr, context.Canceled) {
-			sum.Interrupted = true
-			return true, readErr
-		}
-		if errors.Is(readErr, fs.ErrNotExist) {
-			sum.addSkippedSession(SkipMissingFile, 1)
-		} else {
-			sum.addSkippedSession(SkipUnreadable, 1)
-		}
-		return false, nil
-	}
-
-	// Re-stat immediately after Pass 1 so a turn appended while reading never leaves.
-	afterReadSnap, statSkip := statSessionFiles(sp.file, sp.companions)
-	if statSkip != "" {
-		sum.addSkippedSession(statSkip, 1)
-		return false, nil
-	}
-	if afterReadSnap != preSnap || nowFn().Sub(afterReadSnap.modTime) < activeWindow {
-		sum.addSkippedSession(SkipActive, 1)
-		return false, nil
-	}
-
 	var resumeMax time.Time
 	if prev, ok := st.InProgress[sp.key]; ok && !prev.SourceModTime.IsZero() && preSnap.modTime.After(prev.SourceModTime) {
 		resumeMax = prev.SourceModTime
@@ -138,13 +109,12 @@ func uploadOneSession(
 		return nil
 	}
 
-	// Pass 2 (bounded memory): stream segments into one bounded <= maxReqBytes OTLP chunk
-	// at a time, recording in_progress immediately before the first POST.
+	// Stream segments into one bounded <= maxReqBytes OTLP chunk at a time,
+	// recording in_progress immediately before the first POST.
 	markedInProgress := false
 	var stateSaveErr error
 	totalRecs := 0
 	var totalBytes int64
-	mixedDropped := 0
 	chunker := NewChunkWriter(maxReqBytes, func(ch Chunk) error {
 		if !markedInProgress {
 			if err := beforeAttempt(ctx); err != nil {
@@ -180,8 +150,7 @@ func uploadOneSession(
 		if !ok || target.Team.EnrollmentID != b.team.EnrollmentID {
 			return nil
 		}
-		prepared, n, dropped := prepareSegmentFiltered(seg, opts.Filter, preparedPolicy, buildStampOptions(opts, target, userIDFor), runSnap, lookupSnap, reachMixedAt, hasReachMixed, resumeMax)
-		mixedDropped += dropped
+		prepared, n := prepareSegmentForUpload(seg, opts.Filter, preparedPolicy, buildStampOptions(opts, target, userIDFor), resumeMax)
 		if n == 0 || prepared.Empty() {
 			return nil
 		}
@@ -241,7 +210,6 @@ func uploadOneSession(
 		return stopRouteWithIssue(b, remaining, SkipSendFailed, streamErr.Error(), report, sum), nil
 	}
 
-	sum.WithheldRecords += mixedDropped
 	if totalRecs == 0 {
 		if _, failed := st.IsFailed(sp.key); failed || st.IsInProgress(sp.key) {
 			delete(st.InProgress, sp.key)
@@ -250,11 +218,7 @@ func uploadOneSession(
 				return true, fmt.Errorf("save history state: %w", err)
 			}
 		}
-		if mixedDropped > 0 {
-			sum.addSkippedSession(SkipMixed, 1)
-		} else {
-			sum.addSkippedSession(SkipEmptyAfterFilter, 1)
-		}
+		sum.addSkippedSession(SkipEmptyAfterFilter, 1)
 		return false, nil
 	}
 

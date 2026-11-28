@@ -78,9 +78,6 @@ func TestRecheckNeverReroutes(t *testing.T) {
 	if got := verdict(s, Destination{EnrollmentID: "never-selected", Location: repo("github.com/acme/api")}); got != Discard {
 		t.Fatalf("unknown enrollment: %s, want drop", got)
 	}
-	if got := verdict(s, Destination{EnrollmentID: eAcme, Location: Location{Kind: Mixed}}); got != Discard {
-		t.Fatalf("mixed location: %s, want drop", got)
-	}
 }
 
 // A record routed to Personal (Unknown or OutsideGit) waits while Personal is temporarily

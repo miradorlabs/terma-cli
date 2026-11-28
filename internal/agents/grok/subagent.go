@@ -42,7 +42,6 @@ func subagentStart(ctx context.Context, env hookrun.Env) error {
 	if !session.ValidID(in.SessionID) || !session.ValidID(in.SubagentID) || in.SubagentID == in.SessionID {
 		return nil
 	}
-	env.AliasRun(in.SessionID, in.SubagentID)
 	r, ok := env.Open(ctx, in.SubagentID, in.Cwd)
 	if !ok {
 		return nil
@@ -90,7 +89,6 @@ func subagentTool(ctx context.Context, env hookrun.Env, in *grokHookInput) {
 	// The launch hook can come before the child's SubagentStart, so it records the launch too.
 	if launched != "" {
 		env.RememberSubagent(subagentDir, in.SessionID, launched)
-		env.AliasRun(in.SessionID, launched)
 	}
 	// The child is a session of its own, claimed with its parent and its checkout by
 	// SubagentStart: these records, sent from the parent's checkout, must not rewrite that.

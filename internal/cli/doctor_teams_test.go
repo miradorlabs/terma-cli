@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/account/auth"
 	"github.com/miradorlabs/terma-cli/internal/config"
@@ -14,7 +13,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -60,8 +58,8 @@ func TestDoctorFailsClosedOnMissingCorruptAndWrongAccountRoutingState(t *testing
 }
 
 // doctor reports OrgAccessLost refusal, SignInNeeded with single
-// `terma setup` remediation, Mixed runs, and #152 outbox/spool losses together.
-func TestDoctorReportsTeamsHealthSignInMixedAndLosses(t *testing.T) {
+// `terma setup` remediation, and #152 outbox/spool losses together.
+func TestDoctorReportsTeamsHealthSignInAndLosses(t *testing.T) {
 	f, acct := routedMachine(t, "alice", func(f *fakeAuth, s *routing.State) error {
 		if _, err := s.Select(stateTeam(f, orgA().ID, teamsAcmeWeb, false, "github.com/acme/web")); err != nil {
 			return err
@@ -85,18 +83,7 @@ func TestDoctorReportsTeamsHealthSignInMixedAndLosses(t *testing.T) {
 	}
 	names.save(testApp.stateDir, config.DefaultProfile)
 
-	// Record a Mixed run, relay stats blocked/mixed counts, and #152 spool loss.
-	now := time.Now()
-	runID, err := runs.Start(testApp.stateDir, "sess-mixed", now.Add(-time.Minute))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := runs.Touch(testApp.stateDir, "sess-mixed", runID, []string{"github.com/acme/web", "github.com/beta/core"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := runs.MarkMixed(testApp.stateDir, "sess-mixed", now.Add(-10*time.Second), runs.Why{Reason: runs.Crossed, Where: "github.com/beta/core"}); err != nil {
-		t.Fatal(err)
-	}
+	// Relay stats with a stale blocked "mixed:" key from an earlier build, and #152 spool loss.
 	claimDir := claim.Dir(testApp.stateDir)
 	if err := os.MkdirAll(claimDir, 0o700); err != nil {
 		t.Fatal(err)
@@ -119,12 +106,15 @@ func TestDoctorReportsTeamsHealthSignInMixedAndLosses(t *testing.T) {
 	}
 	for _, want := range []string{
 		"no access to this organization, skipped",
-		"1 session is paused",
-		"4 records from paused sessions dropped",
 		"3 with no routed destination",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("doctor output lacks %q:\n%s", want, out)
+		}
+	}
+	for _, gone := range []string{"paused", "sess-mixed"} {
+		if strings.Contains(out, gone) {
+			t.Errorf("doctor output still mentions %q:\n%s", gone, out)
 		}
 	}
 

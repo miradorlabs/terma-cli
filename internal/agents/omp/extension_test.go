@@ -47,13 +47,8 @@ handlers.tool_result({ toolName: "apply_patch", toolCallId: "patch|fc_6", isErro
 handlers.tool_result({ toolName: "apply_patch", toolCallId: "patch|fc_7", isError: false, input: { input: "*** Begin Patch" }, details: { perFileResults: [{ path: "/work/d.go" }, { path: "/work/e.go", isError: true }] } }, parent)
 handlers.tool_result({ toolName: "apply_patch", toolCallId: "patch|fc_8", isError: true, input: { input: "*** Begin Patch" }, details: { path: "/work/f.go" } }, parent)
 handlers.tool_result({ toolName: "read", toolCallId: "paHFu2n2k|fc_5", isError: false, input: { path: "notes.txt" }, details: {} }, parent)
-handlers.tool_call({ toolName: "grep", toolCallId: "grep|fc_13", input: { path: "/other", glob: "*.go" } }, parent)
 handlers.tool_result({ toolName: "grep", toolCallId: "grep|fc_13", isError: false, input: { path: "/other", glob: "*.go" }, details: {} }, parent)
-handlers.tool_call({ toolName: "bash", toolCallId: "bash|fc_14", input: { command: "cat ../other/a.go", cwd: "/other" } }, parent)
 handlers.tool_result({ toolName: "bash", toolCallId: "bash|fc_14", isError: false, input: { command: "cat ../other/a.go", cwd: "/other" }, details: {} }, parent)
-handlers.tool_call({ toolName: "ls", toolCallId: "ls|fc_15", input: { path: "/other" } }, parent)
-handlers.tool_call({ toolName: "read", toolCallId: "url|fc_16", input: { path: "agent://scout" } }, parent)
-handlers.tool_call({ toolName: "ast_grep", toolCallId: "ag|fc_17", input: { path: "src;/other", glob: "*.go" } }, parent)
 await handlers.session_start({ reason: "startup" }, child)
 await handlers.session_start({ reason: "startup" }, fork)
 const fs = await import("node:fs")
@@ -156,20 +151,8 @@ func TestExtensionUnderNode(t *testing.T) {
 	if len(starts) != 4 || len(byEvent["omp-prompt"]) != 2 || len(byEvent["omp-session-end"]) != 1 {
 		t.Errorf("prompts %v, ends %v", byEvent["omp-prompt"], byEvent["omp-session-end"])
 	}
-	if reaches := byEvent["omp-tool-reach"]; len(reaches) != 5 {
-		t.Errorf("omp-tool-reach calls = %d (%v); want 5 (read, grep, bash, ls, ast_grep; deduped and skipping internal URL)", len(reaches), reaches)
-	} else {
-		var sawSplit bool
-		for _, r := range reaches {
-			if r["tool"] == "ast_grep" {
-				if ps, ok := r["paths"].([]any); ok && len(ps) == 2 && ps[0] == "src" && ps[1] == "/other" {
-					sawSplit = true
-				}
-			}
-		}
-		if !sawSplit {
-			t.Errorf("ast_grep multi-target path not split into [src, /other]: %v", reaches)
-		}
+	if reaches := byEvent["omp-tool-reach"]; len(reaches) != 0 {
+		t.Errorf("omp-tool-reach calls = %v; want none", reaches)
 	}
 	if data, err := os.ReadFile(fetched); err == nil {
 		t.Errorf("the hooks-only extension exported:\n%s", data)
@@ -232,7 +215,7 @@ func runDriver(t *testing.T) (byEvent map[string][]map[string]any, ext, fetched 
 				calls = append(calls, c)
 			}
 		}
-		if len(calls) >= 21 && len(calls) == last {
+		if len(calls) >= 16 && len(calls) == last {
 			steady++
 		} else {
 			steady = 0

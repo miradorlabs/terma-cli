@@ -68,14 +68,11 @@ type Claim struct {
 	// Placements are where the session has run, oldest first: an agent can keep a session id
 	// across resumes in another repository, and the first run's late records stay its own.
 	Placements []Placement `json:"placements,omitempty"`
-	// Kind, Run, and Profile mirror the latest placement.
+	// Kind and Profile mirror the latest placement.
 	Kind    Kind   `json:"kind,omitempty"`
-	Run     string `json:"run,omitempty"`
 	Profile string `json:"profile,omitempty"`
-	// Evicted is set once a placement has been dropped to keep maxPlacements; MixedRuns
-	// retains tombstones for any KindMixed runs dropped from Placements ("*" on overflow).
-	Evicted   bool     `json:"evicted,omitempty"`
-	MixedRuns []string `json:"mixed_runs,omitempty"`
+	// Evicted is set once a placement has been dropped to keep maxPlacements.
+	Evicted bool `json:"evicted,omitempty"`
 	// Account is the lane of the sign-in the claiming hook ran under: its account key, or
 	// sendas.NoPersonLane under a server key. The team is the one chosen under it, so the
 	// relay resolves the claim only for that sign-in.
@@ -92,14 +89,12 @@ type Kind string
 const (
 	KindRepository Kind = "repository"  // git checkout located by Repository
 	KindOutsideGit Kind = "outside_git" // directory outside git located by Cwd
-	KindMixed      Kind = "mixed"       // crossed organizations; drops records within its run
 )
 
 // Placement is one run of a session in one location (repository or outside git).
 type Placement struct {
 	ProjectID string `json:"project_id"`
 	Kind      Kind   `json:"kind,omitempty"`
-	Run       string `json:"run,omitempty"`
 	Profile   string `json:"profile,omitempty"`
 	// Account is Claim.Account for this run.
 	Account  string `json:"account,omitempty"`
@@ -142,7 +137,7 @@ func (c Claim) placements() []Placement {
 	if len(c.Placements) > 0 {
 		return c.Placements
 	}
-	return []Placement{{ProjectID: c.ProjectID, Kind: c.Kind, Run: c.Run, Profile: c.Profile, Account: c.Account, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree,
+	return []Placement{{ProjectID: c.ProjectID, Kind: c.Kind, Profile: c.Profile, Account: c.Account, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree,
 		Repository: c.Repository, Root: c.Root, Cwd: c.Cwd, Remote: c.Remote, Branch: c.Branch, PIDs: c.PIDs}}
 }
 
@@ -169,18 +164,13 @@ func path(dir, sessionID string) (string, bool) {
 	return filepath.Join(Dir(dir), claimsDir, sessionID+".json"), true
 }
 
-// lockWait caps lock waits; on timeout, non-Mixed writes back off and KindMixed falls back
-// to the lock-free .mixed sidecar so an active lock holder can never overwrite Mixed.
+// lockWait caps lock waits; on timeout, writes back off rather than blocking the hook.
 var lockWait = 250 * time.Millisecond
 
 // Write merges c into sessionID's claim under dir under a sidecar lock (unlocked writers
 // lose concurrent PIDs) and reports whether it wrote. A project claim requires Account;
-// a kinded claim may name a location alone. On lock timeout, non-Mixed writes back off
-// and KindMixed writes to .mixed. KindMixed clears ProjectID; the runs ledger is authoritative.
+// a kinded claim may name a location alone.
 func Write(dir, sessionID string, c Claim, now time.Time) bool {
-	if c.Kind == KindMixed {
-		c.ProjectID = ""
-	}
 	if c.ProjectID == "" && c.Kind == "" || c.ProjectID != "" && c.Account == "" {
 		return false
 	}
@@ -202,11 +192,8 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	if !ok {
 		return false
 	}
-	// Fast path skips the lock when no sidecar marks are pending and a fresh claim matches.
-	if asideMarks, _ := loadAside(p, now); len(asideMarks) == 0 {
-		if prev, ok := read(p); ok && canSkipRefresh(p, prev, c, now, refresh) {
-			return false
-		}
+	if prev, ok := read(p); ok && canSkipRefresh(p, prev, c, now, refresh) {
+		return false
 	}
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return false
@@ -215,120 +202,60 @@ func write(dir, sessionID string, c Claim, now time.Time) bool {
 	unlock, err := flock.Lock(ctx, p+".lock")
 	cancel()
 	if err != nil {
-		if c.Kind == KindMixed {
-			return writeMixedAside(p, c, now)
-		}
 		return false
 	}
 	defer unlock()
 	now = now.UTC()
-	asideMarks, asideFiles := loadAside(p, now)
 	prev, havePrev := read(p)
-	prev, havePrev, folded := applyAside(prev, havePrev, asideMarks)
-	if havePrev && staysMixed(prev, c) {
-		if c.Parent != "" && prev.Parent == "" {
-			prev.Parent, folded = c.Parent, true
-		}
-		if folded || len(asideMarks) > 0 {
-			_ = persist(p, prev, asideFiles)
-		} else {
-			removeAside(p, asideFiles)
-		}
-		return false
-	}
-	tombForced := havePrev && tombstoneFailClosed(prev.MixedRuns, c)
-	if tombForced {
-		c.Kind, c.ProjectID, c.PIDs = KindMixed, "", nil
-	}
-	// Earlier-run Mixed writes fold into that run's slot; an unseen run may be a new run
-	// starting Mixed, so falling through to append at the tail fails closed intentionally.
-	if !tombForced && havePrev && c.Kind == KindMixed && c.Run != "" && prev.Run != "" && c.Run != prev.Run {
-		c.ClaimedAt = now
-		if matched, ch := foldEarlierRun(&prev, c); matched {
-			if ch || folded || len(asideMarks) > 0 {
-				return persist(p, prev, asideFiles)
-			}
-			removeAside(p, asideFiles)
-			return false
-		}
-	}
 	if havePrev && c.Parent == "" {
 		c.Parent = prev.Parent
 	}
-	placements := []Placement{}
+	var placements []Placement
 	keepSince := false
 	switch {
 	case !havePrev:
 	case samePlace(prev, c):
-		prevPls := prev.placements()
-		lowerSince := c.Kind == KindMixed && now.Before(prevPls[len(prevPls)-1].Since)
-		if !folded && canSkipRefresh(p, prev, c, now, refresh) {
-			removeAside(p, asideFiles)
+		if canSkipRefresh(p, prev, c, now, refresh) {
 			return false
 		}
-		if prev.Kind == KindMixed {
-			c.PIDs = unionPIDs(prev.PIDs, c.PIDs)
-		} else {
-			c.PIDs = merge(prev.PIDs, c.PIDs)
-		}
-		c.Tool, c.Cwd, c.Run = cmp.Or(c.Tool, prev.Tool), cmp.Or(c.Cwd, prev.Cwd), cmp.Or(c.Run, prev.Run)
+		prevPls := prev.placements()
+		c.PIDs = merge(prev.PIDs, c.PIDs)
+		c.Tool, c.Cwd = cmp.Or(c.Tool, prev.Tool), cmp.Or(c.Cwd, prev.Cwd)
 		placements = slices.Clone(prevPls[:len(prevPls)-1])
-		keepSince = !lowerSince
-		if lowerSince {
-			placements, c.PIDs, _ = prepareMixed(placements, c.Run, c.Profile, c.Account, c.PIDs, now)
-		}
+		keepSince = true
 	default:
 		placements = slices.Clone(prev.placements())
-		if c.Kind == KindMixed && (c.Run == "" || prev.Run == "" || c.Run == prev.Run) {
-			placements, c.PIDs, _ = prepareMixed(placements, c.Run, c.Profile, c.Account, c.PIDs, now)
-		}
 	}
 	since := now
 	if keepSince {
 		since = prev.placements()[len(prev.placements())-1].Since
-	} else if c.Kind == KindMixed {
-		since = clampSince(placements, c.Run, now)
 	}
-	placements = append(placements, Placement{ProjectID: c.ProjectID, Kind: c.Kind, Run: c.Run, Profile: c.Profile, Account: c.Account, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree,
+	placements = append(placements, Placement{ProjectID: c.ProjectID, Kind: c.Kind, Profile: c.Profile, Account: c.Account, Tool: c.Tool, Repo: c.Repo, Worktree: c.Worktree,
 		Repository: c.Repository, Root: c.Root, Cwd: c.Cwd, Remote: c.Remote, Branch: c.Branch, PIDs: c.PIDs, Since: since})
-	c.Placements, c.Evicted, c.MixedRuns = trimPlacements(placements, havePrev && prev.Evicted, prev.MixedRuns)
-	if tombstoneFailClosed(c.MixedRuns, c) {
-		c.Kind, c.ProjectID, c.PIDs = KindMixed, "", nil
-		last := &c.Placements[len(c.Placements)-1]
-		last.Kind, last.ProjectID, last.PIDs = KindMixed, "", nil
-		poisonRun(c.Placements, c.Run, last.Since)
-	}
+	c.Placements, c.Evicted = trimPlacements(placements, havePrev && prev.Evicted)
 	c.ClaimedAt = now
-	return persist(p, c, asideFiles)
+	data, err := json.Marshal(c)
+	return err == nil && config.WriteFileAtomicNoSync(p, data, 0o600) == nil
 }
-func tombstoneFailClosed(mixed []string, c Claim) bool {
-	return c.Kind != KindMixed && (c.Kind != "" || c.ProjectID != "") && (slices.Contains(mixed, "*") || c.Run == "" && len(mixed) > 0)
+
+func trimPlacements(pls []Placement, evicted bool) ([]Placement, bool) {
+	if len(pls) <= maxPlacements {
+		return pls, evicted
+	}
+	return pls[len(pls)-maxPlacements:], true
 }
+
 func canSkipRefresh(p string, prev, c Claim, now time.Time, refresh time.Duration) bool {
-	if !samePlace(prev, c) || !sameDirs(prev, c) || !sameParent(prev, c) || !subset(c.PIDs, prev.PIDs) || !sameRun(prev, c) || tombstoneFailClosed(prev.MixedRuns, c) ||
-		c.Kind == KindMixed && (!coveredPIDs(c.PIDs, prev.PIDs) || now.Before(prev.placements()[len(prev.placements())-1].Since)) {
+	if !samePlace(prev, c) || !sameDirs(prev, c) || !sameParent(prev, c) || !subset(c.PIDs, prev.PIDs) {
 		return false
 	}
 	info, err := os.Stat(p)
 	return err == nil && now.Sub(info.ModTime()) < refresh
 }
-func persist(p string, c Claim, asideFiles []string) bool {
-	data, err := json.Marshal(c)
-	if err != nil || config.WriteFileAtomicNoSync(p, data, 0o600) != nil {
-		return false
-	}
-	removeAside(p, asideFiles)
-	return true
-}
+
 func samePlace(prev, c Claim) bool {
 	return prev.Kind == c.Kind && prev.ProjectID == c.ProjectID && prev.Repository == c.Repository && prev.Profile == c.Profile && prev.Account == c.Account &&
-		(prev.Run == "" || c.Run == "" || prev.Run == c.Run) && (c.Kind != KindOutsideGit || prev.Cwd == c.Cwd)
-}
-func sameRun(prev, c Claim) bool { return c.Run == "" || c.Run == prev.Run }
-func staysMixed(prev, c Claim) bool {
-	return c.Kind != KindMixed && (prev.Kind == KindMixed && (c.Run == "" || c.Run == prev.Run) ||
-		(c.Kind != "" || c.ProjectID != "") && (c.Run != "" && slices.Contains(prev.MixedRuns, c.Run) ||
-			slices.ContainsFunc(prev.placements(), func(p Placement) bool { return p.Kind == KindMixed && (c.Run == "" || p.Run == c.Run) })))
+		(c.Kind != KindOutsideGit || prev.Cwd == c.Cwd)
 }
 func sameDirs(prev, c Claim) bool {
 	return prev.Root == c.Root && (c.Cwd == "" || prev.Cwd == c.Cwd) && prev.Worktree == c.Worktree && prev.Remote == c.Remote && prev.Branch == c.Branch
@@ -358,20 +285,16 @@ func merge(old, add []int) []int {
 }
 
 // Read returns sessionID's claim under the state directory dir if written less than TTL ago.
-// It inspects the .mixed sidecar before reading the claim file so a concurrent fold
-// (which saves the claim file before removing sidecar entries) never hides a Mixed mark.
 func Read(dir, sessionID string, now time.Time) (Claim, bool) {
 	p, ok := path(dir, sessionID)
 	if !ok {
 		return Claim{}, false
 	}
-	marks, _ := loadAside(p, now)
-	c, have := Claim{}, false
-	if info, err := os.Stat(p); err == nil && now.Sub(info.ModTime()) < TTL {
-		c, have = read(p)
+	info, err := os.Stat(p)
+	if err != nil || now.Sub(info.ModTime()) >= TTL {
+		return Claim{}, false
 	}
-	merged, ok, _ := applyAside(c, have, marks)
-	return merged, ok
+	return read(p)
 }
 
 func read(p string) (Claim, bool) {
@@ -396,8 +319,9 @@ func Prune(dir string, now time.Time) {
 	}
 	for _, e := range entries {
 		path := filepath.Join(claims, e.Name())
-		if e.IsDir() && strings.HasSuffix(path, asideExt) {
-			pruneAside(path, now)
+		// Clean up legacy .mixed sidecar directories left by earlier builds.
+		if e.IsDir() && strings.HasSuffix(path, ".mixed") {
+			pruneLegacyMixedDir(path, now)
 			continue
 		}
 		info, err := e.Info()
@@ -411,4 +335,14 @@ func Prune(dir string, now time.Time) {
 			flock.Remove(path, unlock)
 		}
 	}
+}
+
+func pruneLegacyMixedDir(dir string, now time.Time) {
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if info, err := e.Info(); err == nil && now.Sub(info.ModTime()) >= TTL {
+			_ = os.Remove(filepath.Join(dir, e.Name()))
+		}
+	}
+	_ = os.Remove(dir)
 }

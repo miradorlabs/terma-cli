@@ -92,11 +92,6 @@ func TestRouteEdges(t *testing.T) {
 			t.Fatalf("changing the state after compiling changed the route: %+v", d)
 		}
 	})
-	t.Run("OrganizationOf holds a repository that names none, as Route does", func(t *testing.T) {
-		if _, ok := NewRouter(*fixture(t)).OrganizationOf(repo("github.com/acme"), now); ok {
-			t.Fatal("a two-segment origin belonged to an organization")
-		}
-	})
 }
 
 // Route compiles each team's entries once per state: a relay that routes many records

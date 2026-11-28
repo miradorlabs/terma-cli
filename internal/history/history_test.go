@@ -26,11 +26,9 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/agents/builtin"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/shape"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
@@ -727,76 +725,6 @@ func TestOriginMismatchFailsClosed(t *testing.T) {
 	}
 }
 
-func TestRunsMixedCutoffDropsPostMixedRecordsAndUnreadableLedgerFailsClosed(t *testing.T) {
-	t.Parallel()
-	stateDir := t.TempDir()
-	repoA := initTestGitRepo(t, "https://github.com/org-a/repo-a.git")
-	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
-	t0 := now.Add(-5 * time.Hour)
-	mixedAt := t0.Add(10 * time.Minute)
-
-	if _, err := runs.Start(stateDir, "s-mixed", t0); err != nil {
-		t.Fatal(err)
-	}
-	if err := runs.MarkMixed(stateDir, "s-mixed", mixedAt, runs.Why{Reason: runs.Crossed}); err != nil {
-		t.Fatal(err)
-	}
-	// Plant corrupt unreadable ledger for s-corrupt -> must fail closed!
-	if err := os.WriteFile(filepath.Join(stateDir, runs.Dir, "s-corrupt.json"), []byte("{not-json"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	var mu sync.Mutex
-	var received []string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		mu.Lock()
-		received = append(received, string(body))
-		mu.Unlock()
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-
-	st := singleTeamRoutingState(now, "acc1", "org-a", "team-a", "github.com/org-a/repo-a", true, true)
-	src := &stubHistorySource{
-		source: "claude",
-		files: []agents.HistoryFile{
-			{SourceSystem: "claude", SessionID: "s-mixed", ModTime: now.Add(-4 * time.Hour)},
-			{SourceSystem: "claude", SessionID: "s-corrupt", ModTime: now.Add(-4 * time.Hour)},
-		},
-		segments: map[string][]agents.HistorySegment{
-			"s-mixed": {
-				makeNativeSegment("claude", "s-mixed", repoA, "BEFORE_MIXED_OK", t0.Add(time.Minute)),
-				makeNativeSegment("claude", "s-mixed", repoA, "AFTER_MIXED_SECRET", mixedAt.Add(time.Second)),
-			},
-			"s-corrupt": {
-				makeNativeSegment("claude", "s-corrupt", repoA, "CORRUPT_LEDGER_SECRET", t0.Add(time.Minute)),
-			},
-		},
-	}
-
-	sum, err := Upload(context.Background(), Options{
-		StateDir: stateDir, Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
-		State: st, Sources: []agents.HistorySource{src}, Filter: relay.NewContentFilter(nil), Holdings: stubHoldings{},
-		Transport:   &Transport{Version: "test", HTTP: srv.Client(), SignIn: &fakeSignIn{account: "acc1", tokens: []string{"tok"}}, BytesPerSec: 1 << 30},
-		EndpointFor: func(string) string { return srv.URL },
-		Now:         func() time.Time { return now },
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	all := strings.Join(received, "\n")
-	if !strings.Contains(all, "BEFORE_MIXED_OK") {
-		t.Errorf("pre-Mixed record was unexpectedly dropped")
-	}
-	if strings.Contains(all, "AFTER_MIXED_SECRET") || strings.Contains(all, "CORRUPT_LEDGER_SECRET") {
-		t.Fatalf("post-Mixed or corrupt-ledger content leaked upstream!")
-	}
-	if sum.SentSessions != 1 || sum.SkippedSessions[SkipMixed] != 1 {
-		t.Errorf("summary = sent:%d skipped:%v, want sent=1 mixed=1", sum.SentSessions, sum.SkippedSessions)
-	}
-}
-
 func TestLivePolicyRecheckStopsBeforeSendingStaleChunks(t *testing.T) {
 	t.Parallel()
 	stateDir := t.TempDir()
@@ -1087,88 +1015,6 @@ func TestHoldingsEmptyEnvelopeOrWrongProjectFailsClosed(t *testing.T) {
 	}
 }
 
-func TestHistoricalToolReachDropsCrossOrgWithoutRunsLedgerAndIgnoresTmp(t *testing.T) {
-	t.Parallel()
-	stateDir := t.TempDir()
-	repoA := initTestGitRepo(t, "https://github.com/org-a/repo-a.git")
-	repoB := initTestGitRepo(t, "https://github.com/org-b/repo-b.git")
-	secretFile := filepath.Join(repoB, "secret.go")
-	if err := os.WriteFile(secretFile, []byte("package secret\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
-	t0 := now.Add(-6 * time.Hour)
-	crossAt := t0.Add(2 * time.Minute)
-
-	st := routing.State{
-		Account: "acc1",
-		Teams: []routing.Team{
-			{
-				EnrollmentID: "enr-a", TeamID: "team-a", OrganizationID: "org-a", AuthURL: "https://auth.example.com",
-				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-a/repo-a"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-a", TeamID: "team-a", AuthURL: "https://auth.example.com", FetchedAt: now},
-			},
-			{
-				EnrollmentID: "enr-b", TeamID: "team-b", OrganizationID: "org-b", AuthURL: "https://auth.example.com",
-				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-b/repo-b"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-b", TeamID: "team-b", AuthURL: "https://auth.example.com", FetchedAt: now},
-			},
-		},
-	}
-
-	var mu sync.Mutex
-	var received []string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		mu.Lock()
-		received = append(received, string(body))
-		mu.Unlock()
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-
-	// Build one segment in repoA with NO runs ledger:
-	// - t0+1m: benign prompt + /dev/null reach (nobody's dir -> stays clean!)
-	// - t0+2m: Read secretFile in orgB -> triggers cross-org Mixed cutoff at t0+2m!
-	// - t0+3m: assistant reply quoting orgB secret -> MUST BE DROPPED!
-	seg := makeNativeSegment("claude", "s-pre-terma", repoA, "BEFORE_CROSSING_OK", t0.Add(time.Minute))
-	afterRec := proto.CloneOf(seg.NativeLogs.ResourceLogs[0].ScopeLogs[0].LogRecords[0])
-	afterRec.TimeUnixNano = uint64(crossAt.Add(time.Minute).UnixNano())
-	afterRec.ObservedTimeUnixNano = afterRec.TimeUnixNano
-	for _, kv := range afterRec.Attributes {
-		if kv.Key == "prompt" {
-			kv.Value = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "AFTER_CROSSING_ORG_B_SECRET"}}
-		}
-	}
-	seg.NativeLogs.ResourceLogs[0].ScopeLogs[0].LogRecords = append(seg.NativeLogs.ResourceLogs[0].ScopeLogs[0].LogRecords, afterRec)
-	seg.RecordCount = 2
-	seg.ToolReaches = []agents.HistoryToolReach{
-		{At: t0.Add(30 * time.Second), Cwd: repoA, Paths: []string{"/dev/null"}},
-		{At: crossAt, Cwd: repoA, Paths: []string{secretFile}},
-	}
-
-	src := &stubHistorySource{
-		source:   "claude",
-		files:    []agents.HistoryFile{{SourceSystem: "claude", SessionID: "s-pre-terma", ModTime: now.Add(-5 * time.Hour)}},
-		segments: map[string][]agents.HistorySegment{"s-pre-terma": {seg}},
-	}
-	sum, err := Upload(context.Background(), Options{
-		StateDir: stateDir, Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
-		State: st, Sources: []agents.HistorySource{src}, Filter: relay.NewContentFilter(nil), Holdings: stubHoldings{},
-		Transport:   &Transport{Version: "test", HTTP: srv.Client(), SignIn: &fakeSignIn{account: "acc1", tokens: []string{"tok"}}, BytesPerSec: 1 << 30},
-		EndpointFor: func(string) string { return srv.URL },
-		Now:         func() time.Time { return now },
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	all := strings.Join(received, "\n")
-	if sum.SentSessions != 1 || !strings.Contains(all, "BEFORE_CROSSING_OK") {
-		t.Fatalf("pre-crossing record should have uploaded: sum=%+v", sum)
-	}
-	if strings.Contains(all, "AFTER_CROSSING_ORG_B_SECRET") {
-		t.Fatalf("post-crossing org B content leaked to org A without a runs ledger!")
-	}
-}
-
 func TestPreAttemptStopsOnRebindAndOnPolicyTightenDuring429Retry(t *testing.T) {
 	t.Parallel()
 	stateDir := t.TempDir()
@@ -1281,7 +1127,7 @@ func (f *failingReadSource) ReadHistory(ctx context.Context, file agents.History
 	return f.stubHistorySource.ReadHistory(ctx, file, opts, emit)
 }
 
-func TestUnreadableFileSkippedAndOutsideGitHasNoRepoRootAndEmptyResumeCleared(t *testing.T) {
+func TestUnreadableFileSkippedAndOutsideGitHasNoRepoRoot(t *testing.T) {
 	t.Parallel()
 	stateDir := t.TempDir()
 	outsideDir := t.TempDir()
@@ -1294,19 +1140,6 @@ func TestUnreadableFileSkippedAndOutsideGitHasNoRepoRootAndEmptyResumeCleared(t 
 			EnrollmentID: "enr-p", TeamID: "team-p", OrganizationID: "org-p", Personal: true, AuthURL: "https://auth.example.com",
 			Policy: config.Policy{Mode: config.ModeGlobal, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-p", TeamID: "team-p", AuthURL: "https://auth.example.com", FetchedAt: now},
 		}},
-	}
-
-	// Pre-seed s-empty-resume in_progress + corrupt its runs ledger so it becomes wholly Mixed and must clear in_progress!
-	rs := NewRouteState("acc1", "default", "enr-p", "team-p")
-	rs.MarkInProgress("claude", "s-empty-resume", now.Add(-time.Hour), 1, 50)
-	if err := SaveState(stateDir, rs); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(filepath.Join(stateDir, runs.Dir), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(stateDir, runs.Dir, "s-empty-resume.json"), []byte("{bad"), 0o600); err != nil {
-		t.Fatal(err)
 	}
 
 	var received *logspb.LogsData
@@ -1324,11 +1157,9 @@ func TestUnreadableFileSkippedAndOutsideGitHasNoRepoRootAndEmptyResumeCleared(t 
 			source: "claude",
 			files: []agents.HistoryFile{
 				{SourceSystem: "claude", SessionID: "s-unreadable", ModTime: now.Add(-5 * time.Hour)},
-				{SourceSystem: "claude", SessionID: "s-empty-resume", ModTime: now.Add(-4 * time.Hour)},
 				{SourceSystem: "claude", SessionID: "s-good-outside", ModTime: now.Add(-3 * time.Hour)},
 			},
 			segments: map[string][]agents.HistorySegment{
-				"s-empty-resume": {makeNativeSegment("claude", "s-empty-resume", outsideDir, "will drop", now.Add(-4*time.Hour))},
 				"s-good-outside": {makeNativeSegment("claude", "s-good-outside", outsideDir, "outside git ok", now.Add(-3*time.Hour))},
 			},
 		},
@@ -1345,7 +1176,7 @@ func TestUnreadableFileSkippedAndOutsideGitHasNoRepoRootAndEmptyResumeCleared(t 
 	if err != nil {
 		t.Fatalf("unreadable file must not abort upload: %v", err)
 	}
-	if sum.SentSessions != 1 || sum.SkippedSessions[SkipUnreadable] != 1 || sum.SkippedSessions[SkipMixed] != 1 {
+	if sum.SentSessions != 1 || sum.SkippedSessions[SkipUnreadable] != 1 {
 		t.Fatalf("unexpected summary: %+v", sum)
 	}
 	// Verify OutsideGit resource did NOT stamp terma.repository.root or worktree.linked.
@@ -1357,55 +1188,21 @@ func TestUnreadableFileSkippedAndOutsideGitHasNoRepoRootAndEmptyResumeCleared(t 
 			t.Errorf("outside-git session stamped bogus repo attribute %s=%v", kv.Key, kv.Value)
 		}
 	}
-	// Verify s-empty-resume was removed from InProgress.
-	after, _, _ := LoadState(stateDir, "acc1", "default", "enr-p", "team-p")
-	if after.IsInProgress(SessionKey("claude", "s-empty-resume")) {
-		t.Errorf("wholly-mixed resumed session remained stuck in InProgress: %+v", after)
-	}
 }
 
-func TestSessionWideReachCutoffOutOfOrderSubagentDeletedPathsAndAgedFailure(t *testing.T) {
+// A permanent failure recorded long ago, whose transcript is no longer discovered, still
+// shows in the summary beside a session that uploads.
+func TestAgedOutPermanentFailureStaysInSummary(t *testing.T) {
 	t.Parallel()
 	stateDir := t.TempDir()
 	repoA := initTestGitRepo(t, "https://github.com/org-a/repo-a.git")
-	repoASub := filepath.Join(repoA, "subpkg")
-	if err := os.MkdirAll(repoASub, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	repoB := initTestGitRepo(t, "https://github.com/org-b/repo-b.git")
-	secretB1 := filepath.Join(repoB, "a.go")
-	secretB2 := filepath.Join(repoB, "b.go")
-	for _, p := range []string{secretB1, secretB2} {
-		if err := os.WriteFile(p, []byte("package b\n"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
 	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
-	t0 := now.Add(-6 * time.Hour)
-
-	// No Personal team selected! Deleted external path MUST still fail closed, while deleted
-	// subdir inside repoA MUST NOT falsely trigger Mixed!
-	st := routing.State{
-		Account: "acc1",
-		Teams: []routing.Team{
-			{
-				EnrollmentID: "enr-a", TeamID: "team-a", OrganizationID: "org-a", AuthURL: "https://auth.example.com",
-				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-a/repo-a"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-a", TeamID: "team-a", AuthURL: "https://auth.example.com", FetchedAt: now},
-			},
-			{
-				EnrollmentID: "enr-b", TeamID: "team-b", OrganizationID: "org-b", AuthURL: "https://auth.example.com",
-				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-b/repo-b"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-b", TeamID: "team-b", AuthURL: "https://auth.example.com", FetchedAt: now},
-			},
-		},
-	}
-
-	// Pre-seed an aged-out permanent failure whose transcript is no longer discovered -> must still appear in Summary.Failed!
-	rs := NewRouteState("acc1", "default", "enr-a", "team-a")
+	st := singleTeamRoutingState(now, "acc1", "org-a", "team-a", "github.com/org-a/repo-a", true, true)
+	rs := NewRouteState("acc1", "default", st.Teams[0].EnrollmentID, "team-a")
 	rs.MarkFailed("claude", "s-aged-out-failure", now.Add(-100*24*time.Hour), "record too large", 1)
 	if err := SaveState(stateDir, rs); err != nil {
 		t.Fatal(err)
 	}
-
 	var mu sync.Mutex
 	var received []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1416,55 +1213,11 @@ func TestSessionWideReachCutoffOutOfOrderSubagentDeletedPathsAndAgedFailure(t *t
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
-
-	// 1. Out-of-order subagent reach at T0+1m BEFORE main reach at T0+5m + subdir switch at T0+6m:
-	//    T0+30s stays; T0+2m (between T1 and T5) AND T0+6m (segment 2 in repoASub) MUST BOTH DROP!
-	seg1 := makeNativeSegment("claude", "s-ooo", repoA, "OOO_BEFORE_OK", t0.Add(30*time.Second))
-	midRec := proto.CloneOf(seg1.NativeLogs.ResourceLogs[0].ScopeLogs[0].LogRecords[0])
-	midRec.TimeUnixNano = uint64(t0.Add(2 * time.Minute).UnixNano())
-	midRec.ObservedTimeUnixNano = midRec.TimeUnixNano
-	for _, kv := range midRec.Attributes {
-		if kv.Key == "prompt" {
-			kv.Value = &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: "OOO_BETWEEN_T1_AND_T5_LEAK"}}
-		}
-	}
-	seg1.NativeLogs.ResourceLogs[0].ScopeLogs[0].LogRecords = append(seg1.NativeLogs.ResourceLogs[0].ScopeLogs[0].LogRecords, midRec)
-	seg1.RecordCount = 2
-	// Main reach at T+5m appears BEFORE subagent reach at T+1m to the SAME orgB dir!
-	seg1.ToolReaches = []agents.HistoryToolReach{
-		{At: t0.Add(5 * time.Minute), Cwd: repoA, Paths: []string{secretB2}},
-		{At: t0.Add(1 * time.Minute), Cwd: repoA, Paths: []string{secretB1}},
-	}
-	seg2Subdir := makeNativeSegment("claude", "s-ooo", repoASub, "SUBDIR_AFTER_CROSSING_LEAK", t0.Add(6*time.Minute))
-
-	// 2. Deleted subdir inside own repoA MUST stay clean; deleted external path MUST fail closed!
-	segOwnDeleted := makeNativeSegment("claude", "s-own-del", repoA, "OWN_DELETED_SUBDIR_OK", t0.Add(2*time.Minute))
-	segOwnDeleted.ToolReaches = []agents.HistoryToolReach{
-		{At: t0.Add(time.Minute), Cwd: repoA, Paths: []string{filepath.Join(repoA, "removed-dir", "gone.go")}},
-	}
-	extDeletedPath := filepath.Join("/workspace", "terma-nonexistent-deleted-orgb-repo", "secret.go")
-	if home, err := os.UserHomeDir(); err == nil && home != "" && home != filepath.Dir(home) {
-		extDeletedPath = filepath.Join(home, "terma-nonexistent-deleted-orgb-repo-"+filepath.Base(stateDir), "secret.go")
-	}
-	segExtDeleted := makeNativeSegment("claude", "s-ext-del", repoA, "EXT_DELETED_SECRET", t0.Add(2*time.Minute))
-	segExtDeleted.ToolReaches = []agents.HistoryToolReach{
-		{At: t0.Add(time.Minute), Cwd: repoA, Paths: []string{extDeletedPath}},
-	}
-
 	src := &stubHistorySource{
-		source: "claude",
-		files: []agents.HistoryFile{
-			{SourceSystem: "claude", SessionID: "s-ooo", ModTime: now.Add(-5 * time.Hour)},
-			{SourceSystem: "claude", SessionID: "s-own-del", ModTime: now.Add(-4 * time.Hour)},
-			{SourceSystem: "claude", SessionID: "s-ext-del", ModTime: now.Add(-3 * time.Hour)},
-		},
-		segments: map[string][]agents.HistorySegment{
-			"s-ooo":     {seg1, seg2Subdir},
-			"s-own-del": {segOwnDeleted},
-			"s-ext-del": {segExtDeleted},
-		},
+		source:   "claude",
+		files:    []agents.HistoryFile{{SourceSystem: "claude", SessionID: "s-ok", ModTime: now.Add(-5 * time.Hour)}},
+		segments: map[string][]agents.HistorySegment{"s-ok": {makeNativeSegment("claude", "s-ok", repoA, "SESSION_OK", now.Add(-6*time.Hour))}},
 	}
-
 	sum, err := Upload(context.Background(), Options{
 		StateDir: stateDir, Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
 		State: st, Sources: []agents.HistorySource{src}, Filter: relay.NewContentFilter(nil), Holdings: stubHoldings{},
@@ -1475,14 +1228,8 @@ func TestSessionWideReachCutoffOutOfOrderSubagentDeletedPathsAndAgedFailure(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	all := strings.Join(received, "\n")
-	if !strings.Contains(all, "OOO_BEFORE_OK") || !strings.Contains(all, "OWN_DELETED_SUBDIR_OK") {
-		t.Errorf("legitimate records dropped unexpectedly")
-	}
-	for _, leak := range []string{"OOO_BETWEEN_T1_AND_T5_LEAK", "SUBDIR_AFTER_CROSSING_LEAK", "EXT_DELETED_SECRET"} {
-		if strings.Contains(all, leak) {
-			t.Fatalf("leaked %s upstream!", leak)
-		}
+	if !strings.Contains(strings.Join(received, "\n"), "SESSION_OK") {
+		t.Errorf("the discovered session did not upload")
 	}
 	if len(sum.Failed) != 1 || sum.Failed[0].SessionID != "s-aged-out-failure" || !sum.Failed[0].Previously {
 		t.Errorf("aged-out permanent failure missing from summary: %+v", sum.Failed)
@@ -1566,36 +1313,15 @@ func TestOtherTeamPolicyRefreshClaimingPersonalRepoAbortsRetry(t *testing.T) {
 	}
 }
 
-func TestHeldSubagentUnroutedReachSpawnedChildAndHistoricalBranch(t *testing.T) {
+// A segment's recorded branch is stamped when its checkout no longer says, and a parent
+// whose spawned child is still active waits for it, skipped as active with its child.
+func TestActiveChildHoldsItsParentAndHistoricalBranch(t *testing.T) {
 	t.Parallel()
 	stateDir := t.TempDir()
 	repoA := initTestGitRepo(t, "https://github.com/org-a/app.git")
-	repoB := initTestGitRepo(t, "https://github.com/org-b/secret.git")
-	scratchDir := t.TempDir()
-	secretB := filepath.Join(repoB, "secret.go")
-	if err := os.WriteFile(secretB, []byte("package secret\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
 	t0 := now.Add(-4 * time.Hour)
-
-	// Org A is active; Org B is blocked but still holds its repository (Suspended: a
-	// Refused team is passed over, so its repository would belong to no organization);
-	// no Personal team selected.
-	st := routing.State{
-		StateID: "st-1", Generation: 1, ConsentGeneration: 1, Account: "acc1",
-		Teams: []routing.Team{
-			{
-				EnrollmentID: "enr-a", TeamID: "team-a", OrganizationID: "org-a", AuthURL: "https://auth.example.com",
-				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-a/app"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-a", TeamID: "team-a", AuthURL: "https://auth.example.com", FetchedAt: now},
-			},
-			{
-				EnrollmentID: "enr-b", TeamID: "team-b", OrganizationID: "org-b", AuthURL: "https://auth.example.com",
-				Refusals: 1,
-				Policy:   config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-b/secret"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-b", TeamID: "team-b", AuthURL: "https://auth.example.com", FetchedAt: now},
-			},
-		},
-	}
+	st := singleTeamRoutingState(now, "acc1", "org-a", "team-a", "github.com/org-a/app", true, true)
 
 	var mu sync.Mutex
 	var received []string
@@ -1608,54 +1334,22 @@ func TestHeldSubagentUnroutedReachSpawnedChildAndHistoricalBranch(t *testing.T) 
 	}))
 	defer srv.Close()
 
-	// 1. Held/blocked companion subagent in Org B must taint parent session in Org A.
-	segMainBefore := makeNativeSegment("claude", "s-held-sub", repoA, "HELD_SUB_BEFORE_OK", t0.Add(30*time.Second))
-	segMainBefore.FallbackBranch = "historical-feature-branch"
-	segSubInBlockedB := makeNativeSegment("claude", "s-held-sub", repoB, "SUB_IN_B", t0.Add(time.Minute))
-	segSubInBlockedB.Subagent = true
-	segMainAfterSub := makeNativeSegment("claude", "s-held-sub", repoA, "HELD_SUB_AFTER_LEAK", t0.Add(2*time.Minute))
-
-	// 2. Unrouted main segment (scratch outside git, no Personal team) reading Org B must taint later Org A segment.
-	segUnrouted1 := makeNativeSegment("claude", "s-unrouted-reach", repoA, "UNROUTED_BEFORE_OK", t0.Add(30*time.Second))
-	segUnroutedMid := makeNativeSegment("claude", "s-unrouted-reach", scratchDir, "IN_SCRATCH", t0.Add(time.Minute))
-	segUnroutedMid.ToolReaches = []agents.HistoryToolReach{{At: t0.Add(time.Minute), Cwd: scratchDir, Paths: []string{secretB}}}
-	segUnroutedAfter := makeNativeSegment("claude", "s-unrouted-reach", repoA, "UNROUTED_AFTER_LEAK", t0.Add(2*time.Minute))
-
-	// 3. Spawned child rollout reading Org B must taint parent rollout's summary at T+2m.
-	segParent1 := makeNativeSegment("codex", "s-parent", repoA, "PARENT_BEFORE_OK", t0.Add(30*time.Second))
-	segParent2 := makeNativeSegment("codex", "s-parent", repoA, "PARENT_AFTER_CHILD_LEAK", t0.Add(2*time.Minute))
-	segChild := makeNativeSegment("codex", "s-child", repoA, "CHILD_WORK", t0.Add(time.Minute))
-	segChild.ToolReaches = []agents.HistoryToolReach{{At: t0.Add(time.Minute), Cwd: repoA, Paths: []string{secretB}}}
-
-	// 4. Parent with an active spawned child rollout must skip as SkipActive.
+	segBranch := makeNativeSegment("claude", "s-branch", repoA, "BRANCH_OK", t0.Add(30*time.Second))
+	segBranch.FallbackBranch = "historical-feature-branch"
 	segActiveParent := makeNativeSegment("codex", "s-parent-active-child", repoA, "ACTIVE_CHILD_PARENT_LEAK", t0)
-
 	srcClaude := &stubHistorySource{
-		source: "claude",
-		files: []agents.HistoryFile{
-			{SourceSystem: "claude", SessionID: "s-held-sub", ModTime: now.Add(-3 * time.Hour)},
-			{SourceSystem: "claude", SessionID: "s-unrouted-reach", ModTime: now.Add(-3 * time.Hour)},
-		},
-		segments: map[string][]agents.HistorySegment{
-			"s-held-sub":       {segMainBefore, segSubInBlockedB, segMainAfterSub},
-			"s-unrouted-reach": {segUnrouted1, segUnroutedMid, segUnroutedAfter},
-		},
+		source:   "claude",
+		files:    []agents.HistoryFile{{SourceSystem: "claude", SessionID: "s-branch", ModTime: now.Add(-3 * time.Hour)}},
+		segments: map[string][]agents.HistorySegment{"s-branch": {segBranch}},
 	}
 	srcCodex := &stubHistorySource{
 		source: "codex",
 		files: []agents.HistoryFile{
-			{SourceSystem: "codex", SessionID: "s-parent", ModTime: now.Add(-3 * time.Hour)},
-			{SourceSystem: "codex", SessionID: "s-child", ParentSessionID: "s-parent", ModTime: now.Add(-3 * time.Hour)},
 			{SourceSystem: "codex", SessionID: "s-parent-active-child", ModTime: now.Add(-3 * time.Hour)},
 			{SourceSystem: "codex", SessionID: "s-active-child", ParentSessionID: "s-parent-active-child", ModTime: now.Add(-5 * time.Minute), Active: true},
 		},
-		segments: map[string][]agents.HistorySegment{
-			"s-parent":              {segParent1, segParent2},
-			"s-child":               {segChild},
-			"s-parent-active-child": {segActiveParent},
-		},
+		segments: map[string][]agents.HistorySegment{"s-parent-active-child": {segActiveParent}},
 	}
-
 	sum, err := Upload(context.Background(), Options{
 		StateDir: stateDir, Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
 		State: st, Sources: []agents.HistorySource{srcClaude, srcCodex}, Filter: relay.NewContentFilter(nil), Holdings: stubHoldings{},
@@ -1667,30 +1361,25 @@ func TestHeldSubagentUnroutedReachSpawnedChildAndHistoricalBranch(t *testing.T) 
 		t.Fatal(err)
 	}
 	all := strings.Join(received, "\n")
-	for _, want := range []string{"HELD_SUB_BEFORE_OK", "UNROUTED_BEFORE_OK", "PARENT_BEFORE_OK", "historical-feature-branch"} {
+	for _, want := range []string{"BRANCH_OK", "historical-feature-branch"} {
 		if !strings.Contains(all, want) {
 			t.Errorf("expected %q in uploaded payloads", want)
 		}
 	}
-	for _, leak := range []string{"HELD_SUB_AFTER_LEAK", "UNROUTED_AFTER_LEAK", "PARENT_AFTER_CHILD_LEAK", "ACTIVE_CHILD_PARENT_LEAK"} {
-		if strings.Contains(all, leak) {
-			t.Fatalf("leaked %q upstream!", leak)
-		}
+	if strings.Contains(all, "ACTIVE_CHILD_PARENT_LEAK") {
+		t.Fatal("a parent with an active child uploaded")
 	}
 	if sum.SkippedSessions[SkipActive] < 2 {
 		t.Errorf("expected both active child and its parent skipped as active, got SkippedSessions=%+v", sum.SkippedSessions)
 	}
 }
 
-func TestSpawnFamilyChildSiblingOrphanDeletedShellTargetGitDashCAndFetchedAtTick(t *testing.T) {
+// A routine TeamRefresher tick during a 429 retry (Generation and FetchedAt only) does not
+// abort the route.
+func TestRoutineFetchedAtTickDoesNotAbortRoute(t *testing.T) {
 	t.Parallel()
 	stateDir := t.TempDir()
 	repoA := initTestGitRepo(t, "https://github.com/org-a/app.git")
-	repoB := initTestGitRepo(t, "https://github.com/org-b/secret.git")
-	secretB := filepath.Join(repoB, "secret.go")
-	if err := os.WriteFile(secretB, []byte("package secret\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
 	t0 := now.Add(-4 * time.Hour)
 
@@ -1735,53 +1424,10 @@ func TestSpawnFamilyChildSiblingOrphanDeletedShellTargetGitDashCAndFetchedAtTick
 	}))
 	defer srv.Close()
 
-	// 1. Parent reads Org B at T+1m then spawns child at T+2m in Org A -> child MUST DROP!
-	segPReadB := makeNativeSegment("codex", "s-p-read-b", repoA, "P_BEFORE_B_OK", t0.Add(30*time.Second))
-	segPReadB.ToolReaches = []agents.HistoryToolReach{{At: t0.Add(time.Minute), Cwd: repoA, Paths: []string{secretB}}}
-	segChildOfB := makeNativeSegment("codex", "s-c-of-b", repoA, "CHILD_QUOTING_B_LEAK", t0.Add(2*time.Minute))
-
-	// 2. Sibling 1 reads Org B at T+1m; Sibling 2 runs in Org A at T+2m -> Sibling 2 MUST DROP!
-	segSibRoot := makeNativeSegment("codex", "s-sib-root", repoA, "SIB_ROOT_OK", t0.Add(15*time.Second))
-	segSib1 := makeNativeSegment("codex", "s-sib-1", repoA, "SIB1_LEAK", t0.Add(time.Minute))
-	segSib1.ToolReaches = []agents.HistoryToolReach{{At: t0.Add(time.Minute), Cwd: repoA, Paths: []string{secretB}}}
-	segSib2 := makeNativeSegment("codex", "s-sib-2", repoA, "SIB2_LEAK", t0.Add(2*time.Minute))
-
-	// 3. Orphan child whose parent rollout is missing from disk -> fails closed!
-	segOrphan := makeNativeSegment("codex", "s-orphan", repoA, "ORPHAN_LEAK", t0.Add(time.Minute))
-
-	// 4. `git -C . status` stays clean (no IFS false positive); deleted external target via shell fails closed!
-	segGitC := makeNativeSegment("codex", "s-git-c", repoA, "GIT_DASH_C_OK", t0.Add(2*time.Minute))
-	segGitC.ToolReaches = []agents.HistoryToolReach{{At: t0.Add(time.Minute), Cwd: repoA, Paths: hookrun.Alone(hookrun.ShellPathsHistorical("git -C . status", repoA)...)}}
-
-	deletedExtTarget := filepath.Join("/workspace", "deleted-b-worktree", "notes")
-	if home, err := os.UserHomeDir(); err == nil && home != "" && home != filepath.Dir(home) {
-		deletedExtTarget = filepath.Join(home, "terma-nonexistent-deleted-b-"+filepath.Base(stateDir), "notes")
-	}
-	segDelShell := makeNativeSegment("codex", "s-del-shell", repoA, "DELETED_SHELL_TARGET_LEAK", t0.Add(2*time.Minute))
-	segDelShell.ToolReaches = []agents.HistoryToolReach{{At: t0.Add(time.Minute), Cwd: repoA, Paths: hookrun.Alone(hookrun.ShellPathsHistorical("grep TODO "+deletedExtTarget, repoA)...)}}
-
 	src := &stubHistorySource{
-		source: "codex",
-		files: []agents.HistoryFile{
-			{SourceSystem: "codex", SessionID: "s-p-read-b", ModTime: now.Add(-3 * time.Hour)},
-			{SourceSystem: "codex", SessionID: "s-c-of-b", ParentSessionID: "s-p-read-b", ModTime: now.Add(-3 * time.Hour)},
-			{SourceSystem: "codex", SessionID: "s-sib-root", ModTime: now.Add(-3 * time.Hour)},
-			{SourceSystem: "codex", SessionID: "s-sib-1", ParentSessionID: "s-sib-root", ModTime: now.Add(-3 * time.Hour)},
-			{SourceSystem: "codex", SessionID: "s-sib-2", ParentSessionID: "s-sib-root", ModTime: now.Add(-3 * time.Hour)},
-			{SourceSystem: "codex", SessionID: "s-orphan", ParentSessionID: "s-deleted-parent", ModTime: now.Add(-3 * time.Hour)},
-			{SourceSystem: "codex", SessionID: "s-git-c", ModTime: now.Add(-3 * time.Hour)},
-			{SourceSystem: "codex", SessionID: "s-del-shell", ModTime: now.Add(-3 * time.Hour)},
-		},
-		segments: map[string][]agents.HistorySegment{
-			"s-p-read-b":  {segPReadB},
-			"s-c-of-b":    {segChildOfB},
-			"s-sib-root":  {segSibRoot},
-			"s-sib-1":     {segSib1},
-			"s-sib-2":     {segSib2},
-			"s-orphan":    {segOrphan},
-			"s-git-c":     {segGitC},
-			"s-del-shell": {segDelShell},
-		},
+		source:   "codex",
+		files:    []agents.HistoryFile{{SourceSystem: "codex", SessionID: "s-tick", ModTime: now.Add(-3 * time.Hour)}},
+		segments: map[string][]agents.HistorySegment{"s-tick": {makeNativeSegment("codex", "s-tick", repoA, "TICK_OK", t0.Add(30*time.Second))}},
 	}
 
 	sum, err := Upload(context.Background(), Options{
@@ -1812,115 +1458,43 @@ func TestSpawnFamilyChildSiblingOrphanDeletedShellTargetGitDashCAndFetchedAtTick
 	if len(sum.TeamIssues) != 0 {
 		t.Fatalf("routine FetchedAt-only refresh must not abort route; got TeamIssues=%+v", sum.TeamIssues)
 	}
-	all := strings.Join(received, "\n")
-	for _, want := range []string{"P_BEFORE_B_OK", "SIB_ROOT_OK", "GIT_DASH_C_OK"} {
-		if !strings.Contains(all, want) {
-			t.Errorf("expected %q in uploaded payloads", want)
-		}
-	}
-	for _, leak := range []string{"CHILD_QUOTING_B_LEAK", "SIB1_LEAK", "SIB2_LEAK", "ORPHAN_LEAK", "DELETED_SHELL_TARGET_LEAK"} {
-		if strings.Contains(all, leak) {
-			t.Fatalf("leaked %q upstream!", leak)
-		}
+	if !strings.Contains(strings.Join(received, "\n"), "TICK_OK") {
+		t.Errorf("expected TICK_OK in uploaded payloads")
 	}
 }
 
-func TestUnroutedMainWithSubagentsResumeAcrossOrgsAndCompanionError(t *testing.T) {
+// A session whose companion transcript discovery could not read fails closed as unreadable
+// and names the path; a clean session beside it still uploads.
+func TestCompanionReadErrorFailsClosed(t *testing.T) {
 	t.Parallel()
 	stateDir := t.TempDir()
 	repoA := initTestGitRepo(t, "https://github.com/org-a/app.git")
-	repoB := initTestGitRepo(t, "https://github.com/org-b/other.git")
-	if err := os.WriteFile(filepath.Join(repoA, "secret-a.txt"), []byte("a"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(repoA, "go.mod"), []byte("module x\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	scratch := t.TempDir()
 	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
 	day1 := now.Add(-48 * time.Hour)
-	day2 := now.Add(-24 * time.Hour)
-
-	// Org A and Org B active; NO Personal team selected.
-	st := routing.State{
-		StateID: "st-1", Generation: 1, ConsentGeneration: 1, Account: "acc1",
-		Teams: []routing.Team{
-			{
-				EnrollmentID: "enr-a", TeamID: "team-a", OrganizationID: "org-a", AuthURL: "https://auth.example.com",
-				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-a/app"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-a", TeamID: "team-a", AuthURL: "https://auth.example.com", FetchedAt: now},
-			},
-			{
-				EnrollmentID: "enr-b", TeamID: "team-b", OrganizationID: "org-b", AuthURL: "https://auth.example.com",
-				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/org-b/other"}, IncludePrompts: true, IncludeToolContent: true, OrganizationID: "org-b", TeamID: "team-b", AuthURL: "https://auth.example.com", FetchedAt: now},
-			},
-		},
-	}
+	st := singleTeamRoutingState(now, "acc1", "org-a", "team-a", "github.com/org-a/app", true, true)
 
 	var mu sync.Mutex
-	byTeam := map[string][]string{}
+	var received []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		mu.Lock()
-		byTeam[r.Header.Get("X-Mirador-Project")] = append(byTeam[r.Header.Get("X-Mirador-Project")], string(body))
+		received = append(received, string(body))
 		mu.Unlock()
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
 
-	// 1. Unrouted main in scratch reads Org A at T+1m then spawns subagent in Org B at T+2m -> subagent MUST DROP!
-	s1Main := makeNativeSegment("claude", "s-unrouted-main-sub", scratch, "MAIN_SCRATCH", day1)
-	s1Main.ToolReaches = []agents.HistoryToolReach{{At: day1.Add(time.Minute), Cwd: scratch, Paths: []string{filepath.Join(repoA, "secret-a.txt")}}}
-	s1Sub := makeNativeSegment("claude", "s-unrouted-main-sub", repoB, "UNROUTED_PARENT_SUB_B_LEAK", day1.Add(2*time.Minute))
-	s1Sub.Subagent = true
-
-	// 2. Unrouted main in scratch spawns sibling subagents in Org A (T+1m) and Org B (T+2m) -> Org B sibling MUST DROP!
-	s2Main := makeNativeSegment("claude", "s-sib-sub", scratch, "MAIN_SCRATCH", day1)
-	s2SubA := makeNativeSegment("claude", "s-sib-sub", repoA, "SIB_SUB_A_BEFORE_OK", day1.Add(time.Minute))
-	s2SubA.Subagent = true
-	s2SubB := makeNativeSegment("claude", "s-sib-sub", repoB, "SIB_SUB_B_CROSS_LEAK", day1.Add(2*time.Minute))
-	s2SubB.Subagent = true
-
-	// 3. Deleted main cwd spawns subagent in Org B -> fails closed, subagent MUST DROP!
-	s3Main := makeNativeSegment("claude", "s-del-main-sub", filepath.Join(t.TempDir(), "gone-repo"), "GONE", day1)
-	s3SubB := makeNativeSegment("claude", "s-del-main-sub", repoB, "DEL_MAIN_SUB_B_LEAK", day1.Add(time.Minute))
-	s3SubB.Subagent = true
-
-	// 4. Parent + child finish in Org A on Day 1; parent resumes in Org B on Day 2. A family
-	// with subagents must sit in one organization, so Day 1 uploads and Day 2 is withheld.
-	s4MainA := makeNativeSegment("claude", "s-resumed-with-sub", repoA, "DAY1_MAIN_A_OK", day1)
-	s4SubA := makeNativeSegment("claude", "s-resumed-with-sub", repoA, "DAY1_SUB_A_OK", day1.Add(time.Minute))
-	s4SubA.Subagent = true
-	s4MainB := makeNativeSegment("claude", "s-resumed-with-sub", repoB, "DAY2_MAIN_B_LEAK", day2)
-
-	// 5. A missing path inside the segment's own checkout (`grep 'go.mod/v2' docs.md`) stays clean.
-	s5Clean := makeNativeSegment("claude", "s-route-regex", repoA, "ROUTE_REGEX_CLEAN_OK", day1.Add(5*time.Minute))
-	s5Clean.ToolReaches = []agents.HistoryToolReach{
-		{At: day1.Add(2 * time.Minute), Cwd: repoA, Paths: hookrun.Alone(hookrun.ShellPathsHistorical("grep 'go.mod/v2' docs.md", repoA)...)},
-	}
-
-	// 6. CompanionReadError fails closed as SkipUnreadable!
-	s6Err := makeNativeSegment("claude", "s-comp-err", repoA, "COMP_ERR_LEAK", day1)
-
 	src := &stubHistorySource{
 		source: "claude",
 		files: []agents.HistoryFile{
-			{SourceSystem: "claude", SessionID: "s-unrouted-main-sub", ModTime: day1},
-			{SourceSystem: "claude", SessionID: "s-sib-sub", ModTime: day1},
-			{SourceSystem: "claude", SessionID: "s-del-main-sub", ModTime: day1},
-			{SourceSystem: "claude", SessionID: "s-resumed-with-sub", ModTime: day2},
-			{SourceSystem: "claude", SessionID: "s-route-regex", ModTime: day1},
+			{SourceSystem: "claude", SessionID: "s-clean", ModTime: day1},
 			{SourceSystem: "claude", SessionID: "s-comp-err", ModTime: day1, CompanionReadError: "/nonexistent/subagents"},
 		},
 		segments: map[string][]agents.HistorySegment{
-			"s-unrouted-main-sub": {s1Main, s1Sub},
-			"s-sib-sub":           {s2Main, s2SubA, s2SubB},
-			"s-del-main-sub":      {s3Main, s3SubB},
-			"s-resumed-with-sub":  {s4MainA, s4SubA, s4MainB},
-			"s-route-regex":       {s5Clean},
-			"s-comp-err":          {s6Err},
+			"s-clean":    {makeNativeSegment("claude", "s-clean", repoA, "CLEAN_OK", day1)},
+			"s-comp-err": {makeNativeSegment("claude", "s-comp-err", repoA, "COMP_ERR_LEAK", day1)},
 		},
 	}
-
 	sum, err := Upload(context.Background(), Options{
 		StateDir: stateDir, Profile: "default", Account: "acc1", AuthURL: "https://auth.example.com", Version: "test",
 		State: st, Sources: []agents.HistorySource{src}, Filter: relay.NewContentFilter(nil), Holdings: stubHoldings{},
@@ -1931,18 +1505,9 @@ func TestUnroutedMainWithSubagentsResumeAcrossOrgsAndCompanionError(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	gotA := strings.Join(byTeam["team-a"], "\n")
-	gotB := strings.Join(byTeam["team-b"], "\n")
-	for _, want := range []string{"SIB_SUB_A_BEFORE_OK", "DAY1_MAIN_A_OK", "DAY1_SUB_A_OK", "ROUTE_REGEX_CLEAN_OK"} {
-		if !strings.Contains(gotA, want) {
-			t.Errorf("expected %q uploaded to team-a", want)
-		}
-	}
-	all := gotA + "\n" + gotB
-	for _, leak := range []string{"UNROUTED_PARENT_SUB_B_LEAK", "SIB_SUB_B_CROSS_LEAK", "DEL_MAIN_SUB_B_LEAK", "COMP_ERR_LEAK", "DAY2_MAIN_B_LEAK"} {
-		if strings.Contains(all, leak) {
-			t.Fatalf("leaked %q upstream!", leak)
-		}
+	all := strings.Join(received, "\n")
+	if !strings.Contains(all, "CLEAN_OK") || strings.Contains(all, "COMP_ERR_LEAK") {
+		t.Fatalf("uploaded = %q; want CLEAN_OK and no COMP_ERR_LEAK", all)
 	}
 	if sum.SkippedSessions[SkipUnreadable] != 1 {
 		t.Errorf("expected 1 unreadable skip for CompanionReadError, got %+v", sum.SkippedSessions)

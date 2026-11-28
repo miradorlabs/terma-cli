@@ -328,20 +328,17 @@ func (p *ompHistoryParser) maybeFlushSegment() error {
 }
 
 func (p *ompHistoryParser) flushSegment() error {
-	if len(p.segSpans) == 0 && len(p.segSupp) == 0 && len(p.segReaches) == 0 {
+	if len(p.segSpans) == 0 && len(p.segSupp) == 0 {
 		return nil
 	}
 	spans := p.segSpans
 	supp := p.segSupp
-	reaches := p.segReaches
-	p.segSpans, p.segSupp, p.segReaches = nil, nil, nil
+	p.segSpans, p.segSupp = nil, nil
 
 	seg := agents.HistorySegment{
 		SourceSystem: ompSourceSystem,
 		SessionID:    p.rootSessionID,
 		Cwd:          p.cwd,
-		ToolReaches:  reaches,
-		Subagent:     p.subagent,
 		RecordCount:  len(spans) + len(supp),
 	}
 	if len(spans) > 0 {

@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/miradorlabs/terma-cli/internal/agents/internal/reach"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
@@ -41,7 +40,6 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	env.StartRun(in.SessionID)
 	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
@@ -50,11 +48,9 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// prompt is BeforeAgent: the caller claims the session and records the turn start for post-tool reach cutoffs.
+// prompt is BeforeAgent: reading the payload lets dispatch claim the session from it.
 func prompt(_ context.Context, env hookrun.Env) error {
-	if in, ok := readGeminiInput(env); ok {
-		env.StartTurn(in.SessionID)
-	}
+	_, _ = readGeminiInput(env)
 	return nil
 }
 
@@ -63,15 +59,7 @@ func afterTool(ctx context.Context, env hookrun.Env) error {
 	if !ok {
 		return nil
 	}
-	if env.Routing != nil {
-		env.MixedSince = env.TurnSince(in.SessionID)
-	}
-	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	sess := session.Session{ID: in.SessionID, Tool: geminiTool}
 	if !geminiEditTools[in.ToolName] {
-		if env.Routing != nil {
-			env.Classify(ctx, nil, sess, reach.Gemini.Of(in.ToolInput, env.Cwd), nil)
-		}
 		return nil
 	}
 	var input struct {
@@ -84,11 +72,12 @@ func afterTool(ctx context.Context, env hookrun.Env) error {
 	if file == "" {
 		return nil
 	}
-	if r, err := env.Repo(ctx); err != nil {
-		env.Classify(ctx, nil, sess, []string{file}, nil)
-	} else {
-		env.Touch(r, sess, in.ToolName, []string{file}, nil)
+	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	r, err := env.Repo(ctx)
+	if err != nil {
+		return nil
 	}
+	env.Touch(r, session.Session{ID: in.SessionID, Tool: geminiTool}, in.ToolName, []string{file}, nil)
 	return nil
 }
 

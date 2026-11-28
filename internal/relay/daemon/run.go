@@ -172,7 +172,7 @@ func Run(ctx context.Context, c Config) (Result, error) {
 	if c.Listening != nil {
 		c.Listening(ln.Addr(), opts.Hold)
 	}
-	pruneState(ctx, c.StateDir, r, time.Now())
+	claim.Prune(c.StateDir, time.Now())
 	runPath := filepath.Join(dir, RunFile)
 	if data, err := json.Marshal(RunInfo{PID: os.Getpid(), Environment: c.Environment, Launch: launch, Service: res.Service, Version: c.Version, Routing: true}); err == nil {
 		_ = config.WriteFileAtomicNoSync(runPath, append(data, '\n'), 0o600)
@@ -425,7 +425,7 @@ func watch(ctx context.Context, r *relay.Relay, stateDir string, idle time.Durat
 			return stopReplaced, installed.Installed, nil
 		}
 		if time.Since(lastPrune) > time.Hour {
-			pruneState(ctx, stateDir, r, time.Now())
+			claim.Prune(stateDir, time.Now())
 			lastPrune = time.Now()
 		}
 		if d, quiet := r.Idle(); quiet && idle > 0 && d >= idle {

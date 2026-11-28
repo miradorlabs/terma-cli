@@ -17,10 +17,8 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/account/api"
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
@@ -91,132 +89,6 @@ func checkSent(t *testing.T, got string, want, leaks []string) {
 	for _, l := range leaks {
 		if strings.Contains(got, l) {
 			t.Errorf("%q was uploaded", l)
-		}
-	}
-}
-
-// A missing path under a working directory outside git is not that directory's own: it
-// may be an organization repository since deleted, so it cuts the session.
-func TestMissingPathUnderNonGitCwdIsUnknown(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	cwd := filepath.Join(home, "work")
-	if err := os.MkdirAll(cwd, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
-	t0 := now.Add(-4 * time.Hour)
-	before := makeNativeSegment("claude", "s-home", cwd, "BEFORE_READ_OK", t0)
-	after := makeNativeSegment("claude", "s-home", cwd, "AFTER_DELETED_REPO_READ", t0.Add(2*time.Minute))
-	after.ToolReaches = []agents.HistoryToolReach{{At: t0.Add(time.Minute), Cwd: cwd, Paths: []string{filepath.Join(cwd, "deleted-orgb-repo", "secret.go")}}}
-	src := &stubHistorySource{
-		source:   "claude",
-		files:    []agents.HistoryFile{{SourceSystem: "claude", SessionID: "s-home", ModTime: now.Add(-3 * time.Hour)}},
-		segments: map[string][]agents.HistorySegment{"s-home": {before, after}},
-	}
-	srv, got := captureServer(t)
-	if _, err := Upload(context.Background(), uploadOpts(t.TempDir(), twoOrgState(now, true), srv, now, src)); err != nil {
-		t.Fatal(err)
-	}
-	checkSent(t, got()["team-p"], []string{"BEFORE_READ_OK"}, []string{"AFTER_DELETED_REPO_READ"})
-}
-
-// A segment whose checkout is since deleted is placed by the origin its transcript recorded,
-// and what it reached under its own working directory does not cut it. A deleted path
-// anywhere else still does.
-func TestReachUnderDeletedRecordedCheckoutIsItsOwn(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	gone := filepath.Join(home, "worktrees", "app-1")
-	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
-	t0 := now.Add(-4 * time.Hour)
-	seg := func(text string, at time.Time, reach string) agents.HistorySegment {
-		s := makeNativeSegment("codex", "s-gone", gone, text, at)
-		s.FallbackRepoURL = "https://github.com/org-a/app.git"
-		s.ToolReaches = []agents.HistoryToolReach{{At: at.Add(-time.Second), Cwd: gone, Paths: []string{reach}}}
-		return s
-	}
-	src := &stubHistorySource{
-		source: "codex",
-		files:  []agents.HistoryFile{{SourceSystem: "codex", SessionID: "s-gone", ModTime: now.Add(-3 * time.Hour)}},
-		segments: map[string][]agents.HistorySegment{"s-gone": {
-			seg("AFTER_OWN_FILE_READ", t0, filepath.Join(gone, "internal", "main.go")),
-			seg("AFTER_OTHER_DELETED_READ", t0.Add(time.Minute), filepath.Join(home, "worktrees", "secret-1", "keys.go")),
-		}},
-	}
-	srv, got := captureServer(t)
-	if _, err := Upload(context.Background(), uploadOpts(t.TempDir(), twoOrgState(now, true), srv, now, src)); err != nil {
-		t.Fatal(err)
-	}
-	checkSent(t, got()["team-a"], []string{"AFTER_OWN_FILE_READ"}, []string{"AFTER_OTHER_DELETED_READ"})
-}
-
-// A family with subagents must sit in one organization: once the parent's transcript moves
-// to org B while its child still works in org A, nothing from then on uploads.
-func TestFamilyWithSubagentsSpanningTwoOrgsIsCutWhenSecondAppears(t *testing.T) {
-	t.Parallel()
-	repoA := initTestGitRepo(t, "https://github.com/org-a/app.git")
-	repoB := initTestGitRepo(t, "https://github.com/org-b/secret.git")
-	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
-	t0 := now.Add(-4 * time.Hour)
-	src := &stubHistorySource{
-		source: "codex",
-		files: []agents.HistoryFile{
-			{SourceSystem: "codex", SessionID: "s-par", ModTime: now.Add(-3 * time.Hour)},
-			{SourceSystem: "codex", SessionID: "s-kid", ParentSessionID: "s-par", ModTime: now.Add(-3 * time.Hour)},
-		},
-		segments: map[string][]agents.HistorySegment{
-			"s-par": {
-				makeNativeSegment("codex", "s-par", repoA, "PARENT_IN_A_OK", t0),
-				makeNativeSegment("codex", "s-par", repoB, "PARENT_IN_B_LEAK", t0.Add(10*time.Minute)),
-			},
-			"s-kid": {
-				makeNativeSegment("codex", "s-kid", repoA, "CHILD_EARLY_A_OK", t0.Add(time.Minute)),
-				makeNativeSegment("codex", "s-kid", repoA, "CHILD_LATE_A_LEAK", t0.Add(20*time.Minute)),
-			},
-		},
-	}
-	srv, got := captureServer(t)
-	if _, err := Upload(context.Background(), uploadOpts(t.TempDir(), twoOrgState(now, false), srv, now, src)); err != nil {
-		t.Fatal(err)
-	}
-	sent := got()
-	checkSent(t, sent["team-a"]+"\n"+sent["team-b"], []string{"PARENT_IN_A_OK", "CHILD_EARLY_A_OK"}, []string{"PARENT_IN_B_LEAK", "CHILD_LATE_A_LEAK"})
-}
-
-// A reach to a top-level directory that no longer exists, or to a path under it, cuts the
-// session at that call, rather than reading as a reach to "/".
-func TestMissingTopLevelPathCutsSession(t *testing.T) {
-	t.Parallel()
-	repoA := initTestGitRepo(t, "https://github.com/org-a/app.git")
-	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
-	t0 := now.Add(-4 * time.Hour)
-	gone := "/terma-nonexistent-mount-" + filepath.Base(t.TempDir())
-	shell := func(cmd string) []string { return hookrun.Alone(hookrun.ShellPathsHistorical(cmd, repoA)...) }
-	for name, paths := range map[string][]string{
-		"file under it":    shell("cat " + gone + "/org-b/notes"),
-		"search of it":     shell("rg apiKey " + gone),
-		"cd into it":       shell("cd " + gone + " && cat secret.go"),
-		"search tool path": hookrun.SearchHistorical(gone, "*.go"),
-	} {
-		before := makeNativeSegment("claude", "s-mount", repoA, "BEFORE_MOUNT_OK", t0)
-		after := makeNativeSegment("claude", "s-mount", repoA, "AFTER_MOUNT_LEAK", t0.Add(2*time.Minute))
-		after.ToolReaches = []agents.HistoryToolReach{{At: t0.Add(time.Minute), Cwd: repoA, Paths: paths}}
-		src := &stubHistorySource{
-			source:   "claude",
-			files:    []agents.HistoryFile{{SourceSystem: "claude", SessionID: "s-mount", ModTime: now.Add(-3 * time.Hour)}},
-			segments: map[string][]agents.HistorySegment{"s-mount": {before, after}},
-		}
-		srv, got := captureServer(t)
-		sum, err := Upload(context.Background(), uploadOpts(t.TempDir(), twoOrgState(now, false), srv, now, src))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if sent := got()["team-a"]; !strings.Contains(sent, "BEFORE_MOUNT_OK") || strings.Contains(sent, "AFTER_MOUNT_LEAK") {
-			t.Errorf("%s (%q): want the session cut at the reach", name, paths)
-		}
-		if sum.SentSessions != 1 || sum.WithheldRecords != 1 {
-			t.Errorf("%s: sent %d session(s), withheld %d record(s); want 1 and 1", name, sum.SentSessions, sum.WithheldRecords)
 		}
 	}
 }
@@ -298,49 +170,6 @@ func TestWatchDirCompanionNotDiscoveredOrUnstatableSkipsSession(t *testing.T) {
 	})
 }
 
-// A live hook can mark a family member's run Mixed between two members' uploads; the
-// transcript verdict is cached per family, but the ledgers are read every time.
-func TestCompanionLedgerReadForEveryMember(t *testing.T) {
-	t.Parallel()
-	stateDir := t.TempDir()
-	repoA := initTestGitRepo(t, "https://github.com/org-a/app.git")
-	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
-	t0 := now.Add(-4 * time.Hour)
-	for _, id := range []string{"s-root", "s-kid1", "s-kid2"} {
-		if _, err := runs.Start(stateDir, id, t0.Add(-time.Minute)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	src := &stubHistorySource{
-		source: "codex",
-		files: []agents.HistoryFile{
-			{SourceSystem: "codex", SessionID: "s-root", ModTime: now.Add(-3 * time.Hour)},
-			{SourceSystem: "codex", SessionID: "s-kid1", ParentSessionID: "s-root", ModTime: now.Add(-3*time.Hour + time.Minute)},
-			{SourceSystem: "codex", SessionID: "s-kid2", ParentSessionID: "s-root", ModTime: now.Add(-3*time.Hour + 2*time.Minute)},
-		},
-		segments: map[string][]agents.HistorySegment{
-			"s-root": {makeNativeSegment("codex", "s-root", repoA, "ROOT_OK", t0)},
-			"s-kid1": {makeNativeSegment("codex", "s-kid1", repoA, "KID1_AFTER_MARK_LEAK", t0.Add(time.Minute))},
-			"s-kid2": {makeNativeSegment("codex", "s-kid2", repoA, "KID2_AFTER_MARK_LEAK", t0.Add(time.Minute))},
-		},
-	}
-	srv, got := captureServer(t)
-	opts := uploadOpts(stateDir, twoOrgState(now, false), srv, now, src)
-	var markErr error
-	opts.Progress = func(ev ProgressEvent) {
-		if ev.Kind == ProgressSessionDone && ev.SessionID == "s-root" {
-			markErr = runs.MarkMixed(stateDir, "s-kid2", t0, runs.Why{Reason: runs.Crossed})
-		}
-	}
-	if _, err := Upload(context.Background(), opts); err != nil {
-		t.Fatal(err)
-	}
-	if markErr != nil {
-		t.Fatal(markErr)
-	}
-	checkSent(t, got()["team-a"], []string{"ROOT_OK"}, []string{"KID1_AFTER_MARK_LEAK", "KID2_AFTER_MARK_LEAK"})
-}
-
 func TestHoldingsPageMismatchOrEmptyMiddlePageFailsClosed(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
@@ -401,30 +230,23 @@ func refusedOverlapState(now time.Time, refusals int) routing.State {
 }
 
 // A Refused team is passed over, as the live hooks' routing does: what it lists goes to the
-// next team that lists it, or nowhere, and reaching it crosses into no organization. A
-// Suspended team still holds what it lists, so the same reach cuts the session.
+// next team that lists it, or nowhere. A Suspended team still holds what it lists.
 func TestRefusedTeamIsPassedOverAndSuspendedTeamStillHolds(t *testing.T) {
 	t.Parallel()
 	repoA := initTestGitRepo(t, "https://github.com/org-a/app.git")
 	shared := initTestGitRepo(t, "https://github.com/org-x/shared.git")
 	repoB := initTestGitRepo(t, "https://github.com/org-b/secret.git")
-	secretB := filepath.Join(repoB, "secret.go")
-	if err := os.WriteFile(secretB, []byte("package secret\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	now := time.Date(2026, 11, 25, 12, 0, 0, 0, time.UTC)
 	t0 := now.Add(-4 * time.Hour)
-	reach := makeNativeSegment("claude", "s-reach", repoA, "AFTER_REACH_INTO_B", t0.Add(2*time.Minute))
-	reach.ToolReaches = []agents.HistoryToolReach{{At: t0.Add(time.Minute), Cwd: repoA, Paths: []string{secretB}}}
 	src := &stubHistorySource{
 		source: "claude",
 		files: []agents.HistoryFile{
-			{SourceSystem: "claude", SessionID: "s-reach", ModTime: now.Add(-3 * time.Hour)},
+			{SourceSystem: "claude", SessionID: "s-app", ModTime: now.Add(-3 * time.Hour)},
 			{SourceSystem: "claude", SessionID: "s-shared", ModTime: now.Add(-3 * time.Hour)},
 			{SourceSystem: "claude", SessionID: "s-secret", ModTime: now.Add(-3 * time.Hour)},
 		},
 		segments: map[string][]agents.HistorySegment{
-			"s-reach":  {makeNativeSegment("claude", "s-reach", repoA, "BEFORE_REACH_OK", t0), reach},
+			"s-app":    {makeNativeSegment("claude", "s-app", repoA, "IN_APP", t0)},
 			"s-shared": {makeNativeSegment("claude", "s-shared", shared, "IN_SHARED", t0)},
 			"s-secret": {makeNativeSegment("claude", "s-secret", repoB, "IN_SECRET", t0)},
 		},
@@ -436,7 +258,7 @@ func TestRefusedTeamIsPassedOverAndSuspendedTeamStillHolds(t *testing.T) {
 		t.Fatal(err)
 	}
 	sent := got()
-	checkSent(t, sent["team-a"], []string{"BEFORE_REACH_OK", "AFTER_REACH_INTO_B", "IN_SHARED"}, []string{"IN_SECRET"})
+	checkSent(t, sent["team-a"], []string{"IN_APP", "IN_SHARED"}, []string{"IN_SECRET"})
 	if sent["team-b"] != "" {
 		t.Errorf("a Refused team was sent to: %q", sent["team-b"])
 	}
@@ -450,7 +272,7 @@ func TestRefusedTeamIsPassedOverAndSuspendedTeamStillHolds(t *testing.T) {
 		t.Fatal(err)
 	}
 	sent = got()
-	checkSent(t, sent["team-a"], []string{"BEFORE_REACH_OK"}, []string{"AFTER_REACH_INTO_B", "IN_SHARED", "IN_SECRET"})
+	checkSent(t, sent["team-a"], []string{"IN_APP"}, []string{"IN_SHARED", "IN_SECRET"})
 	if sent["team-b"] != "" {
 		t.Errorf("a Suspended team was sent to: %q", sent["team-b"])
 	}

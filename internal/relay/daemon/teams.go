@@ -14,7 +14,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 )
 
@@ -41,8 +40,8 @@ type TeamsDeps struct {
 	Profile      func(name string) (*config.Config, error)
 }
 
-// Teams implements relay.Router over account-verified routing.State files and the run
-// ledger, using the profile's single user token (or keys.json on a server-key profile).
+// Teams implements relay.Router over account-verified routing.State files,
+// using the profile's single user token (or keys.json on a server-key profile).
 type Teams struct {
 	cfg  *config.Config
 	deps TeamsDeps
@@ -60,11 +59,6 @@ type Teams struct {
 
 	userMu sync.Mutex
 	users  map[string]cachedUser
-
-	ledgerMu   sync.Mutex
-	ledgers    map[string]cachedLedger
-	ledgerTTL  time.Duration
-	readLedger func(stateDir, idOrAlias string) runs.Snapshot
 }
 
 type cachedUser struct {
@@ -80,8 +74,7 @@ func NewTeams(cfg *config.Config, deps TeamsDeps) *Teams {
 	return &Teams{
 		cfg: cfg, deps: deps,
 		profiles: map[string]*profileRoute{}, owners: map[string]string{}, ttl: stateTTL,
-		users:   map[string]cachedUser{},
-		ledgers: map[string]cachedLedger{}, ledgerTTL: ledgerTTL, readLedger: runs.Read,
+		users: map[string]cachedUser{},
 	}
 }
 
@@ -94,8 +87,7 @@ func (t *Teams) UnknownToPersonal() bool {
 }
 
 // Route decides where rec goes under its placement's profile (or the relay's start profile
-// when unplaced), checking the run ledger for interval Mixed before routing and pinning
-// held destinations whenever routing assigns an enrollment.
+// when unplaced) and pins held destinations whenever routing assigns an enrollment.
 func (t *Teams) Route(rec relay.Record) relay.Routed {
 	profile := ""
 	if rec.Placed {
@@ -108,23 +100,13 @@ func (t *Teams) Route(rec relay.Record) relay.Routed {
 	if rec.Placed && (rec.Placement.Account == "" || rec.Placement.Account != pr.st.Account) {
 		return relay.Routed{Outcome: relay.Hold, Why: relay.WhyNoState}
 	}
-	placedIn := ""
-	if rec.Placed {
-		placedIn = rec.Placement.Run
-	}
-	if run, from, mixed := t.mixedInterval(rec.Session, placedIn, rec.At, rec.EffectiveEnd()); mixed || rec.Placed && rec.Placement.Kind == claim.KindMixed {
-		if !mixed {
-			run, from = rec.Placement.Run, rec.At
-		}
-		return relay.Routed{Outcome: relay.Drop, Why: relay.WhyMixed, Blocker: mixedBlocker(rec.Session), MixedAt: from, MixedRun: run}
-	}
 	loc := location(rec)
 	d := pr.router.Route(loc, t.deps.Now())
 	queuedFor := func(tm routing.Team) relay.Queued {
 		return relay.Queued{
 			Profile: pr.st.Profile, Enrollment: tm.EnrollmentID, Project: tm.TeamID, Account: pr.st.Account,
 			Kind: string(loc.Kind), Repository: loc.Repository, Narrow: loc.Narrow,
-			Session: rec.Session, Run: rec.Placement.Run, At: rec.At, EndAt: rec.EndAt,
+			Session: rec.Session, At: rec.At, EndAt: rec.EndAt,
 		}
 	}
 	switch d.Outcome {
@@ -144,9 +126,6 @@ func (t *Teams) Route(rec relay.Record) relay.Routed {
 		}
 		return res
 	}
-	if d.Reason == routing.ReasonMixed {
-		return relay.Routed{Outcome: relay.Drop, Why: relay.WhyMixed, Blocker: mixedBlocker(rec.Session)}
-	}
 	return relay.Routed{Outcome: relay.Drop, Why: relay.WhyNoTeam}
 }
 
@@ -154,18 +133,17 @@ func (t *Teams) Route(rec relay.Record) relay.Routed {
 func (t *Teams) Recheck(enrollment, account string) relay.Rechecker {
 	pr, found, waits := t.owner(enrollment, account, true)
 	return &recheck{
-		stateDir: t.cfg.StateDir, enrollment: enrollment, st: pr.st, router: pr.router,
-		ok: found || !waits, now: t.deps.Now(), runs: map[string]runs.Snapshot{},
+		enrollment: enrollment, st: pr.st, router: pr.router,
+		ok: found || !waits, now: t.deps.Now(),
 	}
 }
 
 type recheck struct {
-	stateDir, enrollment string
-	st                   routing.State
-	router               *routing.Router
-	ok                   bool
-	now                  time.Time
-	runs                 map[string]runs.Snapshot
+	enrollment string
+	st         routing.State
+	router     *routing.Router
+	ok         bool
+	now        time.Time
 }
 
 func (p *recheck) StateID() string {
@@ -200,9 +178,6 @@ func (p *recheck) TeamWaits() (relay.Rechecked, bool) {
 func (p *recheck) Entry(q relay.Queued) relay.Rechecked {
 	if !p.ok {
 		return relay.Rechecked{Verdict: relay.Wait, Why: relay.WhyNoState}
-	}
-	if from, mixed := p.mixedInterval(q.Session, q.At, q.EffectiveEnd()); mixed {
-		return relay.Rechecked{Verdict: relay.Discard, Why: relay.WhyMixed, Blocker: mixedBlocker(q.Session), MixedAt: from}
 	}
 	if p.router == nil {
 		return relay.Rechecked{Verdict: relay.Discard, Why: relay.WhyDeselected}
@@ -360,8 +335,6 @@ func location(rec relay.Record) routing.Location {
 	c := rec.Placement
 	origin := cmp.Or(c.Repository.Origin, c.Remote)
 	switch c.Kind {
-	case claim.KindMixed:
-		return routing.Location{Kind: routing.Mixed}
 	case claim.KindOutsideGit:
 		return routing.Location{Kind: routing.OutsideGit}
 	case claim.KindRepository:
