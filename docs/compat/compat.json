@@ -73,7 +73,7 @@
       "label": "The machine's heartbeat reaches the project's ingest"
     }
   ],
-  "generated_at": "2026-11-28T08:00:25Z",
+  "generated_at": "2026-11-28T11:59:29Z",
   "harnesses": [
     {
       "ID": "claude",
@@ -13799,7 +13799,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.content_allowed",
       "result": "pass",
-      "last_run": "2026-11-28T05:43:37.70374Z",
+      "last_run": "2026-11-28T11:58:46.762187Z",
       "first_passed": "2026-11-27T17:16:49.804037Z",
       "terma": "terma version dev",
       "test": "TestRelayPi/v1.7.0/content"
@@ -13810,7 +13810,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.content_withheld",
       "result": "pass",
-      "last_run": "2026-11-28T05:43:42.645219Z",
+      "last_run": "2026-11-28T11:58:51.215614Z",
       "first_passed": "2026-11-27T17:16:57.091834Z",
       "terma": "terma version dev",
       "test": "TestRelayPi/v1.7.0/withheld"
@@ -13821,7 +13821,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.equivalent",
       "result": "pass",
-      "last_run": "2026-11-28T05:43:23.246989Z",
+      "last_run": "2026-11-28T11:58:31.993276Z",
       "first_passed": "2026-11-27T17:16:34.356912Z",
       "terma": "terma version dev",
       "test": "TestRelayWorkloadsPi/v1.7.0"
@@ -13832,7 +13832,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.only_opted_in",
       "result": "pass",
-      "last_run": "2026-11-28T05:43:32.490645Z",
+      "last_run": "2026-11-28T11:58:41.37644Z",
       "first_passed": "2026-11-27T17:16:44.100565Z",
       "terma": "terma version dev",
       "test": "TestRelayPiOutsideARepository/v1.7.0"
@@ -13843,7 +13843,7 @@
       "platform": "darwin/arm64",
       "capability": "relay.telemetry",
       "result": "pass",
-      "last_run": "2026-11-28T05:43:42.64524Z",
+      "last_run": "2026-11-28T11:58:51.215659Z",
       "first_passed": "2026-11-27T17:16:57.0919Z",
       "terma": "terma version dev",
       "test": "TestRelayPi/v1.7.0"
