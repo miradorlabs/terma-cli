@@ -3,7 +3,7 @@
   "harness": "pi",
   "version": "1.7.0",
   "platform": "darwin/arm64",
-  "captured_at": "2026-11-27T23:29:43.945104122Z",
+  "captured_at": "2026-11-28T05:44:29.533099474Z",
   "capture": {
     "command": [
       "pi",
@@ -18,7 +18,7 @@
       "Part of this build's capture did not finish; the frequent check tries it again, up to four attempts."
     ],
     "sections": {
-      "behavior": "2026-11-27T23:29:43.945104122Z",
+      "behavior": "2026-11-28T05:44:29.533099474Z",
       "binary": "2026-11-27T17:17:43.546096674Z",
       "caching": "2026-11-27T17:17:43.546096674Z",
       "cli": "2026-11-27T17:17:43.546096674Z",
@@ -32,8 +32,8 @@
       "telemetry": "2026-11-27T17:17:43.546096674Z",
       "tools": "2026-11-27T17:17:43.546096674Z"
     },
-    "attempted_at": "2026-11-27T23:29:43.945104122Z",
-    "attempts": 2,
+    "attempted_at": "2026-11-28T05:44:29.533099474Z",
+    "attempts": 3,
     "announced_at": "2026-11-27T17:17:43.546096674Z"
   },
   "model": {
@@ -210,9 +210,9 @@
         "429": {
           "attempts": 4,
           "backoff_ms": [
-            2049,
-            4041,
-            8067
+            2012,
+            4011,
+            8006
           ],
           "failed": 3,
           "failed_first": 3,
@@ -224,9 +224,9 @@
         "500": {
           "attempts": 4,
           "backoff_ms": [
-            2035,
-            4048,
-            8117
+            2012,
+            4009,
+            8005
           ],
           "failed": 3,
           "failed_first": 3,

@@ -24332,7 +24332,7 @@
         "read": false
       }
     },
-    "fetched_at": "2026-11-28T01:48:21.431167548Z",
+    "fetched_at": "2026-11-28T05:44:29.533099474Z",
     "settings": {
       "advisorModel": {
         "default": "unset, so the advisor is off",
@@ -24886,9 +24886,9 @@
         "description": "Turn off Code sessions that run on the device in the desktop app, for deployments where developers should work on remote machines over SSH. With the key set to `true`, users see this in the Code tab:",
         "read": false,
         "scope": "Managed",
-        "scope_note": "By default, the desktop app reads the key from one managed source.",
+        "scope_note": "If you deliver server-managed settings, set it there and on each computer. Otherwise, the desktop app reads the key from one managed source by default.",
         "topic": "Remote, desktop, and notifications",
-        "type": "Boolean; only the JSON Boolean `true` takes effect"
+        "type": "Boolean. Use the JSON Boolean `true`."
       },
       "disableDirectMcpSkills": {
         "default": "unset. These skills are off for Team and Enterprise members who sign in to claude.ai with `/login`. For other sign-ins, see MCP skill availability",
@@ -26101,11 +26101,11 @@
         "type": "array of objects, each with required `id`, `name`, and `sshHost` and optional `sshPort` and `sshIdentityFile`"
       },
       "sshHostAllowlist": {
-        "default": "unset, so any host is allowed",
+        "default": "unset, so any host is allowed. With a third-party provider, SSH sessions are off by default. To turn them on, see Enable SSH remote sessions.",
         "description": "Limit the hosts a Desktop SSH session can connect to. Only the Desktop app reads this key; the CLI doesn't. Patterns are case-insensitive: `*` matches any host, `*.example.com` matches `example.com` and every subdomain, and anything else is an exact match against the hostname after `~/.ssh/config` resolution. An empty array turns SSH sessions off.",
         "read": false,
         "scope": "Managed",
-        "scope_note": "By default, Desktop reads the key from one managed source.",
+        "scope_note": "If you deliver server-managed settings, set the same list there and on each computer: see Which SSH host allowlists apply. Without server-managed settings, Desktop reads the key from one managed source by default. Desktop doesn't read this key from a policy helper, so set it in the policy or file that names the helper.",
         "topic": "Remote, desktop, and notifications",
         "type": "array of hostname patterns"
       },
