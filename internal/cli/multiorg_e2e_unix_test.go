@@ -29,7 +29,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -193,47 +192,6 @@ exec curl -sSf -o /dev/null -H "Authorization: Bearer $TOKEN" -H "Content-Type: 
 	}
 }
 
-// runCrossingAndPostExport runs Claude PreToolUse Read targeting crossFile in another org,
-// a post-crossing UserPromptSubmit hook, and an OTLP log export (at now+5s) via `exec curl`
-// so the HTTP client shares the shell PID recorded by the hooks.
-func runCrossingAndPostExport(t *testing.T, bin, startRoot, crossFile, sessionID, postMarker, relayAddr, relayToken string) {
-	t.Helper()
-	postBody := e2eOTLPLogBody(t, sessionID, postMarker, time.Now().Add(5*time.Second))
-	readPayload, _ := json.Marshal(map[string]any{
-		"session_id":      sessionID,
-		"cwd":             startRoot,
-		"hook_event_name": "PreToolUse",
-		"tool_name":       "Read",
-		"tool_input":      map[string]any{"file_path": crossFile},
-	})
-	promptPayload, _ := json.Marshal(map[string]any{
-		"session_id":      sessionID,
-		"cwd":             startRoot,
-		"hook_event_name": "UserPromptSubmit",
-		"prompt":          postMarker + "-hook",
-	})
-	sh := exec.Command("sh", "-c", `set -e
-"$TERMA" hook --user pre-tool-use <<EOF
-$READ_PAYLOAD
-EOF
-"$TERMA" hook --user user-prompt-submit <<EOF
-$PROMPT_PAYLOAD
-EOF
-exec curl -sSf -o /dev/null -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/x-protobuf" --data-binary @"$POST_BODY" "http://$ADDR/v1/logs"`)
-	sh.Dir = startRoot
-	sh.Env = append(os.Environ(),
-		"TERMA="+bin,
-		"READ_PAYLOAD="+string(readPayload),
-		"PROMPT_PAYLOAD="+string(promptPayload),
-		"POST_BODY="+postBody,
-		"TOKEN="+relayToken,
-		"ADDR="+relayAddr,
-	)
-	if out, err := sh.CombinedOutput(); err != nil {
-		t.Fatalf("mixed crossing session: %v\n%s", err, out)
-	}
-}
-
 func startE2ERelay(t *testing.T, configDir, stateDir string) (stop func()) {
 	t.Helper()
 	relayApp := New(builtin.Agents, "dev")
@@ -265,10 +223,9 @@ func startE2ERelay(t *testing.T, configDir, stateDir string) (stop func()) {
 // TestMultiOrgSingleTokenEndToEnd exercises the complete single-user-token multi-org stack
 // on an isolated scratch machine:
 //  1. Multi-org routing across two shared orgs (Acme, Beta Labs) + Personal on one user token.
-//  2. Cross-org Mixed cutoff (pre-crossing delivered, post-crossing dropped, doctor reports Mixed).
-//  3. Org-wide 403 ORG_NOT_ACCESSIBLE refusing every Acme enrollment via coalesced refresh nudge
+//  2. Org-wide 403 ORG_NOT_ACCESSIBLE refusing every Acme enrollment via coalesced refresh nudge
 //     without retiring Alice's user token, while Beta Labs and Personal keep delivering.
-//  4. Account switch CAS (alice -> bob) rejecting stale alice writers and failing closed on
+//  3. Account switch CAS (alice -> bob) rejecting stale alice writers and failing closed on
 //     wrong-account routing.State in route explain and doctor.
 func TestMultiOrgSingleTokenEndToEnd(t *testing.T) {
 	for _, tool := range []string{"git", "sh", "curl"} {
@@ -408,41 +365,7 @@ func TestMultiOrgSingleTokenEndToEnd(t *testing.T) {
 		}
 	}
 
-	// 2. Mixed cutoff across orgs: start in Acme, send pre-crossing record, read a Beta file,
-	// send post-crossing record + hook. Pre-crossing delivers; post-crossing is dropped.
-	betaFile := filepath.Join(betaRepo, "README.md")
-	if err := os.WriteFile(betaFile, []byte("beta secret\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	const (
-		mixedSession = "e2e-mixed-1"
-		preMarker    = "marker-mixed-pre"
-		postMarker   = "marker-mixed-post"
-	)
-	runAgentSession(t, bin, acmeRepo, mixedSession, preMarker, addr, relayToken)
-	pre := ingest.await(t, preMarker, nil)
-	if pre.project != acmeAPI || pre.token != aliceToken {
-		t.Fatalf("pre-crossing delivery = %+v, want project %s", pre, acmeAPI)
-	}
-	runCrossingAndPostExport(t, bin, acmeRepo, betaFile, mixedSession, postMarker, addr, relayToken)
-	if out, err := runTerma(t, "spool", "flush"); err != nil {
-		t.Fatalf("spool flush after mixed: %v\n%s", err, out)
-	}
-	// Run a healthy follow-up session in Beta so the relay processes beyond the mixed cutoff.
-	runAgentSession(t, bin, betaRepo, "e2e-beta-after-mixed", "marker-beta-after-mixed", addr, relayToken)
-	ingest.await(t, "marker-beta-after-mixed", nil)
-
-	if _, mixed := runs.MixedAt(stateDir, mixedSession, time.Now().Add(time.Minute)); !mixed {
-		t.Fatalf("runs.MixedAt(%s) = false, want true", mixedSession)
-	}
-	if leaked := ingest.matches(postMarker); len(leaked) != 0 {
-		t.Fatalf("post-crossing records leaked to ingest: %+v", leaked)
-	}
-	if docOut, _ := runTerma(t, "doctor"); !strings.Contains(docOut, "1 session is paused") {
-		t.Fatalf("doctor lacks the paused session:\n%s", docOut)
-	}
-
-	// 3. Org-wide 403 ORG_NOT_ACCESSIBLE on Acme: refuse both Acme enrollments via coalesced
+	// 2. Org-wide 403 ORG_NOT_ACCESSIBLE on Acme: refuse both Acme enrollments via coalesced
 	// refresh nudge while keeping Alice's user token, Beta Labs, and Personal working.
 	policiesBefore := f.policies.Load()
 	acmeRevoked.Store(true)
@@ -514,7 +437,7 @@ func TestMultiOrgSingleTokenEndToEnd(t *testing.T) {
 	aliceExpect := st.Expect()
 	stopRelay()
 
-	// 4. Account switch CAS (alice -> bob): replaces routing.State for bob, revokes alice's
+	// 3. Account switch CAS (alice -> bob): replaces routing.State for bob, revokes alice's
 	// session, and rejects stale alice CAS writers with ErrAccountMismatch.
 	f.grant("code-bob", bobID)
 	bobStdin := identityLine(bobID, orgB().ID) + `{"code":"code-bob"}` + "\n"
@@ -560,7 +483,7 @@ func TestMultiOrgSingleTokenEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if queued, err := sp.Peek(10); err != nil || slices.ContainsFunc(queued, func(e spool.Event) bool { return e.SessionID == mixedSession }) {
-		t.Fatalf("unexpected mixed session events left in spool: %+v (err=%v)", queued, err)
+	if queued, err := sp.Peek(10); err != nil || slices.ContainsFunc(queued, func(e spool.Event) bool { return e.SessionID == "e2e-acme-1" }) {
+		t.Fatalf("unexpected alice session events left in spool: %+v (err=%v)", queued, err)
 	}
 }

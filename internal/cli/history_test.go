@@ -337,11 +337,9 @@ func TestRenderHistorySummaryNamesUnreadablePaths(t *testing.T) {
 	var b strings.Builder
 	renderHistorySummary(&b, history.Summary{
 		SkippedSessions: map[string]int{history.SkipUnreadable: 4},
-		WithheldRecords: 7,
 		Unreadable:      []string{"/home/u/.codex/sessions/2026/rollout-x.jsonl", "/home/u/.claude/projects/p/s/subagents"},
 	})
 	want := "Could not read: /home/u/.codex/sessions/2026/rollout-x.jsonl, /home/u/.claude/projects/p/s/subagents (sessions that may depend on them were skipped)\n"
-	want = "Withheld after a Mixed cutoff: 7 record(s)\n" + want
 	if !strings.Contains(b.String(), "Skipped sessions: unreadable=4\n"+want) {
 		t.Errorf("summary output:\n%s\nwant it to contain:\n%s", b.String(), want)
 	}

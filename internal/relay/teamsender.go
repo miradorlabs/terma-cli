@@ -276,28 +276,6 @@ func (s *sender) postBatch(ctx context.Context, pol Policy, batch []entry, body 
 	})
 }
 
-// dropMixed sweeps session's queued entries of run (every run when run is empty) that end at
-// or after from. When a record's span holds more than one Mixed run, run is the earliest
-// (runs.Snapshot.MixedIn): the later runs' entries are not swept here, and the send-time
-// recheck (sender.checkEntry) is what discards them.
-func (r *Relay) dropMixed(session, run string, from time.Time) {
-	key := session + "\x00" + run
-	r.mu.Lock()
-	if seen, ok := r.mixedSeen[key]; ok && !from.Before(seen) {
-		r.mu.Unlock()
-		return
-	}
-	if len(r.mixedSeen) >= maxTraces {
-		clear(r.mixedSeen)
-	}
-	r.mixedSeen[key] = from
-	r.mu.Unlock()
-	for _, s := range r.allTeamSenders() {
-		s.dropMatching(func(e entry) bool {
-			return e.q.Session == session && (run == "" || e.q.Run == "" || e.q.Run == run) && (e.q.EffectiveEnd().IsZero() || !e.q.EffectiveEnd().Before(from))
-		}, string(WhyMixed), "mixed:"+session)
-	}
-}
 func (r *Relay) dropDeselected() {
 	if active := r.account(); r.teams() && active != "" && active != sendas.AccountUnreadable {
 		for _, s := range r.allTeamSenders() {

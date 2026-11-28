@@ -85,7 +85,7 @@ func TestExtensionUnderNode(t *testing.T) {
 				byEvent[c.Event] = append(byEvent[c.Event], c.Payload)
 			}
 		}
-		if len(files) >= 7 || time.Now().After(deadline) {
+		if len(files) >= 4 || time.Now().After(deadline) {
 			break
 		}
 	}
@@ -94,8 +94,8 @@ func TestExtensionUnderNode(t *testing.T) {
 			t.Errorf("%s calls = %v", e, byEvent[e])
 		}
 	}
-	if len(byEvent["pi-tool-reach"]) != 3 {
-		t.Errorf("pi-tool-reach calls = %d (%v); want 3 (read, grep, bash; deduped)", len(byEvent["pi-tool-reach"]), byEvent["pi-tool-reach"])
+	if len(byEvent["pi-tool-reach"]) != 0 {
+		t.Errorf("pi-tool-reach calls = %v; want none", byEvent["pi-tool-reach"])
 	}
 	if edits := byEvent["pi-file-edit"]; len(edits) == 1 && (edits[0]["file"] != "hello.txt" || edits[0]["files"] != nil) {
 		t.Errorf("edit payload = %v, want file hello.txt", edits[0])

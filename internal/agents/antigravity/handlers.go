@@ -9,7 +9,6 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/miradorlabs/terma-cli/internal/agents/internal/reach"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/session"
@@ -115,9 +114,6 @@ func preInvocation(ctx context.Context, env hookrun.Env) error {
 	invocation, _, invocationKnown := hookrun.JSONNumber(in.InvocationNum, true)
 	steps, _, stepsKnown := hookrun.JSONNumber(in.InitialNumSteps, true)
 	first := (!invocationKnown || invocation == 0) && (!stepsKnown || steps <= 1)
-	if first {
-		env.StartRun(in.id())
-	}
 	r, err := env.Repo(ctx)
 	if err != nil {
 		// At any invocation, not only the turn's first.
@@ -199,8 +195,7 @@ func antigravityEditedPaths(in *antigravityHookInput) []string {
 }
 
 // postToolUse records every tool step as a `terma.tool.call`, since agy has no other
-// export, with its arguments where the content rules allow, the file an edit changed,
-// and (when routing is active) reached locations classified from `toolCall.args`.
+// export, with its arguments where the content rules allow and the file an edit changed.
 // Under one hold of the conversation it reads the transcript, then spools the call, so the
 // model call that asked for the tool sorts before it. Whether the call's content is refused
 // is judged from its own arguments, with nothing stored: the reader judges the call line's
@@ -215,19 +210,8 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	id := in.id()
 	sess := session.Session{ID: id, Tool: antigravityTool, Model: in.ModelName}
 	files := antigravityEditedPaths(in)
-	var located *hookrun.Repo
-	if env.Routing != nil && in.ToolCall != nil && len(files) == 0 {
-		spec := reach.Antigravity
-		if in.ToolCall.Name == "str_replace_editor" {
-			spec.Commands = nil // its command is view, create or str_replace
-		}
-		located = env.Classify(ctx, nil, sess, spec.Of(in.ToolCall.Args, env.Cwd), nil)
-	}
-	r, err := env.RepoAt(ctx, located)
+	r, err := env.Repo(ctx)
 	if err != nil {
-		if len(files) > 0 {
-			env.Classify(ctx, nil, sess, files, nil)
-		}
 		antigravitySkipCalls(env, in)
 		return nil
 	}

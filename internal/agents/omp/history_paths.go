@@ -6,14 +6,12 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"slices"
 	"strings"
 )
 
 var (
 	ompInternalURLRe      = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*://`)
 	ompStrayColonTargetRe = regexp.MustCompile(`^(?:[/\\~]|\.\.?[/\\]|[A-Za-z]:)`)
-	ompLineRangeRe        = regexp.MustCompile(`(?i)(?::(?:(?:\d+(?:(?:-|\+)\d+)?|-\d+)(?:,(?:\d+(?:(?:-|\+)\d+)?|-\d+))*|raw|conflicts|img)|#L?\d+(?:-L?\d+)?)$`)
 )
 
 func stripOuterDoubleQuotes(p string) string {
@@ -71,7 +69,7 @@ func normalizeOmpPath(raw string) string {
 	return stripWindowsExtendedPrefix(p)
 }
 
-func decodeReachPath(raw string) (string, bool) {
+func decodeOmpPath(raw string) (string, bool) {
 	p := normalizeOmpPath(raw)
 	if p == "" {
 		return "", false
@@ -100,28 +98,8 @@ func decodeReachPath(raw string) (string, bool) {
 	return p, false
 }
 
-// nonURLPath normalizes OMP path shorthands, converts local file:// URLs to filesystem paths,
-// and filters out non-filesystem OMP internal URLs (agent://, cfg://, local://, http://, etc.).
-func nonURLPath(p string) string {
-	decoded, unknown := decodeReachPath(p)
-	if unknown {
-		return ""
-	}
-	return decoded
-}
-
 func isASCIILetter(b byte) bool {
 	return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z')
-}
-
-// stripPathSelector peels an optional trailing line selector (e.g. :1-2, :10, #L1-L2) while
-// preserving Windows drive colons (C:).
-func stripPathSelector(p string) string {
-	loc := ompLineRangeRe.FindStringIndex(p)
-	if loc == nil || loc[0] <= 1 {
-		return p
-	}
-	return p[:loc[0]]
 }
 
 func isWindowsDrivePath(p string) bool {
@@ -153,12 +131,12 @@ func translateWindowsDriveOnLinux(p string) (string, bool) {
 	return p, true
 }
 
-// resolveReachPath normalizes OMP path shorthands, decodes local file:// URLs, filters
+// resolveOmpPath normalizes OMP path shorthands, decodes local file:// URLs, filters
 // internal URLs, translates or fails closed on Windows drive/UNC paths under Linux/WSL, and
-// expands a leading ~ / ~/ / ~\ to the user's home directory so reach classification never
-// joins ~/... under the session cwd.
-func resolveReachPath(raw string) (string, bool) {
-	p, unknown := decodeReachPath(raw)
+// expands a leading ~ / ~/ / ~\ to the user's home directory so an edited file's path never
+// joins ~/... under the session cwd. The bool reports a path it cannot place on this machine.
+func resolveOmpPath(raw string) (string, bool) {
+	p, unknown := decodeOmpPath(raw)
 	if unknown || p == "" {
 		return p, unknown
 	}
@@ -181,170 +159,4 @@ func resolveReachPath(raw string) (string, bool) {
 		return home, false
 	}
 	return filepath.Join(home, p[2:]), false
-}
-
-// splitOmpDelimitedPaths mirrors OMP's splitDelimitedPathEntry while remaining fail-closed
-// after referenced files have been deleted: an existing literal path stays intact, otherwise
-// entries split on top-level ';' or ',' outside '{...}' braces. When a segment does not exist
-// on disk and has top-level whitespace, live whitespace parts suppress the unsplit segment;
-// when none are live, a deleted path inside an existing spaced enclosing directory stays whole
-// unless a trailing token looks like an independent path root, otherwise both forms are kept.
-func splitOmpDelimitedPaths(entry, cwd string) []string {
-	entry = strings.TrimSpace(normalizeUnicodeSpaces(entry))
-	if entry == "" {
-		return nil
-	}
-	if statReachExists(entry, cwd) {
-		return []string{entry}
-	}
-	primary := splitTopLevel(entry, false, true)
-	if len(primary) == 0 {
-		return nil
-	}
-	var out []string
-	add := func(s string) {
-		if s != "" && !slices.Contains(out, s) {
-			out = append(out, s)
-		}
-	}
-	for _, seg := range primary {
-		if statReachExists(seg, cwd) {
-			add(seg)
-			continue
-		}
-		if ws := splitTopLevel(seg, true, true); len(ws) >= 2 {
-			anyLive := false
-			for _, w := range ws {
-				if statReachExists(w, cwd) {
-					anyLive = true
-					break
-				}
-			}
-			if !anyLive && spacedEnclosingDirExists(seg, ws, cwd) {
-				add(seg)
-				continue
-			}
-			if !anyLive {
-				add(seg)
-			}
-			for _, w := range ws {
-				add(w)
-			}
-			continue
-		}
-		add(seg)
-	}
-	return out
-}
-
-func spacedEnclosingDirExists(seg string, ws []string, cwd string) bool {
-	for _, tok := range ws[1:] {
-		p := normalizeOmpPath(tok)
-		if p == "~" || p == ".." || strings.HasPrefix(p, "/") || strings.HasPrefix(p, `\`) ||
-			strings.HasPrefix(p, "~/") || strings.HasPrefix(p, `~\`) ||
-			strings.HasPrefix(p, "../") || strings.HasPrefix(p, `..\`) ||
-			slices.Contains(strings.Split(strings.ReplaceAll(p, `\`, "/"), "/"), "..") ||
-			isWindowsDrivePath(p) || ompInternalURLRe.MatchString(p) {
-			return false
-		}
-	}
-	joinCwd := func(raw string) (string, bool) {
-		p, unk := resolveReachPath(raw)
-		if unk || p == "" {
-			return "", false
-		}
-		p = stripPathSelector(p)
-		if !isAbsToolPath(p) && cwd != "" {
-			p = filepath.Join(cwd, p)
-		}
-		return filepath.Clean(p), true
-	}
-	cand, ok1 := joinCwd(seg)
-	firstTok, ok2 := joinCwd(ws[0])
-	if !ok1 || !ok2 {
-		return false
-	}
-	for dir := filepath.Dir(cand); len(dir) > len(firstTok); {
-		if fi, err := os.Stat(dir); err == nil && fi.IsDir() {
-			return strings.HasPrefix(dir, firstTok) && (dir[len(firstTok)] == ' ' || dir[len(firstTok)] == '\t')
-		}
-		if parent := filepath.Dir(dir); parent != dir {
-			dir = parent
-		} else {
-			break
-		}
-	}
-	return false
-}
-
-func splitTopLevel(s string, whitespace, comma bool) []string {
-	var parts []string
-	depth, start := 0, 0
-	for i := 0; i < len(s); i++ {
-		ch := s[i]
-		if ch == '\\' && runtime.GOOS != "windows" && i+1 < len(s) {
-			i++
-			continue
-		}
-		if ch == '{' {
-			depth++
-			continue
-		}
-		if ch == '}' && depth > 0 {
-			depth--
-			continue
-		}
-		if depth != 0 {
-			continue
-		}
-		sep := ch == ';' || (comma && ch == ',') || (whitespace && (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'))
-		if sep {
-			if seg := strings.TrimSpace(s[start:i]); seg != "" {
-				parts = append(parts, seg)
-			}
-			start = i + 1
-		}
-	}
-	if seg := strings.TrimSpace(s[start:]); seg != "" {
-		parts = append(parts, seg)
-	}
-	return parts
-}
-
-func statReachExists(raw, cwd string) bool {
-	p, unknown := resolveReachPath(raw)
-	if unknown || p == "" {
-		return false
-	}
-	check := func(cand string) bool {
-		if !isAbsToolPath(cand) && cwd != "" {
-			cand = filepath.Join(cwd, cand)
-		}
-		_, err := os.Stat(cand)
-		return err == nil
-	}
-	if check(p) {
-		return true
-	}
-	if stripped := stripPathSelector(p); stripped != p {
-		return check(stripped)
-	}
-	return false
-}
-
-// peelSelectorIfMissing peels a trailing line selector when the raw path does not exist on
-// disk so reach classification sees the actual file path rather than path:start-end.
-func peelSelectorIfMissing(resolved, cwd string) string {
-	stripped := stripPathSelector(resolved)
-	if stripped == resolved {
-		return resolved
-	}
-	cand := resolved
-	if !isAbsToolPath(cand) && cwd != "" {
-		cand = filepath.Join(cwd, cand)
-	}
-	if _, err := os.Stat(cand); err == nil {
-		return resolved
-	}
-	return stripped
 }

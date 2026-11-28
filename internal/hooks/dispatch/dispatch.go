@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
@@ -78,12 +77,6 @@ const maxPayload = 4 << 20
 
 // handlerTimeout bounds an event handler; a render hook keeps its own deadline.
 const handlerTimeout = 5 * time.Second
-
-// isReachEvent reports whether event is a pre-tool reach hook whose persistence
-// failure must exit non-zero so the hook fails closed.
-func isReachEvent(event string) bool {
-	return strings.HasSuffix(event, "-tool-reach") || event == "pre-tool-use" || strings.HasSuffix(event, "-pre-tool-use")
-}
 
 // Run handles the request and returns the status the process exits with.
 func Run(ctx context.Context, d Deps, r Request) int {
@@ -169,17 +162,13 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 	}
 	ctx, cancel := context.WithTimeout(ctx, handlerTimeout)
 	defer cancel()
-	_ = env.Routing.TakeWriteErr()
-	if err := handler(ctx, env); errors.Is(err, hookrun.ErrFailClosed) {
+	if err := handler(ctx, env); errors.Is(err, hookrun.ErrPlacementFailed) {
 		return 1
 	}
 	if !claimed && tool != "" {
 		if s, ok := d.Agents.PayloadSession(r.Event, payload.Bytes()); ok {
 			claimed, claimedIn = hookrun.ClaimFromPayload(ctx, env, s, tool), cmp.Or(s.Cwd, r.Cwd)
 		}
-	}
-	if isReachEvent(r.Event) && env.Routing.TakeWriteErr() != nil {
-		return 1
 	}
 	if claimed && d.ClaimedRouted != nil {
 		d.ClaimedRouted(claimedIn, p.Routing)

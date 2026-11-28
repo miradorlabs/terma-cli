@@ -115,7 +115,6 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 				modTime := info.ModTime()
 				sid := ompSessionIDFromFilename(ent.Name())
 				var parentID string
-				var oneWayCutoff time.Time
 				hdr, peekErr := peekOmpSessionHeader(mainPath)
 				if hdr.Type == "session" {
 					if !session.ValidID(sid) && session.ValidID(hdr.ID) {
@@ -123,7 +122,6 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 					}
 					if ref := cmp.Or(strings.TrimSpace(hdr.ParentSession), strings.TrimSpace(hdr.ContinuationOf)); ref != "" {
 						parentID = ompParentSessionID(ref)
-						oneWayCutoff = parseOmpTime(hdr.Timestamp)
 					}
 				}
 				if !session.ValidID(sid) {
@@ -144,7 +142,6 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 					SessionID:          sid,
 					ParentSessionID:    parentID,
 					OneWayParent:       parentID != "",
-					OneWayCutoff:       oneWayCutoff,
 					Path:               mainPath,
 					ExtraPaths:         extras,
 					WatchDirs:          watchDirs,
@@ -188,15 +185,14 @@ func (Agent) DiscoverHistory(ctx context.Context, opts agents.HistoryDiscoverOpt
 }
 
 type ompSessionHeader struct {
-	Type                  string   `json:"type"`
-	Version               int      `json:"version"`
-	ID                    string   `json:"id"`
-	Title                 string   `json:"title"`
-	Timestamp             string   `json:"timestamp"`
-	Cwd                   string   `json:"cwd"`
-	ParentSession         string   `json:"parentSession"`
-	ContinuationOf        string   `json:"continuationOf"`
-	AdditionalDirectories []string `json:"additionalDirectories"`
+	Type           string `json:"type"`
+	Version        int    `json:"version"`
+	ID             string `json:"id"`
+	Title          string `json:"title"`
+	Timestamp      string `json:"timestamp"`
+	Cwd            string `json:"cwd"`
+	ParentSession  string `json:"parentSession"`
+	ContinuationOf string `json:"continuationOf"`
 }
 
 // findOmpSubagents recursively discovers companion subagent transcripts inside stemDir

@@ -31,7 +31,7 @@ func (p *claudeHistoryParser) flushPendingCall() error {
 	}
 	p.pending = nil
 	if c.hasUsage || c.isAPIError {
-		if err := p.appendToSegment(c.cwd, c.branch, c.subagent, p.makeAPIRequestRecord(c)); err != nil {
+		if err := p.appendToSegment(c.cwd, c.branch, p.makeAPIRequestRecord(c)); err != nil {
 			return err
 		}
 	}
@@ -41,15 +41,15 @@ func (p *claudeHistoryParser) flushPendingCall() error {
 		if ts.IsZero() {
 			ts = c.at
 		}
-		if err := p.appendToSegment(c.cwd, c.branch, c.subagent, p.makeAssistantResponseRecord(c, text, ts)); err != nil {
+		if err := p.appendToSegment(c.cwd, c.branch, p.makeAssistantResponseRecord(c, text, ts)); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (p *claudeHistoryParser) appendToSegment(cwd, branch string, subagent bool, lr *logspb.LogRecord) error {
-	if p.segStarted && (cwd != p.segCwd || subagent != p.segSubagent || (branch != "" && p.segBranch != "" && branch != p.segBranch)) {
+func (p *claudeHistoryParser) appendToSegment(cwd, branch string, lr *logspb.LogRecord) error {
+	if p.segStarted && (cwd != p.segCwd || (branch != "" && p.segBranch != "" && branch != p.segBranch)) {
 		if err := p.flushSegment(); err != nil {
 			return err
 		}
@@ -57,7 +57,6 @@ func (p *claudeHistoryParser) appendToSegment(cwd, branch string, subagent bool,
 	p.segStarted = true
 	p.segCwd = cwd
 	p.segBranch = cmp.Or(p.segBranch, branch)
-	p.segSubagent = subagent
 	p.segRecords = append(p.segRecords, lr)
 	if len(p.segRecords) >= claudeMaxSegRecords {
 		return p.flushSegment()
@@ -65,37 +64,18 @@ func (p *claudeHistoryParser) appendToSegment(cwd, branch string, subagent bool,
 	return nil
 }
 
-func (p *claudeHistoryParser) addReach(cwd, branch string, subagent bool, at time.Time, paths []string) error {
-	if p.segStarted && (cwd != p.segCwd || subagent != p.segSubagent || (branch != "" && p.segBranch != "" && branch != p.segBranch)) {
-		if err := p.flushSegment(); err != nil {
-			return err
-		}
-	}
-	p.segStarted = true
-	p.segCwd = cwd
-	p.segBranch = cmp.Or(p.segBranch, branch)
-	p.segSubagent = subagent
-	p.segReaches = append(p.segReaches, agents.HistoryToolReach{At: at, Cwd: cwd, Paths: paths})
-	return nil
-}
-
 func (p *claudeHistoryParser) flushSegment() error {
-	if len(p.segRecords) == 0 && len(p.segReaches) == 0 {
+	if len(p.segRecords) == 0 {
 		p.segStarted = false
 		p.segBranch = ""
-		p.segReaches = nil
 		return nil
 	}
 	recs := p.segRecords
-	reaches := p.segReaches
 	cwd := p.segCwd
 	branch := p.segBranch
-	subagent := p.segSubagent
 	p.segRecords = nil
-	p.segReaches = nil
 	p.segStarted = false
 	p.segBranch = ""
-	p.segSubagent = false
 	var logs *logspb.LogsData
 	if len(recs) > 0 {
 		resAttrs := []*commonpb.KeyValue{
@@ -121,8 +101,6 @@ func (p *claudeHistoryParser) flushSegment() error {
 		Cwd:            cwd,
 		FallbackBranch: branch,
 		NativeLogs:     logs,
-		ToolReaches:    reaches,
-		Subagent:       subagent,
 		RecordCount:    len(recs),
 	})
 }

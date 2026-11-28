@@ -115,7 +115,6 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
-	env.StartRun(in.id())
 	r, err := env.Repo(ctx)
 	if err != nil {
 		env.Logf("not in a git repository: %v", err)
@@ -156,7 +155,6 @@ func fileEdit(ctx context.Context, env hookrun.Env) error {
 	sess := session.Session{ID: in.id(), Tool: cursorTool, Model: in.Model}
 	r, err := env.Repo(ctx)
 	if err != nil {
-		env.Classify(ctx, nil, sess, []string{in.FilePath}, nil)
 		return nil
 	}
 	extra := map[string]any{}

@@ -133,7 +133,6 @@ func sessionStart(ctx context.Context, env hookrun.Env) error {
 		env.Logf("%v", err)
 		return nil
 	}
-	env.StartRun(in.SessionID)
 	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
 	if !ok {
 		return nil
@@ -225,8 +224,6 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	attrs := hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType)
 	r, err := env.Repo(ctx)
 	if err != nil {
-		candidates, _ := codexEditedPaths(in, env.Cwd)
-		env.Classify(ctx, nil, sess, candidates, attrs)
 		return nil
 	}
 	captureCodexFunding(ctx, env, r, in)
@@ -261,8 +258,7 @@ func postToolUse(ctx context.Context, env hookrun.Env) error {
 	return nil
 }
 
-// preToolUse classifies what a shell call is about to reach and records the files it writes
-// before its first commit so that commit is stamped.
+// preToolUse records the files a shell call writes before its first commit so that commit is stamped.
 func preToolUse(ctx context.Context, env hookrun.Env) error {
 	in, err := readCodexHookInput(env.Stdin)
 	if err != nil {
@@ -274,10 +270,6 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
 	sess := session.Session{ID: in.SessionID, Tool: codexTool, Model: in.Model}
-	var located *hookrun.Repo
-	if env.Routing != nil {
-		located = env.Classify(ctx, nil, sess, codexShellPaths(in, env.Cwd), hookrun.AgentAttrs(map[string]any{}, in.AgentID, in.AgentType))
-	}
 	paths, commits := codexEditedPaths(in, env.Cwd)
 	if len(commits) > 0 {
 		paths = paths[:commits[0]] // a write after a commit must not claim it
@@ -285,7 +277,7 @@ func preToolUse(ctx context.Context, env hookrun.Env) error {
 	if len(paths) == 0 {
 		return nil
 	}
-	r, err := env.RepoAt(ctx, located)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}
@@ -313,14 +305,6 @@ func codexEditedPaths(in *codexHookInput, cwd string) (paths []string, commits [
 		}
 	}
 	return append(out, applypatch.Paths(input.Command)...), nil
-}
-
-func codexShellPaths(in *codexHookInput, cwd string) []string {
-	var input struct{ Command string }
-	if in.ToolName != codexShellTool || json.Unmarshal(in.ToolInput, &input) != nil {
-		return nil
-	}
-	return hookrun.Alone(hookrun.ShellPaths(input.Command, cwd)...)
 }
 
 // codexShellTool is the tool_name Codex gives every shell call (exec_command and the rest).

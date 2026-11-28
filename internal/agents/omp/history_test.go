@@ -378,8 +378,8 @@ func TestOmpReadHistorySpansSupplementalDeterminismAndRedaction(t *testing.T) {
 
 	// Inspect subagent segment: resource parent ID, agent identity, supplemental session.start.
 	subSeg := segs1[1]
-	if !subSeg.Subagent || subSeg.SessionID != "sess-main" {
-		t.Errorf("subSeg flags = Subagent:%v SessionID:%q", subSeg.Subagent, subSeg.SessionID)
+	if subSeg.SessionID != "sess-main" {
+		t.Errorf("subSeg SessionID = %q, want sess-main", subSeg.SessionID)
 	}
 	subRS := subSeg.NativeTraces.ResourceSpans[0]
 	if got := kvStr(subRS.Resource.Attributes, semconv.TermaSessionParentIDKey); got != "sess-main" {
@@ -421,79 +421,15 @@ func TestOmpReadHistorySpansSupplementalDeterminismAndRedaction(t *testing.T) {
 	}
 }
 
-func TestOmpHistoricalToolReachAndWindowsPaths(t *testing.T) {
+func TestOmpWindowsParentSessionPaths(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "2026-11-20T10-00-00-000Z_reach1.jsonl")
-	jsonl := strings.Join([]string{
-		`{"type":"session","version":3,"id":"reach1","timestamp":"2026-11-20T10:00:00Z","cwd":"/work/repo","additionalDirectories":["/work/add-dir"]}`,
-		`{"type":"message","id":"u1","timestamp":"2026-11-20T10:00:01Z","message":{"role":"user","content":"check files","timestamp":1795168801000}}`,
-		`{"type":"message","id":"a1","timestamp":"2026-11-20T10:00:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","timestamp":1795168802000,"content":[` +
-			`{"type":"toolCall","id":"c1","name":"read","arguments":{"path":"/work/org-b/secret.txt"}},` +
-			`{"type":"toolCall","id":"c2","name":"grep","arguments":{"pattern":"foo","path":"/work/repo/a.go;/work/org-b/b.go"}},` +
-			`{"type":"toolCall","id":"c3","name":"find","arguments":{"pattern":"*.go","path":"/work/org-c"}},` +
-			`{"type":"toolCall","id":"c4","name":"ls","arguments":{"path":"/work/org-d"}},` +
-			`{"type":"toolCall","id":"c5","name":"bash","arguments":{"command":"cat /work/org-e/x.txt","cwd":"/work/repo"}},` +
-			`{"type":"toolCall","id":"c6","name":"write","arguments":{"path":"agent://ignore/me.txt","content":"x"}},` +
-			`{"type":"toolCall","id":"c7","name":"edit","arguments":{"path":"/work/repo/edit.go","diff":"*** Begin Patch\n*** Update File: /work/org-f/patched.go\n*** End Patch"}}` +
-			`]}}`,
-		`{"type":"message","id":"be1","timestamp":"2026-11-20T10:00:03Z","message":{"role":"bashExecution","command":"cat /work/org-g/y.txt","timestamp":1795168803000}}`,
-	}, "\n") + "\n"
-	if err := os.WriteFile(path, []byte(jsonl), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	var reaches []string
-	err := (Agent{}).ReadHistory(context.Background(), agents.HistoryFile{
-		SourceSystem: "omp",
-		SessionID:    "reach1",
-		Path:         path,
-	}, agents.HistoryReadOptions{}, func(seg agents.HistorySegment) error {
-		for _, r := range seg.ToolReaches {
-			for _, raw := range r.Paths {
-				// Strip the hookrun.Alone marker prefix when asserting extracted paths.
-				reaches = append(reaches, strings.TrimPrefix(raw, "\x00alone\x00"))
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, want := range []string{
-		"/work/add-dir",
-		"/work/org-b/secret.txt",
-		"/work/org-b/b.go",
-		"/work/org-c",
-		"/work/org-d",
-		"/work/org-e/x.txt",
-		"/work/org-f/patched.go",
-		"/work/org-g/y.txt",
-	} {
-		if !slices.Contains(reaches, want) {
-			t.Errorf("missing expected reach path %q in %v", want, reaches)
-		}
-	}
-	for _, got := range reaches {
-		if strings.HasPrefix(got, "agent://") {
-			t.Errorf("internal agent:// URL should not appear in tool reaches: %q", got)
-		}
-	}
-
-	// Windows drive-letter paths are preserved by nonURLPath and matched case-/slash-insensitively.
-	if got := nonURLPath(`C:\Users\dev\repo\a.go`); got != `C:\Users\dev\repo\a.go` {
-		t.Errorf("nonURLPath rejected Windows path: %q", got)
-	}
-	if got := nonURLPath("agent://worker/output.md"); got != "" {
-		t.Errorf("nonURLPath kept internal URL: %q", got)
-	}
 	if !sameParentSessionPath(`C:\Users\Dev\Sessions\Parent\0-sub.jsonl`, `C:\Users\Dev\Sessions\Parent.jsonl`, `c:/users/dev/sessions/parent.jsonl`, true) {
 		t.Errorf("sameParentSessionPath should match Windows paths case- and slash-insensitively")
 	}
 }
 
 func TestOmpCouncilRegressionCases(t *testing.T) {
-	// 1. Fork copied prefix is NOT re-emitted as spans, while copied tool reaches ARE retained;
+	// 1. Fork copied prefix is NOT re-emitted as spans;
 	// new entries after header.timestamp emit spans normally; oversized write args are bounded;
 	// updated systemPrompt re-emits; assistant without user starts at step 1.
 	dir := t.TempDir()
@@ -502,12 +438,12 @@ func TestOmpCouncilRegressionCases(t *testing.T) {
 	forkJSONL := strings.Join([]string{
 		`{"type":"session","version":3,"id":"forked","timestamp":"2026-11-21T10:00:00Z","cwd":"/work/repo","parentSession":"parent-id"}`,
 		`{"type":"session_init","id":"i0","timestamp":"2026-11-20T10:00:00Z","systemPrompt":"sys-v1"}`,
-		// Copied prefix (2026-11-20 < header 2026-11-21): must NOT emit spans, MUST keep reach.
+		// Copied prefix (2026-11-20 < header 2026-11-21): must NOT emit spans.
 		`{"type":"message","id":"old_u","timestamp":"2026-11-20T10:00:01Z","message":{"role":"user","content":"old prompt","timestamp":1795168801000}}`,
 		`{"type":"message","id":"old_a","timestamp":"2026-11-20T10:00:02Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","timestamp":1795168802000,"usage":{"input":99,"output":99},"content":[{"type":"toolCall","id":"old_c1","name":"read","arguments":{"path":"/work/org-b/copied.txt;/work/org-c/other.txt"}}]}}`,
 		`{"type":"message","id":"old_tr","timestamp":"2026-11-20T10:00:03Z","message":{"role":"toolResult","toolCallId":"old_c1","toolName":"read","content":[{"type":"text","text":"ok"}],"details":{"displayReadTargets":["/work/org-d/target.txt"]},"isError":false,"timestamp":1795168803000}}`,
 		`{"type":"model_usage","id":"old_mu","timestamp":"2026-11-20T10:00:04Z","purpose":"compaction","model":"claude-haiku-4-5","stopReason":"stop","usage":{"input":10,"output":5}}`,
-		// Post-fork entries (2026-11-21 >= header): assistant without user starts at step 1, oversized write args bounded, bash ~ cwd & edit move reach extracted.
+		// Post-fork entries (2026-11-21 >= header): assistant without user starts at step 1, oversized write args bounded.
 		`{"type":"message","id":"new_a1","timestamp":"2026-11-21T10:00:05Z","message":{"role":"assistant","model":"claude-sonnet-4-6","stopReason":"toolUse","duration":200,"timestamp":1795255205000,"usage":{"input":10,"output":20},"content":[{"type":"toolCall","id":"new_w1","name":"write","arguments":{"path":"/work/repo/big.txt","content":` + mustJSON(hugeBody) + `}},{"type":"toolCall","id":"new_b1","name":"bash","arguments":{"cwd":"~/org-e-repo","command":"ls"}},{"type":"toolCall","id":"new_e1","name":"edit","arguments":{"path":"/work/repo/a.go","move":"/work/org-f/b.go"}}]}}`,
 		`{"type":"message","id":"new_tr1","timestamp":"2026-11-21T10:00:06Z","message":{"role":"toolResult","toolCallId":"new_w1","toolName":"write","content":[{"type":"text","text":"wrote"}],"isError":false,"timestamp":1795255206000}}`,
 		// Updated system prompt on resume triggers a fresh gen_ai.system_instructions.
@@ -544,22 +480,6 @@ func TestOmpCouncilRegressionCases(t *testing.T) {
 	}
 	if !strings.Contains(spStr(spans[2], "gen_ai.system_instructions"), "sys-v2") {
 		t.Errorf("updated systemPrompt was not emitted on subsequent chat span")
-	}
-	var reaches []string
-	for _, r := range segs[0].ToolReaches {
-		for _, p := range r.Paths {
-			reaches = append(reaches, strings.TrimPrefix(p, "\x00alone\x00"))
-		}
-	}
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	wantHomeRepo := filepath.Join(homeDir, "org-e-repo")
-	for _, want := range []string{"/work/org-b/copied.txt", "/work/org-c/other.txt", "/work/org-d/target.txt", wantHomeRepo, "/work/org-f/b.go"} {
-		if !slices.Contains(reaches, want) {
-			t.Errorf("missing expected reach %q in %v", want, reaches)
-		}
 	}
 
 	// 2. XDG_DATA_HOME discovery + SeenWatchFiles for stale copied subagents.
@@ -636,40 +556,27 @@ func TestOmpCouncilRegressionCases(t *testing.T) {
 	}
 
 	// 4. Local file:// decoding, OMP path aliases (@, :, quotes, \\?\), remote file:// fail-closed,
-	// deleted whitespace-split selectors, and ompParentSessionID filename-first & non-regular-path safety.
-	if got := nonURLPath("file:///work/org-b/plan%201.md"); got != "/work/org-b/plan 1.md" {
-		t.Errorf("nonURLPath(file://) = %q", got)
+	// and ompParentSessionID filename-first & non-regular-path safety.
+	if got, unk := decodeOmpPath("file:///work/org-b/plan%201.md"); unk || got != "/work/org-b/plan 1.md" {
+		t.Errorf("decodeOmpPath(file://) = (%q, %v)", got, unk)
 	}
-	if got := nonURLPath("file:///C:/Users/dev/a.go"); got != "C:/Users/dev/a.go" {
-		t.Errorf("nonURLPath(windows file://) = %q", got)
+	if got, unk := decodeOmpPath("file:///C:/Users/dev/a.go"); unk || got != "C:/Users/dev/a.go" {
+		t.Errorf("decodeOmpPath(windows file://) = (%q, %v)", got, unk)
 	}
-	if got, unk := resolveReachPath("@/work/org-b/plan.md"); unk || got != "/work/org-b/plan.md" {
-		t.Errorf("resolveReachPath(@/...) = (%q, %v)", got, unk)
+	if got, unk := resolveOmpPath("@/work/org-b/plan.md"); unk || got != "/work/org-b/plan.md" {
+		t.Errorf("resolveOmpPath(@/...) = (%q, %v)", got, unk)
 	}
-	if got, unk := resolveReachPath(":/work/org-b/plan.md"); unk || got != "/work/org-b/plan.md" {
-		t.Errorf("resolveReachPath(:/...) = (%q, %v)", got, unk)
+	if got, unk := resolveOmpPath(":/work/org-b/plan.md"); unk || got != "/work/org-b/plan.md" {
+		t.Errorf("resolveOmpPath(:/...) = (%q, %v)", got, unk)
 	}
-	if got, unk := resolveReachPath(`"/work/org-b/plan.md"`); unk || got != "/work/org-b/plan.md" {
-		t.Errorf("resolveReachPath(quoted) = (%q, %v)", got, unk)
+	if got, unk := resolveOmpPath(`"/work/org-b/plan.md"`); unk || got != "/work/org-b/plan.md" {
+		t.Errorf("resolveOmpPath(quoted) = (%q, %v)", got, unk)
 	}
-	if got, unk := resolveReachPath("@my-file.txt"); unk || got != "@my-file.txt" {
-		t.Errorf("resolveReachPath(@my-file.txt) = (%q, %v), want literal preserved", got, unk)
+	if got, unk := resolveOmpPath("@my-file.txt"); unk || got != "@my-file.txt" {
+		t.Errorf("resolveOmpPath(@my-file.txt) = (%q, %v), want literal preserved", got, unk)
 	}
-	if _, unk := resolveReachPath("file://server/share/secret.txt"); !unk {
-		t.Errorf("resolveReachPath(remote file://) should fail closed with unknown=true")
-	}
-	if got := stripPathSelector("/work/org-b/a.txt:1-2,5-6"); got != "/work/org-b/a.txt" {
-		t.Errorf("stripPathSelector(multi-range) = %q", got)
-	}
-	if got := stripPathSelector("/work/org-b/a.txt:-60"); got != "/work/org-b/a.txt" {
-		t.Errorf("stripPathSelector(tail) = %q", got)
-	}
-	if got := stripPathSelector("/work/org-b/a.txt:raw"); got != "/work/org-b/a.txt" {
-		t.Errorf("stripPathSelector(raw) = %q", got)
-	}
-	wsDeleted := splitOmpDelimitedPaths("missing-a.txt:1-2 /work/org-b/missing-b.txt:1-2", dir)
-	if !slices.Contains(wsDeleted, "/work/org-b/missing-b.txt:1-2") {
-		t.Errorf("splitOmpDelimitedPaths(deleted) = %v, want /work/org-b/missing-b.txt:1-2", wsDeleted)
+	if _, unk := resolveOmpPath("file://server/share/secret.txt"); !unk {
+		t.Errorf("resolveOmpPath(remote file://) should fail closed with unknown=true")
 	}
 	if got := ompParentSessionID("2026-11-20T10-00-00-000Z_parent1.jsonl"); got != "parent1" {
 		t.Errorf("ompParentSessionID(bare filename) = %q, want parent1", got)
@@ -680,34 +587,7 @@ func TestOmpCouncilRegressionCases(t *testing.T) {
 }
 
 func TestOmpRound6SecurityRegressions(t *testing.T) {
-	dir := t.TempDir()
-
-	// 1. ast_edit, lsp, security_scan, eval tool reach extraction + semicolon-split glob.pattern.
-	astEditPaths := ompToolCallReachPaths("ast_edit", json.RawMessage(`{"ops":[{"pat":"a","out":"b"}],"paths":["/work/org-b/repo/a.ts","../../org-c/**/*.ts"]}`), "/work/org-a/repo")
-	if !slices.Contains(astEditPaths, "/work/org-b/repo/a.ts") {
-		t.Errorf("ast_edit missing /work/org-b/repo/a.ts: %v", astEditPaths)
-	}
-	if !slices.Contains(astEditPaths, "/work/org-c") {
-		t.Errorf("ast_edit glob path missing /work/org-c: %v", astEditPaths)
-	}
-	globPaths := ompToolCallReachPaths("glob", json.RawMessage(`{"pattern":"*.go;/work/org-b/*.ts"}`), "/work/org-a/repo")
-	if !slices.Contains(globPaths, "/work/org-b") {
-		t.Errorf("glob semicolon pattern missing /work/org-b: %v", globPaths)
-	}
-	lspPaths := ompToolCallReachPaths("lsp", json.RawMessage(`{"action":"rename_file","file":"/work/org-a/a.go","new_name":"/work/org-b/b.go"}`), "/work/org-a/repo")
-	if !slices.ContainsFunc(lspPaths, func(s string) bool { return strings.HasSuffix(s, "/work/org-b/b.go") }) {
-		t.Errorf("lsp rename_file missing destination reach: %v", lspPaths)
-	}
-	scanPaths := ompToolCallReachPaths("security_scan", json.RawMessage(`{"include_paths":["/work/org-b/src"]}`), "/work/org-a/repo")
-	if !slices.ContainsFunc(scanPaths, func(s string) bool { return strings.HasSuffix(s, "/work/org-b/src") }) {
-		t.Errorf("security_scan missing include_paths reach: %v", scanPaths)
-	}
-	evalPaths := ompToolCallReachPaths("eval", json.RawMessage(`{"language":"py","code":"print(1)"}`), "/work/org-a/repo")
-	if !slices.ContainsFunc(evalPaths, func(s string) bool { return strings.HasPrefix(s, "\x00unknown\x00") }) {
-		t.Errorf("eval should fail closed with UnknownReach: %v", evalPaths)
-	}
-
-	// 2. @../, @./, @.., and quotes after @ / :.
+	// 1. @../, @./, @.., and quotes after @ / :.
 	for _, tc := range []struct{ in, want string }{
 		{"@../org-b/secret.txt", "../org-b/secret.txt"},
 		{"@./../org-b/secret.txt", "./../org-b/secret.txt"},
@@ -716,39 +596,23 @@ func TestOmpRound6SecurityRegressions(t *testing.T) {
 		{`:"/work/org-b/secret.txt"`, "/work/org-b/secret.txt"},
 		{"@scope/pkg", "@scope/pkg"},
 	} {
-		if got, unk := resolveReachPath(tc.in); unk || got != tc.want {
-			t.Errorf("resolveReachPath(%q) = (%q, %v), want (%q, false)", tc.in, got, unk, tc.want)
+		if got, unk := resolveOmpPath(tc.in); unk || got != tc.want {
+			t.Errorf("resolveOmpPath(%q) = (%q, %v), want (%q, false)", tc.in, got, unk, tc.want)
 		}
 	}
 
-	// 3. Windows drive / UNC paths fail closed on non-Windows hosts instead of joining under cwd.
+	// 2. Windows drive / UNC paths fail closed on non-Windows hosts instead of joining under cwd.
 	if runtime.GOOS != "windows" {
 		t.Setenv("WSL_DISTRO_NAME", "")
 		t.Setenv("WSL_INTEROP", "")
 		for _, winPath := range []string{`C:/work/org-b/file.ts`, `C:\work\org-b\file.ts`, `\\server\share\file.ts`} {
-			if _, unk := resolveReachPath(winPath); !unk {
-				t.Errorf("resolveReachPath(%q) on %s should fail closed with unknown=true", winPath, runtime.GOOS)
+			if _, unk := resolveOmpPath(winPath); !unk {
+				t.Errorf("resolveOmpPath(%q) on %s should fail closed with unknown=true", winPath, runtime.GOOS)
 			}
 		}
 	}
 
-	// 4. Spaced enclosing directory keeps deleted absolute path whole while still splitting multi-target calls.
-	spacedRepo := filepath.Join(dir, "My Projects", "repo-a")
-	if err := os.MkdirAll(spacedRepo, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	deletedInSpaced := filepath.Join(spacedRepo, "deleted.go")
-	if got := splitOmpDelimitedPaths(deletedInSpaced, spacedRepo); !slices.Equal(got, []string{deletedInSpaced}) {
-		t.Errorf("splitOmpDelimitedPaths(deleted in spaced dir) = %v, want [%q]", got, deletedInSpaced)
-	}
-	if got := splitOmpDelimitedPaths(deletedInSpaced+" /work/org-b/b.go", spacedRepo); !slices.Contains(got, "/work/org-b/b.go") {
-		t.Errorf("splitOmpDelimitedPaths(spaced + orgB) = %v, want /work/org-b/b.go", got)
-	}
-	if got := splitOmpDelimitedPaths("local.txt ~", spacedRepo); !slices.Contains(got, "~") {
-		t.Errorf("splitOmpDelimitedPaths(local.txt ~) = %v, want ~", got)
-	}
-
-	// 5. Oversized (> 1 MiB) session header returns an error from peekOmpSessionHeader and fails closed in DiscoverHistory.
+	// 3. Oversized (> 1 MiB) session header returns an error from peekOmpSessionHeader and fails closed in DiscoverHistory.
 	agentDir := t.TempDir()
 	t.Setenv("PI_CODING_AGENT_DIR", agentDir)
 	projDir := filepath.Join(agentDir, "sessions", "--work-repo--")
@@ -764,7 +628,7 @@ func TestOmpRound6SecurityRegressions(t *testing.T) {
 		t.Errorf("peekOmpSessionHeader should return error when 1 MiB cap is exhausted without session header")
 	}
 
-	// 6. Subagent recursion past depth 8 fails closed with CompanionReadError when a depth-9 .jsonl exists,
+	// 4. Subagent recursion past depth 8 fails closed with CompanionReadError when a depth-9 .jsonl exists,
 	// while a depth-8 leaf without deeper transcripts stays clean.
 	writeChain := func(rootName, rootID string, totalDepth int) {
 		parentPath := filepath.Join(projDir, rootName+".jsonl")
@@ -890,96 +754,21 @@ func TestOmpChangesJournalSidecar(t *testing.T) {
 	}
 }
 
-func TestOmpEvalFailClosedAndEmbeddedSearchGlobs(t *testing.T) {
+func TestOmpURLsChangesJournalAndForks(t *testing.T) {
 	cwd := t.TempDir()
-	hasUnknown := func(paths []string) bool {
-		return slices.ContainsFunc(paths, func(p string) bool { return strings.HasPrefix(p, "\x00unknown\x00") })
-	}
 
-	// 1. eval executes arbitrary Python/JS code and must always emit UnknownReach.
-	for _, raw := range []json.RawMessage{
-		json.RawMessage(`{"language":"py","code":"print(open('/work/org-b/secret.txt').read())"}`),
-		json.RawMessage(`{"language":"js","code":"console.log(1)"}`),
-		nil,
-		json.RawMessage(`{invalid`),
-	} {
-		got := ompToolCallReachPaths("eval", raw, cwd)
-		if !hasUnknown(got) {
-			t.Errorf("eval(%s) = %v, want UnknownReach", string(raw), got)
-		}
-	}
-
-	// 2. Embedded globs in search path/paths split to (baseDir, embeddedGlob) matching OMP's parseSearchPath.
-	if got := ompToolCallReachPaths("grep", json.RawMessage(`{"pattern":"x","path":"**/*.txt"}`), cwd); !slices.Contains(got, cwd) {
-		t.Errorf("grep path=**/*.txt = %v, want cwd %q so ExpandReachHistorical walks nested checkouts", got, cwd)
-	}
-	wantSafe := filepath.Join(cwd, "safe")
-	if got := ompToolCallReachPaths("grep", json.RawMessage(`{"pattern":"x","path":"safe/*.txt"}`), cwd); !slices.Equal(got, []string{wantSafe}) {
-		t.Errorf("grep path=safe/*.txt = %v, want [%q]", got, wantSafe)
-	}
-	wantSub := filepath.Join(cwd, "sub")
-	if got := ompToolCallReachPaths("grep", json.RawMessage(`{"pattern":"x","path":"sub/**/*.txt"}`), cwd); !slices.Equal(got, []string{wantSub}) {
-		t.Errorf("grep path=sub/**/*.txt = %v, want [%q]", got, wantSub)
-	}
-	wantRelB := filepath.Clean(filepath.Join(cwd, "..", "org-b"))
-	if got := ompToolCallReachPaths("grep", json.RawMessage(`{"pattern":"x","path":"../org-b/*.txt"}`), cwd); !slices.Contains(got, wantRelB) {
-		t.Errorf("grep path=../org-b/*.txt = %v, want %q", got, wantRelB)
-	}
-	if got := ompToolCallReachPaths("grep", json.RawMessage(`{"pattern":"x","path":"/abs/root/**/*.txt"}`), cwd); !slices.Contains(got, filepath.FromSlash("/abs/root")) {
-		t.Errorf("grep path=/abs/root/**/*.txt = %v, want /abs/root", got)
-	}
-	if got := ompToolCallReachPaths("grep", json.RawMessage(`{"pattern":"x","path":"{safe,../org-b}/*.txt"}`), cwd); !slices.Contains(got, wantRelB) {
-		t.Errorf("grep path={safe,../org-b}/*.txt = %v, want %q", got, wantRelB)
-	}
-	for _, failClosedPath := range []string{"/*/*.txt", "/**/*.txt", "{a,{b,c}}/*.txt"} {
-		raw := json.RawMessage(`{"pattern":"x","path":` + mustJSON(failClosedPath) + `}`)
-		if got := ompToolCallReachPaths("grep", raw, cwd); !hasUnknown(got) {
-			t.Errorf("grep path=%q = %v, want UnknownReach", failClosedPath, got)
-		}
-	}
-
-	// Literal directory/file containing glob metacharacters (e.g. apps/[id]/page.tsx) stays literal.
-	litFile := filepath.Join(cwd, "apps", "[id]", "page.tsx")
-	if err := os.MkdirAll(filepath.Dir(litFile), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(litFile, []byte("export default 1\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if got := ompToolCallReachPaths("grep", json.RawMessage(`{"pattern":"x","path":"apps/[id]/page.tsx"}`), cwd); !slices.Equal(got, []string{"apps/[id]/page.tsx"}) {
-		t.Errorf("literal existing path with brackets = %v, want [apps/[id]/page.tsx]", got)
-	}
-
-	// 3. Round 7 blockers & should: debug fail-closed, ssh:// fail-closed, backslash glob paths
-	// on Linux/WSL, Changes.jsonl vs changes.jsonl content check, and multi-level spaced dirs.
-	if got := ompToolCallReachPaths("debug", json.RawMessage(`{"action":"launch","cwd":"/work/org-b","program":"app"}`), cwd); !hasUnknown(got) {
-		t.Errorf("debug should fail closed with UnknownReach: %v", got)
-	}
-	if _, unk := resolveReachPath("ssh://client-host/work/repo/README.md"); !unk {
+	// 1. ssh:// and other unknown schemes fail closed; OMP's internal URLs resolve to nothing.
+	if _, unk := resolveOmpPath("ssh://client-host/work/repo/README.md"); !unk {
 		t.Errorf("ssh:// URI should fail closed with unknown=true")
 	}
-	if _, unk := resolveReachPath("vault://notes/secret.md"); !unk {
+	if _, unk := resolveOmpPath("vault://notes/secret.md"); !unk {
 		t.Errorf("vault:// URI should fail closed with unknown=true")
 	}
-	if got, unk := resolveReachPath("agent://worker/out.md"); unk || got != "" {
+	if got, unk := resolveOmpPath("agent://worker/out.md"); unk || got != "" {
 		t.Errorf("agent:// URI should be safely ignored, got (%q, %v)", got, unk)
 	}
-	if got := ompToolCallReachPaths("glob", json.RawMessage(`{"path":"..\\org-b\\*.go"}`), cwd); !slices.Contains(got, wantRelB) {
-		t.Errorf("backslash glob path ..\\org-b\\*.go = %v, want %q", got, wantRelB)
-	}
-	// Multi-level glob and deleted subdir under a spaced parent directory stay unsplit.
-	spacedRoot := filepath.Join(cwd, "My Projects", "org-a", "repo")
-	if err := os.MkdirAll(filepath.Join(spacedRoot, "src"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	spacedGlob := filepath.Join(spacedRoot, "src", "**", "*.go")
-	if got := splitOmpDelimitedPaths(spacedGlob, spacedRoot); !slices.Equal(got, []string{spacedGlob}) {
-		t.Errorf("splitOmpDelimitedPaths(spaced multi-level glob) = %v, want [%q]", got, spacedGlob)
-	}
-	spacedDeletedSub := filepath.Join(spacedRoot, "old-dir", "file.go")
-	if got := splitOmpDelimitedPaths(spacedDeletedSub, spacedRoot); !slices.Equal(got, []string{spacedDeletedSub}) {
-		t.Errorf("splitOmpDelimitedPaths(spaced deleted subdir) = %v, want [%q]", got, spacedDeletedSub)
-	}
+
+	// 2. Changes.jsonl vs changes.jsonl content check.
 	// Changes.jsonl (task subagent named Changes) is NOT exempted even alongside changes.jsonl.
 	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
 		subDir := filepath.Join(cwd, "sub-case")
@@ -1012,31 +801,12 @@ func TestOmpEvalFailClosedAndEmbeddedSearchGlobs(t *testing.T) {
 		t.Errorf("empty 0-byte changes.jsonl must not be exempted")
 	}
 
-	// 4. Round 8 fixes: !negation path fallback to cwd, generate_image input[].path,
-	// backslash normalization in glob.pattern, browser/computer/tts, and /tan bare parentSession ID.
-	if got := ompToolCallReachPaths("grep", json.RawMessage(`{"pattern":"secret","path":"!vendor"}`), cwd); !slices.Contains(got, cwd) {
-		t.Errorf("grep path=!vendor = %v, want fallback to cwd %q", got, cwd)
-	}
-	if got := ompToolCallReachPaths("glob", json.RawMessage(`{"pattern":"..\\org-b\\*.txt"}`), cwd); !slices.Contains(got, wantRelB) {
-		t.Errorf("glob pattern=..\\org-b\\*.txt = %v, want %q", got, wantRelB)
-	}
-	if got := ompToolCallReachPaths("generate_image", json.RawMessage(`{"subject":"edit","input":[{"path":"/work/org-b/ref.png"}]}`), cwd); !slices.ContainsFunc(got, func(s string) bool { return strings.HasSuffix(s, "/work/org-b/ref.png") }) {
-		t.Errorf("generate_image input[].path = %v, want /work/org-b/ref.png", got)
-	}
-	if got := ompToolCallReachPaths("tts", json.RawMessage(`{"output_path":"/work/org-b/out.mp3"}`), cwd); !slices.ContainsFunc(got, func(s string) bool { return strings.HasSuffix(s, "/work/org-b/out.mp3") }) {
-		t.Errorf("tts output_path = %v, want /work/org-b/out.mp3", got)
-	}
-	for _, tool := range []string{"browser", "computer", "run_code", "python"} {
-		if got := ompToolCallReachPaths(tool, json.RawMessage(`{}`), cwd); !hasUnknown(got) {
-			t.Errorf("%s should fail closed with UnknownReach, got %v", tool, got)
-		}
-	}
+	// 3. /tan bare parentSession ID.
 	if !matchesParentSession(filepath.Join(cwd, "p", "tan-1.jsonl"), filepath.Join(cwd, "p.jsonl"), "parent-123", "parent-123", false) {
 		t.Errorf("matchesParentSession should match bare parent session ID for /tan children")
 	}
 
-	// 5. Round 9 fixes: top-level /fork with bare parent ID stays non-subagent (emits title, no session.start),
-	// and read on a directory emits non-Alone directory reach so nested checkouts are walked.
+	// 4. Top-level /fork with bare parent ID stays non-subagent (emits title, no session.start).
 	agentDir := t.TempDir()
 	t.Setenv("PI_CODING_AGENT_DIR", agentDir)
 	projDir := filepath.Join(agentDir, "sessions", "--work-repo--")
@@ -1067,9 +837,6 @@ func TestOmpEvalFailClosedAndEmbeddedSearchGlobs(t *testing.T) {
 	}
 	var gotTitle, gotStart bool
 	if err := (Agent{}).ReadHistory(context.Background(), forkHF, agents.HistoryReadOptions{IncludeSupplemental: true}, func(seg agents.HistorySegment) error {
-		if seg.Subagent {
-			t.Errorf("top-level /fork emitted Subagent=true")
-		}
 		for _, lr := range collectLogRecords(seg.SupplementalLogs) {
 			if lr.GetEventName() == semconv.TermaSessionTitleEvent {
 				gotTitle = true
@@ -1084,15 +851,6 @@ func TestOmpEvalFailClosedAndEmbeddedSearchGlobs(t *testing.T) {
 	}
 	if !gotTitle || gotStart {
 		t.Errorf("top-level /fork supplemental logs: gotTitle=%v gotStart=%v, want true/false", gotTitle, gotStart)
-	}
-
-	readDirCall := ompToolCallReachPaths("read", json.RawMessage(`{"path":"."}`), cwd)
-	if !slices.Contains(readDirCall, ".") {
-		t.Errorf("read on directory '.' should emit non-Alone directory reach '.', got %v", readDirCall)
-	}
-	readDirRes := ompToolResultReachPaths("read", &ompToolDetails{ResolvedPath: cwd, IsDirectory: true}, cwd)
-	if !slices.Contains(readDirRes, cwd) {
-		t.Errorf("read result with isDirectory=true should emit non-Alone reach %q, got %v", cwd, readDirRes)
 	}
 }
 
@@ -1253,5 +1011,39 @@ func TestOmpDiscoverHistoryRelocatedSessionsAndLocalFiles(t *testing.T) {
 	}
 	if sameParentSessionPath("/n/--r--/2026-11-21T10-00-00-000Z_f1/0-a.jsonl", "/n/--r--/2026-11-21T10-00-00-000Z_f1.jsonl", "/o/--r--/2026-11-20T10-00-00-000Z_s1.jsonl", false) {
 		t.Errorf("sameParentSessionPath matched another session's transcript")
+	}
+}
+
+func TestOmpMovedSessionClearsCwd(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "2026-11-20T10-00-00-000Z_moved-sess.jsonl")
+	body := strings.Join([]string{
+		`{"type":"session","version":3,"id":"moved-sess","timestamp":"2026-11-20T10:00:00Z","cwd":"/work/org-b/repo","previousSessionFiles":["/home/u/.omp/agent/sessions/--work-org-a-repo--/2026-11-20T09-00-00-000Z_moved-sess.jsonl"]}`,
+		`{"type":"message","id":"u1","timestamp":"2026-11-20T10:00:01Z","message":{"role":"user","content":"org-a secret prompt"}}`,
+		`{"type":"message","id":"a1","timestamp":"2026-11-20T10:00:02Z","message":{"role":"assistant","model":"claude-sonnet-4","provider":"anthropic","content":[{"type":"text","text":"reply"}],"usage":{"input":10,"output":5,"totalTokens":15},"stopReason":"stop"}}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var segs []agents.HistorySegment
+	err := Agent{}.ReadHistory(context.Background(), agents.HistoryFile{
+		SourceSystem: ompSourceSystem,
+		SessionID:    "moved-sess",
+		Path:         path,
+	}, agents.HistoryReadOptions{IncludeSupplemental: true}, func(seg agents.HistorySegment) error {
+		segs = append(segs, seg)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(segs) == 0 {
+		t.Fatal("expected at least one segment from moved transcript")
+	}
+	for i, seg := range segs {
+		if seg.Cwd != "" {
+			t.Errorf("segment %d Cwd = %q, want empty so moved transcript is skipped as no_cwd", i, seg.Cwd)
+		}
 	}
 }

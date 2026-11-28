@@ -13,11 +13,8 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/gitx"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/relay"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 )
 
 type fileSnapshot struct {
@@ -218,22 +215,6 @@ func buildStampOptions(opts Options, target RouteTarget, userIDFor func(routing.
 	}
 }
 
-func newRunSnapLookup(stateDir, sessionID string) (runs.Snapshot, func(string) runs.Snapshot) {
-	mainSnap := runs.Read(stateDir, sessionID)
-	subSnaps := map[string]runs.Snapshot{}
-	return mainSnap, func(id string) runs.Snapshot {
-		if id == sessionID {
-			return mainSnap
-		}
-		if s, ok := subSnaps[id]; ok {
-			return s
-		}
-		s := runs.Read(stateDir, id)
-		subSnaps[id] = s
-		return s
-	}
-}
-
 func sortedPlans(m map[string]*routeSessionPlan) []*routeSessionPlan {
 	out := make([]*routeSessionPlan, 0, len(m))
 	for _, sp := range m {
@@ -262,12 +243,9 @@ func measureDryRunSession(
 	resolver *cwdResolver,
 	existingStates map[string]RouteState,
 	resumableByRoute map[string]map[string]bool,
-	reachMixedAt time.Time,
-	hasReachMixed bool,
 	userIDFor func(routing.Team, string) string,
 	sum *Summary,
 ) (map[string]dryRunRouteEst, error) {
-	snap, lookup := newRunSnapLookup(opts.StateDir, f.SessionID)
 	byRoute := map[string]dryRunRouteEst{}
 	// Chunk each route's batches as the upload would, so the estimate counts request
 	// bodies and a record over the request limit leaves the session out of that route.
@@ -321,14 +299,9 @@ func measureDryRunSession(
 		if prev, ok := st.InProgress[key]; ok && !prev.SourceModTime.IsZero() && f.ModTime.After(prev.SourceModTime) {
 			resumeMax = prev.SourceModTime
 		}
-		prepared, n, mixedDropped := prepareSegmentFiltered(seg, opts.Filter, target.Team.Policy, buildStampOptions(opts, target, userIDFor), snap, lookup, reachMixedAt, hasReachMixed, resumeMax)
-		sum.WithheldRecords += mixedDropped
+		prepared, n := prepareSegmentForUpload(seg, opts.Filter, target.Team.Policy, buildStampOptions(opts, target, userIDFor), resumeMax)
 		if n == 0 || prepared.Empty() {
-			if mixedDropped > 0 {
-				sum.addSkippedSegment(SkipMixed, 1)
-			} else {
-				sum.addSkippedSegment(SkipEmptyAfterFilter, 1)
-			}
+			sum.addSkippedSegment(SkipEmptyAfterFilter, 1)
 			return nil
 		}
 		cur := byRoute[eid]
@@ -356,91 +329,4 @@ func measureDryRunSession(
 		sum.addSkippedSession(SkipRecordTooLarge, 1)
 	}
 	return byRoute, nil
-}
-
-// classifyReachedPath classifies a reached path without spawning git subprocesses.
-// Uses gitx.LocateFS so deleted subdirectories inside an existing checkout still resolve
-// to their enclosing repository (baseRoot, the segment's own checkout root, counts as
-// nobody's), while any other missing path outside nobody's directories fails closed
-// (unknown=true), even under a working directory outside git: a deleted organization
-// repository there must not read as the developer's own folder.
-func classifyReachedPath(cand, baseRoot string) reachedClass {
-	info, statErr := os.Stat(cand)
-	if statErr == nil {
-		dir := cand
-		if !info.IsDir() {
-			dir = filepath.Dir(cand)
-		}
-		if _, gitDir, ok := gitx.LocateFS(dir); ok && gitDir != "" {
-			if origin, _ := gitx.OriginFS(gitDir); routing.Owner(origin) != "" {
-				return reachedClass{loc: routing.Location{Kind: routing.Repository, Repository: origin}}
-			}
-		} else if _, _, place := gitx.PlaceFolderFS(dir); place == gitx.Unplaced {
-			// A .git marker that does not resolve (a stale linked worktree whose main
-			// repository moved or was deleted): whose checkout this was is not known.
-			return reachedClass{unknown: true}
-		}
-		if hookrun.IsNobodyDir(dir) {
-			return reachedClass{nobody: true}
-		}
-		return reachedClass{loc: routing.Location{Kind: routing.OutsideGit}}
-	}
-	if root, gitDir, ok := gitx.LocateFS(cand); ok && gitDir != "" {
-		if linkLeavesRoot(cand, root) {
-			return reachedClass{unknown: true}
-		}
-		if baseRoot != "" && sameCleanPath(root, baseRoot) {
-			return reachedClass{nobody: true}
-		}
-		if origin, _ := gitx.OriginFS(gitDir); routing.Owner(origin) != "" {
-			return reachedClass{loc: routing.Location{Kind: routing.Repository, Repository: origin}}
-		}
-	}
-	// IsNobodyDir goes by name, so it covers a missing path under /tmp or /etc. The parent
-	// is not asked: the parent of a deleted top-level directory is "/", which is nobody's.
-	if hookrun.IsNobodyDir(cand) {
-		return reachedClass{nobody: true}
-	}
-	return reachedClass{unknown: true}
-}
-
-// linkLeavesRoot reports whether a missing path, which LocateFS placed in root by its name,
-// passes on the way through a symlink that does not resolve or resolves outside root: where
-// the path led is then not root's to say.
-func linkLeavesRoot(cand, root string) bool {
-	realRoot, err := filepath.EvalSymlinks(root)
-	rel, relErr := filepath.Rel(root, cand)
-	if err != nil || relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return true
-	}
-	cur := root
-	for part := range strings.SplitSeq(rel, string(filepath.Separator)) {
-		cur = filepath.Join(cur, part)
-		fi, err := os.Lstat(cur)
-		if errors.Is(err, fs.ErrNotExist) {
-			return false
-		} else if err != nil {
-			return true
-		} else if fi.Mode()&fs.ModeSymlink == 0 {
-			continue
-		}
-		target, err := filepath.EvalSymlinks(cur)
-		if err != nil {
-			return true
-		}
-		if in, err := filepath.Rel(realRoot, target); err != nil || in == ".." || strings.HasPrefix(in, ".."+string(filepath.Separator)) {
-			return true
-		}
-	}
-	return false
-}
-
-func sameCleanPath(a, b string) bool {
-	ca, cb := filepath.Clean(a), filepath.Clean(b)
-	if ca == cb {
-		return true
-	}
-	ra, ea := filepath.EvalSymlinks(ca)
-	rb, eb := filepath.EvalSymlinks(cb)
-	return ea == nil && eb == nil && ra == rb
 }

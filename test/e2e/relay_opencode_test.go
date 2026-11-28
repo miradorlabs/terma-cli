@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -185,25 +184,6 @@ func openCodeRelayIn(sb *Sandbox, b Binary, content bool, scripted func(sb *Sand
 	sb.UseOpenCode(b)
 	sb.UseRelay(RelayOptions{Start: true, Content: content})
 	return sb
-}
-
-// paused reports whether terma holds session's run in force as Mixed: its run ledger in
-// the state folder, which doctor counts but no longer lists by session.
-func (sb *Sandbox) paused(session string) bool {
-	sb.T.Helper()
-	data, err := os.ReadFile(filepath.Join(sb.TermaConfig, "runs", session+".json"))
-	if err != nil {
-		return false
-	}
-	var ledger struct {
-		Runs []struct {
-			MixedAt time.Time `json:"mixed_at"`
-		} `json:"runs"`
-	}
-	if json.Unmarshal(data, &ledger) != nil || len(ledger.Runs) == 0 {
-		return false
-	}
-	return !ledger.Runs[len(ledger.Runs)-1].MixedAt.IsZero()
 }
 
 // finishOpenCode stops the relay and fails a scenario whose withheld content met a key no
@@ -464,48 +444,6 @@ func TestOpenCodeResume(t *testing.T) {
 	})
 }
 
-// A session paused by a shell call terma cannot place, then resumed in two more processes:
-// the prompt that resumes it and its reply arrive, and so does the next, while nothing of
-// the paused part does. The resuming process claims the session in a new, clean run.
-func TestOpenCodeResumeAfterPause(t *testing.T) {
-	forEachOpenCode(t, func(t *testing.T, b Binary, _ bool) {
-		sb := openCodeRelay(t, b, true, func(sb *Sandbox) []openCodeStep {
-			return []openCodeStep{
-				{text: "TERMA_FIRST_REPLY"},
-				{calls: []openCodeCall{openCodeCallFor(b, "call_cd", openCodeIntent{shell: `cd "$(cat where.txt)" && ls`, description: "a cd terma cannot place"})}},
-				{text: "TERMA_PAUSED_REPLY"},
-				{text: "TERMA_RESUMED_REPLY"},
-				{text: "TERMA_AGAIN_REPLY"},
-			}
-		})
-		sb.writeAbs(filepath.Join(sb.Repo, "where.txt"), sb.Repo+"\n")
-		sid := sb.OpenCodeRun(b, sb.Repo, "", "TERMA_FIRST_PROMPT")
-		sb.OpenCodeRun(b, sb.Repo, sid, "TERMA_PAUSING_PROMPT")
-		if !sb.paused(sid) {
-			t.Fatalf("the shell call did not pause session %s", sid)
-		}
-		sb.OpenCodeRun(b, sb.Repo, sid, "TERMA_RESUMED_PROMPT")
-		sb.OpenCodeRun(b, sb.Repo, sid, "TERMA_AGAIN_PROMPT")
-		var e telemetryEvidence
-		waitUntil(45*time.Second, func() bool {
-			e = sb.Receiver.evidence()
-			return len(leakedFieldsOf(e, "TERMA_AGAIN_REPLY")) > 0
-		})
-		// What would leak of the paused part arrives a little later, if at all: give it the time.
-		time.Sleep(5 * time.Second)
-		e = sb.Receiver.evidence()
-		for _, m := range []string{"TERMA_FIRST_PROMPT", "TERMA_RESUMED_PROMPT", "TERMA_RESUMED_REPLY", "TERMA_AGAIN_PROMPT", "TERMA_AGAIN_REPLY"} {
-			if len(leakedFieldsOf(e, m)) == 0 {
-				t.Errorf("%s did not arrive; relay %v", m, sb.RelayStats())
-			}
-		}
-		if leaked := leakedFieldsOf(e, "TERMA_PAUSED_REPLY"); len(leaked) > 0 {
-			t.Errorf("the paused part arrived: %v", leaked)
-		}
-		finishOpenCode(t, sb)
-	})
-}
-
 // A provider that numbers its call ids per response gives call_0 twice: the plugin
 // qualifies each by its assistant message, so two calls arrive as two.
 func TestOpenCodeRepeatedToolCallID(t *testing.T) {
@@ -735,147 +673,6 @@ func TestOpenCodeTermaRemoved(t *testing.T) {
 		// Doctor looks at OpenCode only where it is on the PATH, where UseOpenCode put it.
 		if out := sb.doctor(); !strings.Contains(out, moved) {
 			t.Errorf("terma doctor does not name %s:\n%s", moved, out)
-		}
-		finishOpenCode(t, sb)
-	})
-}
-
-// `opencode run -f <file>` on OpenCode 2 puts the file's content into the prompt and gives a
-// plugin no path to check what the session read, so the plugin fails closed: nothing of that
-// session leaves it, and the file's content is nowhere upstream. A run without -f in the same
-// sandbox is recorded as usual.
-func TestOpenCodeAttachedFileOnCommandLine(t *testing.T) {
-	forEachOpenCode(t, func(t *testing.T, b Binary, _ bool) {
-		if !openCode2(b) {
-			t.Skip("OpenCode 1 gives a plugin an attached file's path")
-		}
-		sb := openCodeRelay(t, b, true, nil)
-		attached := filepath.Join(sb.Repo, "attached.txt")
-		sb.writeAbs(attached, "TERMA_ATTACHED_MARKER\n")
-		unread := sb.openCodeRun(b, sb.Repo, "", "Read the attached file. TERMA_OPENCODE_PROMPT", nil, false, []string{"-f", attached})
-		// The cutoff is terma's, not only the plugin's memory: the run is Mixed for a read
-		// terma cannot place, which doctor lists as the one paused session.
-		if !sb.paused(unread) {
-			t.Errorf("terma does not hold the run with -f as Mixed")
-		}
-		if out := sb.doctor(); !strings.Contains(out, "1 session is paused") || !strings.Contains(out, "ran a command terma could not trace") {
-			t.Errorf("terma doctor does not list the run with -f as paused:\n%s", out)
-		}
-		recorded := sb.OpenCodeRun(b, sb.Repo, "", openCodePrompt)
-		var e telemetryEvidence
-		if !waitUntil(45*time.Second, func() bool {
-			e = sb.Receiver.evidence()
-			return len(openCodeCalls(e, recorded)) > 0 && len(openCodeRecords(e, recorded, "opencode.user_prompt")) > 0
-		}) {
-			t.Fatalf("the run without -f was not recorded; relay %v", sb.RelayStats())
-		}
-		// What arrives a little later would be the attached run's: give it the time.
-		time.Sleep(5 * time.Second)
-		e = sb.Receiver.evidence()
-		for _, s := range e.spans {
-			if s.Scope == openCodeScope && s.Attrs["session.id"] == unread {
-				t.Errorf("the run with -f exported span %s", s.Name)
-			}
-		}
-		for _, r := range e.logs {
-			if r.Scope == openCodeScope && r.Attrs["session.id"] == unread {
-				t.Errorf("the run with -f exported record %s", r.Attrs["event.name"])
-			}
-		}
-		if leaked := leakedFieldsOf(e, "TERMA_ATTACHED_MARKER"); len(leaked) > 0 {
-			t.Errorf("the attached file's content reached upstream: %v", leaked)
-		}
-		finishOpenCode(t, sb)
-	})
-}
-
-// An edit into another organization's checkout, nested in the session's own folder so
-// OpenCode asks no permission: a write, an edit and a subagent's write in one run, and a
-// patch in a second run on a model OpenCode offers its patch tool to. terma checks each
-// before it runs, the run goes Mixed at that check, and nothing of the call (its span, its
-// arguments, the file's content) reaches upstream. (A checkout no ticked team collects
-// belongs to no organization, so reaching it is no crossing: terma's routing, not this.)
-func TestOpenCodeEditIntoAnotherCheckout(t *testing.T) {
-	forEachOpenCode(t, func(t *testing.T, b Binary, _ bool) {
-		const (
-			editPrompt  = "Make the changes. TERMA_OPENCODE_PROMPT"
-			patchPrompt = "Patch it. TERMA_OPENCODE_PROMPT"
-			childJob    = "TERMA_CHILD_JOB: write the file."
-		)
-		markers := []string{"TERMA_CROSS_WRITE", "TERMA_CROSS_EDIT", "TERMA_CROSS_SUB", "TERMA_CROSS_PATCH"}
-		var other string
-		track(t)
-		const otherOrigin = "github.com/someone/other"
-		sb := openCodeRelayIn(New(t, Isolated, WithOtherOrganization(otherOrigin)), b, true, nil, func(sb *Sandbox) {
-			other = filepath.Join(sb.Repo, "other")
-			if err := os.MkdirAll(other, 0o700); err != nil {
-				t.Fatal(err)
-			}
-			sb.gitIn(other, "init", "-q", "-b", "main")
-			sb.gitIn(other, "remote", "add", "origin", "https://"+otherOrigin+".git")
-			sb.writeAbs(filepath.Join(other, "notes.txt"), "alpha\nbeta\n")
-			call := func(id string, intent openCodeIntent) openCodeStep {
-				return openCodeStep{calls: []openCodeCall{openCodeCallFor(b, id, intent)}}
-			}
-			provider := httptest.NewServer(openCodeConversationProvider([]openCodeConversation{
-				{key: childJob, steps: []openCodeStep{
-					call("call_sub", openCodeIntent{writePath: filepath.Join(other, "sub.txt"), content: "TERMA_CROSS_SUB\n"}),
-				}},
-				{key: patchPrompt, steps: []openCodeStep{
-					call("call_patch", openCodeIntent{patchText: "*** Begin Patch\n*** Add File: " + filepath.Join(other, "patched.txt") + "\n+TERMA_CROSS_PATCH\n*** End Patch"}),
-				}},
-				{key: editPrompt, steps: []openCodeStep{
-					call("call_write", openCodeIntent{writePath: filepath.Join(other, "w.txt"), content: "TERMA_CROSS_WRITE\n"}),
-					call("call_edit", openCodeIntent{editPath: filepath.Join(other, "notes.txt"), oldString: "beta", newString: "TERMA_CROSS_EDIT"}),
-					call("call_task", openCodeIntent{subagent: childJob, description: "scripted child"}),
-				}},
-			}))
-			t.Cleanup(provider.Close)
-			sb.UseOpenCodeProvider(provider.URL)
-		})
-		// The person ticks the other organization's team, so its checkout is that organization's.
-		teams := exec.Command(sb.Terma, "teams", "--select", otherOrgProject)
-		teams.Dir, teams.Env = sb.Repo, sb.termaEnv()
-		if out, err := teams.CombinedOutput(); err != nil {
-			t.Fatalf("terma teams: %v\n%s", err, out)
-		}
-		edited := sb.OpenCodeRun(b, sb.Repo, "", editPrompt)
-		patched := sb.openCodeRun(b, sb.Repo, "", patchPrompt, nil, false, []string{"-m", "fake/gpt-5-m"})
-		// OpenCode did make each change: the scenario is not empty.
-		for file, marker := range map[string]string{"w.txt": "TERMA_CROSS_WRITE", "notes.txt": "TERMA_CROSS_EDIT", "sub.txt": "TERMA_CROSS_SUB", "patched.txt": "TERMA_CROSS_PATCH"} {
-			if data, err := os.ReadFile(filepath.Join(other, file)); err != nil || !strings.Contains(string(data), marker) {
-				t.Errorf("OpenCode did not write %s into the other checkout (%v): %q", file, err, data)
-			}
-		}
-		// Each session was collected up to the crossing: its prompt arrived.
-		var e telemetryEvidence
-		if !waitUntil(45*time.Second, func() bool {
-			e = sb.Receiver.evidence()
-			return len(openCodeRecords(e, edited, "opencode.user_prompt")) > 0 && len(openCodeRecords(e, patched, "opencode.user_prompt")) > 0
-		}) {
-			t.Errorf("the sessions' prompts did not arrive: relay %v", sb.RelayStats())
-		}
-		// What arrives a little later would be the crossing's: give it the time.
-		time.Sleep(8 * time.Second)
-		e = sb.Receiver.evidence()
-		if leaked := leakedFieldsOf(e, markers...); len(leaked) > 0 {
-			t.Errorf("what was written into the other checkout reached upstream: %v", leaked)
-		}
-		for _, s := range e.spans {
-			if s.Scope != openCodeScope || !strings.HasPrefix(s.Name, "execute_tool ") {
-				continue
-			}
-			if strings.Contains(s.Attrs["gen_ai.tool.call.arguments"]+s.Attrs["opencode.tool.files"], other) {
-				t.Errorf("the span of a call into the other checkout reached upstream: %s %v", s.Name, s.Attrs["gen_ai.tool.call.id"])
-			}
-		}
-		for _, id := range []string{edited, patched} {
-			if !sb.paused(id) {
-				t.Errorf("terma does not hold run %s as Mixed", id)
-			}
-		}
-		if out := sb.doctor(); !strings.Contains(out, "Paused sessions") {
-			t.Errorf("terma doctor does not list the runs as paused (%s, %s):\n%s", edited, patched, out)
 		}
 		finishOpenCode(t, sb)
 	})
@@ -1147,52 +944,6 @@ func (sb *Sandbox) termaHookProcesses() []string {
 		}
 	}
 	return out
-}
-
-// How long the plugin's reach check takes with the real terma: the plugin holds a tool for
-// it and gives it REACH_HOOK_TIMEOUT_MS. This logs the times and asserts none: it needs
-// terma only, so it runs once, not on each OpenCode build. It fails only if a hook does.
-func TestOpenCodeReachHookTime(t *testing.T) {
-	// Set up as a person would, with the newest build on the list; OpenCode is never started.
-	bins := OpenCodeBinaries(t)
-	sb := openCodeRelay(t, bins[len(bins)-1], true, nil)
-	const sid = "ses_reach_timing"
-	hook := func(event string, payload map[string]any) time.Duration {
-		t.Helper()
-		body, _ := json.Marshal(payload)
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		cmd := exec.CommandContext(ctx, sb.Terma, "hook", event)
-		cmd.Dir = sb.Repo
-		cmd.Env = sb.termaEnv()
-		cmd.Stdin = bytes.NewReader(body)
-		began := time.Now()
-		out, err := cmd.CombinedOutput()
-		took := time.Since(began)
-		if err != nil {
-			t.Fatalf("terma hook %s: %v\n%s", event, err, out)
-		}
-		return took
-	}
-	t.Logf("opencode-session-start: %v", hook("opencode-session-start", map[string]any{"session_id": sid, "cwd": sb.Repo}))
-	for _, c := range []struct {
-		name  string
-		reach map[string]any
-	}{
-		{"read", map[string]any{"tool": "read", "paths": []string{filepath.Join(sb.Repo, "README.md")}}},
-		{"bash", map[string]any{"tool": "bash", "command": "cat README.md"}},
-	} {
-		var times []time.Duration
-		for range 20 {
-			payload := map[string]any{"session_id": sid, "cwd": sb.Repo}
-			maps.Copy(payload, c.reach)
-			times = append(times, hook("opencode-tool-reach", payload))
-		}
-		first := times[0]
-		slices.Sort(times)
-		t.Logf("opencode-tool-reach %s, %d runs: first %v; min %v, median %v, max %v", c.name, len(times), first, times[0], times[len(times)/2], times[len(times)-1])
-	}
-	finishOpenCode(t, sb)
 }
 
 // UseOpenCodeMCP adds the echo MCP server to the sandbox's OpenCode config as server, so

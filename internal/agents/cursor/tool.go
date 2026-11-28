@@ -4,16 +4,13 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/miradorlabs/terma-cli/internal/agents/internal/reach"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
-	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
 // postToolUse records one finished tool call: the generic pair is the one place a
-// tool_use_id and a duration arrive together. When routing is active it first classifies
-// what the call reached (hookrun.Env.Classify); inputs are read only for that.
+// tool_use_id and a duration arrive together.
 func postToolUse(ctx context.Context, env hookrun.Env) error {
 	return cursorToolCall(ctx, env, "postToolUse")
 }
@@ -31,11 +28,7 @@ func cursorToolCall(ctx context.Context, env hookrun.Env, hook string) error {
 		return nil
 	}
 	env.Cwd = in.cwd(env.Cwd)
-	var located *hookrun.Repo
-	if env.Routing != nil {
-		located = env.Classify(ctx, nil, session.Session{ID: in.id(), Tool: cursorTool}, reach.Cursor.Of(in.ToolInput, env.Cwd), nil)
-	}
-	r, err := env.RepoAt(ctx, located)
+	r, err := env.Repo(ctx)
 	if err != nil {
 		return nil
 	}

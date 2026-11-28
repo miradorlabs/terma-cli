@@ -6,9 +6,9 @@
 //
 // What it does: turns OpenCode's own record of a session into OpenTelemetry (one span per
 // model call, one per tool call, a log record per prompt and per title) and posts it as
-// OTLP/JSON to terma's relay. Claiming a session for a repository, guarding what a tool
-// reaches and reporting file edits are handed to `terma hook <event>`, where the logic
-// lives. It changes no request and reads no response.
+// OTLP/JSON to terma's relay. Claiming a session for a repository and reporting file edits
+// are handed to `terma hook <event>`, where the logic lives. It changes no request and reads
+// no response.
 //
 // One file serves both majors: OpenCode 1 calls `server`, OpenCode 2 calls `setup`, and
 // both translate into the same emitter, so both send the same wire. OpenCode 2 evaluates
@@ -24,28 +24,20 @@ import { createHash } from "node:crypto"
 import { existsSync, readFileSync } from "node:fs"
 import { spawn, execFile } from "node:child_process"
 import { dirname, isAbsolute, join, resolve } from "node:path"
-import { fileURLToPath } from "node:url"
 
 // --- limits -------------------------------------------------------------------------
 
 // Every rule here that runs on the clock, and why:
 // - BATCH_DELAY_MS: a batch leaves this long after its first item, so a quiet session still sends.
 // - post's back-off (1 s, doubling, MAX_RETRIES times) and HEADERS_TTL_MS: a relay may restart.
-// - HOOK_TIMEOUT_MS (REACH_HOOK_TIMEOUT_MS for a reach check), HOOK_KILL_GRACE_MS: a hung hook
-//   is ended, so its session's queue moves on.
+// - HOOK_TIMEOUT_MS, HOOK_KILL_GRACE_MS: a hung hook is ended, so its session's queue moves on.
 // - HOOK_QUEUE_WAIT_MS: a hook's caller stops waiting once the hook has waited this long for its
-//   turn in the hook queue. A tool held for a check also waits for its session's earlier work
-//   (the record, the claim), each with its own limit here.
+//   turn in the hook queue.
 // - MISSING_RETRY_MS: a terma that could not be run is not tried again on every hook.
-// - RECORD_WAIT_MS: a session with no record is given up on (fails closed), not held forever.
+// - RECORD_WAIT_MS: a session with no record is given up on (goes dark), not held forever.
 // - At exit, one after another: the entry's session queues get EXIT_QUEUE_MS, the hooks still
 //   running HOOK_TIMEOUT_MS, the flush EXIT_FLUSH_MS, OpenCode 1's log LOG_SETTLE_MS.
 // - update() stamps what follows a move 1 ms after its claim, so none of it sorts before the claim.
-// - A reach check made after its tool ran is noted for the session's family (checked), 1 ms
-//   after it finished, and no model or tool call the family sends afterwards ends
-//   earlier, nor is a prompt or title stamped earlier. A patch is checked in
-//   tool.execute.after, which OpenCode waits for, so it keeps its own end; a call no hook saw
-//   is checked when its part arrives and ends at that check.
 
 // Bodies are bounded so a single reply or tool result cannot make an export enormous.
 const MAX_TEXT = 64 * 1024
@@ -65,13 +57,10 @@ const MAX_PENDING_BYTES = 8 * 1024 * 1024
 const HEADERS_TTL_MS = 29 * 60 * 1000
 // A session's hooks run one at a time; a hung one is terminated so its queue keeps moving.
 const HOOK_TIMEOUT_MS = 2000
-// A reach check decides whether a session is recorded at all, so it gets a little longer
-// than `terma hook` allows itself, 5 s; every other hook keeps HOOK_TIMEOUT_MS.
-const REACH_HOOK_TIMEOUT_MS = 5500
 const HOOK_KILL_GRACE_MS = 250
 const MAX_HOOK_QUEUE = 64
 // How long a hook may wait in its session's hook queue before its caller stops waiting: a
-// tool is held for its reach check, so that wait is bounded.
+// prompt held for its session's claim waits a bounded time.
 const HOOK_QUEUE_WAIT_MS = 10000
 // A terma that could not be run is tried again this long after the last attempt.
 const MISSING_RETRY_MS = 60 * 1000
@@ -81,13 +70,12 @@ const LOG_SETTLE_MS = 1500
 // How long the exit waits for what is still queued to be sent: a relay that is down must
 // not hold OpenCode open.
 const EXIT_FLUSH_MS = 4000
-// The longest the exit waits for its sessions' queued work: a little more than a reach
-// check may take.
+// The longest the exit waits for its sessions' queued work.
 const EXIT_QUEUE_MS = 8000
 // How long a session waits for its record before it is given up on (fail closed).
 const RECORD_WAIT_MS = 5000
 // What the plugin remembers is bounded, so a long-running server cannot grow it forever;
-// only the ids of sessions that failed closed are kept for good (see taint, darken).
+// only the ids of sessions that went dark are kept for good (see darken).
 const MAX_SESSIONS = 512
 // Who opened whom is remembered far longer than a session is kept, so a family holds
 // together on a long-running server (see parents).
@@ -104,15 +92,6 @@ const BUILTIN_UNDERSCORE_TOOLS = new Set(["apply_patch", "plan_enter", "plan_exi
 // OpenCode 1.x names the placeholder this way until the title call answers.
 const PLACEHOLDER_TITLE = /^New session - \d{4}-\d{2}-\d{2}T/
 const RULE_REFUSAL = "The user has specified a rule which prevents"
-// How OpenCode 1 opens the synthetic part for a file attached to a prompt.
-const READ_ATTACHMENT = "Called the Read tool with the following input: "
-// The path an attached file is reach-checked under when its marker names no path terma can
-// use: two leading separators make it a reach terma cannot place.
-const UNPLACED_ATTACHMENT = "//attached-file/unplaced"
-// The shell command a session that failed closed sends as its reach: one terma cannot
-// follow, so the hook marks the run Mixed. OMP's extension (internal/agents/omp/terma-omp.ts)
-// sends the same one, and a test holds the two together.
-const REACH_FAILED_COMMAND = "eval $TERMA_REACH_FAILED"
 
 // --- state --------------------------------------------------------------------------
 
@@ -120,7 +99,7 @@ const REACH_FAILED_COMMAND = "eval $TERMA_REACH_FAILED"
 // copy of this file (OpenCode 2 evaluates one per directory, and again after a rewrite) must
 // be able to work on it with its own functions, so nothing in it does a copy's work.
 // A change to its shape bumps the number in the key, so a copy never reads another shape.
-const KEY = Symbol.for("terma.opencode.state/1")
+const KEY = Symbol.for("terma.opencode.state/2")
 const state = (globalThis[KEY] ??= newState())
 
 // This copy's entry loggers; a missing terma is reported through the newest.
@@ -153,17 +132,12 @@ function newState() {
       unowned: { hookQueue: Promise.resolve(), hookPending: 0 },
     },
     sessions: new Map(),
-    tainted: new Set(),
-    // The ids of sessions that went dark, kept for good as taints are: a session that has
-    // ended or been forgotten still fails what is below it closed.
+    // The ids of sessions that went dark, kept for good: a session that has ended or been
+    // forgotten still keeps what is below it dark.
     dark: new Set(),
     // session id -> the id of the session that opened it, for every subagent seen: a family
     // is walked through this, never through sessions, which are forgotten when idle.
     parents: new Map(),
-    // The time of the last reach check made after its tool ran, by family (familyOf), and
-    // the late checks running now, which the family's queued work waits for (lateCheck).
-    floors: new Map(),
-    checking: new Map(),
     seenEvents: new Set(),
     owners: 0,
   }
@@ -429,7 +403,7 @@ async function authHeaders(cfg) {
 // runHook hands an event to `terma hook <event>` on a queue: the session's own (a FIFO, so
 // its claim always finishes before its other hooks) or, for a session this process does
 // not keep, state.hooks.unowned. Queues do not wait for each other. A hook's limit is
-// hookLimit(event), counted from its turn. What can happen to a hook, and what its caller
+// HOOK_TIMEOUT_MS, counted from its turn. What can happen to a hook, and what its caller
 // gets:
 //   runs and exits 0                         true
 //   runs and exits non-zero                  false
@@ -468,7 +442,7 @@ function runHook(lane, event, payload) {
   const slot = lane.hookQueue.then(() => {
     // Its turn: the run limit starts now, not when it was queued.
     clearTimeout(queued)
-    if (!settled) running = giveUp(hookLimit(event) + HOOK_KILL_GRACE_MS + 500)
+    if (!settled) running = giveUp(HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS + 500)
     return spawnHook(argv, event, payload)
   })
   lane.hookQueue = slot.then((s) => s.exit, () => undefined).finally(() => {
@@ -476,11 +450,6 @@ function runHook(lane, event, payload) {
   })
   slot.then((s) => s.result, () => false).then(settle, () => settle(false))
   return answer
-}
-
-// hookLimit is how long a hook may run.
-function hookLimit(event) {
-  return event === "opencode-tool-reach" ? REACH_HOOK_TIMEOUT_MS : HOOK_TIMEOUT_MS
 }
 
 function spawnHook(argv, event, payload) {
@@ -538,7 +507,7 @@ function spawnHook(argv, event, payload) {
         finish(false)
       }, HOOK_KILL_GRACE_MS)
       killTimer.unref?.()
-    }, hookLimit(event))
+    }, HOOK_TIMEOUT_MS)
     timer.unref?.()
     try {
       // In a process group of its own: OpenCode 2 signals the group a tool step ran in when
@@ -629,9 +598,6 @@ function newSession(id, owner) {
     doneTools: new Set(),
     asked: new Map(), // permission request id -> qualified call id
     rejected: new Set(),
-    guarded: new Map(), // provider call id -> { reachKey }
-    fenced: false, // terma marked the session's run Mixed after a reach check failed
-    fencing: false, // that request is running
     pendingTitle: null,
     entry: {}, // an entry point's own per-session data
   }
@@ -706,13 +672,12 @@ async function firstSight(s, lookup) {
   s.version = str(rec.version)
   s.created = num(rec.created) ?? 0
   const titled = (s.title = str(rec.title))
-  // Seen now, before the claim: a title given while the session was paused is judged in
-  // the paused run, as OpenCode 2's lookup does.
+  // Seen now, before the claim, as OpenCode 2's lookup does.
   const titleSeenAt = Date.now()
   s.policy = repoPolicy(s.directory)
   s.claimed = await runHook(s, "opencode-session-start", base(s))
-  // The claim starts this process's run of the session: a resumed session's record stamped
-  // before it would fall in the run before, which may be paused (Mixed).
+  // The claim starts this process's run of the session: nothing of it is stamped before it,
+  // so the relay files it under this claim.
   s.claimedAt = Date.now()
   // A timeout or a refusal is not fatal: the relay holds an unclaimed session and the
   // next prompt claims it again. A terma that cannot be run is.
@@ -722,7 +687,7 @@ async function firstSight(s, lookup) {
   }
   // The title the session came with, which is what titles a resumed session. One that
   // arrived during the claim is not sent here: it has its own place in the queue, behind
-  // whatever was queued before it, a call still to be checked included.
+  // whatever was queued before it.
   if (!s.parentID && isRealTitle(titled)) {
     s.sentTitle = titled
     emitTitle(s, titled, titleSeenAt)
@@ -748,7 +713,12 @@ function update(s, rec) {
       s.policy = repoPolicy(directory)
       // The relay files a record under the claim in force at its time: claim the session
       // in its new directory before anything more of it leaves, and stamp nothing earlier.
-      await guardReach(s, { tool: "list", lists: [directory] })
+      // If the move claim fails, the relay still holds the previous directory's claim:
+      // darken the session rather than risk routing new records to the old organization.
+      if (!(await runHook(s, "opencode-prompt", base(s)))) {
+        darken(s)
+        return
+      }
       s.movedAt = Date.now() + 1 // strictly after the claim, never the same millisecond
     })
   }
@@ -767,7 +737,6 @@ function run(s, fn) {
   s.busy++
   s.queue = s.queue.then(async () => {
     try {
-      await state.checking.get(familyOf(s))
       if (!blocked(s)) await fn()
     } catch {
       // A telemetry failure must never surface in the agent.
@@ -778,25 +747,9 @@ function run(s, fn) {
   return s.queue
 }
 
-// beside runs a check that OpenCode itself waits for (before a tool runs, or before its
-// result is handed on) once the session's first sight is done, outside its queue. Such a
-// check sends nothing, so it waits neither behind what the session has queued to send nor
-// for a late check elsewhere in the family: the plugin's waits may delay what terma sends,
-// never OpenCode's own work beyond the check that work needs. What the tool itself sends
-// later goes through the queue as ever, and is held there. A session that failed closed is
-// judged here (blocked), as run judges it for queued work.
-async function beside(s, fn) {
-  await s.first
-  try {
-    if (!blocked(s)) await fn()
-  } catch {
-    // A telemetry failure must never surface in the agent.
-  }
-}
-
 function blocked(s) {
   if (!s.claimed && termaMissing()) darken(s)
-  return s.dark || isTainted(s)
+  return s.dark || isDark(s)
 }
 
 // darken gives up on a session that could not be claimed: nothing of it is exported.
@@ -805,66 +758,12 @@ function darken(s) {
   state.dark.add(s.id)
 }
 
-// A failed reach hook taints the session and every session above it: their content could
-// now include what the child read across organizations, so none of them exports more. A
-// taint is one short id and is never dropped: dropping one would let a session that failed
-// closed export again.
-function taint(s) {
+// isDark is whether a session, or one above it, went dark (never given its record, or
+// never claimed for want of terma): what is below it derives from it, so it stays dark too.
+function isDark(s) {
   let id = s.id
   for (let i = 0; i < 16 && id; i++) {
-    state.tainted.add(id)
-    id = state.parents.get(id)
-  }
-}
-// familyOf names s's family by the topmost session above it, whether or not the sessions
-// between are still kept. A session and its subagents share one run in terma, and so one
-// Mixed cutoff: a reach check made after its tool ran, anywhere in the family, holds the
-// whole family's times (checked, checkFloor).
-function familyOf(s) {
-  let id = s.id
-  for (let i = 0, parent; i < 16 && (parent = state.parents.get(id)); i++) id = parent
-  return id
-}
-
-// checked notes that a reach check made after its tool ran has just finished in s's
-// family, a millisecond on so that nothing shares its time, and returns that time.
-function checked(s) {
-  const at = Date.now() + 1
-  remember(state.floors, familyOf(s), at, MAX_SESSIONS)
-  return at
-}
-
-// lateCheck is guardReach for a call that has already run, with nothing waiting for its
-// check. While it runs, the queued work of every session in the family waits for it (run),
-// so nothing that may derive from the call is sent before the check is done, and what is
-// sent afterwards is held to its time. A check is bounded by its hook's limits.
-async function lateCheck(s, reach) {
-  const family = familyOf(s)
-  let done
-  const mine = Promise.all([state.checking.get(family), new Promise((r) => (done = r))])
-  state.checking.set(family, mine)
-  try {
-    const ok = await guardReach(s, reach)
-    if (ok) checked(s)
-    return ok
-  } finally {
-    if (state.checking.get(family) === mine) state.checking.delete(family)
-    done()
-  }
-}
-
-// checkFloor is the time nothing s sends may end or be stamped before: its family's last
-// such check, or 0.
-function checkFloor(s) {
-  return state.floors.get(familyOf(s)) ?? 0
-}
-
-// isTainted is whether a session, or one above it, failed closed: tainted, or never given
-// its record (dark), so nothing it read was checked and what is below it derives from it.
-function isTainted(s) {
-  let id = s.id
-  for (let i = 0; i < 16 && id; i++) {
-    if (state.tainted.has(id) || state.dark.has(id)) return true
+    if (state.dark.has(id)) return true
     id = state.parents.get(id)
   }
   return false
@@ -989,7 +888,7 @@ function call(s, c) {
     name: "chat " + str(c.model),
     kind: 3,
     startTimeUnixNano: nanos(c.start),
-    endTimeUnixNano: nanos(endAfterCheck(s, c.end)),
+    endTimeUnixNano: nanos(c.end),
     attributes: attrs({ ...a, ...common(s) }),
     status: c.error ? { code: 2 } : { code: 1 },
   })
@@ -1027,7 +926,7 @@ function tool(s, t) {
     name: "execute_tool " + str(t.name),
     kind: 1,
     startTimeUnixNano: nanos(t.start),
-    endTimeUnixNano: nanos(endAfterCheck(s, t.end)),
+    endTimeUnixNano: nanos(t.end),
     attributes: attrs({ ...a, ...common(s) }),
     status: t.status === "completed" ? { code: 1 } : { code: 2 },
   })
@@ -1038,22 +937,13 @@ function tool(s, t) {
   }
 }
 
-// endAfterCheck is a model or tool call's end, no earlier than the last reach check made
-// after its tool ran in the session's family. The relay forwards a record that ends before
-// the run went Mixed, and a call that overlapped that check may carry what the checked call
-// read or wrote. When OpenCode waits for the check nothing overlaps it, and no time changes.
-function endAfterCheck(s, end) {
-  const floor = checkFloor(s)
-  return floor && num(end) !== undefined && end < floor ? floor : end
-}
-
 // prompt is one prompt: p = { messageID, text, agent?, model?, provider?, time? }. No
 // prompt text ever goes to a hook.
 function prompt(s, pr) {
   const text = str(pr.text)
-  // No earlier than the session's claim, its last move or its last check made after a tool
-  // ran: the relay files a record by its time, under the claim and the Mixed cutoff in force then.
-  const floor = Math.max(s.claimedAt ?? 0, s.movedAt, checkFloor(s))
+  // No earlier than the session's claim or its last move: the relay files a record by its
+  // time, under the claim in force then.
+  const floor = Math.max(s.claimedAt ?? 0, s.movedAt)
   // A prompt OpenCode gave no time is stamped now, never back at the floor.
   const time = floor ? Math.max(num(pr.time) ?? Date.now(), floor) : pr.time
   emitRecord(s, "opencode.user_prompt", policyOf(s).includePrompts ? truncate(text, MAX_TEXT) : "", {
@@ -1076,11 +966,10 @@ function title(s, t) {
 
 // emitTitle stamps the moment the plugin saw the title, made strictly later than the
 // session's previous title, so two titles of a session never share an identity, and no
-// earlier than its last move or its last check made after a tool ran, as a prompt is. Not
-// held to the claim: a title seen before it may be one given while the session was paused,
-// and the relay judges it by the time it was seen.
+// earlier than its last move, as a prompt is. Not held to the claim: the relay judges a
+// title seen before it by the time it was seen.
 function emitTitle(s, text, time) {
-  const at = Math.max(num(time) ?? Date.now(), s.lastTitleTime + 1, s.movedAt, checkFloor(s))
+  const at = Math.max(num(time) ?? Date.now(), s.lastTitleTime + 1, s.movedAt)
   s.lastTitleTime = at
   emitRecord(s, "opencode.session.title", policyOf(s).includePrompts ? text : "", {}, at)
 }
@@ -1110,7 +999,7 @@ function end(s, reason) {
 // endUnknown ends a session this process never kept, as when an old one is deleted from a
 // list: it is not claimed, titled or exported, only ended.
 function endUnknown(rec, reason) {
-  if (isTainted(rec)) return
+  if (isDark(rec)) return
   runHook(state.hooks.unowned, "opencode-session-end", { session_id: rec.id, cwd: rec.directory, reason })
 }
 
@@ -1136,149 +1025,26 @@ async function shutdown(owner) {
   await Promise.race([flush(), sleep(EXIT_FLUSH_MS, true)])
 }
 
-// --- reach --------------------------------------------------------------------------
+// --- where things leave -------------------------------------------------------------
 //
-// Where anything leaves, and what it passes. "queued" is a step of the session's queue
-// (run), where a session that failed closed is skipped and a late check in the family is
-// waited for; the floor is checkFloor, applied as the span or record is built.
-//   a model or tool call's span        queued; its end is held to the floor
-//   a prompt or title record           queued; its time is held to the floor
+// Where anything leaves. "queued" is a step of the session's queue (run), where a session
+// that went dark is skipped.
+//   a model or tool call's span        queued
+//   a prompt or title record           queued; its time is held to the claim and last move
 //   the file-edit, prompt, idle and    queued, from the step that sends what they belong to;
 //   session-end hooks                  they carry no content
 //   the claim (session-start hook)     the queue's first step; nothing precedes it
-//   a reach check, and the request     beside the queue or in it: they are the guard, carry
-//   to mark a run Mixed                no content, and must not wait for what they protect
+//   a move's claim (prompt hook)       the move's turn in the session's queue (update)
 //   the end of a session never kept    its own hook queue; an id and a folder only
 // The OpenCode 2 entry (setup) sends through the same functions, from:
 //   every event of a session           queued (handle2), and so every span, title and hook
 //                                      an event brings
-//   the prompt hook                    the record queued; the attached files' check beside
-//                                      the queue, or behind a move still queued (waited2)
-//   the title, side-question and       queued
-//   compaction hooks, a code-mode
+//   the prompt, title, side-question   queued
+//   and compaction hooks, a code-mode
 //   call's end
 //   the title its record brings when   queued at the end of the queue, not with the claim:
 //   first looked up                    the lookup can answer after later events were queued
 //   a deleted session never kept       the end of a session never kept, above
-//
-// Where a reach is checked:
-//   site                 checks                         when                         waits  sets
-//   tool.execute.before  a read, search, list, shell    before the tool runs         yes    nothing
-//                        command, write or edit
-//   tool.execute.after   what a call reaches known      after the tool ran, before   yes    the family's floor
-//                        once it ran (a patch's files)  its result is handed on
-//   onToolPart1          a call no hook saw (a shell    when its completed part      no     the family's floor,
-//                        command the person runs, one   arrives                             call's end
-//                        finished in an earlier run)
-//   chat.message         the files attached to a        before the prompt is sent    yes    the prompt's time,
-//                        prompt                         on                                  after the check
-//   update (a move)      the directory moved into       at the move's turn in the    no     movedAt
-//                                                       session's queue
-// The OpenCode 2 entry (setup):
-//   tool.execute.before  as above, and a patch on the   before the tool runs         yes    nothing
-//                        files its text names
-//   endTool2             a call no hook saw, or a patch  when its end event arrives   no     lateCheck: the
-//                        whose text names no file                                           family's floor, the
-//                                                                                           call's end
-//   session.prompt       the files attached to a        before the prompt is sent    yes    the prompt's time,
-//                        prompt                         on                                  after the check
-//   session.shell.       a shell command the person     when it starts               no     lateCheck: the
-//   started              runs                                                               family's floor
-//   session.moved        the directory moved into       at the move's turn in the    no     movedAt
-//                                                       session's queue
-// "waits" is whether OpenCode waits for the check. A check it waits for runs beside the
-// session's queue (beside); in the OpenCode 2 entry it waits in the queue only behind a move
-// still queued (waited2). One it does not wait for holds the family's queues (lateCheck).
-
-// Each major's name for a tool that reads, changes or runs something, mapped to one
-// vocabulary. An edit is checked on the file it changes, as a read is on the file it reads.
-const REACH_TOOLS = { read: "read", write: "write", edit: "edit", grep: "grep", glob: "glob", list: "list", bash: "bash", shell: "bash" }
-
-// toolReach describes what a read, edit, search, list or shell call can reach, or null.
-function toolReach(name, args) {
-  const kind = REACH_TOOLS[name]
-  if (!kind || !args || typeof args !== "object") return null
-  const out = {}
-  const path = typeof args.filePath === "string" && args.filePath ? args.filePath : typeof args.path === "string" && args.path ? args.path : ""
-  switch (kind) {
-    case "read":
-    case "write":
-    case "edit":
-      if (path) out.paths = [path]
-      break
-    case "grep":
-      out.paths = [path || "."]
-      if (typeof args.include === "string" && args.include) out.globs = [args.include]
-      break
-    case "glob":
-      out.paths = [path || "."]
-      if (typeof args.pattern === "string" && args.pattern) out.globs = [args.pattern]
-      break
-    case "list":
-      if (path) out.lists = [path]
-      break
-    case "bash": {
-      if (typeof args.command === "string" && args.command) out.command = args.command
-      const dir = typeof args.workdir === "string" && args.workdir ? args.workdir : typeof args.cwd === "string" && args.cwd ? args.cwd : ""
-      if (dir) out.dir = dir
-      break
-    }
-  }
-  return Object.keys(out).length > 0 ? { tool: kind, ...out } : null
-}
-
-// guardReach runs the reach hook for a call; one that fails taints the session (fails
-// closed, failClosed). Resolves false when the session may not export the call.
-async function guardReach(s, reach) {
-  const { tool: name, ...rest } = reach
-  const ok = await runHook(s, "opencode-tool-reach", { ...base(s), tool: name, ...rest })
-  if (!ok) failClosed(s)
-  return ok
-}
-
-// failClosed taints a session whose reach could not be checked, says so once in OpenCode's
-// log and fences its run, unless terma cannot be run, which has its own warning.
-function failClosed(s) {
-  const fresh = !isTainted(s)
-  taint(s)
-  if (termaMissing()) return
-  if (fresh) {
-    const log = loggers[loggers.length - 1]
-    try {
-      log?.(`terma: could not check what a tool reaches in session ${s.id}; nothing more of this session is recorded.`)
-    } catch {}
-  }
-  fence(s)
-}
-
-// subagentChecked is whether the session a call opened for a subagent, id, ran under the
-// guard. One that never got its record (dark) or that failed closed ran unchecked, and its
-// answer is the call's result, so the session that opened it, s, fails closed too. A
-// subagent still waiting for its record is judged once that wait is over. An entry calls
-// this before it sends the call that opened a subagent.
-async function subagentChecked(s, id) {
-  if (typeof id !== "string" || id === s.id) return true
-  const child = state.sessions.get(id)
-  if (child) await child.queue
-  // By id too: a subagent that has ended or been forgotten is still known to have failed.
-  if (!state.dark.has(id) && !state.tainted.has(id) && !(child && isTainted(child))) return true
-  failClosed(s)
-  return false
-}
-
-// fence asks terma to mark the run of a session that failed closed Mixed, as OMP's
-// extension does: with a shell reach terma cannot place, so the relay drops what is
-// exported of the run from then on and `terma doctor` names it. Nothing waits for it. One
-// that fails is tried again at the session's next tool call; it goes straight to the hook
-// queue, since run() skips a tainted session's work.
-function fence(s) {
-  if (s.fenced || s.fencing || termaMissing()) return
-  s.fencing = true
-  runHook(s, "opencode-tool-reach", { ...base(s), tool: "bash", command: REACH_FAILED_COMMAND }).then((ok) => {
-    s.fencing = false
-    if (ok) s.fenced = true
-  })
-}
 
 // --- OpenCode 1 entry ---------------------------------------------------------------
 
@@ -1292,15 +1058,6 @@ function recordOf(info) {
     created: num(info.time?.created) ?? 0,
     title: str(info.title),
   }
-}
-
-// reachOf1 is what a completed OpenCode 1 call reached: what its arguments name, or for
-// an edit, the files it changed (a patch's are known only once it ran). Null if nothing.
-function reachOf1(s, tool, input, metadata) {
-  const reach = toolReach(tool, input)
-  if (reach || !EDIT_TOOLS.has(tool)) return reach
-  const files = filesOf1(s, tool, { input, metadata })
-  return files.length > 0 ? { tool, paths: files } : null
 }
 
 // The files a file tool read or changed, absolute.
@@ -1419,7 +1176,7 @@ function keepText1(s, part) {
   parts.set(part.id, str(part.text))
 }
 
-async function onToolPart1(s, part, servers) {
+function onToolPart1(s, part, servers) {
   const st = part.state ?? {}
   const id = qualify(part.messageID, part.callID)
   // A task's part names the session it opened from when it starts to run; one that ends in
@@ -1435,20 +1192,6 @@ async function onToolPart1(s, part, servers) {
   if (st.time?.compacted) return
   if (s.messages.get(part.messageID)?.copied) return
   if (num(st.time?.end) !== undefined && st.time.end < s.created) return
-  // A call no hook saw (a shell command the person runs, a call finished in an earlier
-  // process) is checked now; one checked before or after it ran is not checked again.
-  const reach = reachOf1(s, part.tool, st.input, st.metadata)
-  const guarded = s.guarded.get(part.callID)
-  s.guarded.delete(part.callID)
-  let end = num(st.time?.end)
-  if (reach && guarded?.reachKey !== JSON.stringify(reach)) {
-    if (!(await lateCheck(s, reach))) return
-    // The relay judges a record by its time: a call checked only after it ran must not end
-    // before its check.
-    end = Math.max(end ?? 0, checkFloor(s))
-  }
-  if (part.tool === "task" && !(await subagentChecked(s, subagent))) return
-  if (isTainted(s)) return
   let status = "completed"
   let denial
   if (st.status === "error") {
@@ -1468,7 +1211,7 @@ async function onToolPart1(s, part, servers) {
     name: part.tool,
     turn: turnOf1(s, s.messages.get(part.messageID)?.parentID),
     start: num(st.time?.start),
-    end,
+    end: num(st.time?.end),
     status,
     denial,
     exitCode: num(st.metadata?.exit),
@@ -1596,43 +1339,6 @@ async function server(input) {
       if (!s) return
       const msg = out?.message ?? {}
       const parts = Array.isArray(out?.parts) ? out.parts : []
-      // An attached file (or folder) is read into synthetic text parts with no tool call:
-      // reach-check it as a read or a list, and keep its content out of the prompt.
-      const reaches = []
-      const taken = new Set()
-      for (const x of parts) {
-        if (x?.type !== "file" || typeof x.url !== "string" || !x.url.startsWith("file:")) continue
-        let path
-        try {
-          path = fileURLToPath(x.url)
-        } catch {
-          continue
-        }
-        reaches.push(x.mime === "application/x-directory" ? { tool: "list", lists: [path] } : { tool: "read", paths: [path] })
-        taken.add(path)
-      }
-      // An attached image or PDF arrives as a data: URL; where it came from is only in the
-      // synthetic part that says OpenCode read it. OpenCode may write that path unescaped
-      // (a Windows path), so a marker that is not JSON is read for the path as written, and
-      // one that names no path at all is a reach no one can place.
-      let unplaced = false
-      for (const x of parts) {
-        if (x?.type !== "text" || x.synthetic !== true || !str(x.text).startsWith(READ_ATTACHMENT)) continue
-        const raw = x.text.slice(READ_ATTACHMENT.length)
-        let path
-        try {
-          path = JSON.parse(raw)?.filePath
-        } catch {}
-        if (typeof path !== "string" || !path) path = /^\{"filePath":"([\s\S]*)"\}$/.exec(raw)?.[1]
-        if (!path) {
-          unplaced = true
-          continue
-        }
-        if (taken.has(path)) continue
-        reaches.push({ tool: "read", paths: [path] })
-        taken.add(path)
-      }
-      if (unplaced) reaches.push({ tool: "read", paths: [UNPLACED_ATTACHMENT] })
       // Under `opencode run` the hook's own input names no agent or model; the message does.
       const pr = {
         messageID: msg.id ?? inp?.messageID,
@@ -1646,12 +1352,7 @@ async function server(input) {
       // starts the turn's calls only once this hook returns: while this process's first
       // claim of the session runs, wait for it, so no call of the turn starts before its prompt.
       const claiming = !s.claimedAt && !s.dark
-      const sent = run(s, async () => {
-        for (const reach of reaches) if (!(await guardReach(s, reach))) return
-        // A reach that crosses organizations marks the run from the moment its hook did; the
-        // prompt is stamped after it, and OpenCode goes on only once the checks are done.
-        if (reaches.length > 0) pr.time = Math.max(pr.time ?? 0, Date.now() + 1)
-        if (isTainted(s)) return
+      const sent = run(s, () => {
         if (pr.messageID) {
           const e = entry1(s)
           remember(e.prompts, pr.messageID)
@@ -1659,7 +1360,7 @@ async function server(input) {
         }
         prompt(s, pr)
       })
-      if (reaches.length > 0 || claiming) await sent
+      if (claiming) await sent
     }),
 
     // Only to see the title call start. It writes nothing to the request.
@@ -1668,41 +1369,6 @@ async function server(input) {
       const s = see(inp.sessionID)
       const c = { id: "title:" + inp.message.id, model: inp.model?.id, provider: inp.model?.providerID, agent: "title", start: Date.now() }
       run(s, () => titleCallStarted(s, c))
-    }),
-
-    // The reach guard: the tool waits for the hook, and a failure taints the session.
-    "tool.execute.before": guard(async (inp, out) => {
-      const s = see(inp?.sessionID)
-      if (!s || typeof inp?.callID !== "string") return
-      // A session that failed closed asks again, if it must, for its run to be fenced; the
-      // tool does not wait for it.
-      if (isTainted(s)) fence(s)
-      const reach = toolReach(inp.tool, out?.args ?? inp.args)
-      if (!reach) return
-      remember(s.guarded, inp.callID, { reachKey: JSON.stringify(reach) }, MAX_SMALL)
-      await beside(s, () => guardReach(s, reach))
-    }),
-
-    // The guard for what a call is known to reach only once it ran (a patch's files):
-    // OpenCode waits for this hook before it hands the result on, sets the call's end and
-    // starts the next model step, so nothing that saw the result ends before the check.
-    "tool.execute.after": guard(async (inp, out) => {
-      const s = see(inp?.sessionID)
-      if (!s || typeof inp?.callID !== "string") return
-      const callID = inp.callID
-      // A call that reaches nothing, or that was checked before it ran, does not wait.
-      const before = toolReach(inp.tool, inp.args)
-      if (before ? s.guarded.get(callID)?.reachKey === JSON.stringify(before) : !EDIT_TOOLS.has(inp.tool)) return
-      // After its first sight: a relative path resolves against the session's directory.
-      await beside(s, async () => {
-        const reach = reachOf1(s, inp.tool, inp.args, out?.metadata)
-        if (!reach) return
-        const reachKey = JSON.stringify(reach)
-        if (s.guarded.get(callID)?.reachKey === reachKey) return
-        if (!(await guardReach(s, reach))) return
-        checked(s)
-        remember(s.guarded, callID, { reachKey }, MAX_SMALL)
-      })
     }),
 
     dispose: guard(async () => {
@@ -1746,11 +1412,7 @@ const EVENTS2 = new Set([
   "session.execution.succeeded",
   "session.execution.failed",
   "session.execution.interrupted",
-  "session.shell.started",
 ])
-
-// What `opencode run -f` appends to a prompt's text for each text file: its name and content.
-const INLINED_FILES = /(?:^|\n\n)<file name="[\s\S]*">\n[\s\S]*\n<\/file>$/
 
 // data2 is the OpenCode 2 entry's own data for a session, kept in its entry slot.
 function data2(s) {
@@ -1770,44 +1432,14 @@ function data2(s) {
     e.compactionRequest = null
     e.compaction = null
     e.movedFrom = "" // where a move found the session, when it arrived before the record
-    e.moves = 0 // moves queued and not yet done (waited2)
-    e.floor = 0 // the session's claim, or just after its last reach check: no prompt is stamped earlier
+    e.floor = 0 // the session's claim: no prompt is stamped earlier
     e.stamps = new Map() // prompt id -> the time its record carries
   }
   return e
 }
 
-// checked2 runs a reach check OpenCode waits for, before what it checks runs, and notes when
-// it was done. The relay judges a record by its time, so a prompt that follows a check is
-// stamped after it, never in its millisecond.
-async function checked2(s, reach) {
-  const ok = await guardReach(s, reach)
-  data2(s).floor = Date.now() + 1
-  return ok
-}
-
-// waited2 runs a reach check OpenCode waits for. It runs beside the session's queue (the
-// core's beside), so it waits neither for a late check in the family nor behind what the
-// session has queued to send. A move still waiting in the queue is the exception: the check
-// waits in the queue behind it, so it is made in the directory the session moved to, after
-// the session's claim there.
-function waited2(s, fn) {
-  const moving = data2(s).moves > 0 || (s.askedDirectory && s.askedDirectory !== s.directory)
-  return moving ? run(s, fn) : beside(s, fn)
-}
-
-// lateChecked2 is checked2 for what already ran with nothing waiting for its check (a call
-// no hook saw, a shell command the person runs): the core's lateCheck holds the session's
-// family while it runs and sets the family's floor (checkFloor) when it passes.
-async function lateChecked2(s, reach) {
-  const ok = await lateCheck(s, reach)
-  data2(s).floor = Date.now() + 1
-  return ok
-}
-
 // begun2 is a start or end of a span of a turn: OpenCode's own time, but never before the
-// turn's prompt, whose record is held back behind the session's claim, a move or a reach
-// check ahead of it. A reader that orders a session by time then finds each call under the
+// turn's prompt, whose record is held back behind the session's claim or a move ahead of it. A reader that orders a session by time then finds each call under the
 // prompt that asked for it. A call that ran wholly inside that wait (OpenCode does not wait
 // for a claim) starts and ends at the prompt.
 function begun2(e, turn, t) {
@@ -1851,26 +1483,6 @@ function tokens2(t) {
 
 function texts2(content) {
   return Array.isArray(content) ? content.filter((p) => p?.type === "text").map((p) => str(p.text)).join("\n") : ""
-}
-
-// reach2 is what a call can reach, known before it runs: the core's for a read, an edit, a
-// search or a shell call, and for a patch the files its text names. OpenCode 2 waits for
-// tool.execute.before, so a patch is checked before it changes anything.
-function reach2(name, input) {
-  const reach = toolReach(name, input)
-  if (reach || name !== "patch") return reach
-  const paths = patchFiles2(input?.patchText)
-  return paths.length > 0 ? { tool: name, paths } : null
-}
-
-// patchFiles2 lists the files a patch text adds, changes, deletes or moves to, as written.
-function patchFiles2(text) {
-  if (typeof text !== "string") return []
-  const out = []
-  for (const m of text.matchAll(/^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+?)\s*$/gm)) {
-    if (m[1] && !out.includes(m[1])) out.push(m[1])
-  }
-  return out
 }
 
 // The files a file tool read or changed, absolute: OpenCode 2 names them relative to the
@@ -2026,8 +1638,8 @@ function handle2(s, event) {
       const text = str(d.title)
       if (!text) return
       s.title = text
-      // The core stamps it no earlier than the session's last move or its last check made
-      // after a tool ran, whatever time OpenCode gave the event.
+      // The core stamps it no earlier than the session's last move, whatever time OpenCode
+      // gave the event.
       title(s, { title: text, time: end })
       return
     }
@@ -2065,17 +1677,10 @@ function handle2(s, event) {
     case "session.execution.interrupted":
       idle(s)
       return
-    case "session.shell.started": {
-      // A shell command the person ran in the session: its output joins the conversation
-      // with no tool call, so it is reach-checked as the agent's own shell calls are.
-      const command = str(d.shell?.command)
-      if (!command) return
-      return lateChecked2(s, { tool: "bash", command, dir: str(d.shell?.cwd) || undefined })
-    }
   }
 }
 
-async function endTool2(s, e, event) {
+function endTool2(s, e, event) {
   const d = event.data ?? {}
   const q = qualify(d.assistantMessageID, d.id)
   if (s.doneTools.has(q)) return
@@ -2084,37 +1689,8 @@ async function endTool2(s, e, event) {
   e.tools.delete(q)
   const asked = e.asked.delete(q)
   if (!t?.name) return
-  // The call may have reached something the guard before it did not see; check again. An
-  // edit whose files its input did not name (a patch text that names none) is checked on
-  // the files OpenCode reports it changed, only now.
-  let reach = reach2(t.name, t.input)
-  if (!reach && EDIT_TOOLS.has(t.name)) {
-    const files = filesOf2(s, t.name, t.input, d.metadata)
-    if (files.length > 0) reach = { tool: t.name, paths: files }
-  }
-  const guarded = s.guarded.get(q)
-  s.guarded.delete(q)
-  const recheck = !!reach && guarded?.reachKey !== JSON.stringify(reach)
-  // Checked only after it ran: it, and every call the session's family sends from now on,
-  // ends no earlier than the check (endAfterCheck), as the relay judges a span by its times.
-  if (recheck && !(await lateChecked2(s, reach))) return
-  if (isTainted(s)) return
-  // A subagent's result is the child's work (on 2.4.1 its answer reaches the parent later,
-  // as an inbox item the parent's next reply can quote): a child that ran unchecked takes
-  // its parent with it, before any of what it returned leaves.
-  if (t.name === "subagent") {
-    // On 2.4.1 the call returns as soon as the child starts. The core judges a child it knows
-    // once its first sight is over (after which it cannot go dark); one this process has not
-    // seen yet is waited for, a bounded time, and one that never appears fails the parent.
-    const child = t.subagent || str(d.metadata?.sessionID) || ""
-    if (child && !(await childSeen2(child))) {
-      failClosed(s)
-      return
-    }
-    if (!(await subagentChecked(s, child))) return
-  }
   const ok = event.type === "session.tool.success"
-  const end = recheck ? Math.max(num(event.created) ?? 0, checkFloor(s)) : num(event.created)
+  const end = num(event.created)
   tool(s, {
     messageID: t.messageID,
     callID: t.callID,
@@ -2131,15 +1707,6 @@ async function endTool2(s, e, event) {
     mcp: t.mcp,
     subagentSession: t.name === "subagent" ? t.subagent || str(d.metadata?.sessionID) || undefined : undefined,
   })
-}
-
-// childSeen2 waits, RECORD_WAIT_MS at most, for a subagent's session to reach this process.
-async function childSeen2(id) {
-  for (const until = Date.now() + RECORD_WAIT_MS; Date.now() < until; ) {
-    if (state.sessions.has(id) || state.tainted.has(id)) return true
-    await sleep(25)
-  }
-  return state.sessions.has(id) || state.tainted.has(id)
 }
 
 // codeCall2 reports an MCP call made in code mode, which exists only in the hook. When
@@ -2268,17 +1835,17 @@ async function setup(ctx) {
         s = see(id, undefined, directory)
         if (!s.known && directory) data2(s).movedFrom ||= directory
         if (to) {
-          // Counted until its turn is done: a check OpenCode waits for waits for it (waited2).
-          const e = data2(s)
-          e.moves++
           run(s, async () => {
             if (to === s.directory) return
             s.askedDirectory = to
             s.directory = to
             s.policy = repoPolicy(to)
-            await guardReach(s, { tool: "list", lists: [to] })
+            if (!(await runHook(s, "opencode-prompt", base(s)))) {
+              darken(s)
+              return
+            }
             s.movedAt = Date.now() + 1
-          }).then(() => e.moves--)
+          })
         }
         break
       }
@@ -2295,59 +1862,21 @@ async function setup(ctx) {
         if (!s) return
         const pr = { messageID: str(input.messageID), text: str(input.prompt?.text) }
         const asked = Date.now()
-        // A file attached to a prompt is read into the conversation with no tool call:
-        // reach-check it as a read before the prompt leaves. `opencode run -f` gives a file
-        // without its place: a text file as its name and content at the end of the prompt's
-        // text, an image or a PDF as a data: URL. Such a file cannot be reach-checked.
-        const reaches = []
-        let unplaced = INLINED_FILES.test(pr.text)
-        for (const f of Array.isArray(input.prompt?.files) ? input.prompt.files : []) {
-          const uri = [f?.source?.uri, f?.uri].find((u) => typeof u === "string" && u.startsWith("file:"))
-          let path
-          try {
-            path = uri && fileURLToPath(uri)
-          } catch {}
-          if (path) reaches.push({ tool: "read", paths: [path] })
-          // An image pasted from the clipboard has no file behind it: it is the person's own
-          // input, like pasted text, and nothing of it is exported.
-          else if (!(f?.name === "clipboard" && f.source === undefined && str(f.uri).startsWith("data:image/"))) unplaced = true
-        }
-        // A prompt must not wait for telemetry; one with a file waits for its reach check,
-        // so the run is marked before OpenCode reads the file into the conversation. The
-        // check sends nothing, so it waits for no late check in the family (waited2).
-        let ok = true
-        const checking =
-          unplaced || reaches.length > 0
-            ? waited2(s, async () => {
-                // A file without its place fails closed, as an unknown reach does: terma marks
-                // the run, which holds in a later process too.
-                if (unplaced) await checked2(s, { tool: "read", paths: [UNPLACED_ATTACHMENT] })
-                else for (const reach of reaches) if (!(ok = await checked2(s, reach))) return
-              })
-            : undefined
-        run(s, async () => {
-          await checking
+        // A prompt must not wait for telemetry.
+        run(s, () => {
           const e = data2(s)
           if (pr.messageID) {
             remember(e.prompts, pr.messageID, undefined, MAX_SMALL)
             e.lastPrompt = pr.messageID
           }
-          // In its turn: what the session queued before the prompt still leaves; this
-          // process hands nothing of the session over from the prompt on.
-          if (unplaced) {
-            taint(s)
-            return
-          }
-          if (!ok) return
           // The prompt carries the moment it was asked, held back only behind what the relay
-          // must judge it by: the session's claim, its own reach checks, and a move or a
-          // check that was ahead of it in the queue. The spans of its turn start no earlier
-          // (begun2), so the calls a prompt starts come after it.
-          pr.time = Math.max(asked, e.floor, s.movedAt, checkFloor(s))
+          // must judge it by: the session's claim and a move that was ahead of it in the
+          // queue. The spans of its turn start no earlier (begun2), so the calls a prompt
+          // starts come after it.
+          pr.time = Math.max(asked, e.floor, s.movedAt)
           if (pr.messageID) remember(e.stamps, pr.messageID, pr.time, MAX_SMALL)
-          if (!isTainted(s)) prompt(s, pr)
+          prompt(s, pr)
         })
-        await checking
       },
       title: async (input) => {
         const s = see(input.sessionID)
@@ -2387,22 +1916,11 @@ async function setup(ctx) {
       },
     },
     tool: {
-      // The reach guard: the tool waits for the hook, and a failure taints the session.
+      // Only for code mode: the start of a call that exists only in the hooks.
       "execute.before": async (input) => {
         const s = see(input.sessionID)
         if (!s || typeof input.id !== "string") return
-        // A session that failed closed asks again, if it must, for its run to be fenced; the
-        // tool does not wait for it.
-        if (isTainted(s)) fence(s)
-        const q = qualify(input.messageID, input.id)
-        if (input.codemode === true) {
-          remember(data2(s).code, q, Date.now(), MAX_SMALL)
-          return
-        }
-        const reach = reach2(input.tool, input.input)
-        if (!reach) return
-        remember(s.guarded, q, { reachKey: JSON.stringify(reach) }, MAX_SMALL)
-        await waited2(s, () => checked2(s, reach))
+        if (input.codemode === true) remember(data2(s).code, qualify(input.messageID, input.id), Date.now(), MAX_SMALL)
       },
       // Only for code mode: every other call is reported from the events.
       "execute.after": async (input) => {

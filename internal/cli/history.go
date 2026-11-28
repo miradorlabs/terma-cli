@@ -339,9 +339,6 @@ func renderHistorySummary(w io.Writer, sum history.Summary) {
 		}
 		fmt.Fprintf(w, "Skipped segments: %s\n", strings.Join(parts, ", "))
 	}
-	if sum.WithheldRecords > 0 {
-		fmt.Fprintf(w, "Withheld after a Mixed cutoff: %d record(s)\n", sum.WithheldRecords)
-	}
 	if len(sum.Unreadable) > 0 {
 		fmt.Fprintf(w, "Could not read: %s (sessions that may depend on them were skipped)\n", strings.Join(sum.Unreadable, ", "))
 	}

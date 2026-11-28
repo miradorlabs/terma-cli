@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/doctor"
@@ -13,15 +12,10 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 )
 
-// mixedRecent is how lately a Mixed run was active for doctor to name its session; older
-// ones it counts.
-const mixedRecent = 24 * time.Hour
-
 // routingFacts gathers routing/<profile>.json, active-lane pairing, cached team/org names,
-// Mixed runs, and relay blocked counts for doctor and status.
+// and relay blocked counts for doctor and status.
 func (app *App) routingFacts(cfg *config.Config) *doctor.Routing {
 	st, ok, err := routing.Load(app.stateDir, cfg.ProfileName)
 	names := app.routeNames(cfg)
@@ -35,8 +29,7 @@ func (app *App) routingFacts(cfg *config.Config) *doctor.Routing {
 		Teams:           names.Teams,
 		Orgs:            names.Orgs,
 	}
-	r.Mixed = runs.Mixed(app.stateDir, time.Now(), mixedRecent)
-	r.MixedDropped, r.Blocked = relayBlocked(app.stateDir)
+	r.Blocked = relayBlocked(app.stateDir)
 	return r
 }
 
@@ -53,21 +46,19 @@ func (app *App) routeNames(cfg *config.Config) teamNames {
 	return names
 }
 
-// relayBlocked reads what the relay kept from leaving from stats.json (relay.Snapshot.Blocked):
-// records dropped from Mixed runs ("mixed:<session>", summed) and the rest by blocker
-// ("pending:<binding>", "team:<enrollment>", "overflow").
-func relayBlocked(stateDir string) (mixed int, blocked map[string]int) {
+// relayBlocked reads what the relay kept from leaving from stats.json (relay.Snapshot.Blocked)
+// by blocker ("team:<enrollment>", "overflow"), ignoring legacy "mixed:" keys.
+func relayBlocked(stateDir string) (blocked map[string]int) {
 	data, err := os.ReadFile(filepath.Join(claim.Dir(stateDir), daemon.StatsFile))
 	if err != nil {
-		return 0, nil
+		return nil
 	}
 	var snap relay.Snapshot
 	if json.Unmarshal(data, &snap) != nil {
-		return 0, nil
+		return nil
 	}
 	for k, v := range snap.Blocked {
 		if strings.HasPrefix(k, "mixed:") {
-			mixed += v
 			continue
 		}
 		if blocked == nil {
@@ -75,5 +66,5 @@ func relayBlocked(stateDir string) (mixed int, blocked map[string]int) {
 		}
 		blocked[k] += v
 	}
-	return mixed, blocked
+	return blocked
 }

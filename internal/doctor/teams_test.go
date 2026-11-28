@@ -10,7 +10,6 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/ui/style"
 )
@@ -231,46 +230,6 @@ func TestTeamsCheckEnrollmentHealthAndSingleSignInRemediation(t *testing.T) {
 	}
 }
 
-// The paused sessions get a section of their own, counted by why, never named; what the
-// relay dropped is counted under the teams.
-func TestTeamsCheckAndSectionsShowPausedSessionsAndDroppedRecords(t *testing.T) {
-	t.Parallel()
-	now := time.Now()
-	r := routedFixture(t)
-	r.Mixed = []runs.MixedRun{
-		{Session: "s-1", Why: runs.Why{Reason: runs.Crossed, Where: "github.com/acme/api"}, At: now.Add(-time.Hour), Recent: true},
-		{Session: "s-2", Why: runs.Why{Reason: runs.Crossed, Where: "github.com/acme/web"}, At: now.Add(-50 * time.Hour), Recent: true},
-		{Session: "s-3", Why: runs.Why{Reason: runs.UnknownReach, Where: `cd "$(cat p)" && cat …`}, Recent: false},
-	}
-	r.MixedDropped = 7
-	r.Blocked = map[string]int{"team:" + r.State.Teams[0].EnrollmentID: 2}
-
-	c := TeamsCheck(r, now)
-	if c.Status != Pass || !strings.Contains(c.Detail, "3 session run(s) Mixed") || !strings.Contains(c.Detail, "dropped 7 record(s)") {
-		t.Fatalf("TeamsCheck = %+v", c)
-	}
-	got := render(r.teamSections(now), 80)
-	for _, want := range []string{
-		"  ! 2 records for Acme › Platform could not be sent\n",
-		"Paused sessions\n" +
-			"  ! 3 sessions are paused\n" +
-			"       worked in another organization's repository  paused " + now.Add(-time.Hour).Local().Format("15:04") + "\n" +
-			"       worked in another organization's repository  paused " + now.Add(-50*time.Hour).Local().Format("2 Jan 15:04") + "\n" +
-			"       ran a command terma could not trace\n" +
-			"          e.g. a command reading files outside the repository\n" +
-			"  ! 7 records from paused sessions dropped\n" +
-			"    Terma pauses a session that touches another organization's work, so nothing\n",
-		"    To send again, start a new session or resume this one. Keep each session to\n",
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("sections lack %q:\n%s", want, got)
-		}
-	}
-	if strings.Contains(got, "s-1") || strings.Contains(got, "cat p") {
-		t.Errorf("sections name a session or its command:\n%s", got)
-	}
-}
-
 // collectsFixture is routedFixture plus an older Beta Labs Core whose list overlaps Acme
 // Platform's, and a Gamma Ops that lost access to its organization.
 func collectsFixture(t *testing.T, now time.Time) Routing {
@@ -379,13 +338,11 @@ func TestTeamName(t *testing.T) {
 	}
 }
 
-func TestRoutedRepositoryAndDoctorCombineMixedWithOutboxLosses(t *testing.T) {
+func TestRoutedRepositoryAndDoctorWithOutboxLosses(t *testing.T) {
 	t.Parallel()
 	_, gitDir := listed(t)
 	now := time.Now()
 	r := routedFixture(t)
-	r.Mixed = []runs.MixedRun{{Session: "s-mix", Why: runs.Why{Reason: runs.Crossed, Where: "github.com/beta/core"}, Recent: true}}
-	r.MixedDropped = 4
 
 	c, team := RoutedRepository(r, gitDir, nil, now)
 	if c.Status != Pass || team == nil || team.TeamID != testTeamPlat ||
@@ -393,7 +350,7 @@ func TestRoutedRepositoryAndDoctorCombineMixedWithOutboxLosses(t *testing.T) {
 		t.Fatalf("RoutedRepository = %+v, %v", c, team)
 	}
 
-	// Doctor combines Mixed runs (KeyTeams + TeamRows) with #152 outbox/spool losses (KeyOutbox)
+	// Doctor shows the teams (KeyTeams + TeamRows) beside #152 outbox/spool losses (KeyOutbox)
 	// in both Run and Local without losing any #152 loss reason.
 	e := env(t, Probes{
 		Credential: signedIn,
@@ -410,7 +367,7 @@ func TestRoutedRepositoryAndDoctorCombineMixedWithOutboxLosses(t *testing.T) {
 	e.Routing = &r
 
 	rep := Run(t.Context(), e, Progress{})
-	if tc := check(rep, KeyTeams); tc.Status != Pass || !strings.Contains(tc.Detail, "1 session run(s) Mixed") || !strings.Contains(tc.Detail, "dropped 4 record(s)") {
+	if tc := check(rep, KeyTeams); tc.Status != Pass {
 		t.Errorf("KeyTeams = %+v", tc)
 	}
 	if pc := check(rep, KeyProject); pc.Status != Pass || !strings.Contains(pc.Detail, "goes to Acme › Platform") {
@@ -437,7 +394,6 @@ func TestRoutedRepositoryAndDoctorCombineMixedWithOutboxLosses(t *testing.T) {
 	joined := strings.Join(rowText, "\n")
 	for _, want := range []string{
 		"Where your data goes|1. Acme › Platform (",
-		"Paused sessions|1 session is paused",
 		"Repository|github.com/acme/one goes to Acme › Platform",
 		"Records lost|terma dropped records it could not send",
 		"5 with no routed destination",
@@ -453,20 +409,6 @@ func TestRoutedRepositoryAndDoctorCombineMixedWithOutboxLosses(t *testing.T) {
 
 // A long list shows its first five repositories and how many more, marked when a
 // hidden one goes to a newer team; with no colour the mark is a plain "!".
-// The paused list stops at five sessions, however many lines each takes, and counts the rest.
-func TestPausedSectionCapsSessions(t *testing.T) {
-	t.Parallel()
-	now := time.Now()
-	r := routedFixture(t)
-	for i := range 7 {
-		r.Mixed = append(r.Mixed, runs.MixedRun{Session: fmt.Sprint(i), Why: runs.Why{Reason: runs.UnknownReach}})
-	}
-	got := render(r.teamSections(now), 80)
-	if strings.Count(got, "ran a command terma could not trace") != 5 || !strings.Contains(got, "+ 2 more") {
-		t.Errorf("paused sessions not capped at five sessions:\n%s", got)
-	}
-}
-
 func TestTeamSectionsCapLongLists(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 11, 26, 9, 30, 0, 0, time.Local)

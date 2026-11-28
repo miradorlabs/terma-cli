@@ -21,7 +21,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -234,7 +233,7 @@ func (app *App) removeProfileRoutingState(profile string) error {
 // the policies they ran under.
 func (app *App) removeHookState() error {
 	var errs []error
-	for _, name := range append(app.hookStateDirs(), hookrun.AgentsDir, hookrun.PushesDir, runs.Dir, termaproject.WorkspacesDir, spool.Dir, config.PoliciesDir) {
+	for _, name := range append(app.hookStateDirs(), hookrun.AgentsDir, hookrun.PushesDir, termaproject.WorkspacesDir, spool.Dir, config.PoliciesDir) {
 		errs = append(errs, os.RemoveAll(filepath.Join(app.stateDir, name)))
 	}
 	if err := errors.Join(errs...); err != nil {

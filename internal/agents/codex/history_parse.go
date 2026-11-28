@@ -53,7 +53,6 @@ type codexHistoryParser struct {
 	segHasStart    bool
 	segNative      []*logspb.LogRecord
 	segSupplements []*logspb.LogRecord
-	segReaches     []agents.HistoryToolReach
 }
 
 func newCodexHistoryParser(sessionID string, includeSupplemental bool, emit func(agents.HistorySegment) error) *codexHistoryParser {
@@ -215,8 +214,6 @@ func (p *codexHistoryParser) handleEventMsg(raw json.RawMessage, ts time.Time) e
 			Type             string   `json:"type"`
 			ID               string   `json:"id"`
 			Status           string   `json:"status"`
-			Cwd              string   `json:"cwd"`
-			Path             string   `json:"path"`
 			Command          []string `json:"command"`
 			ExitCode         *int64   `json:"exit_code"`
 			FormattedOutput  string   `json:"formatted_output"`
@@ -225,9 +222,6 @@ func (p *codexHistoryParser) handleEventMsg(raw json.RawMessage, ts time.Time) e
 				Secs  int64 `json:"secs"`
 				Nanos int64 `json:"nanos"`
 			} `json:"duration"`
-			Changes []struct {
-				Path string `json:"path"`
-			} `json:"changes"`
 			Content []struct {
 				Type string `json:"type"`
 				Text string `json:"text"`
@@ -304,10 +298,6 @@ func (p *codexHistoryParser) handleEventMsg(raw json.RawMessage, ts time.Time) e
 				return nil
 			}
 			p.emittedCalls[pl.Item.ID] = true
-			cmdCwd := codexNormalizeCwd(pl.Item.Cwd, p.cwd)
-			if paths := codexCommandReachPaths(pl.Item.Command, cmdCwd, p.cwd); len(paths) > 0 {
-				p.addReach(ts, cmdCwd, paths)
-			}
 			argsJSON, _ := json.Marshal(map[string]any{"cmd": strings.Join(pl.Item.Command, " ")})
 			out := cmp.Or(pl.Item.FormattedOutput, pl.Item.AggregatedOutput)
 			success := pl.Item.Status == "completed"
@@ -322,24 +312,6 @@ func (p *codexHistoryParser) handleEventMsg(raw json.RawMessage, ts time.Time) e
 				durMs = pl.Item.Duration.Secs*1000 + pl.Item.Duration.Nanos/1e6
 			}
 			return p.emitToolResult(pl.Item.ID, "exec_command", string(argsJSON), out, success, durMs, p.traceBytes, ts)
-		case "ImageView":
-			// A code-mode script's image read shows up only as this item.
-			if pl.Item.Path != "" {
-				p.addReach(ts, p.cwd, hookrun.Alone(codexNormalizeCwd(pl.Item.Path, p.cwd)))
-			}
-		case "FileChange":
-			var paths []string
-			if pl.Item.Path != "" {
-				paths = append(paths, pl.Item.Path)
-			}
-			for _, ch := range pl.Item.Changes {
-				if ch.Path != "" {
-					paths = append(paths, ch.Path)
-				}
-			}
-			if len(paths) > 0 {
-				p.addReach(ts, codexNormalizeCwd(pl.Item.Cwd, p.cwd), hookrun.Alone(paths...))
-			}
 		}
 	}
 	return nil
@@ -398,15 +370,9 @@ func (p *codexHistoryParser) handleResponseItem(raw json.RawMessage, ts time.Tim
 		if pl.CallID != "" {
 			p.pendingCalls[pl.CallID] = codexPendingCall{Name: pl.Name, Arguments: pl.Input, Cwd: p.cwd, At: ts, TraceID: p.traceBytes}
 		}
-		if paths := codexToolReachPaths(pl.Name, pl.Input, p.cwd); len(paths) > 0 {
-			p.addReach(ts, p.cwd, paths)
-		}
 	case "function_call":
 		if pl.CallID != "" {
 			p.pendingCalls[pl.CallID] = codexPendingCall{Name: pl.Name, Arguments: pl.Arguments, Cwd: p.cwd, At: ts, TraceID: p.traceBytes}
-		}
-		if paths := codexToolReachPaths(pl.Name, pl.Arguments, p.cwd); len(paths) > 0 {
-			p.addReach(ts, p.cwd, paths)
 		}
 	case "custom_tool_call_output", "function_call_output":
 		if pl.CallID == "" || p.emittedCalls[pl.CallID] {

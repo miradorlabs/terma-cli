@@ -18,7 +18,6 @@ var claudeHooks = []struct {
 	// Edits build the manifest; the Agent tool's response (Task in older builds) is the only place a
 	// subagent's model is named.
 	{"PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|Agent|Task", "post-tool-use"},
-	{"PreToolUse", "Read|Grep|Glob|NotebookRead|LS|Bash", "pre-tool-use"},
 	{"Stop", "", "stop"},
 	{"StopFailure", "", "stop-failure"},
 	// The one hook before a turn exports anything, so the relay is up and the session claimed first.
@@ -48,6 +47,8 @@ func planClaude(root, path string, command func(event string) string, install bo
 		}
 		own = append(own, entry)
 	}
+	// PreToolUse ran a check this build no longer makes: refresh and teardown take it out.
+	own = append(own, hookmgr.EventHook{Event: "PreToolUse"})
 	return hookmgr.MergeEventHooks(root, hookmgr.HooksFile{Path: path}, own, install)
 }
 

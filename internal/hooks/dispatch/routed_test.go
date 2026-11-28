@@ -3,8 +3,8 @@ package dispatch
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -12,11 +12,11 @@ import (
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
 	"github.com/miradorlabs/terma-cli/internal/config"
-	"github.com/miradorlabs/terma-cli/internal/gitx"
+	"github.com/miradorlabs/terma-cli/internal/flock"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookruntest"
+	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/session"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
 
@@ -70,131 +70,106 @@ func (extFake) DisplayName() string            { return "ExtFake" }
 func (extFake) Installed(context.Context) bool { return true }
 func (extFake) FlushAfter() []string           { return nil }
 func (extFake) Events() map[string]agents.Handler {
-	return hookrun.Extension{Tool: "omp"}.Events("extfake")
+	ext := hookrun.Extension{Tool: "omp"}
+	ev := ext.Events("extfake")
+	ev["extfake-verify-prompt"] = ext.VerifyPrompt
+	return ev
 }
 
-type nativeReachFake struct {
-	event string
-	tool  string
-	path  string
-	sid   string
-}
-
-func (n nativeReachFake) Name() string                   { return n.tool }
-func (n nativeReachFake) DisplayName() string            { return n.tool }
-func (n nativeReachFake) Installed(context.Context) bool { return true }
-func (n nativeReachFake) FlushAfter() []string           { return []string{n.event} }
-func (n nativeReachFake) Events() map[string]agents.Handler {
-	return map[string]agents.Handler{
-		n.event: func(ctx context.Context, env hookrun.Env) error {
-			env.Classify(ctx, nil, session.Session{ID: n.sid, Tool: n.tool}, []string{n.path}, nil)
-			return nil
-		},
-	}
-}
-
-func TestDispatchToolReachFailsClosedOnWriteError(t *testing.T) {
-	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
-		t.Skip("POSIX non-root chmod permission test")
-	}
+// A plugin installed by an earlier build still sends <tool>-tool-reach until setup refreshes
+// it: the hook takes it, writes nothing and exits 0, routed or not.
+func TestDispatchLegacyToolReachIsANoOp(t *testing.T) {
 	stateDir := t.TempDir()
 	hookruntest.RelayOn(t, stateDir)
-	parent, _ := filepath.EvalSymlinks(t.TempDir())
-	repoA, repoB := filepath.Join(parent, "alpha"), filepath.Join(parent, "beta")
-	for _, r := range [][2]string{{repoA, "git@github.com:orgA/alpha.git"}, {repoB, "git@github.com:orgB/beta.git"}} {
-		_, _ = gitx.Git(context.Background(), parent, "init", "-q", "-b", "main", r[0])
-		_, _ = gitx.Git(context.Background(), r[0], "remote", "add", "origin", r[1])
+	repo := t.TempDir()
+	body := `{"session_id":"018f3a2c-9109-7000-8000-000000000001","cwd":` + strconv.Quote(repo) + `,"tool":"read","paths":["/elsewhere/secret.go"]}`
+	for _, rt := range []*hookrun.Routing{nil, hookrun.NewRouting("default", nil)} {
+		var claimed bool
+		deps := Deps{
+			StateDir:      stateDir,
+			Agents:        agents.New(extFake{}),
+			Profile:       func() Profile { return Profile{Routing: rt} },
+			Spool:         func() *spool.Spool { return nil },
+			ClaimedRouted: func(string, *hookrun.Routing) { claimed = true },
+		}
+		if code := Run(context.Background(), deps, Request{Event: "extfake-tool-reach", Cwd: repo, Stdin: strings.NewReader(body)}); code != 0 {
+			t.Fatalf("extfake-tool-reach (routing %v) exited %d; want 0", rt != nil, code)
+		}
+		if claimed {
+			t.Fatalf("extfake-tool-reach (routing %v) claimed the session", rt != nil)
+		}
 	}
-	fileB := filepath.Join(repoB, "secret.go")
-	if err := os.WriteFile(fileB, []byte("package b\n"), 0o644); err != nil {
-		t.Fatal(err)
+	entries, _ := os.ReadDir(filepath.Join(stateDir, "runs"))
+	if len(entries) != 0 {
+		t.Fatalf("extfake-tool-reach wrote run state: %v", entries)
 	}
-	const acct = "1111111111111111"
-	now := time.Now().UTC().Truncate(time.Second)
-	st, err := routing.Create(stateDir, "default", acct, func(s *routing.State) error {
-		for _, spec := range [][3]string{{"orgA", "team-a", "github.com/orgA/alpha"}, {"orgB", "team-b", "github.com/orgB/beta"}} {
-			if _, err := s.Select(routing.Team{OrganizationID: spec[0], AuthURL: "https://api.example.com", TeamID: spec[1],
-				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{spec[2]}, Revision: 1, FetchedAt: now, TeamID: spec[1], OrganizationID: spec[0], AuthURL: "https://api.example.com"}}); err != nil {
-				return err
+}
+
+func TestDispatchVerifyPromptFailsClosedWhenClaimLocked(t *testing.T) {
+	stateDir := t.TempDir()
+	hookruntest.RelayOn(t, stateDir)
+	repoA := t.TempDir()
+	repoB := t.TempDir()
+	for _, pair := range [][2]string{{repoA, "git@github.com:acme/api.git"}, {repoB, "git@github.com:beta/core.git"}} {
+		for _, args := range [][]string{{"init", "-q"}, {"remote", "add", "origin", pair[1]}} {
+			cmd := exec.Command("git", append([]string{"-C", pair[0]}, args...)...)
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("git %v: %v\n%s", args, err, out)
 			}
 		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	st := routing.State{
+		Account: "acct-test",
+		Profile: "default",
+		Teams: []routing.Team{
+			{
+				EnrollmentID: "enr-a", TeamID: "team-a", OrganizationID: "org-a",
+				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/acme/api"}, OrganizationID: "org-a", TeamID: "team-a", FetchedAt: now},
+			},
+			{
+				EnrollmentID: "enr-b", TeamID: "team-b", OrganizationID: "org-b",
+				Policy: config.Policy{Mode: config.ModeRepo, Repositories: []string{"github.com/beta/core"}, OrganizationID: "org-b", TeamID: "team-b", FetchedAt: now},
+			},
+		},
 	}
 	rt := hookrun.NewRouting("default", &st)
 	deps := Deps{
 		StateDir: stateDir,
 		Agents:   agents.New(extFake{}),
-		Profile:  func() Profile { return Profile{Routing: rt, Account: acct} },
+		Profile:  func() Profile { return Profile{Routing: rt, Account: "acct-test"} },
 		Spool:    func() *spool.Spool { return nil },
 	}
-	ctx := context.Background()
-	sid := "018f3a2c-9109-7000-8000-000000000001"
-	if code := Run(ctx, deps, Request{Event: "extfake-session-start", Cwd: repoA, Stdin: strings.NewReader(`{"session_id":"` + sid + `","cwd":` + strconv.Quote(repoA) + `}`)}); code != 0 {
-		t.Fatalf("session-start code = %d; want 0", code)
+	sid := "018f3a2c-9109-7000-8000-000000000099"
+	runPrompt := func(cwd string) int {
+		body := `{"session_id":` + strconv.Quote(sid) + `,"cwd":` + strconv.Quote(cwd) + `}`
+		return Run(context.Background(), deps, Request{Event: "extfake-verify-prompt", Cwd: cwd, Stdin: strings.NewReader(body)})
 	}
-	// Make runs/ and claims/ readable (stale clean claim remains readable) but unwritable.
-	runsDir := filepath.Join(stateDir, "runs")
-	claimsDir := filepath.Join(stateDir, "claims")
-	_ = os.MkdirAll(claimsDir, 0o700)
-	if err := os.Chmod(runsDir, 0o500); err != nil {
-		t.Fatal(err)
+	if code := runPrompt(repoA); code != 0 {
+		t.Fatalf("initial placement in repoA exited %d; want 0", code)
 	}
-	if err := os.Chmod(claimsDir, 0o500); err != nil {
-		t.Fatal(err)
+	if code := runPrompt(repoA); code != 0 {
+		t.Fatalf("same-place refresh in repoA exited %d; want 0", code)
 	}
-	t.Cleanup(func() {
-		_ = os.Chmod(runsDir, 0o700)
-		_ = os.Chmod(claimsDir, 0o700)
-	})
-	// Cross-org reach must exit non-zero when persistence fails.
-	reachBody := `{"session_id":"` + sid + `","cwd":` + strconv.Quote(repoA) + `,"tool":"read","paths":[` + strconv.Quote(fileB) + `]}`
-	if code := Run(ctx, deps, Request{Event: "extfake-tool-reach", Cwd: repoA, Stdin: strings.NewReader(reachBody)}); code == 0 {
-		t.Fatalf("extfake-tool-reach exited 0 despite unwritable stateDir; want non-zero")
+	if code := runPrompt(repoB); code != 0 {
+		t.Fatalf("move placement to repoB exited %d; want 0", code)
 	}
-	// Unknown-reach fallback fence must also exit non-zero when persistence fails.
-	fenceBody := `{"session_id":"` + sid + `","cwd":` + strconv.Quote(repoA) + `,"tool":"bash","command":"eval $TERMA_REACH_FAILED"}`
-	if code := Run(ctx, deps, Request{Event: "extfake-tool-reach", Cwd: repoA, Stdin: strings.NewReader(fenceBody)}); code == 0 {
-		t.Fatalf("fallback fence exited 0 despite unwritable stateDir; want non-zero")
+	c, ok := claim.Read(stateDir, sid, time.Now())
+	if !ok || c.Repository.Origin != "github.com/beta/core" {
+		t.Fatalf("claim after move = (%+v, %v); want beta/core", c, ok)
 	}
-	// Local read inside repoB triggers fallback ClaimFromPayload crossing orgA->orgB;
-	// persistence failure during fallback claiming must also exit non-zero.
-	localInB := `{"session_id":"` + sid + `","cwd":` + strconv.Quote(repoB) + `,"tool":"read","paths":[` + strconv.Quote(fileB) + `]}`
-	if code := Run(ctx, deps, Request{Event: "extfake-tool-reach", Cwd: repoB, Stdin: strings.NewReader(localInB)}); code == 0 {
-		t.Fatalf("fallback ClaimFromPayload tool-reach exited 0 despite unwritable stateDir; want non-zero")
+	// Hold the claim's sidecar lock so moving back to repoA cannot persist the new placement.
+	lockPath := filepath.Join(claim.Dir(stateDir), "claims", sid+".json.lock")
+	unlock, err := flock.Lock(context.Background(), lockPath)
+	if err != nil {
+		t.Fatalf("lock claim: %v", err)
 	}
-	// Native pre-tool reach hooks (Claude pre-tool-use and Codex codex-pre-tool-use)
-	// must also exit non-zero and skip ClaimedRouted/Flush when persistence fails.
-	for _, tc := range []struct {
-		event, tool string
-	}{
-		{"pre-tool-use", "claude-code"},
-		{"codex-pre-tool-use", "codex"},
-	} {
-		var claimed, flushed bool
-		nativeDeps := Deps{
-			StateDir:      stateDir,
-			Agents:        agents.New(nativeReachFake{event: tc.event, tool: tc.tool, path: fileB, sid: sid}),
-			Profile:       func() Profile { return Profile{Routing: hookrun.NewRouting("default", &st), Account: acct} },
-			Spool:         func() *spool.Spool { return nil },
-			ClaimedRouted: func(string, *hookrun.Routing) { claimed = true },
-			Flush:         func() { flushed = true },
-		}
-		if code := Run(ctx, nativeDeps, Request{Event: tc.event, Cwd: repoA, Stdin: strings.NewReader("{}")}); code == 0 {
-			t.Fatalf("%s exited 0 despite unwritable stateDir; want non-zero", tc.event)
-		}
-		if claimed || flushed {
-			t.Fatalf("%s invoked ClaimedRouted=%v Flush=%v on persistence failure", tc.event, claimed, flushed)
-		}
+	defer unlock()
+	if code := runPrompt(repoA); code != 1 {
+		t.Fatalf("move placement while claim locked exited %d; want 1", code)
 	}
-	// Unusable routing state also fails closed with non-zero exit.
-	unusableDeps := deps
-	unusableDeps.Profile = func() Profile {
-		return Profile{Routing: hookrun.NewRouting("default", nil)}
-	}
-	if code := Run(ctx, unusableDeps, Request{Event: "extfake-tool-reach", Cwd: repoA, Stdin: strings.NewReader(reachBody)}); code == 0 {
-		t.Fatalf("unusable routing tool-reach exited 0; want non-zero")
+	c, ok = claim.Read(stateDir, sid, time.Now())
+	if !ok || c.Repository.Origin != "github.com/beta/core" {
+		t.Fatalf("claim changed while locked: (%+v, %v)", c, ok)
 	}
 }

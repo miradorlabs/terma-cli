@@ -15,17 +15,13 @@ type HistoryFile struct {
 	// SessionID is the agent's native session identifier.
 	SessionID string
 	// ParentSessionID is the optional parent session identifier for spawned subagent
-	// transcripts stored as separate files (so cross-org reach in a child taints its parent),
-	// or a fork/continuation ancestor when OneWayParent is true.
+	// transcripts stored as separate files (so an active or unreadable child keeps its parent
+	// back until quiet), or a fork/continuation ancestor when OneWayParent is true.
 	ParentSessionID string
 	// OneWayParent reports that ParentSessionID is a one-directional lineage ancestor (such
 	// as a forked or continued transcript) whose history flowed into this session, rather
 	// than a bidirectional subagent whose activity flows back into the parent.
 	OneWayParent bool
-	// OneWayCutoff optionally bounds inherited ancestor activity to events strictly before
-	// this timestamp (such as a fork's creation time) when OneWayParent is true, so later
-	// unrelated activity on the original parent does not suppress the independent fork.
-	OneWayCutoff time.Time
 	// Path is the main transcript file path on disk.
 	Path string
 	// ExtraPaths lists companion transcript files belonging to the same session, such as
@@ -71,15 +67,6 @@ type HistoryReadOptions struct {
 	IncludeSupplemental bool
 }
 
-// HistoryToolReach records paths or shell-reached locations inspected by one tool call
-// inside a transcript segment, used to detect cross-organization reach even when no live
-// runs ledger exists.
-type HistoryToolReach struct {
-	At    time.Time
-	Cwd   string
-	Paths []string
-}
-
 // HistorySegment is a contiguous portion of a transcript recorded under one working
 // directory, converted into OTLP log batches ready for checkout stamping and content
 // filtering.
@@ -107,13 +94,6 @@ type HistorySegment struct {
 	// titles, subagent parent starts, or file-touch metadata not present in the native
 	// stream), filtered by the destination team's content policy before upload.
 	SupplementalLogs *logspb.LogsData
-	// ToolReaches holds paths reached by tool calls in this segment (with their timestamps)
-	// so historical upload enforces the same cross-organization Mixed cutoff as live hooks.
-	ToolReaches []HistoryToolReach
-	// Subagent reports whether this segment came from a companion subagent transcript
-	// sharing the parent session's run (so a subagent crossing into another organization
-	// taints the parent session's run at that timestamp).
-	Subagent bool
 	// RecordCount is the total number of log records and spans across NativeLogs,
 	// NativeTraces, and SupplementalLogs.
 	RecordCount int

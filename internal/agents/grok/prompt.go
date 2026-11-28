@@ -38,7 +38,6 @@ func userPromptSubmit(ctx context.Context, env hookrun.Env) error {
 	if !uuidShape.MatchString(in.PromptID) {
 		return nil
 	}
-	env.StartTurn(in.SessionID)
 	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
 	if !ok {
 		return nil

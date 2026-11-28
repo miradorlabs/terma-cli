@@ -21,7 +21,6 @@ import (
 type claimFile struct {
 	ProjectID  string           `json:"project_id"`
 	Kind       string           `json:"kind"`
-	Run        string           `json:"run"`
 	Repository claimRepository  `json:"repository"`
 	Placements []claimPlacement `json:"placements"`
 }
@@ -33,7 +32,6 @@ type claimRepository struct {
 type claimPlacement struct {
 	ProjectID  string          `json:"project_id"`
 	Kind       string          `json:"kind"`
-	Run        string          `json:"run"`
 	Repository claimRepository `json:"repository"`
 }
 
@@ -59,11 +57,11 @@ func (sb *Sandbox) claimFileOf(session string) (*claimFile, string) {
 // routedUncollected reports whether c is a routed claim that never names a project or
 // the admitted repository.
 func (c *claimFile) routedUncollected(admittedOrigin string) bool {
-	if c == nil || c.ProjectID != "" || c.Run == "" || len(c.Placements) == 0 {
+	if c == nil || c.ProjectID != "" || c.Kind == "" || len(c.Placements) == 0 {
 		return false
 	}
 	for _, p := range c.Placements {
-		if p.ProjectID != "" || strings.EqualFold(p.Repository.Origin, admittedOrigin) {
+		if p.ProjectID != "" || p.Kind == "" || strings.EqualFold(p.Repository.Origin, admittedOrigin) {
 			return false
 		}
 	}
@@ -228,7 +226,7 @@ func TestMachineHooksAdmission(t *testing.T) {
 					return
 				}
 				c := sb.claimOf(sid)
-				if c == nil || c.ProjectID != "" || c.Kind != "repository" || c.Run == "" || !strings.EqualFold(c.Repository.Origin, "github.com/acme/repo") {
+				if c == nil || c.ProjectID != "" || c.Kind != "repository" || !strings.EqualFold(c.Repository.Origin, "github.com/acme/repo") {
 					t.Errorf("claim = %+v, want routed repository claim with origin github.com/acme/repo", c)
 				}
 				if len(sb.Delivered("terma.session.start", sid, 30*time.Second)) == 0 || len(sb.Delivered("terma.files.touched", sid, 30*time.Second)) == 0 {

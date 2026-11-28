@@ -44,14 +44,6 @@ func (p *codexHistoryParser) setCwd(cwd string) error {
 	return nil
 }
 
-func (p *codexHistoryParser) addReach(at time.Time, cwd string, paths []string) {
-	if !p.segStarted {
-		p.segStarted = true
-		p.segCwd = p.cwd
-	}
-	p.segReaches = append(p.segReaches, agents.HistoryToolReach{At: at, Cwd: cwd, Paths: paths})
-}
-
 func (p *codexHistoryParser) ensureSegment(ts time.Time) {
 	if !p.segStarted {
 		p.segStarted = true
@@ -65,9 +57,8 @@ func (p *codexHistoryParser) ensureSegment(ts time.Time) {
 }
 
 // uniqueNanos returns ts in Unix nanoseconds, moved just after the previous record of the
-// same kind when they collide. An untimed record stays at zero: a made-up time would read
-// as a dated record from before any Mixed cutoff, while a zero time is dropped whenever a
-// cutoff exists.
+// same kind when they collide. An untimed record stays at zero rather than taking a made-up
+// time that would place it under whatever claim was in force then.
 func (p *codexHistoryParser) uniqueNanos(kind string, ts time.Time) uint64 {
 	if ts.IsZero() || ts.UnixNano() <= 0 {
 		return 0
@@ -82,8 +73,8 @@ func (p *codexHistoryParser) uniqueNanos(kind string, ts time.Time) uint64 {
 
 func (p *codexHistoryParser) makeConversationStartRecord(eventTS time.Time) *logspb.LogRecord {
 	// Stamp conversation_starts with the triggering event's timestamp (falling back to
-	// session_meta) so resumed segments and Mixed-run cutoffs evaluate in the segment's
-	// own run rather than borrowing an earlier checkout's start time.
+	// session_meta) so a resumed segment is placed by its own time rather than borrowing an
+	// earlier checkout's start time.
 	ts := eventTS
 	if ts.IsZero() {
 		ts = p.metaTime
@@ -273,19 +264,17 @@ func (p *codexHistoryParser) flushSegment() error {
 }
 
 func (p *codexHistoryParser) flushSegmentWithReset(reset bool) error {
-	if len(p.segNative) == 0 && len(p.segSupplements) == 0 && len(p.segReaches) == 0 {
+	if len(p.segNative) == 0 && len(p.segSupplements) == 0 {
 		if reset {
 			p.segStarted = false
 			p.segHasStart = false
 		}
-		p.segReaches = nil
 		return nil
 	}
 	nativeRecs := p.segNative
 	suppRecs := p.segSupplements
-	reaches := p.segReaches
 	cwd := p.segCwd
-	p.segNative, p.segSupplements, p.segReaches = nil, nil, nil
+	p.segNative, p.segSupplements = nil, nil
 	if reset {
 		p.segStarted, p.segHasStart = false, false
 	}
@@ -294,7 +283,6 @@ func (p *codexHistoryParser) flushSegmentWithReset(reset bool) error {
 		SourceSystem: codexSourceSystem,
 		SessionID:    p.sessionID,
 		Cwd:          cwd,
-		ToolReaches:  reaches,
 		RecordCount:  len(nativeRecs) + len(suppRecs),
 	}
 	if cwd != "" && cwd == p.metaCwd {

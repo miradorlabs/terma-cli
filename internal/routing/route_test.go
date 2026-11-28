@@ -117,9 +117,6 @@ func TestRouteScenarios(t *testing.T) {
 		s.Deselect(enrollment(t, s, "acme-platform"))
 		expect(t, s, repo("github.com/acme/api"), Send, "personal")
 	})
-	t.Run("a mixed run sends nothing", func(t *testing.T) {
-		expect(t, fixture(t), Location{Kind: Mixed}, Drop, "")
-	})
 	t.Run("a narrowed personal policy", func(t *testing.T) {
 		s := fixture(t, team("acme", "acme-platform", "github.com/acme/*"), personal("github.com/dawson/terma"))
 		expect(t, s, repo("github.com/dawson/side"), Drop, "")
@@ -233,30 +230,6 @@ func TestUnknownGoesToPersonalOnlyWhenNothingElseCouldClaimIt(t *testing.T) {
 
 	alone.Teams[0].SignInNeeded = true
 	expect(t, alone, unknown, Hold, "")
-}
-
-// Which organization a location belongs to, for telling when a run crosses.
-func TestOrganizationOf(t *testing.T) {
-	t.Parallel()
-	s := fixture(t)
-	for _, c := range []struct {
-		loc Location
-		org string
-		ok  bool
-	}{
-		{repo("github.com/acme/api"), "acme", true},
-		{repo("github.com/dawson/side"), "me", true},
-		{Location{Kind: OutsideGit}, "me", true},
-	} {
-		org, ok := NewRouter(*s).OrganizationOf(c.loc, now)
-		if org != c.org || ok != c.ok {
-			t.Errorf("OrganizationOf(%+v) = %q, %v; want %q, %v", c.loc, org, ok, c.org, c.ok)
-		}
-	}
-	narrowed := fixture(t, team("acme", "acme-platform", "github.com/acme/*"), personal("github.com/dawson/terma"))
-	if _, ok := NewRouter(*narrowed).OrganizationOf(repo("github.com/dawson/side"), now); ok {
-		t.Error("a location nothing collects belongs to an organization")
-	}
 }
 
 // Overlaps names every entry two teams both cover, in one organization or two, and the

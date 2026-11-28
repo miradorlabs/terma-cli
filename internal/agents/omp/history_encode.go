@@ -15,32 +15,31 @@ import (
 )
 
 type ompLine struct {
-	Type                  string          `json:"type"`
-	ID                    string          `json:"id"`
-	Timestamp             string          `json:"timestamp"`
-	UpdatedAt             string          `json:"updatedAt"`
-	Title                 string          `json:"title"`
-	Cwd                   string          `json:"cwd"`
-	ParentSession         string          `json:"parentSession"`
-	ContinuationOf        string          `json:"continuationOf"`
-	PreviousSessionFiles  []string        `json:"previousSessionFiles"`
-	AdditionalDirectories []string        `json:"additionalDirectories"`
-	ThinkingLevel         string          `json:"thinkingLevel"`
-	Configured            string          `json:"configured"`
-	Model                 string          `json:"model"`
-	Role                  string          `json:"role"`
-	Purpose               string          `json:"purpose"`
-	Provider              string          `json:"provider"`
-	StopReason            string          `json:"stopReason"`
-	Duration              *float64        `json:"duration"`
-	TTFT                  *float64        `json:"ttft"`
-	Usage                 *ompUsage       `json:"usage"`
-	Judgment              json.RawMessage `json:"judgment"`
-	Agent                 string          `json:"agent"`
-	Tools                 []string        `json:"tools"`
-	SystemPrompt          json.RawMessage `json:"systemPrompt"`
-	Message               json.RawMessage `json:"message"`
-	Runtime               *struct {
+	Type                 string          `json:"type"`
+	ID                   string          `json:"id"`
+	Timestamp            string          `json:"timestamp"`
+	UpdatedAt            string          `json:"updatedAt"`
+	Title                string          `json:"title"`
+	Cwd                  string          `json:"cwd"`
+	ParentSession        string          `json:"parentSession"`
+	ContinuationOf       string          `json:"continuationOf"`
+	PreviousSessionFiles []string        `json:"previousSessionFiles"`
+	ThinkingLevel        string          `json:"thinkingLevel"`
+	Configured           string          `json:"configured"`
+	Model                string          `json:"model"`
+	Role                 string          `json:"role"`
+	Purpose              string          `json:"purpose"`
+	Provider             string          `json:"provider"`
+	StopReason           string          `json:"stopReason"`
+	Duration             *float64        `json:"duration"`
+	TTFT                 *float64        `json:"ttft"`
+	Usage                *ompUsage       `json:"usage"`
+	Judgment             json.RawMessage `json:"judgment"`
+	Agent                string          `json:"agent"`
+	Tools                []string        `json:"tools"`
+	SystemPrompt         json.RawMessage `json:"systemPrompt"`
+	Message              json.RawMessage `json:"message"`
+	Runtime              *struct {
 		Version string `json:"version"`
 	} `json:"runtime"`
 }
@@ -62,13 +61,9 @@ type ompUsage struct {
 }
 
 type ompMessage struct {
-	Role      string          `json:"role"`
-	Content   json.RawMessage `json:"content"`
-	Synthetic bool            `json:"synthetic"`
-	Command   string          `json:"command"`
-	Files     []struct {
-		Path string `json:"path"`
-	} `json:"files"`
+	Role          string          `json:"role"`
+	Content       json.RawMessage `json:"content"`
+	Synthetic     bool            `json:"synthetic"`
 	Provider      string          `json:"provider"`
 	Model         string          `json:"model"`
 	UpstreamModel string          `json:"upstreamModel"`
@@ -328,7 +323,7 @@ func assistantSpanTimes(msg *ompMessage, entryTS time.Time) (start, end time.Tim
 	} else if msg.Timestamp > 0 {
 		// In pi-ai / OMP, msg.Timestamp is stamped at stream creation (request start) while
 		// entryTS is written at persistence. Start at msg.Timestamp and cap end at entryTS so
-		// timelines stay ordered while never projecting past subsequent tool results or Mixed cutoffs.
+		// timelines stay ordered while never projecting past subsequent tool results.
 		start = time.UnixMilli(msg.Timestamp).UTC()
 		end = start
 		if dur > 0 {

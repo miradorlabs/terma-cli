@@ -16,8 +16,6 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/agents/internal/applypatch"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
@@ -240,120 +238,6 @@ func (Agent) ReadHistory(ctx context.Context, file agents.HistoryFile, opts agen
 }
 
 var _ agents.HistorySource = Agent{}
-
-// shellReserved lists the words a shell reads as syntax when they start a command.
-const shellReserved = "if then else elif fi for while until do done case esac select function time coproc in"
-
-// shellArgvCommand renders argv as the shell command that would run it. Words a shell
-// reads as themselves stay bare, so the scanner still sees command names and flags (it
-// reads them as literal words and a quoted word has none); everything else is single-quoted
-// so "$foo", spaces and globs keep their argv boundaries and meaning. The first word is
-// also quoted when a shell would read it as an assignment or a reserved word.
-func shellArgvCommand(argv []string) string {
-	words := make([]string, len(argv))
-	for i, arg := range argv {
-		bare := arg != "" && strings.Trim(arg, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_@%+=:,./-") == ""
-		if i == 0 && (strings.Contains(arg, "=") || slices.Contains(strings.Fields(shellReserved), arg)) {
-			bare = false
-		}
-		words[i] = arg
-		if !bare {
-			words[i] = "'" + strings.ReplaceAll(arg, "'", `'\''`) + "'"
-		}
-	}
-	return strings.Join(words, " ")
-}
-
-// codexCommandReachPaths returns what a CommandExecution's argv reaches: its working
-// directory dir, already resolved against the session's, when it differs from the
-// session's cwd, and the paths the shell scan finds in the command, which unwraps
-// `bash -c '<script>'` the same way the live Codex hook does.
-func codexCommandReachPaths(cmd []string, dir, sessionCwd string) []string {
-	var out []string
-	if dir != "" && dir != sessionCwd {
-		out = append(out, hookrun.Alone(dir)...)
-	}
-	if len(cmd) == 0 {
-		return out
-	}
-	return append(out, hookrun.Alone(hookrun.ShellPathsHistorical(shellArgvCommand(cmd), dir)...)...)
-}
-
-func codexToolReachPaths(name, args, cwd string) []string {
-	if args == "" {
-		return nil
-	}
-	if name == "exec" {
-		// Code-mode "exec" scripts are JavaScript wrappers whose inner shell calls appear
-		// as CommandExecution items; never parse JS as POSIX shell, but do extract any
-		// embedded apply_patch file headers so cross-org patch targets are always caught.
-		if patched := applypatch.Paths(args); len(patched) > 0 {
-			return hookrun.Alone(patched...)
-		}
-		return nil
-	}
-	if name == codexPatchTool {
-		patchText := args
-		var wrapped struct {
-			Input string `json:"input"`
-			Patch string `json:"patch"`
-		}
-		if json.Unmarshal([]byte(args), &wrapped) == nil {
-			if p := cmp.Or(wrapped.Input, wrapped.Patch); p != "" {
-				patchText = p
-			}
-		}
-		return hookrun.Alone(applypatch.Paths(patchText)...)
-	}
-	var fields map[string]json.RawMessage
-	if json.Unmarshal([]byte(args), &fields) != nil {
-		return nil
-	}
-	strField := func(k string) string {
-		var s string
-		if raw, ok := fields[k]; ok && json.Unmarshal(raw, &s) == nil {
-			return s
-		}
-		return ""
-	}
-	var out []string
-	dir := cwd
-	if raw := cmp.Or(strField("workdir"), strField("cwd")); strings.TrimSpace(raw) != "" {
-		dir = codexNormalizeCwd(raw, cwd)
-		out = append(out, hookrun.Alone(dir)...)
-	}
-	scanCmd := func(raw json.RawMessage) {
-		if len(raw) == 0 {
-			return
-		}
-		var s string
-		if json.Unmarshal(raw, &s) == nil {
-			if s != "" {
-				out = append(out, hookrun.Alone(hookrun.ShellPathsHistorical(s, dir)...)...)
-			}
-			return
-		}
-		var argv []string
-		if json.Unmarshal(raw, &argv) == nil && len(argv) > 0 {
-			out = append(out, codexCommandReachPaths(argv, dir, cwd)...)
-		}
-	}
-	if raw, ok := fields["cmd"]; ok {
-		scanCmd(raw)
-	}
-	if raw, ok := fields["command"]; ok {
-		scanCmd(raw)
-	}
-	for _, k := range []string{"file_path", "path"} {
-		if p := strField(k); p != "" {
-			if !filepath.IsAbs(p) && dir != "" {
-				p = filepath.Join(dir, p) // the call's own working directory, not the session's
-			}
-			out = append(out, hookrun.Alone(p)...)
-		}
-	}
-	return out
-}
 
 func codexOutputSuccess(raw json.RawMessage, decoded string) bool {
 	checkJSON := func(s string) (decided, ok bool) {

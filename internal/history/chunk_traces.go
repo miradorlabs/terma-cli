@@ -9,7 +9,6 @@ import (
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 )
 
@@ -74,64 +73,25 @@ func filterSupplementalLogs(msg *logspb.LogsData, prompts, toolContent bool) {
 	msg.ResourceLogs = keptRL
 }
 
-// FilterMixedTraces removes any trace span whose [start, end] interval falls at or after a
-// Mixed cutoff recorded in snap or derived from transcript tool reach (reachMixedAt when
-// hasReachMixed), drops spans newer than maxRecordTime when resuming a modified transcript,
-// or drops every span when the ledger is unreadable (failing closed). dropped counts Mixed
-// drops only.
-func FilterMixedTraces(msg *tracepb.TracesData, snap runs.Snapshot, lookup func(id string) runs.Snapshot, reachMixedAt time.Time, hasReachMixed bool, maxRecordTime time.Time) (kept, dropped int) {
+// TrimTracesAfter drops trace spans newer than maxRecordTime when resuming a modified
+// transcript and returns the number of spans kept.
+func TrimTracesAfter(msg *tracepb.TracesData, maxRecordTime time.Time) int {
 	if msg == nil {
-		return 0, 0
+		return 0
 	}
-	spanBounds := func(sp *tracepb.Span) (start, end time.Time) {
-		start = spanStartTime(sp)
-		end = spanEndTime(sp)
-		if start.IsZero() && end.IsZero() {
-			return time.Time{}, time.Time{}
-		}
-		if start.IsZero() {
-			start = end
-		}
-		if end.IsZero() || end.Before(start) {
-			end = start
-		}
-		return start, end
+	if maxRecordTime.IsZero() {
+		return countTraces(msg)
 	}
-	later := func(start, end time.Time) bool {
-		return !maxRecordTime.IsZero() && ((!start.IsZero() && start.After(maxRecordTime)) || (!end.IsZero() && end.After(maxRecordTime)))
-	}
-	crossesSnap := func(s runs.Snapshot, start, end time.Time) bool {
-		mixedAt, mixed := s.MixedInterval(start, end)
-		return mixed && (mixedAt.IsZero() || start.IsZero() || !start.Before(mixedAt) || !end.Before(mixedAt))
-	}
-	isMixed := func(sp *tracepb.Span, start, end time.Time) bool {
-		if hasReachMixed && (reachMixedAt.IsZero() || start.IsZero() || !start.Before(reachMixedAt) || !end.Before(reachMixedAt)) {
-			return true
-		}
-		if crossesSnap(snap, start, end) {
-			return true
-		}
-		if lookup != nil {
-			for _, attrKey := range []string{"gen_ai.conversation.id", "agent_id"} {
-				if id := spanAttrString(sp, attrKey); id != "" && crossesSnap(lookup(id), start, end) {
-					return true
-				}
-			}
-		}
-		return false
-	}
+	kept := 0
 	var keptRS []*tracepb.ResourceSpans
 	for _, rs := range msg.GetResourceSpans() {
 		var keptSS []*tracepb.ScopeSpans
 		for _, ss := range rs.GetScopeSpans() {
 			var keptSpans []*tracepb.Span
 			for _, sp := range ss.GetSpans() {
-				start, end := spanBounds(sp)
-				if later(start, end) {
-					continue
-				}
-				if isMixed(sp, start, end) {
-					dropped++
+				start := spanStartTime(sp)
+				end := spanEndTime(sp)
+				if (!start.IsZero() && start.After(maxRecordTime)) || (!end.IsZero() && end.After(maxRecordTime)) {
 					continue
 				}
 				keptSpans = append(keptSpans, sp)
@@ -148,7 +108,7 @@ func FilterMixedTraces(msg *tracepb.TracesData, snap runs.Snapshot, lookup func(
 		}
 	}
 	msg.ResourceSpans = keptRS
-	return kept, dropped
+	return kept
 }
 
 func spanStartTime(sp *tracepb.Span) time.Time {
@@ -163,15 +123,6 @@ func spanEndTime(sp *tracepb.Span) time.Time {
 		return time.Unix(0, int64(ns)).UTC()
 	}
 	return time.Time{}
-}
-
-func spanAttrString(sp *tracepb.Span, key string) string {
-	for _, kv := range sp.GetAttributes() {
-		if kv.GetKey() == key {
-			return kv.GetValue().GetStringValue()
-		}
-	}
-	return ""
 }
 
 // AddTraces appends one prepared TracesData batch, flushing completed /v1/traces chunks

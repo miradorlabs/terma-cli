@@ -109,49 +109,28 @@ type verdict struct {
 	q, pin                *Queued
 	why, blocker, session string
 	ok, final             bool
-	mixedAt               time.Time
-	// mixedRun is the run mixedAt belongs to, which may not be the placement's (c.Run):
-	// a resumed process's record stamped before its new run began is in the paused one.
-	mixedRun string
 }
 
 func (r *Relay) judge(key string, p *part) verdict {
 	if r.teams() {
-		v := r.decideTeams(key, p)
-		if !v.mixedAt.IsZero() && v.session != "" {
-			r.dropMixed(v.session, v.mixedRun, v.mixedAt)
-		}
-		return v
+		return r.decideTeams(key, p)
 	}
 	c, pol, why, ok, how := r.decide(key, p.pid, p.at, p.narrow, p.claimed, p.account)
 	return verdict{c: c, pol: pol, why: why, ok: ok, how: how}
-}
-func (r *Relay) splitMixed(p *part, v verdict) (*part, *part) {
-	if !r.teams() || v.why != string(WhyMixed) || v.mixedAt.IsZero() || p.records <= 1 || p.startAt.IsZero() || !p.startAt.Before(v.mixedAt) {
-		return nil, nil
-	}
-	return splitBeforeMixed(p, v.mixedAt)
 }
 func (r *Relay) route(p *part) {
 	r.deliverMu.Lock()
 	defer r.deliverMu.Unlock()
 	for _, piece := range r.pieces(p.session, p) {
-		r.routePiece(piece, true)
+		r.routePiece(piece)
 	}
 }
-func (r *Relay) routePiece(p *part, allowSplit bool) {
+func (r *Relay) routePiece(p *part) {
 	if r.teams() && p.lost != "" {
 		r.lose(p)
 		return
 	}
 	v := r.judge(p.session, p)
-	if before, after := r.splitMixed(p, v); allowSplit && before != nil {
-		r.routePiece(before, false)
-		if after != nil {
-			r.routePiece(after, false)
-		}
-		return
-	}
 	c, pol, why, ok, how := v.c, v.pol, v.why, v.ok, v.how
 	switch {
 	case why == whyNotCollected || v.final:

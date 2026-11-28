@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -56,13 +55,6 @@ func (p *pass) admit(e spool.Event, pr *profileRoute, lane string, now time.Time
 	switch {
 	case v == routing.Discard || !ok:
 		res.Discarded++
-		return routing.Team{}, spool.Event{}, admitDrop
-	case p.mixed(e):
-		res.Mixed++
-		if res.MixedBy == nil {
-			res.MixedBy = map[runs.Reason]int{}
-		}
-		res.MixedBy[p.ledgers[e.SessionID].Why(e.Time).Reason]++
 		return routing.Team{}, spool.Event{}, admitDrop
 	case v == routing.Wait:
 		res.Blocked++
@@ -159,37 +151,6 @@ func locationOf(e spool.Event) routing.Location {
 		return routing.Location{Kind: routing.OutsideGit}
 	}
 	return routing.Location{Kind: routing.Repository, Repository: e.Repository.Origin}
-}
-
-// mixed reports whether e's session's run crossed organizations at or before e's time,
-// and e is not exempt: a record that carries content obeys its run's Mixed state even
-// when it routes by its own location, as a reply read from an agent's turn does. Only a
-// record with its own location that says where something happened and nothing else (a
-// file event, a commit, a push: runs.Locational) keeps its destination. A ledger that
-// cannot be read counts as Mixed from the start.
-//
-// Each ledger is read once a pass. A pass sends only what was spooled before it began
-// (spool.Flush), so that one read is later than every event it judges, and sees every
-// crossing recorded before one of them was spooled.
-func (p *pass) mixed(e spool.Event) bool {
-	if e.SessionID == "" || e.OwnLocation && runs.Locational(e.Name) {
-		return false
-	}
-	l, read := p.ledgers[e.SessionID]
-	if !read {
-		l = p.r.ledger(e.SessionID)
-		p.ledgers[e.SessionID] = l
-	}
-	at, mixed := l.MixedAt(e.Time)
-	return mixed && (e.Time.IsZero() || !at.After(e.Time))
-}
-
-// ledger reads the run ledger of idOrAlias.
-func (r Router) ledger(idOrAlias string) runs.Snapshot {
-	if r.readLedger != nil {
-		return r.readLedger(r.StateDir, idOrAlias)
-	}
-	return runs.Read(r.StateDir, idOrAlias)
 }
 
 // outgoingTo is e as it may leave for team, whose recheck found it still covers e: under

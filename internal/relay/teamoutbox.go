@@ -87,24 +87,6 @@ func (o outbox) listTeam(rt teamRoute) ([]entry, error) {
 	return out, err
 }
 
-// QueuedSessions lists session/subagent IDs queued under dir/.teams/ for runs.Prune.
-func QueuedSessions(dir string) (map[string]bool, error) {
-	o, out := outbox{dir: dir}, map[string]bool{}
-	routes, err := o.teamRoutes()
-	for _, rt := range routes {
-		entries, lerr := o.listTeam(rt)
-		err = errors.Join(err, lerr)
-		for _, e := range entries {
-			if !e.corrupt && !e.unread && e.q.Session != "" {
-				out[e.q.Session] = true
-			}
-		}
-	}
-	return out, err
-}
-
-// QueuedSessions lists session/subagent IDs queued in this relay's .teams/ outbox.
-func (r *Relay) QueuedSessions() (map[string]bool, error) { return QueuedSessions(r.outbox.dir) }
 func readSubdirs(dir string) ([]os.DirEntry, error) {
 	if des, err := os.ReadDir(dir); !errors.Is(err, fs.ErrNotExist) {
 		return des, err

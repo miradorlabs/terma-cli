@@ -33,7 +33,6 @@ type claudePendingCall struct {
 	key           string
 	cwd           string
 	branch        string
-	subagent      bool
 	sessionID     string
 	agentID       string
 	promptID      string
@@ -73,12 +72,10 @@ type claudeHistoryParser struct {
 	tools   map[string]claudePendingTool
 	pending *claudePendingCall
 
-	segStarted  bool
-	segCwd      string
-	segBranch   string
-	segSubagent bool
-	segRecords  []*logspb.LogRecord
-	segReaches  []agents.HistoryToolReach
+	segStarted bool
+	segCwd     string
+	segBranch  string
+	segRecords []*logspb.LogRecord
 }
 
 func newClaudeHistoryParser(sessionID string, emit func(agents.HistorySegment) error) *claudeHistoryParser {
@@ -249,7 +246,7 @@ func (p *claudeHistoryParser) handleUser(rec *claudeTranscriptLine, defaultAgent
 		if json.Unmarshal(raw, &text) != nil || strings.TrimSpace(text) == "" {
 			return nil
 		}
-		return p.appendToSegment(rec.Cwd, rec.GitBranch, defaultAgentID != "", p.makeUserPromptRecord(sid, agentID, rec.UUID, p.promptID, text, ts))
+		return p.appendToSegment(rec.Cwd, rec.GitBranch, p.makeUserPromptRecord(sid, agentID, rec.UUID, p.promptID, text, ts))
 	}
 	if raw[0] != '[' {
 		return nil
@@ -280,19 +277,19 @@ func (p *claudeHistoryParser) handleUser(rec *claudeTranscriptLine, defaultAgent
 			tAgent := cmp.Or(agentID, tool.AgentID)
 			if rec.PermissionDecision != nil && rec.PermissionDecision.Decision != "" {
 				decRec := p.makeToolDecisionRecord(sid, tAgent, promptID, blk.ToolUseID, tool.Name, rec.PermissionDecision.Decision, rec.PermissionDecision.Source, ts)
-				if err := p.appendToSegment(rec.Cwd, rec.GitBranch, defaultAgentID != "", decRec); err != nil {
+				if err := p.appendToSegment(rec.Cwd, rec.GitBranch, decRec); err != nil {
 					return err
 				}
 			}
 			trRec := p.makeToolResultRecord(sid, tAgent, promptID, blk.ToolUseID, tool, blk, ts)
-			if err := p.appendToSegment(rec.Cwd, rec.GitBranch, defaultAgentID != "", trRec); err != nil {
+			if err := p.appendToSegment(rec.Cwd, rec.GitBranch, trRec); err != nil {
 				return err
 			}
 		}
 	}
 	if len(promptTexts) > 0 {
 		text := strings.Join(promptTexts, "\n")
-		return p.appendToSegment(rec.Cwd, rec.GitBranch, defaultAgentID != "", p.makeUserPromptRecord(sid, agentID, rec.UUID, p.promptID, text, ts))
+		return p.appendToSegment(rec.Cwd, rec.GitBranch, p.makeUserPromptRecord(sid, agentID, rec.UUID, p.promptID, text, ts))
 	}
 	return nil
 }
@@ -326,7 +323,6 @@ func (p *claudeHistoryParser) handleAssistant(rec *claudeTranscriptLine, default
 			key:         callKey,
 			cwd:         rec.Cwd,
 			branch:      rec.GitBranch,
-			subagent:    defaultAgentID != "",
 			sessionID:   sid,
 			agentID:     agentID,
 			promptID:    p.promptID,
@@ -410,11 +406,6 @@ func (p *claudeHistoryParser) mergeAssistantChunk(c *claudePendingCall, rec *cla
 					At:        ts,
 					PromptID:  c.promptID,
 					AgentID:   c.agentID,
-				}
-			}
-			if paths := claudeToolReachPaths(blk.Name, blk.Input, c.cwd); len(paths) > 0 {
-				if err := p.addReach(c.cwd, c.branch, c.subagent, ts, paths); err != nil {
-					return err
 				}
 			}
 		}

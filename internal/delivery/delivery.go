@@ -19,7 +19,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/config"
 	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/semconv"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
@@ -47,8 +46,6 @@ type Router struct {
 	// under the account it was collected under (spool.Event.Account), else held until it
 	// ages out. Nil sends nothing that way.
 	SignIn SignIn
-	// readLedger reads a session's run ledger; runs.Read when nil (test hook).
-	readLedger func(stateDir, idOrAlias string) runs.Snapshot
 	// loadState reads a profile's routing state; routing.Load when nil (test hook).
 	loadState func(stateDir, profile string) (routing.State, bool, error)
 	// now returns the current wall clock; time.Now when nil (test hook).
@@ -71,14 +68,12 @@ type Result struct {
 	// missing, unreadable, or belongs to another account.
 	Blocked, Unrouted int
 	// Discarded were dropped by Recheck (enrollment ended, Refused, or no longer covers the
-	// event's location). Mixed were dropped because their session's run turned Mixed by
-	// their time, MixedBy counting them by reason ("" for an unreadable run ledger).
-	Discarded, Mixed int
-	MixedBy          map[runs.Reason]int
-	Skipped          bool
-	Reason           spool.SkipReason
-	NextAttempt      time.Time
-	Err              error
+	// event's location).
+	Discarded   int
+	Skipped     bool
+	Reason      spool.SkipReason
+	NextAttempt time.Time
+	Err         error
 	// Failures names each failed project once, in order; doctor tells its own from another's.
 	Failures []Failure
 	// Waiting names each project skipped because its retry window was open.
@@ -100,9 +95,8 @@ type Wait struct {
 }
 
 // Lost reports whether the pass discarded events rather than delivering or holding them.
-// A drop by policy is not loss: neither Withheld (what a team's policy withholds), nor
-// Discarded (what its team no longer collects), nor Mixed (what a session that crossed
-// organizations carried); `terma spool flush` reports each and succeeds.
+// A drop by policy is not loss: neither Withheld (what a team's policy withholds) nor
+// Discarded (what its team no longer collects); `terma spool flush` reports each and succeeds.
 func (r Result) Lost() bool {
 	return r.Expired > 0 || r.Pruned > 0 || r.Dropped > 0 || r.Unroutable > 0
 }
@@ -133,7 +127,7 @@ func (r Router) Flush(ctx context.Context, s *spool.Spool, cfg *config.Config, f
 		r: r, s: s, cfg: cfg, force: force, now: now, res: &res, http: httpClient,
 		serverKey: serverKey, account: account,
 		failed: map[string]bool{}, waiting: map[string]bool{}, accepted: map[string]bool{},
-		routes: routeCache{}, ledgers: map[string]runs.Snapshot{}, profiles: map[string]*config.Config{},
+		routes: routeCache{}, profiles: map[string]*config.Config{},
 	}
 	fr := s.Flush(ctx, spool.SenderFunc(p.routed), spool.FlushOptions{Force: force, MinInterval: minInterval, Now: now})
 	res.Endpoints = slices.Sorted(maps.Keys(p.accepted))
@@ -166,8 +160,6 @@ type pass struct {
 	failed, waiting, accepted map[string]bool
 	// routes are the routing states kept across a routed pass's batches.
 	routes routeCache
-	// ledgers are the run ledgers the pass read, by session or subagent ID (pass.mixed).
-	ledgers map[string]runs.Snapshot
 	// profiles caches non-active profile configs loaded for cross-profile routed parcels
 	// (nil entry records a missing or unreadable profile so it fails closed).
 	profiles map[string]*config.Config

@@ -102,10 +102,7 @@ function schedule() {
   if (!timer) timer = setTimeout(() => void flush(), 1000)
 }
 
-const tainted = new Set()
-
 function span(session, name, start, end, a, error = false) {
-  if (session && tainted.has(session)) return
   spans.push({
     traceId: traceId(session), spanId: hex(8), name, kind: 3,
     startTimeUnixNano: nanos(start), endTimeUnixNano: nanos(end),
@@ -116,7 +113,6 @@ function span(session, name, start, end, a, error = false) {
 }
 
 function record(session, event, body, a) {
-  if (session && tainted.has(session)) return
   const t = nanos(Date.now())
   logs.push({
     timeUnixNano: t, observedTimeUnixNano: t, severityNumber: 9, severityText: "INFO",
@@ -141,7 +137,8 @@ function usageAttrs(u) {
 // --- terma hook ------------------------------------------------------------------------
 
 // termaHook hands an event to `terma hook dsh-*` in FIFO order, as this process's child —
-// which lets its claim name this process and ensures session-start finishes before tool-reach.
+// which lets its claim name this process and ensures session-start finishes before the
+// session's prompts and file edits.
 // A timed-out child is terminated and the queue only advances once child exit is confirmed.
 const HOOK_TIMEOUT_MS = 2000, HOOK_KILL_GRACE_MS = 250, MAX_HOOK_QUEUE = 64
 let hookQueue = Promise.resolve()
@@ -194,7 +191,7 @@ const EDIT_TOOLS = new Set(["write", "edit", "multi_edit"])
 
 const cwds = new Map() // session → workspace
 const stepStart = new Map() // session → when its model step began
-const calls = new Map() // callId → { name, args, start, reachDone }
+const calls = new Map() // callId → { name, args, start }
 const ended = new Set()
 
 function sessionOf(session, event) {
@@ -217,59 +214,6 @@ function args(raw) {
   }
 }
 
-// toolReach describes what a read, search, glob, list or shell tool call can reach.
-function toolReach(tool, raw) {
-  const a = args(raw)
-  const out = {}
-  const str = (...keys) => {
-    for (const k of keys) if (typeof a[k] === "string" && a[k]) return a[k]
-    return ""
-  }
-  const path = str("file_path", "path", "dir_path", "filePath")
-  switch (String(tool || "").toLowerCase()) {
-    case "read":
-    case "read_file":
-    case "view_file":
-      if (path) out.paths = [path]
-      break
-    case "grep":
-    case "grep_search":
-    case "search": {
-      out.paths = [path || "."]
-      const g = str("glob", "include")
-      if (g) out.globs = [g]
-      break
-    }
-    case "glob":
-    case "find":
-    case "find_files": {
-      out.paths = [path || "."]
-      const g = str("pattern", "glob")
-      if (g) out.globs = [g]
-      break
-    }
-    case "ls":
-    case "list":
-    case "list_dir":
-    case "list_files":
-      if (path) out.lists = [path]
-      break
-    case "bash":
-    case "shell":
-    case "exec":
-    case "run_command": {
-      const cmd = str("command", "cmd")
-      if (cmd) out.command = cmd
-      const dir = str("cwd", "workdir")
-      if (dir) out.dir = dir
-      break
-    }
-    default:
-      return null
-  }
-  return Object.keys(out).length > 0 ? out : null
-}
-
 export function apply(ctx) {
   if (!CONFIG) return
 
@@ -282,7 +226,7 @@ export function apply(ctx) {
     termaHook("dsh-session-start", { session_id: s, cwd })
   })
 
-  ctx.on("session/event", async (session, event) => {
+  ctx.on("session/event", (session, event) => {
     const s = sessionOf(session, event)
     if (!s || !event) return
     const d = event.data || {}
@@ -317,16 +261,7 @@ export function apply(ctx) {
         break
       }
       case "tool/call": {
-        const name = String(d.name || "")
-        const reach = toolReach(name, d.arguments)
-        const reachDone = reach
-          ? termaHook("dsh-tool-reach", { session_id: s, cwd, tool: name, ...reach }).then((ok) => {
-              if (!ok) tainted.add(s)
-              return ok
-            })
-          : null
-        if (d.callId) calls.set(d.callId, { name, args: d.arguments, start: at, reachDone })
-        if (reachDone) await reachDone
+        if (d.callId) calls.set(d.callId, { name: String(d.name || ""), args: d.arguments, start: at })
         break
       }
       case "tool/result": {
@@ -334,16 +269,7 @@ export function apply(ctx) {
         const call = calls.get(id)
         if (!call) break
         calls.delete(id)
-        let end = at
-        if (call.reachDone) {
-          if (!(await call.reachDone)) {
-            tainted.add(s)
-            break
-          }
-          end = Math.max(at, Date.now())
-        }
-        if (tainted.has(s)) break
-        span(s, "execute_tool " + call.name, call.start, end, {
+        span(s, "execute_tool " + call.name, call.start, at, {
           "gen_ai.operation.name": "execute_tool",
           "gen_ai.tool.name": call.name,
           "gen_ai.tool.call.id": id,

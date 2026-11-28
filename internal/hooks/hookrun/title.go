@@ -21,7 +21,9 @@ const TitleMaxBytes = 256
 type titleState struct {
 	Hash  string `json:"hash"`
 	Route string `json:"route,omitempty"`
-	Mixed bool   `json:"mixed,omitempty"`
+	// Mixed marks a session whose title was seen under more than one routing destination so
+	// one team's title never attaches to another team's enrollment.
+	Mixed bool `json:"mixed,omitempty"`
 }
 
 // SpoolTitle spools a session's name as terma.session.title when it differs from the one last

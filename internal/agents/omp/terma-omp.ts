@@ -178,74 +178,6 @@ function editedFiles(event: any): string[] {
   return files
 }
 
-// nonURLPath returns p when it is a filesystem path rather than an OMP internal URL.
-function nonURLPath(p: unknown): string {
-  return typeof p === "string" && p && !/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(p) ? p : ""
-}
-
-// toolReach describes what a read, search, glob, list or shell tool call can reach.
-function toolReach(event: any): Record<string, unknown> | null {
-  const name = String(event?.toolName ?? "")
-  const input = event?.input ?? {}
-  const out: Record<string, unknown> = {}
-  const paths: string[] = []
-  const addPath = (p: unknown) => {
-    const s = typeof p === "string" ? p : ""
-    if (s && !paths.includes(s)) paths.push(s)
-  }
-  const addFile = (p: unknown) => {
-    const s = nonURLPath(p)
-    if (s) addPath(s)
-  }
-  // OMP search tools accept semicolon-separated multi-target paths (e.g. "src;../beta").
-  const addSearchPaths = (p: unknown) => {
-    if (typeof p === "string" && p) {
-      if (p.includes(";")) {
-        for (const seg of p.split(";")) addFile(seg.trim())
-      } else {
-        addFile(p)
-      }
-    }
-    if (Array.isArray(input.paths)) for (const q of input.paths) addFile(q)
-  }
-  switch (name) {
-    case "read":
-      addPath(event?.details?.resolvedPath)
-      addFile(input.path)
-      if (Array.isArray(input.paths)) for (const p of input.paths) addFile(p)
-      break
-    case "grep":
-    case "ast_grep": {
-      addSearchPaths(input.path)
-      const g = typeof input.glob === "string" ? input.glob : typeof input.include === "string" ? input.include : ""
-      if (g) out.globs = [g]
-      if (paths.length === 0) paths.push(".")
-      break
-    }
-    case "find":
-    case "glob": {
-      addSearchPaths(input.path)
-      const g = typeof input.pattern === "string" ? input.pattern : typeof input.glob === "string" ? input.glob : ""
-      if (g) out.globs = [g]
-      if (paths.length === 0) paths.push(".")
-      break
-    }
-    case "ls": {
-      const p = nonURLPath(input.path)
-      if (p) out.lists = [p]
-      break
-    }
-    case "bash":
-      if (typeof input.command === "string" && input.command) out.command = input.command
-      if (typeof input.cwd === "string" && input.cwd) out.dir = input.cwd
-      break
-    default:
-      return null
-  }
-  if (paths.length > 0) out.paths = paths
-  return Object.keys(out).length > 0 ? out : null
-}
-
 // askForContent asks OMP for full content, which the relay applies the team's policy to, as if
 // OMP's agent .env asked: OMP keeps that from the tools it runs. It asks only where every
 // signal goes to the relay as OMP resolves it, the shell and the launch directory's .env
@@ -284,8 +216,8 @@ export default async function (omp: any) {
   // and its session is not OMP's to hand over: no handler is registered, so no hook runs.
   if (!CONFIG || (await inPi())) return
   await askForContent()
-  // Serialize lifecycle and reach hooks so session-start always finishes (with confirmed
-  // child exit) before tool-reach; titles keep their own queue.
+  // Serialize lifecycle hooks so session-start always finishes (with confirmed child exit)
+  // before the session's prompts and file edits; titles keep their own queue.
   let lifecycle: Promise<void> = Promise.resolve()
   let pending = 0
   const queuedHook = (event: string, payload: Record<string, unknown>): Promise<boolean> => {
@@ -306,102 +238,10 @@ export default async function (omp: any) {
       slot.then((s) => s.result, () => false).then(settle, () => settle(false))
     })
   }
-  const awaitWithin = <T>(p: Promise<T>, ms: number, fallback: T): Promise<T> =>
-    Promise.race([
-      p,
-      new Promise<T>((resolve) => {
-        const t: any = setTimeout(() => resolve(fallback), ms)
-        t?.unref?.()
-      }),
-    ])
-  // A session whose reach hook failed is tainted: this extension hands nothing more of it
-  // over, and asks terma to fence its run (mark it Mixed) so the relay drops what OMP exports
-  // of it. A tool is never blocked or failed for it: with terma gone, signed out or not yet
-  // set up, nothing claims the session and the relay forwards none of it anyway.
-  const tainted = new Set<string>()
-  const fenced = new Map<string, { gen: number; parent: string; pGen: number }>()
-  const fencing = new Map<string, Promise<boolean>>()
-  // unfenced are the runs whose fence failed once: a later tool call tries again without
-  // waiting for it, so a terma that cannot answer delays the agent once, not at every call.
-  const unfenced = new Set<string>()
-  const runGen = new Map<string, number>()
-  const isTainted = (s: string, parent = "") => !!(s && tainted.has(s)) || !!(parent && tainted.has(parent))
-  const isFenced = (s: string, parent = "") => {
-    const valid = (id: string) => {
-      const f = fenced.get(id)
-      return !!f && f.gen === (runGen.get(id) ?? 0) && (!f.parent || f.pGen === (runGen.get(f.parent) ?? 0))
-    }
-    return (!!s && valid(s)) || (!!parent && valid(parent))
-  }
-  const taint = (s: string, cwd: unknown, parent: string, gen = runGen.get(s) ?? 0, pGen = parent ? (runGen.get(parent) ?? 0) : 0): Promise<boolean> => {
-    if (!s) return Promise.resolve(false)
-    if ((runGen.get(s) ?? 0) === gen) tainted.add(s)
-    if (parent && (runGen.get(parent) ?? 0) === pGen) tainted.add(parent)
-    if (isFenced(s, parent)) return Promise.resolve(true)
-    const key = parent || s
-    const active = fencing.get(key)
-    if (active) return unfenced.has(key) ? Promise.resolve(false) : active
-    // Fail-closed fence: await lifecycle drain (bounded) and flip the run to Mixed via
-    // an unresolvable shell reach, which the first tool call it is needed for waits for,
-    // within the hook's bounds. If fencing fails too the tool still runs: the session stays
-    // tainted, and every later tool call tries the fence again, in the background.
-    const p = (async () => {
-      const drained = await awaitWithin(lifecycle.then(() => true, () => true), HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS, false)
-      if (!drained) return false
-      const run = spawnHook("omp-tool-reach", {
-        session_id: s,
-        cwd,
-        tool: "bash",
-        command: "eval $TERMA_REACH_FAILED",
-        parent_session_id: parent || undefined,
-      }, true, HOOK_TIMEOUT_MS)
-      lifecycle = lifecycle.then(() => run.exit, () => run.exit)
-      const ok = await awaitWithin(run.result, HOOK_TIMEOUT_MS + HOOK_KILL_GRACE_MS + 500, false)
-      if (ok && (runGen.get(s) ?? 0) === gen && (!parent || (runGen.get(parent) ?? 0) === pGen)) {
-        fenced.set(s, { gen, parent, pGen })
-        if (parent) fenced.set(parent, { gen: pGen, parent: "", pGen: 0 })
-      }
-      return ok
-    })().finally(() => { if (fencing.get(key) === p) fencing.delete(key) })
-    fencing.set(key, p)
-    const waited = unfenced.has(key) ? Promise.resolve(false) : p
-    void p.then((ok) => {
-      if ((runGen.get(s) ?? 0) !== gen) return
-      if (ok) unfenced.delete(key)
-      else unfenced.add(key)
-    })
-    return waited
-  }
-  const reached = new Map<string, Promise<boolean>>()
-  const emitReach = (event: any, ctx: any): Promise<boolean> | null => {
-    const reach = toolReach(event)
-    if (!reach) return null
-    const s = sessionOf(ctx)
-    if (!s) return null
-    const parent = parentOf(ctx)
-    const gen = runGen.get(s) ?? 0
-    const pGen = parent ? (runGen.get(parent) ?? 0) : 0
-    if (isFenced(s, parent)) return Promise.resolve(true)
-    if (isTainted(s, parent)) return taint(s, ctx?.cwd, parent, gen, pGen)
-    return queuedHook("omp-tool-reach", {
-      session_id: s,
-      cwd: ctx?.cwd,
-      tool: String(event?.toolName ?? ""),
-      parent_session_id: parent || undefined,
-      ...reach,
-    }).then((ok) => (ok ? true : taint(s, ctx?.cwd, parent, gen, pGen)))
-  }
 
   omp.on("session_start", (event: any, ctx: any) => {
     session = sessionOf(ctx)
     const parent = parentOf(ctx)
-    if (session) {
-      runGen.set(session, (runGen.get(session) ?? 0) + 1)
-      fenced.delete(session)
-      fencing.delete(session)
-      unfenced.delete(session)
-      if (!parent) tainted.delete(session)
-    }
     return queuedHook("omp-session-start", { session_id: session, cwd: ctx?.cwd, model: ctx?.model?.id, reason: event?.reason, parent_session_id: parent || undefined }).then(() => undefined)
   })
 
@@ -411,14 +251,13 @@ export default async function (omp: any) {
   omp.on("session_shutdown", async (_event: any, ctx: any) => {
     const s = sessionOf(ctx)
     const end = s ? queuedHook("omp-session-end", { session_id: s, cwd: ctx?.cwd }).then(() => undefined) : Promise.resolve()
-    await Promise.all([end, isTainted(s, parentOf(ctx)) ? Promise.resolve() : sendTitleBefore(ctx, 1500)])
+    await Promise.all([end, sendTitleBefore(ctx, 1500)])
   })
 
   // /new, /resume and a fork leave the session without a shutdown: its name, given or
   // changed since the last turn, goes now. ctx is still the session being left. The handler
   // returns nothing, which lets the switch go ahead.
   omp.on("session_before_switch", async (_event: any, ctx: any) => {
-    if (isTainted(sessionOf(ctx), parentOf(ctx))) return
     await sendTitleBefore(ctx, 1500)
   })
 
@@ -426,50 +265,24 @@ export default async function (omp: any) {
   // that stopped between turns, is covered before the turn exports anything.
   omp.on("before_agent_start", (_event: any, ctx: any) => {
     const s = sessionOf(ctx)
-    if (isTainted(s, parentOf(ctx))) return
     void queuedHook("omp-prompt", { session_id: s, cwd: ctx?.cwd })
     sendTitle(ctx)
   })
 
   omp.on("agent_end", (_event: any, ctx: any) => {
-    if (isTainted(sessionOf(ctx), parentOf(ctx))) return
     sendTitle(ctx)
   })
 
-  // The reach is judged, or the run fenced, before the tool runs where terma answers in
-  // time. The handler returns nothing whatever came of it, which lets the tool run: a hook
-  // never fails the agent, and a failed one only stops what terma collects of the session.
-  omp.on("tool_call", async (event: any, ctx: any) => {
-    const pendingReach = emitReach(event, ctx)
-    if (!pendingReach) return
-    if (event?.toolCallId) {
-      reached.set(event.toolCallId, pendingReach)
-      if (reached.size > 1024) reached.delete(reached.keys().next().value!)
-    }
-    await pendingReach.catch(() => false)
-  })
-
-  omp.on("tool_result", async (event: any, ctx: any) => {
-    const s = sessionOf(ctx)
-    const parent = parentOf(ctx)
-    const id = event?.toolCallId
-    const prior = id ? reached.get(id) : undefined
-    if (id) reached.delete(id)
-    if (prior && !(await prior)) return
-    if ((!prior || event?.details?.resolvedPath) && !isFenced(s, parent)) {
-      const extra = emitReach(event, ctx)
-      if (extra && !(await extra)) return
-    }
-    if (isTainted(s, parent)) return
+  omp.on("tool_result", (event: any, ctx: any) => {
     const files = editedFiles(event)
     if (files.length > 0) {
       void queuedHook("omp-file-edit", {
-        session_id: s,
+        session_id: sessionOf(ctx),
         cwd: ctx?.cwd,
         tool: String(event?.toolName ?? ""),
         files,
         tool_call_id: event?.toolCallId,
-        parent_session_id: parent || undefined,
+        parent_session_id: parentOf(ctx) || undefined,
       })
     }
   })

@@ -22,7 +22,6 @@ import (
 	"github.com/miradorlabs/terma-cli/internal/relay/claim"
 	"github.com/miradorlabs/terma-cli/internal/relay/daemon"
 	"github.com/miradorlabs/terma-cli/internal/routing"
-	"github.com/miradorlabs/terma-cli/internal/runs"
 	"github.com/miradorlabs/terma-cli/internal/sendas"
 	"github.com/miradorlabs/terma-cli/internal/spool"
 )
@@ -496,7 +495,7 @@ func TestTeardownRemovesRoutingStateAndStateDirs(t *testing.T) {
 	_ = f
 	hookruntest.RelayOn(t, testApp.stateDir)
 	// Seed state directories that teardown must clean.
-	dirs := []string{runs.Dir, hookrun.PushesDir, spool.Dir, config.PoliciesDir, claim.DirName}
+	dirs := []string{"runs", hookrun.PushesDir, spool.Dir, config.PoliciesDir, claim.DirName}
 	for _, d := range dirs {
 		p := filepath.Join(testApp.stateDir, d)
 		if err := os.MkdirAll(p, 0o700); err != nil {

@@ -145,7 +145,7 @@ func (e Env) emitRecord(r *Repo, ev spool.Event, accounts []string) bool {
 		e.CountLost(r, sendas.LostAmbiguousPush, 1)
 		return true
 	}
-	ev = e.stampFor(r, ev, true, false)
+	ev = e.stampFor(r, ev)
 	ev.Account, ev.NoPerson = lane.Account, lane.NoPerson
 	if e.Routing == nil {
 		e.claimForRelay(r, ev, true)

@@ -81,7 +81,6 @@ SCOPE = {"name": "terma-hermes", "version": "1"}
 _lock = threading.Lock()
 _spans = []
 _logs = []
-_tainted = set()
 _wake = threading.Event()
 
 
@@ -118,8 +117,6 @@ def _sender():
 
 def _span(session, name, start, end, attrs, error=False):
     with _lock:
-        if session and session in _tainted:
-            return
         _spans.append({
             "traceId": _trace_id(session),
             "spanId": secrets.token_hex(8),
@@ -135,8 +132,6 @@ def _span(session, name, start, end, attrs, error=False):
 def _log(session, event, body, attrs):
     t = _nanos(time.time())
     with _lock:
-        if session and session in _tainted:
-            return
         _logs.append({
             "timeUnixNano": t,
             "observedTimeUnixNano": t,
@@ -224,7 +219,8 @@ def _ensure_hook_worker():
 
 def _terma_hook(event, payload, wait=False):
     """Hands an event to `terma hook` in FIFO order so session-start always finishes before
-    tool-reach. When wait=True, blocks up to 2s and returns True only if the hook exited 0."""
+    the session's prompts and file edits. When wait=True, blocks up to 2s and returns True
+    only if the hook exited 0."""
     try:
         _ensure_hook_worker()
         done = threading.Event()
@@ -278,11 +274,7 @@ def _cost(model, usage, provider, base_url):
 def _on_session_start(session_id="", model="", **_):
     if not session_id:
         return
-    with _lock:
-        tainted = session_id in _tainted
-    if _terma_hook("hermes-session-start", {"session_id": session_id, "cwd": _cwd(), "model": model}, wait=tainted) and tainted:
-        with _lock:
-            _tainted.discard(session_id)
+    _terma_hook("hermes-session-start", {"session_id": session_id, "cwd": _cwd(), "model": model})
 
 
 def _on_pre_llm_call(session_id="", user_message="", model="", turn_id="", **_):
@@ -333,58 +325,9 @@ def _on_post_api_request(session_id="", model="", response_model="", provider=""
     }, error=finish_reason == "error")
 
 
-def _tool_reach(tool_name, args):
-    if not isinstance(args, dict):
-        return None
-    name = str(tool_name or "").lower()
-    out = {}
-
-    def first(*keys):
-        for k in keys:
-            v = args.get(k)
-            if isinstance(v, str) and v:
-                return v
-        return ""
-
-    path = first("path", "file_path", "dir_path")
-    if name in ("read_file", "read"):
-        if path:
-            out["paths"] = [path]
-    elif name in ("search_files", "grep"):
-        out["paths"] = [path or "."]
-        g = first("file_glob", "glob", "include")
-        if not g and name == "search_files" and args.get("target") == "files":
-            g = first("pattern")
-        if g:
-            out["globs"] = [g]
-    elif name in ("glob", "find_files"):
-        out["paths"] = [path or "."]
-        g = first("pattern", "glob")
-        if g:
-            out["globs"] = [g]
-    elif name in ("list_directory", "list_files", "ls"):
-        if path:
-            out["lists"] = [path]
-    elif name in ("terminal", "bash", "shell"):
-        cmd = first("command", "cmd")
-        if cmd:
-            out["command"] = cmd
-        d = first("workdir", "cwd")
-        if d:
-            out["dir"] = d
-    else:
-        return None
-    return out or None
-
-
 def _on_post_tool_call(session_id="", tool_name="", args=None, result=None, tool_call_id="", duration_ms=None,
                        status="", turn_id="", **_):
     if not session_id:
-        return
-    reach = _tool_reach(tool_name, args)
-    if reach and not _terma_hook("hermes-tool-reach", {"session_id": session_id, "cwd": _cwd(), "tool": tool_name, **reach}, wait=True):
-        with _lock:
-            _tainted.add(session_id)
         return
     end = time.time()
     start = end - (duration_ms or 0) / 1000.0

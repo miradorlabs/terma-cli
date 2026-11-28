@@ -1,8 +1,6 @@
 package relay
 
 import (
-	"time"
-
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
@@ -44,21 +42,6 @@ func (r *Relay) pieces(key string, p *part) []*part {
 		}
 		return placementKey(pl) + "\x02" + string([]byte{seg})
 	})
-}
-func splitBeforeMixed(p *part, mixedAt time.Time) (before, atOrAfter *part) {
-	parts := partitionPart(p, func(iv timeInterval) string {
-		if end := unixTime(iv.end); !end.IsZero() && end.Before(mixedAt) {
-			return "b"
-		}
-		return "m"
-	})
-	if len(parts) < 2 {
-		return nil, p
-	}
-	if parts[0].endAt.IsZero() || !parts[0].endAt.Before(mixedAt) {
-		return parts[1], parts[0]
-	}
-	return parts[0], parts[1]
 }
 func emptySignalMessage(sig Signal) proto.Message {
 	switch sig {

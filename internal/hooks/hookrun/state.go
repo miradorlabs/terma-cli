@@ -100,8 +100,15 @@ func pruneData(path string, before time.Time) {
 	unlock()
 }
 
+// Legacy directories from the removed Mixed run tracking: still swept and torn down so an
+// upgraded machine's old files age out and teardown removes them.
+const (
+	legacyTurnStateDir = "turns"
+	legacyRunsStateDir = "runs"
+)
+
 // StateDirs are the hook state directories the runtime itself keeps, beside each agent's.
-var StateDirs = []string{fundingStateDir, turnStateDir}
+var StateDirs = []string{fundingStateDir, legacyTurnStateDir, legacyRunsStateDir}
 
 // Sweep ages out the hook state directories dirs, named under the state directory dir,
 // and every private workspace store: the relay runs it, so state no hook revisits still goes.

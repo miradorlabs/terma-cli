@@ -14,7 +14,6 @@ import (
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
@@ -72,9 +71,8 @@ type ompHistoryParser struct {
 	pendingPrompt    *ompPendingPrompt
 	pendingTools     map[string]ompPendingTool
 
-	segSpans   []*tracepb.Span
-	segSupp    []*logspb.LogRecord
-	segReaches []agents.HistoryToolReach
+	segSpans []*tracepb.Span
+	segSupp  []*logspb.LogRecord
 }
 
 func newOmpHistoryParser(rootSessionID string, includeSupplemental bool, emit func(agents.HistorySegment) error) *ompHistoryParser {
@@ -180,7 +178,14 @@ func (p *ompHistoryParser) handleSessionHeader(rec *ompLine, ts time.Time) error
 	if p.subagent && p.agentID == "" {
 		p.agentID = p.curSessionID
 	}
-	p.cwd = strings.TrimSpace(rec.Cwd)
+	// OMP's /move rewrites header.cwd to the destination checkout while keeping earlier turns
+	// in the same file without per-turn cwd. Drop cwd so history upload skips it (no_cwd)
+	// instead of attributing earlier turns to the destination organization.
+	if len(rec.PreviousSessionFiles) > 0 {
+		p.cwd = ""
+	} else {
+		p.cwd = strings.TrimSpace(rec.Cwd)
+	}
 	if !ts.IsZero() {
 		p.headerTime = ts
 	}
@@ -189,39 +194,6 @@ func (p *ompHistoryParser) handleSessionHeader(rec *ompLine, ts time.Time) error
 	}
 	if t := strings.TrimSpace(rec.Title); t != "" {
 		p.headerTitle = t
-	}
-	// OMP's /move rewrites header.cwd to the new checkout while keeping earlier entries and
-	// listing prior transcript paths in previousSessionFiles. Because earlier turns may belong
-	// to another organization's checkout, fail closed on moved transcripts.
-	if len(rec.PreviousSessionFiles) > 0 {
-		p.segReaches = append(p.segReaches, agents.HistoryToolReach{
-			At:    time.Time{},
-			Cwd:   p.cwd,
-			Paths: []string{hookrun.UnknownReach + "\x00session moved between working directories"},
-		})
-	}
-	// Record each session's (parent and subagent) checkout placement at header time so the
-	// Mixed prepass (IncludeSupplemental: false) knows when each org was entered even before
-	// the first span or when a child emits no spans.
-	if p.cwd != "" {
-		p.segReaches = append(p.segReaches, agents.HistoryToolReach{
-			At:    ts,
-			Cwd:   p.cwd,
-			Paths: hookrun.Alone(p.cwd),
-		})
-	}
-	// Multi-root workspace directories recorded on the session header are reachable from
-	// session start, so crossing into another organization fails closed at header time.
-	var extraDirs []string
-	for _, d := range rec.AdditionalDirectories {
-		if resolved, unknown := resolveReachPath(d); unknown {
-			extraDirs = append(extraDirs, hookrun.UnknownReach+"\x00"+d)
-		} else if resolved != "" && resolved != p.cwd {
-			extraDirs = append(extraDirs, hookrun.Alone(resolved)...)
-		}
-	}
-	if len(extraDirs) > 0 {
-		p.segReaches = append(p.segReaches, agents.HistoryToolReach{At: ts, Cwd: p.cwd, Paths: extraDirs})
 	}
 	return nil
 }
@@ -283,32 +255,6 @@ func (p *ompHistoryParser) handleMessage(rec *ompLine, entryTS time.Time) error 
 		return p.handleAssistant(rec, &msg, entryTS)
 	case "toolResult":
 		return p.handleToolResult(rec, &msg, entryTS)
-	case "fileMention":
-		var paths []string
-		for _, f := range msg.Files {
-			resolved, unknown := resolveReachPath(f.Path)
-			if unknown {
-				paths = append(paths, hookrun.UnknownReach+"\x00"+f.Path)
-			} else if resolved != "" {
-				paths = append(paths, hookrun.Alone(peelSelectorIfMissing(resolved, p.cwd))...)
-			}
-		}
-		if len(paths) > 0 {
-			p.segReaches = append(p.segReaches, agents.HistoryToolReach{
-				At:    messageTime(msg.Timestamp, entryTS),
-				Cwd:   p.cwd,
-				Paths: paths,
-			})
-		}
-	case "bashExecution":
-		if strings.TrimSpace(msg.Command) != "" {
-			ts := messageTime(msg.Timestamp, entryTS)
-			if paths := hookrun.Alone(hookrun.ShellPathsHistorical(msg.Command, p.cwd)...); len(paths) > 0 {
-				p.segReaches = append(p.segReaches, agents.HistoryToolReach{At: ts, Cwd: p.cwd, Paths: paths})
-			}
-		}
-	case "pythonExecution":
-		p.segReaches = append(p.segReaches, agents.HistoryToolReach{At: messageTime(msg.Timestamp, entryTS), Cwd: p.cwd, Paths: []string{hookrun.UnknownReach + "\x00pythonExecution"}})
 	}
 	return nil
 }
@@ -323,12 +269,12 @@ func (p *ompHistoryParser) openTurn(entryID string) {
 
 func (p *ompHistoryParser) handleAssistant(rec *ompLine, msg *ompMessage, entryTS time.Time) error {
 	start, end := assistantSpanTimes(msg, entryTS)
-	reachAt := end
-	if !entryTS.IsZero() && (reachAt.IsZero() || reachAt.After(entryTS)) {
-		reachAt = entryTS
+	callAt := end
+	if !entryTS.IsZero() && (callAt.IsZero() || callAt.After(entryTS)) {
+		callAt = entryTS
 	}
 	blocks := parseOmpContentBlocks(msg.Content)
-	copied := p.isCopiedPrefix(reachAt)
+	copied := p.isCopiedPrefix(callAt)
 
 	if !copied {
 		if len(p.turnTraceID) == 0 {
@@ -353,14 +299,11 @@ func (p *ompHistoryParser) handleAssistant(rec *ompLine, msg *ompMessage, entryT
 				Name:         blk.Name,
 				ArgsJSON:     boundOmpToolArgs(blk.Arguments),
 				ArgsRaw:      blk.Arguments,
-				At:           reachAt,
+				At:           callAt,
 				TraceID:      p.turnTraceID,
 				ParentSpanID: p.turnInvokeSpanID,
 				Copied:       copied,
 			}
-		}
-		if paths := ompToolCallReachPaths(blk.Name, blk.Arguments, p.cwd); len(paths) > 0 {
-			p.segReaches = append(p.segReaches, agents.HistoryToolReach{At: reachAt, Cwd: p.cwd, Paths: paths})
 		}
 	}
 	return p.maybeFlushSegment()
@@ -380,9 +323,6 @@ func (p *ompHistoryParser) handleToolResult(rec *ompLine, msg *ompMessage, entry
 		if json.Unmarshal(msg.Details, &d) == nil {
 			details = &d
 		}
-	}
-	if paths := ompToolResultReachPaths(toolName, details, p.cwd); len(paths) > 0 {
-		p.segReaches = append(p.segReaches, agents.HistoryToolReach{At: end, Cwd: p.cwd, Paths: paths})
 	}
 	if !seen || tool.Copied || p.isCopiedPrefix(end) {
 		return p.maybeFlushSegment()
@@ -437,8 +377,7 @@ func (p *ompHistoryParser) finishFile() error {
 		case p.lastEmittedTitle == "":
 			if fallback := cmp.Or(p.slotTitle, p.headerTitle); fallback != "" {
 				// OMP rewrites header.title on rename without updating header.timestamp;
-				// emit as an undated title (TimeUnixNano=0, ObservedTimeUnixNano=lastTS) so
-				// FilterMixedLogs withholds it whenever any Mixed cutoff exists.
+				// emit as an undated title (TimeUnixNano=0, ObservedTimeUnixNano=lastTS).
 				if err := p.emitUndatedTitle(fallback, cmp.Or(p.lastTS, p.headerTime)); err != nil {
 					return err
 				}

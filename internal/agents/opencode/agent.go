@@ -1,8 +1,8 @@
 // Package opencode integrates OpenCode through terma's plugin, which OpenCode loads from its
 // plugins directory and which is the only record of an OpenCode session: it exports a span
 // per model call and per tool call and a log record per prompt and per title to the local
-// relay, and runs `terma hook opencode-<event>` to claim each session for its repository,
-// guard what a read, search or shell tool reaches, and report the files an edit changed.
+// relay, and runs `terma hook opencode-<event>` to claim each session for its repository
+// and report the files an edit changed.
 // One plugin file serves OpenCode 1 and OpenCode 2 (plugin/terma.js); harness.go writes it
 // and refreshes it, relay.go points it at the relay and says what keeps it from there,
 // telemetry.go is what the relay withholds from its export, and minimum_version.go the
@@ -24,6 +24,7 @@ const (
 
 // The hook events the plugin runs beyond the shared extension's.
 const (
+	eventPrompt     = "opencode-prompt"
 	eventIdle       = "opencode-idle"
 	eventSessionEnd = "opencode-session-end"
 )
@@ -65,7 +66,9 @@ func (a Agent) Surfaces() []agents.Surface {
 // claim, and the idle hook's flush delivers what the turn spooled. The plugin names a
 // subagent's parent on its own spans, so no claim needs to.
 func (Agent) Events() map[string]agents.Handler {
-	events := hookrun.Extension{Tool: name}.Events(name)
+	ext := hookrun.Extension{Tool: name}
+	events := ext.Events(name)
+	events[eventPrompt] = ext.VerifyPrompt
 	events[eventIdle] = hookrun.TurnStart
 	return events
 }
@@ -83,7 +86,7 @@ func (Agent) RefreshMachine() (string, bool, error) { return exporter{}.RefreshP
 // Coverage is how completely terma supports the agent.
 func (Agent) Coverage() (attribution, telemetry agents.CapabilitySupport) {
 	return agents.CapabilitySupport{Level: agents.SupportFull, Note: "files its write, edit and patch tools change; a file a shell command writes is not recorded"},
-		agents.CapabilitySupport{Level: agents.SupportFull, Note: "model calls with tokens and OpenCode's own cost, replies, tool calls, MCP calls, subagents, prompts and titles ride terma's plugin to the local relay; its hooks claim sessions, guard what tools reach and report edits. On OpenCode 1 the call that writes a session's title has no tokens or cost"}
+		agents.CapabilitySupport{Level: agents.SupportFull, Note: "model calls with tokens and OpenCode's own cost, replies, tool calls, MCP calls, subagents, prompts and titles ride terma's plugin to the local relay; its hooks claim sessions and report edits. On OpenCode 1 the call that writes a session's title has no tokens or cost"}
 }
 
 var (

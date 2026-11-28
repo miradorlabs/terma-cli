@@ -4,10 +4,8 @@ import (
 	"cmp"
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"maps"
-	"path/filepath"
 	"slices"
 
 	"github.com/miradorlabs/terma-cli/internal/semconv"
@@ -23,16 +21,20 @@ type Extension struct {
 	ClaimParent bool
 }
 
-// Events is the extension's <prefix>-session-start, -prompt, -session-end, -file-edit and -tool-reach handlers.
+// Events is the extension's <prefix>-session-start, -prompt, -session-end, -file-edit and
+// legacy no-op -tool-reach handlers.
 func (x Extension) Events(prefix string) map[string]func(context.Context, Env) error {
 	return map[string]func(context.Context, Env) error{
 		prefix + "-session-start": x.sessionStart,
 		prefix + "-prompt":        TurnStart,
 		prefix + "-session-end":   x.sessionEnd,
 		prefix + "-file-edit":     x.fileEdit,
-		prefix + "-tool-reach":    x.toolReach,
+		// Kept as a silent no-op so already-loaded extension plugins exit 0 after upgrade.
+		prefix + "-tool-reach": noopHook,
 	}
 }
+
+func noopHook(_ context.Context, _ Env) error { return nil }
 
 type extensionHookInput struct {
 	SessionID string `json:"session_id"`
@@ -46,12 +48,6 @@ type extensionHookInput struct {
 	ToolCallID string `json:"tool_call_id"`
 	// ParentSessionID is set on a session an agent opened for a subagent.
 	ParentSessionID string `json:"parent_session_id"`
-	// Paths, Globs, Lists, Command and Dir describe what a read/search/shell tool call reached.
-	Paths   []string `json:"paths"`
-	Globs   []string `json:"globs"`
-	Lists   []string `json:"lists"`
-	Command string   `json:"command"`
-	Dir     string   `json:"dir"`
 }
 
 func readExtensionInput(r io.Reader) (*extensionHookInput, error) {
@@ -72,11 +68,6 @@ func (x Extension) sessionStart(ctx context.Context, env Env) error {
 		return nil
 	}
 	subagent := session.ValidID(in.ParentSessionID) && in.ParentSessionID != in.SessionID
-	if subagent {
-		env.AliasRun(in.ParentSessionID, in.SessionID)
-	} else {
-		env.StartRun(in.SessionID)
-	}
 	r, ok := env.Open(ctx, in.SessionID, in.Cwd)
 	if !ok {
 		return nil
@@ -104,7 +95,6 @@ func (e Env) StartSubagent(r *Repo, sess session.Session, parent string, claimPa
 	attrs := map[string]any{semconv.TermaSessionParentIDKey: parent}
 	maps.Copy(attrs, extra)
 	e.EmitStart(r, sess, attrs)
-	e.propagateMixed(parent, sess.ID, sess.Tool)
 }
 
 func (x Extension) sessionEnd(ctx context.Context, env Env) error {
@@ -132,11 +122,8 @@ func (x Extension) fileEdit(ctx context.Context, env Env) error {
 		return nil
 	}
 	subagent := session.ValidID(in.ParentSessionID) && in.ParentSessionID != in.SessionID
-	if subagent {
-		env.AliasRun(in.ParentSessionID, in.SessionID)
-		if x.ClaimParent {
-			env.parent = in.ParentSessionID
-		}
+	if subagent && x.ClaimParent {
+		env.parent = in.ParentSessionID
 	}
 	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
 	r, err := env.Repo(ctx)
@@ -146,74 +133,7 @@ func (x Extension) fileEdit(ctx context.Context, env Env) error {
 	attrs := map[string]any{}
 	BoundedAttr(attrs, semconv.GenAIToolCallIDKey, in.ToolCallID)
 	env.Touch(r, session.Session{ID: in.SessionID, Tool: x.Tool, Model: in.Model}, in.Tool, paths, attrs)
-	if subagent {
-		env.propagateMixed(in.ParentSessionID, in.SessionID, x.Tool)
-	}
 	return nil
-}
-
-func (x Extension) toolReach(ctx context.Context, env Env) error {
-	in, err := readExtensionInput(env.Stdin)
-	if err != nil {
-		env.Logf("%v", err)
-		return nil
-	}
-	if !session.ValidID(in.SessionID) {
-		return nil
-	}
-	if env.Routing != nil && !env.Routing.Usable() {
-		return ErrFailClosed
-	}
-	_ = env.Routing.TakeWriteErr()
-	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
-	subagent := session.ValidID(in.ParentSessionID) && in.ParentSessionID != in.SessionID
-	if subagent {
-		env.AliasRun(in.ParentSessionID, in.SessionID)
-		if x.ClaimParent {
-			env.parent = in.ParentSessionID
-		}
-	}
-	if paths := extensionReachPaths(in, env.Cwd); len(paths) > 0 {
-		r, _ := env.Repo(ctx)
-		env.Classify(ctx, r, session.Session{ID: in.SessionID, Tool: x.Tool, Model: in.Model}, paths, nil)
-		if subagent {
-			env.propagateMixed(in.ParentSessionID, in.SessionID, x.Tool)
-		}
-	}
-	if err := env.Routing.TakeWriteErr(); err != nil {
-		return fmt.Errorf("%w: %w", ErrFailClosed, err)
-	}
-	return nil
-}
-
-func extensionReachPaths(in *extensionHookInput, cwd string) []string {
-	paths := slices.DeleteFunc(append([]string{in.File}, in.Paths...), func(p string) bool { return p == "" })
-	paths = append(paths, slices.DeleteFunc(slices.Clone(in.Files), func(p string) bool { return p == "" })...)
-	globs := slices.DeleteFunc(slices.Clone(in.Globs), func(p string) bool { return p == "" })
-	if len(globs) > 0 {
-		if len(paths) > 0 {
-			for _, root := range slices.Clone(paths) {
-				paths = append(paths, Search(root, globs...)[1:]...)
-			}
-		} else if cwd != "" {
-			paths = append(paths, Search(cwd, globs...)...)
-		}
-	}
-	if lists := slices.DeleteFunc(slices.Clone(in.Lists), func(p string) bool { return p == "" }); len(lists) > 0 {
-		paths = append(paths, Alone(lists...)...)
-	}
-	dir := cwd
-	if in.Dir != "" {
-		dir = in.Dir
-		if !filepath.IsAbs(dir) && cwd != "" {
-			dir = filepath.Join(cwd, dir)
-		}
-		paths = append(paths, Alone(dir)...)
-	}
-	if in.Command != "" {
-		paths = append(paths, Alone(ShellPaths(in.Command, dir)...)...)
-	}
-	return paths
 }
 
 // TurnStart records nothing: its caller claims the session and starts the relay before the
@@ -221,4 +141,27 @@ func extensionReachPaths(in *extensionHookInput, cwd string) []string {
 func TurnStart(_ context.Context, env Env) error {
 	_, err := readExtensionInput(env.Stdin)
 	return err
+}
+
+// VerifyPrompt places the session for the payload's cwd and returns ErrPlacementFailed if
+// a routed placement could not be persisted or verified on disk, so a move hook fails
+// closed instead of letting the caller export under an earlier organization's claim.
+func (x Extension) VerifyPrompt(ctx context.Context, env Env) error {
+	in, err := readExtensionInput(env.Stdin)
+	if err != nil {
+		env.Logf("%v", err)
+		return nil
+	}
+	if env.Routing == nil || !session.ValidID(in.SessionID) {
+		return nil
+	}
+	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	root, collected, placed := claimRoutedPlace(ctx, env, PayloadSession{ID: in.SessionID, Cwd: env.Cwd}, x.Tool)
+	if collected && env.OnClaim != nil {
+		env.OnClaim(root)
+	}
+	if !placed {
+		return ErrPlacementFailed
+	}
+	return nil
 }

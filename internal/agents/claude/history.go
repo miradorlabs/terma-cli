@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/miradorlabs/terma-cli/internal/agents"
-	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 	"github.com/miradorlabs/terma-cli/internal/session"
 )
 
@@ -255,37 +254,4 @@ func readJSONLLines(ctx context.Context, path string, handle func(line []byte) e
 			return rerr
 		}
 	}
-}
-
-// claudeToolReachPaths extracts the filesystem paths a historical Claude tool_use call
-// reached without consulting the uploader's live shell environment.
-func claudeToolReachPaths(toolName string, rawInput json.RawMessage, cwd string) []string {
-	if len(rawInput) == 0 {
-		return nil
-	}
-	var in claudeHookInput
-	in.ToolName = toolName
-	if json.Unmarshal(rawInput, &in.ToolInput) != nil {
-		return nil
-	}
-	var paths []string
-	switch in.ToolName {
-	case "Bash":
-		paths = hookrun.Alone(hookrun.ShellPathsHistorical(in.ToolInput.Command, cwd)...)
-	case "Grep":
-		paths = hookrun.SearchHistorical(cmp.Or(in.ToolInput.Path, cwd), in.ToolInput.Glob)
-	case "Glob":
-		paths = hookrun.SearchHistorical(cmp.Or(in.ToolInput.Path, cwd), in.ToolInput.Pattern)
-	case "LS":
-		paths = hookrun.Alone(in.ToolInput.Path)
-	default:
-		paths = append(editedPaths(&in), in.ToolInput.Path)
-	}
-	var out []string
-	for _, p := range paths {
-		if p != "" {
-			out = append(out, p)
-		}
-	}
-	return out
 }
