@@ -1,6 +1,8 @@
 package opencode
 
 import (
+	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/miradorlabs/terma-cli/internal/hooks/hookrun"
 )
 
 func TestOpenCodeRefreshConnectDisconnectConcurrentLockSafety(t *testing.T) {
@@ -126,6 +130,22 @@ await hooks.dispose()
 	}
 	if strings.TrimSpace(string(got)) != "dead" {
 		t.Fatalf("previous hung hook status when next hook started = %q; want dead", strings.TrimSpace(string(got)))
+	}
+}
+
+func TestOpenCodePromptHandlerFailsClosedWhenUnplaced(t *testing.T) {
+	handler := Agent{}.Events()[eventPrompt]
+	if handler == nil {
+		t.Fatalf("%s handler missing", eventPrompt)
+	}
+	err := handler(context.Background(), hookrun.Env{
+		StateDir: t.TempDir(),
+		Cwd:      t.TempDir(),
+		Stdin:    strings.NewReader(`{"session_id":"ses-unplaced","cwd":"/tmp"}`),
+		Routing:  hookrun.NewRouting("default", nil),
+	})
+	if !errors.Is(err, hookrun.ErrPlacementFailed) {
+		t.Fatalf("opencode-prompt error = %v; want ErrPlacementFailed", err)
 	}
 }
 

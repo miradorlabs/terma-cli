@@ -42,7 +42,8 @@ func ClaimFromPayload(ctx context.Context, env Env, s PayloadSession, tool strin
 		return false
 	}
 	if env.Routing != nil {
-		return claimRouted(ctx, env, s, tool)
+		_, collected, _ := claimRoutedPlace(ctx, env, s, tool)
+		return collected
 	}
 	id := s.ID
 	env.Cwd = cmp.Or(s.Cwd, env.Cwd)

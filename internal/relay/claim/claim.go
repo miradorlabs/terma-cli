@@ -124,6 +124,12 @@ func (c Claim) Covers(pid int) bool {
 	return covers(c.PIDs, pid)
 }
 
+// CoversPlace reports whether c's latest placement already covers want's location, working
+// tree, parent and PIDs, matching when Write skips a redundant rewrite.
+func (c Claim) CoversPlace(want Claim) bool {
+	return samePlace(c, want) && sameDirs(c, want) && sameParent(c, want) && subset(want.PIDs, c.PIDs)
+}
+
 // covers never admits an unidentified sender (pid 0) to a placement that names
 // processes, which would let a session resumed elsewhere through.
 func covers(pids []int, pid int) bool {

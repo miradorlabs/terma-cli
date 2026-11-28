@@ -6,6 +6,7 @@ package dispatch
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -161,7 +162,9 @@ func run(ctx context.Context, d Deps, r Request, handler agents.Handler, flush b
 	}
 	ctx, cancel := context.WithTimeout(ctx, handlerTimeout)
 	defer cancel()
-	_ = handler(ctx, env)
+	if err := handler(ctx, env); errors.Is(err, hookrun.ErrPlacementFailed) {
+		return 1
+	}
 	if !claimed && tool != "" {
 		if s, ok := d.Agents.PayloadSession(r.Event, payload.Bytes()); ok {
 			claimed, claimedIn = hookrun.ClaimFromPayload(ctx, env, s, tool), cmp.Or(s.Cwd, r.Cwd)

@@ -95,7 +95,9 @@ const (
 	Wait Verdict = iota
 	SendNow
 	Discard
-	WhyUnknown    Why = "unknown_location"
+	WhyUnknown Why = "unknown_location"
+	// WhyMixed drops a span or delta metric whose interval straddles two placements; keeps
+	// the "mixed_run" wire/counter reason name.
 	WhyMixed      Why = "mixed_run"
 	WhyBlocked    Why = "team_blocked"
 	WhyNoTeam     Why = "no_team"

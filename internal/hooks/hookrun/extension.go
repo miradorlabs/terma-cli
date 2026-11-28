@@ -142,3 +142,26 @@ func TurnStart(_ context.Context, env Env) error {
 	_, err := readExtensionInput(env.Stdin)
 	return err
 }
+
+// VerifyPrompt places the session for the payload's cwd and returns ErrPlacementFailed if
+// a routed placement could not be persisted or verified on disk, so a move hook fails
+// closed instead of letting the caller export under an earlier organization's claim.
+func (x Extension) VerifyPrompt(ctx context.Context, env Env) error {
+	in, err := readExtensionInput(env.Stdin)
+	if err != nil {
+		env.Logf("%v", err)
+		return nil
+	}
+	if env.Routing == nil || !session.ValidID(in.SessionID) {
+		return nil
+	}
+	env.Cwd = cmp.Or(in.Cwd, env.Cwd)
+	root, collected, placed := claimRoutedPlace(ctx, env, PayloadSession{ID: in.SessionID, Cwd: env.Cwd}, x.Tool)
+	if collected && env.OnClaim != nil {
+		env.OnClaim(root)
+	}
+	if !placed {
+		return ErrPlacementFailed
+	}
+	return nil
+}

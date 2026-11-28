@@ -25,9 +25,8 @@ const (
 
 // Recheck judges a queued or held record against the state now: it is sent only to the
 // enrollment it was routed to, while that team is Active and its list still covers the
-// record's location; it waits while that team may recover; anything else drops it, whatever another team would now collect. The caller checks the
-// record's run against the run ledger first (a run-attributed record of a run Mixed by
-// its time is dropped).
+// record's location; it waits while that team may recover; anything else drops it, whatever
+// another team would now collect.
 func (r *Router) Recheck(d Destination, now time.Time) (Verdict, Decision) {
 	if d.EnrollmentID == "" {
 		return Discard, Decision{Outcome: Drop}

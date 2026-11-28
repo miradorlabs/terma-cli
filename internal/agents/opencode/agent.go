@@ -24,6 +24,7 @@ const (
 
 // The hook events the plugin runs beyond the shared extension's.
 const (
+	eventPrompt     = "opencode-prompt"
 	eventIdle       = "opencode-idle"
 	eventSessionEnd = "opencode-session-end"
 )
@@ -65,7 +66,9 @@ func (a Agent) Surfaces() []agents.Surface {
 // claim, and the idle hook's flush delivers what the turn spooled. The plugin names a
 // subagent's parent on its own spans, so no claim needs to.
 func (Agent) Events() map[string]agents.Handler {
-	events := hookrun.Extension{Tool: name}.Events(name)
+	ext := hookrun.Extension{Tool: name}
+	events := ext.Events(name)
+	events[eventPrompt] = ext.VerifyPrompt
 	events[eventIdle] = hookrun.TurnStart
 	return events
 }

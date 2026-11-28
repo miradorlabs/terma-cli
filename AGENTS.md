@@ -113,7 +113,8 @@ refresh after an update, or a relay of this build as it starts, turns into its o
 `no_person` state, once: `internal/cli/serverkey_migrate.go`),
 `relay/` (including `outbox-v2/.teams/@<account>/<enrollment>/<tool>/`), `spool/`,
 `policies/`, `agents/<agent>/` (each agent's hook state), `funding/`,
-`workspaces/` (session stores for work begun outside git) and `update/`; a repository's
+`workspaces/` (session stores for work begun outside git) and `update/` (legacy `runs/` and
+`turns/` folders from older builds are still swept by the relay and removed by `terma teardown`); a repository's
 session store is `.git/terma/`, which also keeps what a git hook in an agent's sandbox could
 not write to the state directory, until a hook outside the sandbox moves it there (a
 sandboxed hook without `routing.State` parks with an empty destination and unpark drops and
